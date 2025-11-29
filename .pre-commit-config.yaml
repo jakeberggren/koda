@@ -1,0 +1,77 @@
+default_language_version:
+  python: python3.14
+
+default_install_hook_types:
+  - pre-commit
+  - commit-msg
+  - pre-push
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=auto]
+
+      - id: check-ast
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: pretty-format-json
+        args: [--autofix]
+
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-case-conflict
+
+      - id: check-docstring-first
+      - id: name-tests-test
+
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.9.13
+    hooks:
+      - id: uv-lock
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.14.7
+    hooks:
+      # Run the linter.
+      - id: ruff-check
+        args: [ --fix ]
+      # Run the formatter.
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: ty # type checking
+        name: ty check
+        entry: ty check .
+        language: python
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v4.3.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [--verbose] # optional: list of Conventional Commits types to allow e.g. [feat, fix, ci, chore, test]
+
+  # Security scanning
+  - repo: https://github.com/semgrep/pre-commit
+    rev: v1.144.0
+    hooks:
+      - id: semgrep
+        args: [--config=auto]
+        stages: [pre-push]
+
+  # Secrets detection
+  - repo: https://github.com/trufflesecurity/trufflehog
+    rev: v3.91.1
+    hooks:
+      - id: trufflehog
+        stages: [pre-push]
