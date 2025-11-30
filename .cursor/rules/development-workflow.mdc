@@ -1,0 +1,47 @@
+---
+description: Complete workflow for writing, checking, and testing code
+alwaysApply: true
+---
+
+# Complete Development Workflow
+
+When writing or modifying code, follow this complete workflow:
+
+## Step-by-Step Process
+
+1. **Write the code** with proper type hints and docstrings
+
+2. **Format the code**:
+
+   ruff format .
+   3. **Lint and auto-fix**:sh
+   ruff check --fix .
+   4. **Type check**:
+
+   ty check .
+   5. **Run tests** (if applicable):
+
+   pytest
+   6. **Fix any issues** reported by the tools above
+
+7. **Verify everything passes** before considering code complete
+
+## Quick Check Command
+
+For a quick check of everything:sh
+ruff format . && ruff check --fix . && ty check . && pytest
+
+Code is only complete when:
+- ✅ `ruff format` passes (code is formatted)
+- ✅ `ruff check` passes (no linting errors)
+- ✅ `ty check` passes (type checking passes)
+- ✅ `pytest` passes (all tests pass, if applicable)
+
+## If Tools Fail
+
+1. Read the error messages carefully
+2. Fix the issues one by one
+3. Re-run the tools after each fix
+4. Don't proceed until all tools pass
+alwaysApply: true
+---
