@@ -51,8 +51,8 @@ repos:
     hooks:
       - id: ty # type checking
         name: ty check
-        entry: ty check .
-        language: python
+        entry: bash -c 'uv run ty check "$@"' --
+        language: system
 
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.3.0
