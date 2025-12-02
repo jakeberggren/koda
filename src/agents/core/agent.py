@@ -108,7 +108,7 @@ class Agent:
         messages = self._build_messages()
 
         # Stream response from provider
-        stream = await self.provider.stream(messages)
+        stream = self.provider.stream(messages)
         response_chunks: list[str] = []
         async for chunk in stream:
             response_chunks.append(chunk)
