@@ -11,8 +11,12 @@ class Settings(BaseSettings):
     environment variables taking precedence.
     """
 
-    OPENAI_API_KEY: SecretStr = Field(..., description="The API key for the OpenAI API")
-    ANTHROPIC_API_KEY: SecretStr = Field(..., description="The API key for the Anthropic API")
+    OPENAI_API_KEY: SecretStr = Field(
+        default=SecretStr(""), description="The API key for the OpenAI API"
+    )
+    ANTHROPIC_API_KEY: SecretStr = Field(
+        default=SecretStr(""), description="The API key for the Anthropic API"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

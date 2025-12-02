@@ -24,7 +24,7 @@ class Provider(Protocol):
         """
         ...
 
-    async def stream(self, messages: list[Message]) -> AsyncIterator[str]:
+    def stream(self, messages: list[Message]) -> AsyncIterator[str]:
         """Stream a response from the provider.
 
         Args:
