@@ -3,7 +3,6 @@ default_language_version:
 
 default_install_hook_types:
   - pre-commit
-  - commit-msg
   - pre-push
 
 repos:
