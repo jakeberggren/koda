@@ -3,6 +3,8 @@
 from collections.abc import AsyncIterator
 
 from agents.core.message import AssistantMessage, Message, SystemMessage, UserMessage
+from agents.observability import Observability
+from agents.observability.decorators import observable
 from agents.providers import Provider
 from agents.utils.exceptions import ProviderValidationError
 
@@ -24,27 +26,32 @@ class Agent:
         ```
     """
 
-    def __init__(self, provider: Provider, system_message: str | None = None) -> None:
+    def __init__(
+        self,
+        provider: Provider,
+        system_message: str | None = None,
+        observability: Observability | None = None,
+    ) -> None:
         """Initialize the agent with a provider and optional system message.
 
         Args:
             provider: The provider to use for generating responses.
             system_message: Optional system message to set the agent's behavior.
-
-        Raises:
-            ProviderValidationError: If provider is None.
+            observability: Optional observability backend for instrumentation.
         """
-        if provider is None:
-            raise ProviderValidationError("Provider cannot be None")
-
         self.provider: Provider = provider
         self.system_message: str | None = system_message
+        self.observability: Observability | None = observability
         self._history: list[Message] = []
 
         # Add system message to history if provided
         if system_message:
             self._history.append(SystemMessage(content=system_message))
 
+    @observable(
+        trace_name="agent.chat",
+        log_generation=True,
+    )
     async def chat(self, message: str) -> str:
         """Send a message and get a response.
 
@@ -78,8 +85,11 @@ class Agent:
         assistant_message = AssistantMessage(content=response_text)
         self._history.append(assistant_message)
 
+        print(f"Observability type: {type(self.observability)}")
+
         return response_text
 
+    @observable(trace_name="agent.stream")
     async def stream(self, message: str) -> AsyncIterator[str]:
         """Stream a response from the agent.
 

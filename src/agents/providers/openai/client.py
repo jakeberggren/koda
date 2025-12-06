@@ -12,6 +12,8 @@ from openai import (
 )
 
 from agents.core.message import Message, MessageRole
+from agents.observability import Observability
+from agents.observability.decorators import observable_generation, observable_span
 from agents.providers.base import Provider
 from agents.utils.exceptions import (
     ProviderAPIError,
@@ -39,6 +41,7 @@ class OpenAIProvider(Provider):
         api_key: str,
         model: str = "gpt-5.1",
         base_url: str | None = None,
+        observability: Observability | None = None,
     ) -> None:
         """Initialize the OpenAI provider.
 
@@ -46,6 +49,7 @@ class OpenAIProvider(Provider):
             api_key: OpenAI API key.
             model: Model to use (default: "gpt-5.1").
             base_url: Optional base URL for custom endpoints.
+            observability: Optional observability provider for instrumentation.
 
         Raises:
             ProviderValidationError: If API key is empty.
@@ -55,8 +59,11 @@ class OpenAIProvider(Provider):
 
         self.client: AsyncOpenAI = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model: str = model
+        self.observability: Observability | None = observability
         self._last_response_id: str | None = None
 
+    @observable_span("openai.chat")
+    @observable_generation()
     async def chat(self, messages: list[Message]) -> str:
         """Send messages and get a response.
 
@@ -107,6 +114,7 @@ class OpenAIProvider(Provider):
             raise ProviderResponseError("Received response without text content from OpenAI API")
         return content.text
 
+    @observable_span("openai.stream")
     async def stream(self, messages: list[Message]) -> AsyncIterator[str]:
         """Stream a response from the provider.
 

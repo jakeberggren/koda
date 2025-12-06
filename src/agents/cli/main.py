@@ -4,9 +4,14 @@ import asyncio
 import sys
 
 import typer
+from typer.main import Typer
 
 from agents.config.settings import Settings
 from agents.core import Agent
+from agents.observability import Observability
+from agents.observability.backends.braintrust import BraintrustObservability
+from agents.observability.backends.langfuse import LangfuseObservability
+from agents.observability.backends.noop import NoOpObservability
 from agents.providers.openai import OpenAIProvider
 from agents.utils.exceptions import (
     ProviderAPIError,
@@ -16,14 +21,16 @@ from agents.utils.exceptions import (
     ProviderValidationError,
 )
 
-app = typer.Typer(
+app: Typer = typer.Typer(
     name="agents",
     help="Provider-agnostic agent framework CLI",
     add_completion=True,
 )
 
 
-def _create_provider(provider_name: str | None, model: str | None) -> OpenAIProvider:  # type: ignore[return-value]
+def _create_provider(
+    provider_name: str | None, model: str | None, observer: Observability | None
+) -> OpenAIProvider:  # type: ignore[return-value]
     """Create a provider instance based on the provider name.
 
     Args:
@@ -44,10 +51,73 @@ def _create_provider(provider_name: str | None, model: str | None) -> OpenAIProv
     if provider_name == "openai":
         api_key = settings.OPENAI_API_KEY.get_secret_value()
         provider_model = model or "gpt-5.1"
-        return OpenAIProvider(api_key=api_key, model=provider_model)
+        return OpenAIProvider(api_key=api_key, model=provider_model, observability=observer)
     else:
         typer.echo(f"Error: Provider '{provider_name}' is not supported yet.", err=True)
         typer.echo("Supported providers: openai", err=True)
+        raise typer.Exit(1)
+
+
+def _create_observer(backend: str | None) -> Observability:
+    """Create an observability instance based on the backend name.
+
+    Args:
+        backend: Name of the observability backend (e.g., "langfuse", "braintrust").
+                 If None, returns a no-op observer.
+
+    Returns:
+        An observability instance.
+
+    Raises:
+        typer.Exit: If backend configuration is invalid.
+    """
+    settings = Settings()
+
+    # If no backend specified, use no-op observer
+    if not backend:
+        return NoOpObservability()
+
+    backend = backend.lower()
+
+    if backend == "langfuse":
+        # Get Langfuse credentials from settings
+        public_key = settings.LANGFUSE_PUBLIC_KEY
+        secret_key = settings.LANGFUSE_SECRET_KEY
+        host = settings.LANGFUSE_BASE_URL
+
+        if not public_key or not secret_key:
+            typer.echo(
+                "Error: Langfuse requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY environment variables.",  # noqa: E501
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        return LangfuseObservability(
+            public_key=public_key,
+            secret_key=secret_key.get_secret_value(),
+            host=str(host),
+        )
+
+    elif backend == "braintrust":
+        # Get Braintrust credentials from settings
+        api_key = getattr(settings, "BRAINTRUST_API_KEY", None)
+        project_name = getattr(settings, "BRAINTRUST_PROJECT_NAME", None)
+
+        if not api_key:
+            typer.echo(
+                "Error: Braintrust requires BRAINTRUST_API_KEY environment variable.",
+                err=True,
+            )
+            raise typer.Exit(1)
+
+        return BraintrustObservability(
+            api_key=api_key,
+            project_name=project_name,
+        )
+
+    else:
+        typer.echo(f"Error: Observability backend '{backend}' is not supported.", err=True)
+        typer.echo("Supported backends: langfuse, braintrust", err=True)
         raise typer.Exit(1)
 
 
@@ -102,6 +172,9 @@ def chat(
     model: str | None = typer.Option(
         None, "--model", "-m", help="Model to use (provider-specific)"
     ),
+    observability: str | None = typer.Option(
+        None, "--observability", "-o", help="Observability backend (e.g., langfuse, braintrust)"
+    ),
 ) -> None:
     """Start an interactive chat session with the agent."""
     typer.echo("Starting interactive chat session...")
@@ -109,7 +182,8 @@ def chat(
 
     try:
         # Create provider
-        provider_instance = _create_provider(provider, model)
+        observer = _create_observer(backend=observability)
+        provider_instance = _create_provider(provider, model, observer)
 
         # Display configuration
         provider_name = (provider or "openai").lower()
@@ -118,10 +192,12 @@ def chat(
             typer.echo(f"Using model: {model}")
         if stream:
             typer.echo("Streaming mode enabled")
+        if observability:
+            typer.echo(f"Observability: {observability}")
         typer.echo()
 
         # Create agent
-        agent = Agent(provider=provider_instance)
+        agent = Agent(provider=provider_instance, observability=observer)
 
         # Run async chat loop
         asyncio.run(_run_chat_loop(agent, stream))
