@@ -1,0 +1,66 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Debug Typer CLI (chat)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "agents.cli.main",
+            "args": [],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+            }
+        },
+        {
+            "name": "Python: Debug Typer CLI (chat with stream)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "agents.cli.main",
+            "args": [
+                "-s"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+            }
+        },
+        {
+            "name": "Python: Debug Typer CLI (chat with observability)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "agents.cli.main",
+            "args": [
+                "--observability",
+                "langfuse"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+            }
+        },
+        {
+            "name": "Python: Debug Typer CLI (custom args)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "agents.cli.main",
+            "args": [],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "cwd": "${workspaceFolder}",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src",
+            }
+        }
+    ]
+}
