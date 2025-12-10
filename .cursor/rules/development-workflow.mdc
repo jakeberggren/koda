@@ -29,13 +29,13 @@ When writing or modifying code, follow this complete workflow:
 ## Quick Check Command
 
 For a quick check of everything:sh
-ruff format . && ruff check --fix . && ty check . && pytest
+uv run ruff format . && uv run ruff check --fix . && uv run ty check . && uv run pytest
 
 Code is only complete when:
-- ✅ `ruff format` passes (code is formatted)
-- ✅ `ruff check` passes (no linting errors)
-- ✅ `ty check` passes (type checking passes)
-- ✅ `pytest` passes (all tests pass, if applicable)
+- ✅ `uv run ruff format` passes (code is formatted)
+- ✅ `uv run ruff check` passes (no linting errors)
+- ✅ `uv run ty check` passes (type checking passes)
+- ✅ `uv run pytest` passes (all tests pass, if applicable)
 
 ## If Tools Fail
 
