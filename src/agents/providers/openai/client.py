@@ -9,40 +9,34 @@ from openai import (
     RateLimitError,
 )
 
-from agents.core.message import Message, MessageRole
-from agents.observability import Observability
-from agents.observability.decorators import observable_generation, observable_span
-from agents.providers.base import Provider
-from agents.utils.exceptions import (
-    ProviderAPIError,
-    ProviderAuthenticationError,
-    ProviderRateLimitError,
-    ProviderResponseError,
-    ProviderValidationError,
-)
+from agents import observability
+from agents.core import message
+from agents.providers import base as providers_base
+from agents.utils import exceptions
 
 
-class OpenAIProvider(Provider):
+class OpenAIProvider(providers_base.Provider):
     def __init__(
         self,
         api_key: str,
         model: str = "gpt-5.1",
         base_url: str | None = None,
-        observability: Observability | None = None,
+        observer: observability.Observability | None = None,
     ) -> None:
         if not api_key or not api_key.strip():
-            raise ProviderValidationError("OpenAI API key cannot be empty")
+            raise exceptions.ProviderValidationError("OpenAI API key cannot be empty")
 
         self.client: AsyncOpenAI = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model: str = model
-        self.observability: Observability | None = observability
+        self.observability: observability.Observability | None = observer
         self._last_response_id: str | None = None
 
-    @observable_span("openai.chat")
-    @observable_generation()
-    async def chat(self, messages: list[Message]) -> str:
+    @observability.observable(
+        trace_name="openai.chat", span_name="openai.chat", log_generation=True
+    )
+    async def chat(self, messages: list[message.Message]) -> str:
         if not messages:
-            raise ProviderValidationError("Messages list cannot be empty")
+            raise exceptions.ProviderValidationError("Messages list cannot be empty")
 
         input_text: str = self._messages_to_input(messages)
 
@@ -53,32 +47,35 @@ class OpenAIProvider(Provider):
                 previous_response_id=self._last_response_id,
             )
         except RateLimitError as e:
-            raise ProviderRateLimitError(f"OpenAI rate limit exceeded: {e}") from e
+            raise exceptions.ProviderRateLimitError(f"OpenAI rate limit exceeded: {e}") from e
         except AuthenticationError as e:
-            raise ProviderAuthenticationError(f"OpenAI authentication failed: {e}") from e
+            auth_error_msg = f"OpenAI authentication failed: {e}"
+            raise exceptions.ProviderAuthenticationError(auth_error_msg) from e
         except (APIConnectionError, APITimeoutError) as e:
-            raise ProviderAPIError(f"OpenAI connection error: {e}") from e
+            raise exceptions.ProviderAPIError(f"OpenAI connection error: {e}") from e
         except APIError as e:
-            raise ProviderAPIError(f"OpenAI API error: {e}") from e
+            raise exceptions.ProviderAPIError(f"OpenAI API error: {e}") from e
 
         # Store response ID for stateful conversations
         if response.id:
             self._last_response_id = response.id
 
         if not response.output or len(response.output) == 0:
-            raise ProviderResponseError("Received empty output from OpenAI API")
+            raise exceptions.ProviderResponseError("Received empty output from OpenAI API")
         output = response.output[0]
         if not output.content or len(output.content) == 0:
-            raise ProviderResponseError("Received empty content from OpenAI API")
+            raise exceptions.ProviderResponseError("Received empty content from OpenAI API")
         content = output.content[0]
         if not hasattr(content, "text") or not content.text:
-            raise ProviderResponseError("Received response without text content from OpenAI API")
+            raise exceptions.ProviderResponseError(
+                "Received response without text content from OpenAI API"
+            )
         return content.text
 
-    @observable_span("openai.stream")
-    async def stream(self, messages: list[Message]) -> AsyncIterator[str]:
+    @observability.observable(trace_name="openai.stream", span_name="openai.stream")
+    async def stream(self, messages: list[message.Message]) -> AsyncIterator[str]:
         if not messages:
-            raise ProviderValidationError("Messages list cannot be empty")
+            raise exceptions.ProviderValidationError("Messages list cannot be empty")
 
         input_text = self._messages_to_input(messages)
 
@@ -90,13 +87,14 @@ class OpenAIProvider(Provider):
                 stream=True,
             )
         except RateLimitError as e:
-            raise ProviderRateLimitError(f"OpenAI rate limit exceeded: {e}") from e
+            raise exceptions.ProviderRateLimitError(f"OpenAI rate limit exceeded: {e}") from e
         except AuthenticationError as e:
-            raise ProviderAuthenticationError(f"OpenAI authentication failed: {e}") from e
+            auth_error_msg = f"OpenAI authentication failed: {e}"
+            raise exceptions.ProviderAuthenticationError(auth_error_msg) from e
         except (APIConnectionError, APITimeoutError) as e:
-            raise ProviderAPIError(f"OpenAI connection error: {e}") from e
+            raise exceptions.ProviderAPIError(f"OpenAI connection error: {e}") from e
         except APIError as e:
-            raise ProviderAPIError(f"OpenAI API error: {e}") from e
+            raise exceptions.ProviderAPIError(f"OpenAI API error: {e}") from e
 
         async for event in stream:
             # Responses API streaming events have a 'type' field
@@ -142,10 +140,12 @@ class OpenAIProvider(Provider):
             if delta_text:
                 yield str(delta_text)
 
-    def _messages_to_input(self, messages: list[Message]) -> str:
+    def _messages_to_input(self, messages: list[message.Message]) -> str:
         parts = []
         for msg in messages:
-            role_prefix: str = f"{msg.role.value.upper()}: " if msg.role != MessageRole.USER else ""
+            role_prefix: str = (
+                f"{msg.role.value.upper()}: " if msg.role != message.MessageRole.USER else ""
+            )
             parts.append(f"{role_prefix}{msg.content}")
 
         return "\n\n".join(parts)

@@ -2,10 +2,10 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-from agents.observability.base import Observability, Span, Trace
+from agents.observability import base
 
 
-class NoOpObservability(Observability):
+class NoOpObservability(base.Observability):
     """No-op implementation that does nothing."""
 
     @asynccontextmanager
@@ -14,7 +14,7 @@ class NoOpObservability(Observability):
         name: str,
         metadata: dict[str, Any] | None = None,
         tags: list[str] | None = None,
-    ) -> AsyncIterator[Trace]:
+    ) -> AsyncIterator[base.Trace]:
         yield _NoOpTrace()
 
     @asynccontextmanager
@@ -24,7 +24,7 @@ class NoOpObservability(Observability):
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> AsyncIterator[Span]:
+    ) -> AsyncIterator[base.Span]:
         yield _NoOpSpan()
 
     def log_generation(

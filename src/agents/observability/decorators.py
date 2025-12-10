@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from inspect import isasyncgenfunction
 from typing import Any, TypeVar, cast
 
-from agents.observability.base import Observability
+from agents.observability import base
 
 T = TypeVar("T")
 
@@ -26,7 +26,7 @@ def observable_trace(
 
         @functools.wraps(func)
         async def wrapper(self, *args: Any, **kwargs: Any) -> T:
-            observability: Observability | None = getattr(self, observability_attr, None)
+            observability: base.Observability | None = getattr(self, observability_attr, None)
 
             if observability is None:
                 return await func(self, *args, **kwargs)
@@ -59,7 +59,7 @@ def observable_span(
             # Handle async generator
             @functools.wraps(func)
             async def wrapper(self, *args: Any, **kwargs: Any) -> AsyncIterator[T]:
-                observability: Observability | None = getattr(self, observability_attr, None)
+                observability: base.Observability | None = getattr(self, observability_attr, None)
 
                 if observability is None:
                     # Type narrowing: we know func is an async generator here
@@ -78,7 +78,7 @@ def observable_span(
             # Handle regular async function
             @functools.wraps(func)
             async def wrapper(self, *args: Any, **kwargs: Any) -> T:
-                observability: Observability | None = getattr(self, observability_attr, None)
+                observability: base.Observability | None = getattr(self, observability_attr, None)
 
                 if observability is None:
                     # Type narrowing: we know func is a regular async function here
@@ -103,7 +103,7 @@ def observable_generation(
     def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         @functools.wraps(func)
         async def wrapper(self, *args: Any, **kwargs: Any) -> T:
-            observability: Observability | None = getattr(self, observability_attr, None)
+            observability: base.Observability | None = getattr(self, observability_attr, None)
 
             # Extract input
             if isinstance(input_arg, int):
@@ -152,7 +152,7 @@ def observable(
             # Handle async generator
             @functools.wraps(func)
             async def wrapper(self, *args: Any, **kwargs: Any) -> AsyncIterator[T]:
-                observability: Observability | None = getattr(self, observability_attr, None)
+                observability: base.Observability | None = getattr(self, observability_attr, None)
 
                 if observability is None:
                     # Type narrowing: we know func is an async generator here
@@ -204,7 +204,7 @@ def observable(
             # Handle regular async function
             @functools.wraps(func)
             async def wrapper(self, *args: Any, **kwargs: Any) -> T:
-                observability: Observability | None = getattr(self, observability_attr, None)
+                observability: base.Observability | None = getattr(self, observability_attr, None)
 
                 if observability is None:
                     # Type narrowing: we know func is a regular async function here

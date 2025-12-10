@@ -7,11 +7,11 @@ from typing import Any, Literal
 
 from langfuse import Langfuse
 
-from agents.core.message import Message
-from agents.observability.base import Observability, Span, Trace
+from agents.core import message
+from agents.observability import base
 
 
-class LangfuseObservability(Observability):
+class LangfuseObservability(base.Observability):
     def __init__(
         self,
         public_key: str,
@@ -30,7 +30,7 @@ class LangfuseObservability(Observability):
         name: str,
         metadata: dict[str, Any] | None = None,
         tags: list[str] | None = None,
-    ) -> AsyncIterator[Trace]:
+    ) -> AsyncIterator[base.Trace]:
         with self.client.start_as_current_observation(
             as_type="span",
             name=name,
@@ -54,7 +54,7 @@ class LangfuseObservability(Observability):
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> AsyncIterator[Span]:
+    ) -> AsyncIterator[base.Span]:
         with self.client.start_as_current_observation(
             as_type="span",
             name=name,
@@ -67,7 +67,7 @@ class LangfuseObservability(Observability):
 
     def log_generation(
         self,
-        input: str | list[Message] | None = None,
+        input: str | list[message.Message] | None = None,
         output: str | None = None,
         metadata: dict[str, Any] | None = None,
         name: str = "generation",
@@ -112,7 +112,7 @@ class LangfuseObservability(Observability):
         )
         self.client.flush()
 
-    def _format_input(self, input: str | list[Message] | None) -> str | dict | list | None:
+    def _format_input(self, input: str | list[message.Message] | None) -> str | dict | list | None:
         if input is None:
             return None
         if isinstance(input, str):

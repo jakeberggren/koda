@@ -4,20 +4,11 @@ import sys
 import typer
 from typer.main import Typer
 
-from agents.config.settings import Settings
-from agents.core import Agent
-from agents.observability import Observability
-from agents.observability.platforms.braintrust import BraintrustObservability
-from agents.observability.platforms.langfuse import LangfuseObservability
-from agents.observability.platforms.noop import NoOpObservability
-from agents.providers.openai import OpenAIProvider
-from agents.utils.exceptions import (
-    ProviderAPIError,
-    ProviderAuthenticationError,
-    ProviderError,
-    ProviderRateLimitError,
-    ProviderValidationError,
-)
+from agents import core, observability
+from agents.config import settings
+from agents.observability import platforms
+from agents.providers import openai
+from agents.utils import exceptions
 
 app: Typer = typer.Typer(
     name="agents",
@@ -27,37 +18,37 @@ app: Typer = typer.Typer(
 
 
 def _create_provider(
-    provider_name: str | None, model: str | None, observer: Observability | None
-) -> OpenAIProvider:
-    settings = Settings()
+    provider_name: str | None, model: str | None, observer: observability.Observability | None
+) -> openai.OpenAIProvider:
+    settings_model = settings.Settings()
 
     # Default to OpenAI if no provider specified
     provider_name = (provider_name or "openai").lower()
 
     if provider_name == "openai":
-        api_key = settings.OPENAI_API_KEY.get_secret_value()
+        api_key = settings_model.OPENAI_API_KEY.get_secret_value()
         provider_model = model or "gpt-5.1"
-        return OpenAIProvider(api_key=api_key, model=provider_model, observability=observer)
+        return openai.OpenAIProvider(api_key=api_key, model=provider_model, observer=observer)
     else:
         typer.echo(f"Error: Provider '{provider_name}' is not supported yet.", err=True)
         typer.echo("Supported providers: openai", err=True)
         raise typer.Exit(1)
 
 
-def _create_observer(backend: str | None) -> Observability:
-    settings = Settings()
+def _create_observer(backend: str | None) -> observability.Observability:
+    settings_model = settings.Settings()
 
     # If no backend specified, use no-op observer
     if not backend:
-        return NoOpObservability()
+        return platforms.noop.NoOpObservability()
 
     backend = backend.lower()
 
     if backend == "langfuse":
         # Get Langfuse credentials from settings
-        public_key = settings.LANGFUSE_PUBLIC_KEY
-        secret_key = settings.LANGFUSE_SECRET_KEY
-        host = settings.LANGFUSE_BASE_URL
+        public_key = settings_model.LANGFUSE_PUBLIC_KEY
+        secret_key = settings_model.LANGFUSE_SECRET_KEY
+        host = settings_model.LANGFUSE_BASE_URL
 
         if not public_key or not secret_key:
             typer.echo(
@@ -66,7 +57,7 @@ def _create_observer(backend: str | None) -> Observability:
             )
             raise typer.Exit(1)
 
-        return LangfuseObservability(
+        return platforms.langfuse.LangfuseObservability(
             public_key=public_key,
             secret_key=secret_key.get_secret_value(),
             host=str(host),
@@ -74,8 +65,8 @@ def _create_observer(backend: str | None) -> Observability:
 
     elif backend == "braintrust":
         # Get Braintrust credentials from settings
-        api_key = getattr(settings, "BRAINTRUST_API_KEY", None)
-        project_name = getattr(settings, "BRAINTRUST_PROJECT_NAME", None)
+        api_key = getattr(settings_model, "BRAINTRUST_API_KEY", None)
+        project_name = getattr(settings_model, "BRAINTRUST_PROJECT_NAME", None)
 
         if not api_key:
             typer.echo(
@@ -84,7 +75,7 @@ def _create_observer(backend: str | None) -> Observability:
             )
             raise typer.Exit(1)
 
-        return BraintrustObservability(
+        return platforms.braintrust.BraintrustObservability(
             api_key=api_key,
             project_name=project_name,
         )
@@ -95,7 +86,7 @@ def _create_observer(backend: str | None) -> Observability:
         raise typer.Exit(1)
 
 
-async def _run_chat_loop(agent: Agent, stream: bool) -> None:
+async def _run_chat_loop(agent: core.agent.Agent, stream: bool) -> None:
     while True:
         try:
             user_input = typer.prompt("You")
@@ -117,13 +108,13 @@ async def _run_chat_loop(agent: Agent, stream: bool) -> None:
                     response = await agent.chat(user_input)
                     typer.echo(f"Assistant: {response}")
                     typer.echo()  # Newline
-            except ProviderRateLimitError as e:
+            except exceptions.ProviderRateLimitError as e:
                 typer.echo(f"Error: Rate limit exceeded. {e}", err=True)
-            except ProviderAuthenticationError as e:
+            except exceptions.ProviderAuthenticationError as e:
                 typer.echo(f"Error: Authentication failed. {e}", err=True)
-            except ProviderAPIError as e:
+            except exceptions.ProviderAPIError as e:
                 typer.echo(f"Error: API error occurred. {e}", err=True)
-            except ProviderError as e:
+            except exceptions.ProviderError as e:
                 typer.echo(f"Error: {e}", err=True)
 
         except (EOFError, KeyboardInterrupt):
@@ -164,12 +155,12 @@ def chat(
         typer.echo()
 
         # Create agent
-        agent = Agent(provider=provider_instance, observability=observer)
+        agent = core.agent.Agent(provider=provider_instance, observer=observer)
 
         # Run async chat loop
         asyncio.run(_run_chat_loop(agent, stream))
 
-    except ProviderValidationError as e:
+    except exceptions.ProviderValidationError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1) from e
     except Exception as e:

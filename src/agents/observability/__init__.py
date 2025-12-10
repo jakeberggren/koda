@@ -1,32 +1,16 @@
-from agents.observability.base import Observability, Span, Trace
-from agents.observability.decorators import (
-    observable,
-    observable_generation,
-    observable_span,
-    observable_trace,
-)
+from agents.observability import base, decorators, platforms
 
-try:
-    from agents.observability.platforms.braintrust import BraintrustObservability
-except ImportError:
-    BraintrustObservability = None  # type: ignore[assignment, misc]
+Observability = base.Observability
+Span = base.Span
+Trace = base.Trace
 
-try:
-    from agents.observability.platforms.langfuse import LangfuseObservability
-except ImportError:
-    LangfuseObservability = None  # type: ignore[assignment, misc]
-
-from agents.observability.platforms.noop import NoOpObservability
+observable = decorators.observable
 
 __all__ = [
+    "base",
     "Observability",
     "Span",
     "Trace",
     "observable",
-    "observable_generation",
-    "observable_span",
-    "observable_trace",
-    "BraintrustObservability",
-    "LangfuseObservability",
-    "NoOpObservability",
+    "platforms",
 ]

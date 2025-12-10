@@ -1,3 +1,3 @@
-from agents.cli.main import app, main
+from agents import cli
 
-__all__ = ["app", "main"]
+__all__ = ["cli"]

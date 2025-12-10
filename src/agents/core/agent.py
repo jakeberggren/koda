@@ -1,38 +1,36 @@
 from collections.abc import AsyncIterator
 
-from agents.core.message import AssistantMessage, Message, SystemMessage, UserMessage
-from agents.observability import Observability
-from agents.observability.decorators import observable
-from agents.providers import Provider
-from agents.utils.exceptions import ProviderValidationError
+from agents import observability, providers
+from agents.core import message
+from agents.utils import exceptions
 
 
 class Agent:
     def __init__(
         self,
-        provider: Provider,
+        provider: providers.Provider,
         system_message: str | None = None,
-        observability: Observability | None = None,
+        observer: observability.Observability | None = None,
     ) -> None:
-        self.provider: Provider = provider
+        self.provider: providers.Provider = provider
         self.system_message: str | None = system_message
-        self.observability: Observability | None = observability
-        self._history: list[Message] = []
+        self.observability: observability.Observability | None = observer
+        self._history: list[message.Message] = []
 
         # Add system message to history if provided
         if system_message:
-            self._history.append(SystemMessage(content=system_message))
+            self._history.append(message.SystemMessage(content=system_message))
 
-    @observable(
+    @observability.observable(
         trace_name="agent.chat",
         log_generation=True,
     )
-    async def chat(self, message: str) -> str:
-        if not message or not message.strip():
-            raise ProviderValidationError("Message cannot be empty")
+    async def chat(self, user_text: str) -> str:
+        if not user_text or not user_text.strip():
+            raise exceptions.ProviderValidationError("Message cannot be empty")
 
         # Create user message and add to history
-        user_message = UserMessage(content=message.strip())
+        user_message = message.UserMessage(content=user_text.strip())
         self._history.append(user_message)
 
         # Build message list for provider
@@ -42,20 +40,20 @@ class Agent:
         response_text = await self.provider.chat(messages)
 
         # Create assistant message and add to history
-        assistant_message = AssistantMessage(content=response_text)
+        assistant_message = message.AssistantMessage(content=response_text)
         self._history.append(assistant_message)
 
         print(f"Observability type: {type(self.observability)}")
 
         return response_text
 
-    @observable(trace_name="agent.stream")
-    async def stream(self, message: str) -> AsyncIterator[str]:
-        if not message or not message.strip():
-            raise ProviderValidationError("Message cannot be empty")
+    @observability.observable(trace_name="agent.stream")
+    async def stream(self, user_text: str) -> AsyncIterator[str]:
+        if not user_text or not user_text.strip():
+            raise exceptions.ProviderValidationError("Message cannot be empty")
 
         # Create user message and add to history
-        user_message = UserMessage(content=message.strip())
+        user_message = message.UserMessage(content=user_text.strip())
         self._history.append(user_message)
 
         # Build message list for provider
@@ -70,13 +68,13 @@ class Agent:
 
         # Create assistant message and add to history
         response_text = "".join(response_chunks)
-        assistant_message = AssistantMessage(content=response_text)
+        assistant_message = message.AssistantMessage(content=response_text)
         self._history.append(assistant_message)
 
-    def add_message(self, message: Message) -> None:
-        self._history.append(message)
+    def add_message(self, message_to_add: message.Message) -> None:
+        self._history.append(message_to_add)
 
-    def get_history(self) -> list[Message]:
+    def get_history(self) -> list[message.Message]:
         return self._history.copy()
 
     def clear_history(self) -> None:
@@ -99,5 +97,5 @@ class Agent:
         if reset_state is not None and callable(reset_state):
             reset_state()
 
-    def _build_messages(self) -> list[Message]:
+    def _build_messages(self) -> list[message.Message]:
         return self._history.copy()

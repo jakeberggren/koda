@@ -6,11 +6,11 @@ from typing import Any
 
 import braintrust
 
-from agents.core.message import Message
-from agents.observability.base import Observability, Span, Trace
+from agents.core import message
+from agents.observability import base
 
 
-class BraintrustObservability(Observability):
+class BraintrustObservability(base.Observability):
     def __init__(
         self,
         api_key: str | None = None,
@@ -27,7 +27,7 @@ class BraintrustObservability(Observability):
         name: str,
         metadata: dict[str, Any] | None = None,
         tags: list[str] | None = None,
-    ) -> AsyncIterator[Trace]:
+    ) -> AsyncIterator[base.Trace]:
         # Braintrust manages trace IDs internally via context
         trace = _BraintrustTrace(name, metadata, tags)
         yield trace
@@ -39,13 +39,13 @@ class BraintrustObservability(Observability):
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> AsyncIterator[Span]:
+    ) -> AsyncIterator[base.Span]:
         span = _BraintrustSpan(name, metadata)
         yield span
 
     def log_generation(
         self,
-        input: str | list[Message] | None = None,
+        input: str | list[message.Message] | None = None,
         output: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
@@ -67,7 +67,7 @@ class BraintrustObservability(Observability):
             metadata=metadata,
         )
 
-    def _format_input(self, input: str | list[Message] | None) -> str | None:
+    def _format_input(self, input: str | list[message.Message] | None) -> str | None:
         if input is None:
             return None
         if isinstance(input, str):

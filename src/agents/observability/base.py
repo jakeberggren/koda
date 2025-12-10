@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
-from agents.core.message import Message
+from agents.core import message
 
 
 class Observability(Protocol):
@@ -24,7 +24,7 @@ class Observability(Protocol):
 
     def log_generation(
         self,
-        input: str | list[Message] | None = None,
+        input: str | list[message.Message] | None = None,
         output: str | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None: ...
