@@ -6,8 +6,8 @@ from typing import Any
 
 import braintrust
 
-from agents.core import message
-from agents.observability import base
+from koda.core import message
+from koda.observability import base
 
 
 class BraintrustObservability(base.Observability):

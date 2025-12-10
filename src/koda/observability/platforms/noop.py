@@ -1,47 +1,56 @@
-from __future__ import annotations
-
 from collections.abc import AsyncIterator
-from typing import Any, Protocol
+from contextlib import asynccontextmanager
+from typing import Any
 
-from agents.core import message
+from koda.observability import base
 
 
-class Observability(Protocol):
+class NoOpObservability(base.Observability):
+    """No-op implementation that does nothing."""
+
+    @asynccontextmanager
     async def trace(
         self,
         name: str,
         metadata: dict[str, Any] | None = None,
         tags: list[str] | None = None,
-    ) -> AsyncIterator[Trace]: ...
+    ) -> AsyncIterator[base.Trace]:
+        yield _NoOpTrace()
 
+    @asynccontextmanager
     async def span(
         self,
         name: str,
         trace_id: str | None = None,
         parent_span_id: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> AsyncIterator[Span]: ...
+    ) -> AsyncIterator[base.Span]:
+        yield _NoOpSpan()
 
     def log_generation(
         self,
-        input: str | list[message.Message] | None = None,
+        input: str | list | None = None,
         output: str | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> None: ...
+    ) -> None:
+        pass
 
     def log_score(
         self,
         name: str = "score",
         value: float | int | None = None,
         metadata: dict[str, Any] | None = None,
-    ) -> None: ...
+    ) -> None:
+        pass
 
 
-class Trace(Protocol):
+class _NoOpTrace:
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        return ""
 
 
-class Span(Protocol):
+class _NoOpSpan:
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        return ""

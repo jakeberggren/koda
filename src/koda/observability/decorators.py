@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from inspect import isasyncgenfunction
 from typing import Any, TypeVar, cast
 
-from agents.observability import base
+from koda.observability import base
 
 T = TypeVar("T")
 

@@ -11,3 +11,9 @@ wheels/
 
 # Environment files
 .env
+
+# uv local cache
+.uvcache/
+
+# macOS files
+.DS_Store

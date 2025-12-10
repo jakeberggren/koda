@@ -3,9 +3,9 @@ requires = ["uv_build>=0.9.13,<0.10.0"]
 build-backend = "uv_build"
 
 [project]
-name = "agents"
+name = "koda"
 version = "0.1.0"
-description = "Provider agnostic Agent frameworka"
+description = "KODA; a coding agent toolkit, CLI and extensible agent framework."
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -15,7 +15,7 @@ dependencies = [
     "typer>=0.20.0",
 ]
 [project.scripts]
-agents = "agents.cli.main:main"
+koda = "koda.cli.main:main"
 
 [project.optional-dependencies]
 observability = [
@@ -53,7 +53,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.isort]
-known-first-party = ["agents"]
+known-first-party = ["koda"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 5

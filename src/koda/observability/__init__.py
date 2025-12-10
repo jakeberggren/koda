@@ -1,4 +1,4 @@
-from agents.observability import base, decorators, platforms
+from koda.observability import base, decorators, platforms
 
 Observability = base.Observability
 Span = base.Span

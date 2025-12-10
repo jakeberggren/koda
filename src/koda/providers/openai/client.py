@@ -9,10 +9,10 @@ from openai import (
     RateLimitError,
 )
 
-from agents import observability
-from agents.core import message
-from agents.providers import base as providers_base
-from agents.utils import exceptions
+from koda import observability
+from koda.core import message
+from koda.providers import base as providers_base
+from koda.utils import exceptions
 
 
 class OpenAIProvider(providers_base.Provider):

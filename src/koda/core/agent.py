@@ -1,8 +1,8 @@
 from collections.abc import AsyncIterator
 
-from agents import observability, providers
-from agents.core import message
-from agents.utils import exceptions
+from koda import observability, providers
+from koda.core import message
+from koda.utils import exceptions
 
 
 class Agent:

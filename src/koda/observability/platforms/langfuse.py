@@ -7,8 +7,8 @@ from typing import Any, Literal
 
 from langfuse import Langfuse
 
-from agents.core import message
-from agents.observability import base
+from koda.core import message
+from koda.observability import base
 
 
 class LangfuseObservability(base.Observability):
@@ -41,10 +41,8 @@ class LangfuseObservability(base.Observability):
                 span_obj.update_trace(tags=tags)
 
             trace = _LangfuseTrace(span_obj)
-            print(f"[Langfuse] Trace created with ID: {trace.id}")  # DEBUG
             yield trace
 
-        print(f"[Langfuse] Flushing trace: {name}")  # DEBUG
         self.client.flush()
 
     @asynccontextmanager

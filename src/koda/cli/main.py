@@ -4,15 +4,15 @@ import sys
 import typer
 from typer.main import Typer
 
-from agents import core, observability
-from agents.config import settings
-from agents.observability import platforms
-from agents.providers import openai
-from agents.utils import exceptions
+from koda import core, observability
+from koda.config import settings
+from koda.observability import platforms
+from koda.providers import openai
+from koda.utils import exceptions
 
 app: Typer = typer.Typer(
-    name="agents",
-    help="Provider-agnostic agent framework CLI",
+    name="koda",
+    help="Koda provider-agnostic agent framework CLI",
     add_completion=True,
 )
 

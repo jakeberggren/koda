@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from typing import Protocol
 
-from agents.core import message
+from koda.core import message
 
 
 class Provider(Protocol):
