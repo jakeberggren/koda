@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
-import braintrust  # type: ignore[import-untyped]
+import braintrust
 
 from agents.core.message import Message
 from agents.observability.base import Observability, Span, Trace

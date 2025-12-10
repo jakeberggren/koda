@@ -9,16 +9,16 @@ from agents.observability.decorators import (
 )
 
 try:
-    from agents.observability.backends.braintrust import BraintrustObservability
+    from agents.observability.platforms.braintrust import BraintrustObservability
 except ImportError:
     BraintrustObservability = None  # type: ignore[assignment, misc]
 
 try:
-    from agents.observability.backends.langfuse import LangfuseObservability
+    from agents.observability.platforms.langfuse import LangfuseObservability
 except ImportError:
     LangfuseObservability = None  # type: ignore[assignment, misc]
 
-from agents.observability.backends.noop import NoOpObservability
+from agents.observability.platforms.noop import NoOpObservability
 
 __all__ = [
     "Observability",

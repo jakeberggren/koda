@@ -18,9 +18,9 @@ class LangfuseObservability(Observability):
 
     def __init__(
         self,
-        public_key: str | None = None,
-        secret_key: str | None = None,
-        host: str | None = None,
+        public_key: str,
+        secret_key: str,
+        host: str,
     ) -> None:
         """Initialize Langfuse observability.
 
