@@ -46,7 +46,6 @@ select = [
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
     "S",   # flake8-bandit (security rules)
-    "D",   # pydocstyle (docstring checks)
 ]
 
 [tool.ruff.format]
@@ -55,11 +54,6 @@ indent-style = "space"
 
 [tool.ruff.lint.isort]
 known-first-party = ["agents"]
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-ignore-var-parameters = true
-ignore-decorators = ["typing.overload"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 5

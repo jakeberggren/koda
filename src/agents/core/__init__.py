@@ -1,5 +1,3 @@
-"""Core abstractions for the agents framework."""
-
 from agents.core.agent import Agent
 from agents.core.message import (
     AssistantMessage,

@@ -1,5 +1,3 @@
-"""Observability decorators for automatic instrumentation."""
-
 from __future__ import annotations
 
 import functools
@@ -18,22 +16,6 @@ def observable_trace(
     tags: list[str] | None = None,
     observability_attr: str = "observability",
 ):
-    """Decorator to automatically create a trace for a method.
-
-    Args:
-        name: Trace name (defaults to function name).
-        metadata: Optional metadata to attach.
-        tags: Optional tags to attach.
-        observability_attr: Attribute name on the instance that holds observability.
-
-    Example:
-        ```python
-        @observable_trace("agent.run")
-        async def run(self, task: str):
-            ...
-        ```
-    """
-
     def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         trace_name = (
             name
@@ -62,23 +44,6 @@ def observable_span(
     metadata: dict[str, Any] | None = None,
     observability_attr: str = "observability",
 ):
-    """Decorator to automatically create a span for a method.
-
-    Supports both async functions and async generators.
-
-    Args:
-        name: Span name (defaults to function name).
-        metadata: Optional metadata to attach.
-        observability_attr: Attribute name on the instance that holds observability.
-
-    Example:
-        ```python
-        @observable_span("provider.chat")
-        async def chat(self, messages: list[Message]) -> str:
-            ...
-        ```
-    """
-
     def decorator(
         func: Callable[..., Awaitable[T] | AsyncIterator[T]],
     ) -> Callable[..., Awaitable[T] | AsyncIterator[T]]:
@@ -135,23 +100,6 @@ def observable_generation(
     metadata: dict[str, Any] | None = None,
     observability_attr: str = "observability",
 ):
-    """Decorator to automatically log a generation (input/output).
-
-    Args:
-        input_arg: Name or index of the input argument (default: first arg).
-        output_arg: Name or index of the output (default: return value).
-        metadata: Optional metadata to attach.
-        observability_attr: Attribute name on the instance that holds observability.
-
-    Example:
-        ```python
-        @observable_generation(input_arg="messages", output_arg=None)
-        async def chat(self, messages: list[Message]) -> str:
-            response = await self.provider.chat(messages)
-            return response  # This will be logged as output
-        ```
-    """
-
     def decorator(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T]]:
         @functools.wraps(func)
         async def wrapper(self, *args: Any, **kwargs: Any) -> T:
@@ -196,27 +144,6 @@ def observable(
     metadata: dict[str, Any] | None = None,
     observability_attr: str = "observability",
 ):
-    """Combined decorator for full observability.
-
-    Creates a trace, span, and optionally logs generation.
-    Supports both async functions and async generators.
-
-    Args:
-        trace_name: Trace name (defaults to function name).
-        span_name: Span name (defaults to function name).
-        log_generation: Whether to log input/output as generation.
-        input_arg: Input argument name/index for generation logging.
-        metadata: Optional metadata to attach.
-        observability_attr: Attribute name on the instance that holds observability.
-
-    Example:
-        ```python
-        @observable(trace_name="agent.chat", log_generation=True, input_arg="user_message")
-        async def chat(self, user_message: str) -> str:
-            ...
-        ```
-    """
-
     def decorator(
         func: Callable[..., Awaitable[T] | AsyncIterator[T]],
     ) -> Callable[..., Awaitable[T] | AsyncIterator[T]]:

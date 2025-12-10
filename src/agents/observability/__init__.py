@@ -1,5 +1,3 @@
-"""Observability providers for agent instrumentation."""
-
 from agents.observability.base import Observability, Span, Trace
 from agents.observability.decorators import (
     observable,

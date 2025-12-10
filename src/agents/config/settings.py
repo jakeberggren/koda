@@ -1,17 +1,9 @@
-"""Configuration settings for the agents framework."""
-
 from pydantic import Field, SecretStr
 from pydantic_core import Url
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables.
-
-    Settings are automatically loaded from a `.env` file if present, with
-    environment variables taking precedence.
-    """
-
     OPENAI_API_KEY: SecretStr = Field(
         default=SecretStr(""), description="The API key for the OpenAI API"
     )

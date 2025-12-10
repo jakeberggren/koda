@@ -25,7 +25,6 @@ repos:
       - id: check-merge-conflict
       - id: check-case-conflict
 
-      - id: check-docstring-first
       - id: name-tests-test
 
       - id: check-executables-have-shebangs

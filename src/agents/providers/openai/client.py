@@ -1,5 +1,3 @@
-"""OpenAI provider implementation using the Responses API."""
-
 from collections.abc import AsyncIterator
 
 from openai import (
@@ -25,17 +23,6 @@ from agents.utils.exceptions import (
 
 
 class OpenAIProvider(Provider):
-    """OpenAI provider implementation using the Responses API.
-
-    Implements the Provider protocol. Uses OpenAI's Responses API which
-    is stateful and designed for agentic workflows.
-
-    Args:
-        api_key: OpenAI API key.
-        model: Model to use (default: "gpt-5.1").
-        base_url: Optional base URL for custom endpoints.
-    """
-
     def __init__(
         self,
         api_key: str,
@@ -43,17 +30,6 @@ class OpenAIProvider(Provider):
         base_url: str | None = None,
         observability: Observability | None = None,
     ) -> None:
-        """Initialize the OpenAI provider.
-
-        Args:
-            api_key: OpenAI API key.
-            model: Model to use (default: "gpt-5.1").
-            base_url: Optional base URL for custom endpoints.
-            observability: Optional observability provider for instrumentation.
-
-        Raises:
-            ProviderValidationError: If API key is empty.
-        """
         if not api_key or not api_key.strip():
             raise ProviderValidationError("OpenAI API key cannot be empty")
 
@@ -65,21 +41,6 @@ class OpenAIProvider(Provider):
     @observable_span("openai.chat")
     @observable_generation()
     async def chat(self, messages: list[Message]) -> str:
-        """Send messages and get a response.
-
-        Args:
-            messages: List of messages in the conversation.
-
-        Returns:
-            The assistant's response as a string.
-
-        Raises:
-            ProviderValidationError: If messages list is empty.
-            ProviderRateLimitError: If rate limit is exceeded.
-            ProviderAuthenticationError: If authentication fails.
-            ProviderAPIError: If an API error occurs.
-            ProviderResponseError: If response is empty or invalid.
-        """
         if not messages:
             raise ProviderValidationError("Messages list cannot be empty")
 
@@ -116,20 +77,6 @@ class OpenAIProvider(Provider):
 
     @observable_span("openai.stream")
     async def stream(self, messages: list[Message]) -> AsyncIterator[str]:
-        """Stream a response from the provider.
-
-        Args:
-            messages: List of messages in the conversation.
-
-        Yields:
-            Text chunks as they are generated.
-
-        Raises:
-            ProviderValidationError: If messages list is empty.
-            ProviderRateLimitError: If rate limit is exceeded.
-            ProviderAuthenticationError: If authentication fails.
-            ProviderAPIError: If an API error occurs.
-        """
         if not messages:
             raise ProviderValidationError("Messages list cannot be empty")
 
@@ -196,14 +143,6 @@ class OpenAIProvider(Provider):
                 yield str(delta_text)
 
     def _messages_to_input(self, messages: list[Message]) -> str:
-        """Convert a list of messages to a single input string.
-
-        Args:
-            messages: List of messages to convert.
-
-        Returns:
-            Combined input string for the Responses API.
-        """
         parts = []
         for msg in messages:
             role_prefix: str = f"{msg.role.value.upper()}: " if msg.role != MessageRole.USER else ""
@@ -212,8 +151,4 @@ class OpenAIProvider(Provider):
         return "\n\n".join(parts)
 
     def reset_state(self) -> None:
-        """Reset the conversation state.
-
-        Clears the stored response ID, effectively starting a new conversation.
-        """
         self._last_response_id = None

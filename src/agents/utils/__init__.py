@@ -1,5 +1,3 @@
-"""Utility modules for the agents framework."""
-
 from agents.utils.exceptions import (
     ProviderAPIError,
     ProviderAuthenticationError,

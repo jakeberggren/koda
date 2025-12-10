@@ -1,5 +1,3 @@
-"""CLI interface for the agents framework."""
-
 import asyncio
 import sys
 
@@ -30,20 +28,7 @@ app: Typer = typer.Typer(
 
 def _create_provider(
     provider_name: str | None, model: str | None, observer: Observability | None
-) -> OpenAIProvider:  # type: ignore[return-value]
-    """Create a provider instance based on the provider name.
-
-    Args:
-        provider_name: Name of the provider (e.g., "openai").
-        model: Model to use (provider-specific).
-        observer: Observability instance to use.
-
-    Returns:
-        A provider instance.
-
-    Raises:
-        typer.Exit: If provider is not supported or configuration is invalid.
-    """
+) -> OpenAIProvider:
     settings = Settings()
 
     # Default to OpenAI if no provider specified
@@ -60,18 +45,6 @@ def _create_provider(
 
 
 def _create_observer(backend: str | None) -> Observability:
-    """Create an observability instance based on the backend name.
-
-    Args:
-        backend: Name of the observability backend (e.g., "langfuse", "braintrust").
-                 If None, returns a no-op observer.
-
-    Returns:
-        An observability instance.
-
-    Raises:
-        typer.Exit: If backend configuration is invalid.
-    """
     settings = Settings()
 
     # If no backend specified, use no-op observer
@@ -123,12 +96,6 @@ def _create_observer(backend: str | None) -> Observability:
 
 
 async def _run_chat_loop(agent: Agent, stream: bool) -> None:
-    """Run the interactive chat loop.
-
-    Args:
-        agent: The agent instance to use.
-        stream: Whether to stream responses.
-    """
     while True:
         try:
             user_input = typer.prompt("You")
@@ -177,7 +144,6 @@ def chat(
         None, "--observability", "-o", help="Observability backend (e.g., langfuse, braintrust)"
     ),
 ) -> None:
-    """Start an interactive chat session with the agent."""
     typer.echo("Starting interactive chat session...")
     typer.echo("Type 'exit' or 'quit' to end the session.\n")
 
@@ -212,7 +178,6 @@ def chat(
 
 
 def main() -> None:
-    """Entry point for the CLI."""
     app()
 
 
