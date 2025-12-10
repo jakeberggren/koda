@@ -9,9 +9,9 @@ from typer.main import Typer
 from agents.config.settings import Settings
 from agents.core import Agent
 from agents.observability import Observability
-from agents.observability.backends.braintrust import BraintrustObservability
-from agents.observability.backends.langfuse import LangfuseObservability
-from agents.observability.backends.noop import NoOpObservability
+from agents.observability.platforms.braintrust import BraintrustObservability
+from agents.observability.platforms.langfuse import LangfuseObservability
+from agents.observability.platforms.noop import NoOpObservability
 from agents.providers.openai import OpenAIProvider
 from agents.utils.exceptions import (
     ProviderAPIError,
@@ -36,6 +36,7 @@ def _create_provider(
     Args:
         provider_name: Name of the provider (e.g., "openai").
         model: Model to use (provider-specific).
+        observer: Observability instance to use.
 
     Returns:
         A provider instance.
