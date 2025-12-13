@@ -1,0 +1,70 @@
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Minor and patch updates - Weekly
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "09:00"
+      timezone: "Europe/Stockholm"
+    open-pull-requests-limit: 10
+    rebase-strategy: "auto"
+    labels:
+      - "dependencies"
+      - "python"
+      - "minor-patch"
+    commit-message:
+      prefix: "deps"
+      prefix-security: "security"
+      include: "scope"
+    groups:
+      security-updates:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    versioning-strategy: increase-if-necessary
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Major updates - Monthly
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "sunday"
+      time: "09:00"
+      timezone: "Europe/Stockholm"
+    open-pull-requests-limit: 5
+    rebase-strategy: "auto"
+    labels:
+      - "dependencies"
+      - "python"
+      - "major"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    versioning-strategy: increase-if-necessary
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-minor", "version-update:semver-patch"]
+
+  # GitHub Actions - Monthly
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "sunday"
+      time: "09:00"
+      timezone: "Europe/Stockholm"
+    rebase-strategy: "auto"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
