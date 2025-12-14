@@ -1,16 +1,3 @@
-from koda.observability import base, decorators, platforms
+from koda.observability.langfuse_observer import LangfuseObserver, create_observer
 
-Observability = base.Observability
-Span = base.Span
-Trace = base.Trace
-
-observable = decorators.observable
-
-__all__ = [
-    "base",
-    "Observability",
-    "Span",
-    "Trace",
-    "observable",
-    "platforms",
-]
+__all__ = ["LangfuseObserver", "create_observer"]

@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 
+from langfuse import observe
 from openai import (
     APIConnectionError,
     APIError,
@@ -9,7 +10,6 @@ from openai import (
     RateLimitError,
 )
 
-from koda import observability
 from koda.core import message
 from koda.providers import base as providers_base
 from koda.utils import exceptions
@@ -21,19 +21,15 @@ class OpenAIProvider(providers_base.Provider):
         api_key: str,
         model: str = "gpt-5.1",
         base_url: str | None = None,
-        observer: observability.Observability | None = None,
     ) -> None:
         if not api_key or not api_key.strip():
             raise exceptions.ProviderValidationError("OpenAI API key cannot be empty")
 
         self.client: AsyncOpenAI = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model: str = model
-        self.observability: observability.Observability | None = observer
         self._last_response_id: str | None = None
 
-    @observability.observable(
-        trace_name="openai.chat", span_name="openai.chat", log_generation=True
-    )
+    @observe(name="openai.chat")
     async def chat(self, messages: list[message.Message]) -> str:
         if not messages:
             raise exceptions.ProviderValidationError("Messages list cannot be empty")
@@ -72,7 +68,7 @@ class OpenAIProvider(providers_base.Provider):
             )
         return content.text
 
-    @observability.observable(trace_name="openai.stream", span_name="openai.stream")
+    @observe(name="openai.stream")
     async def stream(self, messages: list[message.Message]) -> AsyncIterator[str]:
         if not messages:
             raise exceptions.ProviderValidationError("Messages list cannot be empty")

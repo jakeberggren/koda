@@ -1,6 +1,8 @@
 from collections.abc import AsyncIterator
 
-from koda import observability, providers
+from langfuse import observe
+
+from koda import providers
 from koda.core import message
 from koda.utils import exceptions
 
@@ -10,21 +12,16 @@ class Agent:
         self,
         provider: providers.Provider,
         system_message: str | None = None,
-        observer: observability.Observability | None = None,
     ) -> None:
         self.provider: providers.Provider = provider
         self.system_message: str | None = system_message
-        self.observability: observability.Observability | None = observer
         self._history: list[message.Message] = []
 
         # Add system message to history if provided
         if system_message:
             self._history.append(message.SystemMessage(content=system_message))
 
-    @observability.observable(
-        trace_name="agent.chat",
-        log_generation=True,
-    )
+    @observe(name="agent.chat")
     async def chat(self, user_text: str) -> str:
         if not user_text or not user_text.strip():
             raise exceptions.ProviderValidationError("Message cannot be empty")
@@ -43,11 +40,9 @@ class Agent:
         assistant_message = message.AssistantMessage(content=response_text)
         self._history.append(assistant_message)
 
-        print(f"Observability type: {type(self.observability)}")
-
         return response_text
 
-    @observability.observable(trace_name="agent.stream")
+    @observe(name="agent.stream")
     async def stream(self, user_text: str) -> AsyncIterator[str]:
         if not user_text or not user_text.strip():
             raise exceptions.ProviderValidationError("Message cannot be empty")

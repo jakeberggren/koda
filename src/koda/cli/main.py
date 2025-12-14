@@ -6,7 +6,6 @@ from typer.main import Typer
 
 from koda import core, observability
 from koda.config import settings
-from koda.observability import platforms
 from koda.providers import openai
 from koda.utils import exceptions
 
@@ -18,71 +17,18 @@ app: Typer = typer.Typer(
 
 
 def _create_provider(
-    provider_name: str | None, model: str | None, observer: observability.Observability | None
+    provider_name: str | None, model: str | None, settings: settings.Settings
 ) -> openai.OpenAIProvider:
-    settings_model = settings.Settings()
-
     # Default to OpenAI if no provider specified
     provider_name = (provider_name or "openai").lower()
 
     if provider_name == "openai":
-        api_key = settings_model.OPENAI_API_KEY.get_secret_value()
+        api_key = settings.OPENAI_API_KEY.get_secret_value()
         provider_model = model or "gpt-5.1"
-        return openai.OpenAIProvider(api_key=api_key, model=provider_model, observer=observer)
+        return openai.OpenAIProvider(api_key=api_key, model=provider_model)
     else:
         typer.echo(f"Error: Provider '{provider_name}' is not supported yet.", err=True)
         typer.echo("Supported providers: openai", err=True)
-        raise typer.Exit(1)
-
-
-def _create_observer(backend: str | None) -> observability.Observability:
-    settings_model = settings.Settings()
-
-    # If no backend specified, use no-op observer
-    if not backend:
-        return platforms.noop.NoOpObservability()
-
-    backend = backend.lower()
-
-    if backend == "langfuse":
-        # Get Langfuse credentials from settings
-        public_key = settings_model.LANGFUSE_PUBLIC_KEY
-        secret_key = settings_model.LANGFUSE_SECRET_KEY
-        host = settings_model.LANGFUSE_BASE_URL
-
-        if not public_key or not secret_key:
-            typer.echo(
-                "Error: Langfuse requires LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY environment variables.",  # noqa: E501
-                err=True,
-            )
-            raise typer.Exit(1)
-
-        return platforms.langfuse.LangfuseObservability(
-            public_key=public_key,
-            secret_key=secret_key.get_secret_value(),
-            host=str(host),
-        )
-
-    elif backend == "braintrust":
-        # Get Braintrust credentials from settings
-        api_key = getattr(settings_model, "BRAINTRUST_API_KEY", None)
-        project_name = getattr(settings_model, "BRAINTRUST_PROJECT_NAME", None)
-
-        if not api_key:
-            typer.echo(
-                "Error: Braintrust requires BRAINTRUST_API_KEY environment variable.",
-                err=True,
-            )
-            raise typer.Exit(1)
-
-        return platforms.braintrust.BraintrustObservability(
-            api_key=api_key,
-            project_name=project_name,
-        )
-
-    else:
-        typer.echo(f"Error: Observability backend '{backend}' is not supported.", err=True)
-        typer.echo("Supported backends: langfuse, braintrust", err=True)
         raise typer.Exit(1)
 
 
@@ -131,33 +77,24 @@ def chat(
     model: str | None = typer.Option(
         None, "--model", "-m", help="Model to use (provider-specific)"
     ),
-    observability: str | None = typer.Option(
-        None, "--observability", "-o", help="Observability backend (e.g., langfuse, braintrust)"
-    ),
 ) -> None:
     typer.echo("Starting interactive chat session...")
     typer.echo("Type 'exit' or 'quit' to end the session.\n")
 
+    app_settings = settings.get_settings()
+    observability.create_observer(settings=app_settings)
     try:
-        # Create provider
-        observer = _create_observer(backend=observability)
-        provider_instance = _create_provider(provider, model, observer)
-
-        # Display configuration
+        provider_instance = _create_provider(provider, model, app_settings)
         provider_name = (provider or "openai").lower()
         typer.echo(f"Using provider: {provider_name}")
         if model:
             typer.echo(f"Using model: {model}")
         if stream:
             typer.echo("Streaming mode enabled")
-        if observability:
-            typer.echo(f"Observability: {observability}")
         typer.echo()
 
-        # Create agent
-        agent = core.agent.Agent(provider=provider_instance, observer=observer)
+        agent = core.agent.Agent(provider=provider_instance)
 
-        # Run async chat loop
         asyncio.run(_run_chat_loop(agent, stream))
 
     except exceptions.ProviderValidationError as e:
