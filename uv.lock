@@ -368,21 +368,21 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "braintrust", marker = "extra == 'observability'", specifier = ">=0.3.9" },
-    { name = "langfuse", marker = "extra == 'observability'", specifier = ">=3.10.3" },
-    { name = "openai", specifier = ">=2.8.1" },
-    { name = "pydantic", specifier = ">=2.12.5" },
-    { name = "pydantic-settings", specifier = ">=2.12.0" },
-    { name = "typer", specifier = ">=0.20.0" },
+    { name = "braintrust", marker = "extra == 'observability'", specifier = "~=0.3.9" },
+    { name = "langfuse", marker = "extra == 'observability'", specifier = "~=3.10.3" },
+    { name = "openai", specifier = "~=2.8.1" },
+    { name = "pydantic", specifier = "~=2.12.5" },
+    { name = "pydantic-settings", specifier = "~=2.12.0" },
+    { name = "typer", specifier = "~=0.20.0" },
 ]
 provides-extras = ["observability"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pre-commit", specifier = ">=4.5.0" },
-    { name = "pytest", specifier = ">=9.0.1" },
-    { name = "ruff", specifier = ">=0.14.7" },
-    { name = "ty", specifier = ">=0.0.1a29" },
+    { name = "pre-commit", specifier = "~=4.5.0" },
+    { name = "pytest", specifier = "~=9.0.1" },
+    { name = "ruff", specifier = "~=0.14.7" },
+    { name = "ty", specifier = "~=0.0.1a29" },
 ]
 
 [[package]]

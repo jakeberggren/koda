@@ -9,26 +9,26 @@ description = "KODA; a coding agent toolkit, CLI and extensible agent framework.
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "openai>=2.8.1",
-    "pydantic>=2.12.5",
-    "pydantic-settings>=2.12.0",
-    "typer>=0.20.0",
+    "openai~=2.8.1",
+    "pydantic~=2.12.5",
+    "pydantic-settings~=2.12.0",
+    "typer~=0.20.0",
 ]
 [project.scripts]
 koda = "koda.cli.main:main"
 
 [project.optional-dependencies]
 observability = [
-    "braintrust>=0.3.9",
-    "langfuse>=3.10.3",
+    "braintrust~=0.3.9",
+    "langfuse~=3.10.3",
 ]
 
 [dependency-groups]
 dev = [
-    "pre-commit>=4.5.0",
-    "pytest>=9.0.1",
-    "ruff>=0.14.7",
-    "ty>=0.0.1a29",
+    "pre-commit~=4.5.0",
+    "pytest~=9.0.1",
+    "ruff~=0.14.7",
+    "ty~=0.0.1a29",
 ]
 
 [tool.ruff]
