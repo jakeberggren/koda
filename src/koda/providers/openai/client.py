@@ -29,7 +29,7 @@ class OpenAIProvider(providers_base.Provider):
         self.model: str = model
         self._last_response_id: str | None = None
 
-    @observe(name="openai.chat")
+    @observe(name="openai.chat", as_type="generation")
     async def chat(self, messages: list[message.Message]) -> str:
         if not messages:
             raise exceptions.ProviderValidationError("Messages list cannot be empty")
@@ -68,7 +68,7 @@ class OpenAIProvider(providers_base.Provider):
             )
         return content.text
 
-    @observe(name="openai.stream")
+    @observe(name="openai.stream", as_type="generation")
     async def stream(self, messages: list[message.Message]) -> AsyncIterator[str]:
         if not messages:
             raise exceptions.ProviderValidationError("Messages list cannot be empty")

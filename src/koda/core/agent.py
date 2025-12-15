@@ -21,7 +21,7 @@ class Agent:
         if system_message:
             self._history.append(message.SystemMessage(content=system_message))
 
-    @observe(name="agent.chat")
+    @observe(name="agent.chat", as_type="agent")
     async def chat(self, user_text: str) -> str:
         if not user_text or not user_text.strip():
             raise exceptions.ProviderValidationError("Message cannot be empty")
@@ -42,7 +42,7 @@ class Agent:
 
         return response_text
 
-    @observe(name="agent.stream")
+    @observe(name="agent.stream", as_type="agent")
     async def stream(self, user_text: str) -> AsyncIterator[str]:
         if not user_text or not user_text.strip():
             raise exceptions.ProviderValidationError("Message cannot be empty")
