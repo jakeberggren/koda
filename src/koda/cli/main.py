@@ -82,7 +82,7 @@ def chat(
     typer.echo("Type 'exit' or 'quit' to end the session.\n")
 
     app_settings = settings.get_settings()
-    observability.create_observer(settings=app_settings)
+    _observer: observability.LangfuseObserver = observability.create_observer(settings=app_settings)
     try:
         provider_instance = _create_provider(provider, model, app_settings)
         provider_name = (provider or "openai").lower()
