@@ -9,6 +9,7 @@ from openai import (
     AuthenticationError,
     RateLimitError,
 )
+from openai.types.responses import ResponseCompletedEvent, ResponseTextDeltaEvent
 
 from koda.core import message
 from koda.providers import base as providers_base
@@ -93,48 +94,10 @@ class OpenAIProvider(providers_base.Provider):
             raise exceptions.ProviderAPIError(f"OpenAI API error: {e}") from e
 
         async for event in stream:
-            # Responses API streaming events have a 'type' field
-            # Check for text delta events
-            event_type = getattr(event, "type", None)
-            delta_text = None
-
-            if event_type:
-                event_type_lower = event_type.lower()
-
-                # Only process delta events - skip full text/output events to prevent duplication
-                # Delta events contain incremental text chunks
-                is_delta_event = "delta" in event_type_lower
-
-                if is_delta_event:
-                    # Try different possible locations for delta text
-                    # Stop as soon as we find text in any location to avoid duplication
-                    # Check event.data.delta first
-                    if hasattr(event, "data"):
-                        data = event.data
-                        if hasattr(data, "delta") and data.delta:
-                            delta_text = data.delta
-                        elif hasattr(data, "text") and data.text:
-                            delta_text = data.text
-
-                    # Check event.delta directly (only if not found in data)
-                    if not delta_text and hasattr(event, "delta") and event.delta:
-                        delta_text = event.delta
-
-                    # Check event.text (only if not found elsewhere)
-                    if not delta_text and hasattr(event, "text") and event.text:
-                        delta_text = event.text
-
-                # Handle completed events to get response ID (but don't yield text from them)
-                if "completed" in event_type_lower and hasattr(event, "id"):
-                    event_id = getattr(event, "id", None)
-                    if event_id is not None and isinstance(event_id, str):
-                        self._last_response_id = event_id
-                    # Skip text extraction for completed events
-                    continue
-
-            # Yield the delta text only once per event (only for delta events)
-            if delta_text:
-                yield str(delta_text)
+            if isinstance(event, ResponseTextDeltaEvent):
+                yield event.delta
+            elif isinstance(event, ResponseCompletedEvent):
+                self._last_response_id = event.response.id
 
     def _messages_to_input(self, messages: list[message.Message]) -> str:
         parts = []

@@ -17,7 +17,6 @@ class Agent:
         self.system_message: str | None = system_message
         self._history: list[message.Message] = []
 
-        # Add system message to history if provided
         if system_message:
             self._history.append(message.SystemMessage(content=system_message))
 
