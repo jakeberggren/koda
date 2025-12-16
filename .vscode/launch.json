@@ -8,7 +8,7 @@
         "PYTHONPATH": "${workspaceFolder}/src"
       },
       "justMyCode": false,
-      "module": "agents.cli.main",
+      "module": "koda.cli.main",
       "name": "Python: Debug Typer CLI (chat)",
       "python": "${workspaceFolder}/.venv/bin/python",
       "request": "launch",
@@ -24,39 +24,8 @@
         "PYTHONPATH": "${workspaceFolder}/src"
       },
       "justMyCode": false,
-      "module": "agents.cli.main",
+      "module": "koda.cli.main",
       "name": "Python: Debug Typer CLI (chat with stream)",
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "request": "launch",
-      "type": "debugpy"
-    },
-    {
-      "args": [
-        "--observability",
-        "langfuse"
-      ],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/src"
-      },
-      "justMyCode": false,
-      "module": "agents.cli.main",
-      "name": "Python: Debug Typer CLI (chat with observability)",
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "request": "launch",
-      "type": "debugpy"
-    },
-    {
-      "args": [],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/src"
-      },
-      "justMyCode": false,
-      "module": "agents.cli.main",
-      "name": "Python: Debug Typer CLI (custom args)",
       "python": "${workspaceFolder}/.venv/bin/python",
       "request": "launch",
       "type": "debugpy"
