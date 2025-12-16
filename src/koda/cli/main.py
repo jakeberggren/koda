@@ -1,7 +1,9 @@
 import asyncio
+import random
 import sys
 
 import typer
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from typer.main import Typer
 
 from koda import core, observability
@@ -32,6 +34,20 @@ def _create_provider(
         raise typer.Exit(1)
 
 
+def _get_random_thinking_message() -> str:
+    return random.choice(  # noqa: S311
+        [
+            "Koda is up to something good...",
+            "Koda is in the zone...",
+            "Koda is getting the job done...",
+            "Koda is hard at work...",
+            "Koda is on it...",
+            "Koda is plotting next move...",
+            "Koda is deep in the weeds...",
+        ]
+    )
+
+
 async def _run_chat_loop(agent: core.agent.Agent, stream: bool) -> None:
     while True:
         try:
@@ -45,14 +61,26 @@ async def _run_chat_loop(agent: core.agent.Agent, stream: bool) -> None:
 
             try:
                 typer.echo()  # Newline
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    transient=True,
+                ) as progress:
+                    progress.add_task(_get_random_thinking_message())
+                    if stream:
+                        stream_iter = agent.stream(user_input)
+                        # In stream mode, show spinner until first chunk.
+                        first_chunk = await anext(stream_iter)
+                    else:
+                        response = await agent.chat(user_input)
                 if stream:
-                    typer.echo("Assistant: ", nl=False)
-                    async for chunk in agent.stream(user_input):
+                    typer.echo("Koda: ", nl=False)
+                    typer.echo(first_chunk, nl=False)
+                    async for chunk in stream_iter:
                         typer.echo(chunk, nl=False)
-                    typer.echo()  # Newline
+                    typer.echo("\n")
                 else:
-                    response = await agent.chat(user_input)
-                    typer.echo(f"Assistant: {response}")
+                    typer.echo(f"Koda: {response}")
                     typer.echo()  # Newline
             except exceptions.ProviderRateLimitError as e:
                 typer.echo(f"Error: Rate limit exceeded. {e}", err=True)
