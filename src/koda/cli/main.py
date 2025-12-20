@@ -85,6 +85,8 @@ async def _run_chat_loop(agent: core.agent.Agent) -> None:
                 typer.echo(f"Error: API error occurred. {e}", err=True)
             except exceptions.ProviderError as e:
                 typer.echo(f"Error: {e}", err=True)
+            except exceptions.ToolError as e:
+                typer.echo(f"Error: {e}", err=True)
 
         except (EOFError, KeyboardInterrupt):
             typer.echo("\nGoodbye!")
