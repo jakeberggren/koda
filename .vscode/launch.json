@@ -9,23 +9,7 @@
       },
       "justMyCode": false,
       "module": "koda.cli.main",
-      "name": "Python: Debug Typer CLI (chat)",
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "request": "launch",
-      "type": "debugpy"
-    },
-    {
-      "args": [
-        "-s"
-      ],
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}",
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/src"
-      },
-      "justMyCode": false,
-      "module": "koda.cli.main",
-      "name": "Python: Debug Typer CLI (chat with stream)",
+      "name": "Python: Debug CLI",
       "python": "${workspaceFolder}/.venv/bin/python",
       "request": "launch",
       "type": "debugpy"
