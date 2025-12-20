@@ -1,0 +1,210 @@
+from pathlib import Path
+
+from pydantic import BaseModel, Field
+
+from koda.tools.base import ToolResult
+
+BLACKLISTED_FILES = [".env", ".env.local", ".DS_Store", ".ds_store", ".gitignore"]
+
+
+class ReadFileParams(BaseModel):
+    """Parameters for reading a file."""
+
+    path: str = Field(..., description="Path to the file to read")
+
+
+class ReadFileTool:
+    """Tool for reading file contents."""
+
+    def __init__(self) -> None:
+        self.name: str = "read_file"
+        self.description: str = "Read the contents of a file from the filesystem"
+        self.parameters_model: type[BaseModel] = ReadFileParams
+
+    async def execute(self, params: ReadFileParams) -> ToolResult:
+        """Execute the read_file tool. Reading .env files is explicitly forbidden."""
+        try:
+            file_path = Path(params.path)
+            # Prevent directory traversal by resolving relative paths
+            if not file_path.is_absolute():
+                file_path = file_path.resolve()
+
+            # Deny reading of .env files regardless of location or casing
+            if file_path.name.lower() in BLACKLISTED_FILES:
+                return ToolResult(
+                    content=None,
+                    is_error=True,
+                    error_message="Reading '.env' files is not allowed.",
+                )
+
+            if not file_path.exists():
+                return ToolResult(
+                    content=None,
+                    is_error=True,
+                    error_message=f"File not found: {params.path}",
+                )
+
+            if not file_path.is_file():
+                return ToolResult(
+                    content=None,
+                    is_error=True,
+                    error_message=f"Path is not a file: {params.path}",
+                )
+
+            content = file_path.read_text(encoding="utf-8")
+            return ToolResult(content=content, is_error=False)
+
+        except PermissionError as e:
+            return ToolResult(
+                content=None,
+                is_error=True,
+                error_message=f"Permission denied: {e}",
+            )
+        except Exception as e:
+            return ToolResult(
+                content=None,
+                is_error=True,
+                error_message=f"Error reading file: {e}",
+            )
+
+
+class WriteFileParams(BaseModel):
+    """Parameters for writing a file."""
+
+    path: str = Field(..., description="Path to the file to write")
+    content: str = Field(..., description="Content to write to the file")
+
+
+class WriteFileTool:
+    """Tool for writing file contents."""
+
+    def __init__(self) -> None:
+        self.name: str = "write_file"
+        self.description: str = "Write content to a file on the filesystem"
+        self.parameters_model: type[BaseModel] = WriteFileParams
+
+    async def execute(self, params: WriteFileParams) -> ToolResult:
+        """Execute the write_file tool."""
+        try:
+            file_path = Path(params.path)
+            # Basic security: prevent directory traversal
+            if not file_path.is_absolute():
+                file_path = file_path.resolve()
+
+            # Create parent directories if they don't exist
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            file_path.write_text(params.content, encoding="utf-8")
+            return ToolResult(
+                content={"success": True, "path": str(file_path)},
+                is_error=False,
+            )
+
+        except PermissionError as e:
+            return ToolResult(
+                content=None,
+                is_error=True,
+                error_message=f"Permission denied: {e}",
+            )
+        except Exception as e:
+            return ToolResult(
+                content=None,
+                is_error=True,
+                error_message=f"Error writing file: {e}",
+            )
+
+
+class ListDirectoryParams(BaseModel):
+    """Parameters for listing a directory."""
+
+    path: str = Field(default=".", description="Path to the directory to list")
+
+
+class ListDirectoryTool:
+    """Tool for listing directory contents."""
+
+    def __init__(self) -> None:
+        self.name: str = "list_directory"
+        self.description: str = "List the contents of a directory"
+        self.parameters_model: type[BaseModel] = ListDirectoryParams
+
+    async def execute(self, params: ListDirectoryParams) -> ToolResult:
+        """Execute the list_directory tool."""
+        try:
+            dir_path = Path(params.path)
+            if not dir_path.is_absolute():
+                dir_path = dir_path.resolve()
+
+            if not dir_path.exists():
+                return ToolResult(
+                    content=None,
+                    is_error=True,
+                    error_message=f"Directory not found: {params.path}",
+                )
+
+            if not dir_path.is_dir():
+                return ToolResult(
+                    content=None,
+                    is_error=True,
+                    error_message=f"Path is not a directory: {params.path}",
+                )
+
+            items = []
+            for item in dir_path.iterdir():
+                items.append(
+                    {
+                        "name": item.name,
+                        "type": "directory" if item.is_dir() else "file",
+                        "path": str(item),
+                    }
+                )
+
+            return ToolResult(content=items, is_error=False)
+
+        except PermissionError as e:
+            return ToolResult(
+                content=None,
+                is_error=True,
+                error_message=f"Permission denied: {e}",
+            )
+        except Exception as e:
+            return ToolResult(
+                content=None,
+                is_error=True,
+                error_message=f"Error listing directory: {e}",
+            )
+
+
+class FileExistsParams(BaseModel):
+    """Parameters for checking if a file exists."""
+
+    path: str = Field(..., description="Path to check")
+
+
+class FileExistsTool:
+    """Tool for checking if a file exists."""
+
+    def __init__(self) -> None:
+        self.name: str = "file_exists"
+        self.description: str = "Check if a file or directory exists"
+        self.parameters_model: type[BaseModel] = FileExistsParams
+
+    async def execute(self, params: FileExistsParams) -> ToolResult:
+        """Execute the file_exists tool."""
+        try:
+            file_path = Path(params.path)
+            if not file_path.is_absolute():
+                file_path = file_path.resolve()
+
+            exists = file_path.exists()
+            return ToolResult(
+                content={"exists": exists, "path": str(file_path)},
+                is_error=False,
+            )
+
+        except Exception as e:
+            return ToolResult(
+                content=None,
+                is_error=True,
+                error_message=f"Error checking file existence: {e}",
+            )

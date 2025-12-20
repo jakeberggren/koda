@@ -12,6 +12,12 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: SecretStr = Field(
         default=SecretStr(""), description="The API key for the Anthropic API"
     )
+    KODA_DEFAULT_PROVIDER: str = Field(
+        default="openai", description="The default provider to use for the Koda agent"
+    )
+    KODA_DEFAULT_MODEL: str = Field(
+        default="gpt-5.2", description="The default model to use for the Koda agent"
+    )
     LANGFUSE_SECRET_KEY: SecretStr = Field(
         default=SecretStr(""), description="Secret key for Langfuse observability platform"
     )
