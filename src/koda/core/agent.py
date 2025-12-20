@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator
 
 from langfuse import observe
@@ -5,6 +6,7 @@ from langfuse import observe
 from koda import providers
 from koda.core import message
 from koda.providers import TextDelta, ToolCallRequested
+from koda.tools import ToolDefinition
 from koda.tools.base import ToolCall, ToolResult
 from koda.tools.registry import ToolRegistry
 from koda.utils import exceptions
@@ -110,7 +112,7 @@ class Agent:
     def _build_messages(self) -> list[message.Message]:
         return self._history.copy()
 
-    def _build_tool_definitions(self) -> list:
+    def _build_tool_definitions(self) -> list[ToolDefinition]:
         """Get tool definitions from registry."""
         if not self.tool_registry:
             return []
@@ -118,8 +120,6 @@ class Agent:
 
     async def _execute_tools(self, tool_calls: list[ToolCall]) -> list[ToolResult]:
         """Execute multiple tools in parallel."""
-        import asyncio
-
         if not self.tool_registry:
             raise exceptions.ToolError("No tool registry available")
 

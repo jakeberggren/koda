@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Any, Protocol
 
 from pydantic import BaseModel
@@ -15,7 +17,7 @@ class Tool(Protocol):
     parameters_model: type[BaseModel]
     """Pydantic model for validating tool parameters."""
 
-    async def execute(self, params: BaseModel) -> "ToolResult":
+    async def execute(self, params: BaseModel) -> ToolResult:
         """Execute the tool with validated parameters."""
         ...
 

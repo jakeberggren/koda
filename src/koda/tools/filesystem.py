@@ -23,49 +23,31 @@ class ReadFileTool:
 
     async def execute(self, params: ReadFileParams) -> ToolResult:
         """Execute the read_file tool. Reading .env files is explicitly forbidden."""
-        try:
-            file_path = Path(params.path)
-            # Prevent directory traversal by resolving relative paths
-            if not file_path.is_absolute():
-                file_path = file_path.resolve()
+        file_path = Path(params.path)
+        # Prevent directory traversal by resolving relative paths
+        if not file_path.is_absolute():
+            file_path = file_path.resolve()
 
-            # Deny reading of .env files regardless of location or casing
-            if file_path.name.lower() in BLACKLISTED_FILES:
-                return ToolResult(
-                    content=None,
-                    is_error=True,
-                    error_message="Reading '.env' files is not allowed.",
-                )
-
-            if not file_path.exists():
-                return ToolResult(
-                    content=None,
-                    is_error=True,
-                    error_message=f"File not found: {params.path}",
-                )
-
-            if not file_path.is_file():
-                return ToolResult(
-                    content=None,
-                    is_error=True,
-                    error_message=f"Path is not a file: {params.path}",
-                )
-
-            content = file_path.read_text(encoding="utf-8")
-            return ToolResult(content=content, is_error=False)
-
-        except PermissionError as e:
+        # Deny reading of .env files regardless of location or casing
+        # This is a business rule, so return ToolResult directly
+        if file_path.name.lower() in BLACKLISTED_FILES:
             return ToolResult(
                 content=None,
                 is_error=True,
-                error_message=f"Permission denied: {e}",
+                error_message=f"Reading {file_path.name} is not allowed.",
             )
-        except Exception as e:
-            return ToolResult(
-                content=None,
-                is_error=True,
-                error_message=f"Error reading file: {e}",
-            )
+
+        # Let filesystem operations raise their natural exceptions
+        # The agent will catch and convert them to ToolResult
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {params.path}")
+
+        if not file_path.is_file():
+            raise IsADirectoryError(f"Path is not a file: {params.path}")
+
+        # read_text will raise PermissionError if needed
+        content = file_path.read_text(encoding="utf-8")
+        return ToolResult(content=content, is_error=False)
 
 
 class WriteFileParams(BaseModel):
@@ -85,33 +67,29 @@ class WriteFileTool:
 
     async def execute(self, params: WriteFileParams) -> ToolResult:
         """Execute the write_file tool."""
-        try:
-            file_path = Path(params.path)
-            # Basic security: prevent directory traversal
-            if not file_path.is_absolute():
-                file_path = file_path.resolve()
+        file_path = Path(params.path)
+        # Basic security: prevent directory traversal
+        if not file_path.is_absolute():
+            file_path = file_path.resolve()
 
-            # Create parent directories if they don't exist
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-
-            file_path.write_text(params.content, encoding="utf-8")
-            return ToolResult(
-                content={"success": True, "path": str(file_path)},
-                is_error=False,
-            )
-
-        except PermissionError as e:
+        # Business rule: deny writing to blacklisted files
+        if file_path.name.lower() in BLACKLISTED_FILES:
             return ToolResult(
                 content=None,
                 is_error=True,
-                error_message=f"Permission denied: {e}",
+                error_message=f"Writing to {file_path.name} is not allowed.",
             )
-        except Exception as e:
-            return ToolResult(
-                content=None,
-                is_error=True,
-                error_message=f"Error writing file: {e}",
-            )
+
+        # Create parent directories if they don't exist
+        # mkdir may raise PermissionError - let it propagate
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # write_text will raise PermissionError if needed
+        file_path.write_text(params.content, encoding="utf-8")
+        return ToolResult(
+            content={"success": True, "path": str(file_path)},
+            is_error=False,
+        )
 
 
 class ListDirectoryParams(BaseModel):
@@ -130,49 +108,28 @@ class ListDirectoryTool:
 
     async def execute(self, params: ListDirectoryParams) -> ToolResult:
         """Execute the list_directory tool."""
-        try:
-            dir_path = Path(params.path)
-            if not dir_path.is_absolute():
-                dir_path = dir_path.resolve()
+        dir_path = Path(params.path)
+        if not dir_path.is_absolute():
+            dir_path = dir_path.resolve()
 
-            if not dir_path.exists():
-                return ToolResult(
-                    content=None,
-                    is_error=True,
-                    error_message=f"Directory not found: {params.path}",
-                )
+        if not dir_path.exists():
+            raise FileNotFoundError(f"Directory not found: {params.path}")
 
-            if not dir_path.is_dir():
-                return ToolResult(
-                    content=None,
-                    is_error=True,
-                    error_message=f"Path is not a directory: {params.path}",
-                )
+        if not dir_path.is_dir():
+            raise NotADirectoryError(f"Path is not a directory: {params.path}")
 
-            items = []
-            for item in dir_path.iterdir():
-                items.append(
-                    {
-                        "name": item.name,
-                        "type": "directory" if item.is_dir() else "file",
-                        "path": str(item),
-                    }
-                )
-
-            return ToolResult(content=items, is_error=False)
-
-        except PermissionError as e:
-            return ToolResult(
-                content=None,
-                is_error=True,
-                error_message=f"Permission denied: {e}",
+        # iterdir will raise PermissionError if needed
+        items = []
+        for item in dir_path.iterdir():
+            items.append(
+                {
+                    "name": item.name,
+                    "type": "directory" if item.is_dir() else "file",
+                    "path": str(item),
+                }
             )
-        except Exception as e:
-            return ToolResult(
-                content=None,
-                is_error=True,
-                error_message=f"Error listing directory: {e}",
-            )
+
+        return ToolResult(content=items, is_error=False)
 
 
 class FileExistsParams(BaseModel):
@@ -191,20 +148,13 @@ class FileExistsTool:
 
     async def execute(self, params: FileExistsParams) -> ToolResult:
         """Execute the file_exists tool."""
-        try:
-            file_path = Path(params.path)
-            if not file_path.is_absolute():
-                file_path = file_path.resolve()
+        file_path = Path(params.path)
+        if not file_path.is_absolute():
+            file_path = file_path.resolve()
 
-            exists = file_path.exists()
-            return ToolResult(
-                content={"exists": exists, "path": str(file_path)},
-                is_error=False,
-            )
-
-        except Exception as e:
-            return ToolResult(
-                content=None,
-                is_error=True,
-                error_message=f"Error checking file existence: {e}",
-            )
+        # exists() shouldn't raise exceptions, but if it does, let it propagate
+        exists = file_path.exists()
+        return ToolResult(
+            content={"exists": exists, "path": str(file_path)},
+            is_error=False,
+        )
