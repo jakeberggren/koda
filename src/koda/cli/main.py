@@ -125,16 +125,7 @@ def run(
         tool_registry.register(filesystem.ListDirectoryTool(sandbox_dir=sandbox_dir))
         tool_registry.register(filesystem.FileExistsTool(sandbox_dir=sandbox_dir))
 
-        # Create agent with system message explaining available tools
-        system_message = (
-            "You are Koda, an AI coding assistant. You have access to the following tools:\n\n"
-            "1. read_file - Read the contents of a file from the filesystem\n"
-            "2. write_file - Write content to a file on the filesystem\n"
-            "3. list_directory - List the contents of a directory\n"
-            "4. file_exists - Check if a file or directory exists\n\n"
-            "Use these tools when the user asks you to read, write, list, or check files. "
-            "Always use the appropriate tool to accomplish file-related tasks."
-        )
+        system_message = Path("src/koda/cli/system_message.md").read_text(encoding="utf-8")
 
         agent = core.agent.Agent(
             provider=provider_instance,
