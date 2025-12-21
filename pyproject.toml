@@ -9,7 +9,7 @@ description = "KODA; a coding agent toolkit, CLI and extensible agent framework.
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "openai~=2.8.1",
+    "openai~=2.14.0",
     "pydantic~=2.12.5",
     "pydantic-settings~=2.12.0",
     "typer~=0.20.0",
