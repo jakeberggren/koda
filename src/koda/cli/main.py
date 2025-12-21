@@ -10,7 +10,7 @@ from typer.main import Typer
 
 from koda import core, observability
 from koda.config import settings
-from koda.providers import TextDelta, openai
+from koda.providers import OpenAIProvider, Provider, TextDelta
 from koda.tools import filesystem, registry
 from koda.utils import exceptions
 
@@ -23,14 +23,14 @@ app: Typer = typer.Typer(
 
 def _create_provider(
     provider_name: str | None, model: str | None, settings: settings.Settings
-) -> openai.OpenAIProvider:
+) -> Provider:
     # Default to OpenAI if no provider specified
     provider_name = (provider_name or "openai").lower()
 
     if provider_name == "openai":
         api_key = settings.OPENAI_API_KEY.get_secret_value()
         provider_model = model or settings.KODA_DEFAULT_MODEL
-        return openai.OpenAIProvider(api_key=api_key, model=provider_model)
+        return OpenAIProvider(api_key=api_key, model=provider_model)
     else:
         typer.echo(f"Error: Provider '{provider_name}' is not supported yet.", err=True)
         typer.echo("Supported providers: openai", err=True)
