@@ -24,9 +24,7 @@ class ReadFileTool:
     async def execute(self, params: ReadFileParams) -> ToolResult:
         """Execute the read_file tool. Reading .env files is explicitly forbidden."""
         file_path = Path(params.path)
-        # Prevent directory traversal by resolving relative paths
-        if not file_path.is_absolute():
-            file_path = file_path.resolve()
+        file_path = file_path.resolve()
 
         # Deny reading of .env files regardless of location or casing
         # This is a business rule, so return ToolResult directly
@@ -68,9 +66,7 @@ class WriteFileTool:
     async def execute(self, params: WriteFileParams) -> ToolResult:
         """Execute the write_file tool."""
         file_path = Path(params.path)
-        # Basic security: prevent directory traversal
-        if not file_path.is_absolute():
-            file_path = file_path.resolve()
+        file_path = file_path.resolve()
 
         # Business rule: deny writing to blacklisted files
         if file_path.name.lower() in BLACKLISTED_FILES:
@@ -109,8 +105,7 @@ class ListDirectoryTool:
     async def execute(self, params: ListDirectoryParams) -> ToolResult:
         """Execute the list_directory tool."""
         dir_path = Path(params.path)
-        if not dir_path.is_absolute():
-            dir_path = dir_path.resolve()
+        dir_path = dir_path.resolve()
 
         if not dir_path.exists():
             raise FileNotFoundError(f"Directory not found: {params.path}")
@@ -149,8 +144,7 @@ class FileExistsTool:
     async def execute(self, params: FileExistsParams) -> ToolResult:
         """Execute the file_exists tool."""
         file_path = Path(params.path)
-        if not file_path.is_absolute():
-            file_path = file_path.resolve()
+        file_path = file_path.resolve()
 
         # exists() shouldn't raise exceptions, but if it does, let it propagate
         exists = file_path.exists()
