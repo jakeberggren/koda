@@ -1,6 +1,7 @@
 import asyncio
 import random
 import sys
+from pathlib import Path
 
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -116,12 +117,13 @@ def run(
         typer.echo(f"Using model: {model}")
         typer.echo()
 
-        # Create tool registry and register tools
+        # Create tool registry and register tools within the sandbox
+        sandbox_dir = Path.cwd().resolve()
         tool_registry = registry.ToolRegistry()
-        tool_registry.register(filesystem.ReadFileTool())
-        tool_registry.register(filesystem.WriteFileTool())
-        tool_registry.register(filesystem.ListDirectoryTool())
-        tool_registry.register(filesystem.FileExistsTool())
+        tool_registry.register(filesystem.ReadFileTool(sandbox_dir=sandbox_dir))
+        tool_registry.register(filesystem.WriteFileTool(sandbox_dir=sandbox_dir))
+        tool_registry.register(filesystem.ListDirectoryTool(sandbox_dir=sandbox_dir))
+        tool_registry.register(filesystem.FileExistsTool(sandbox_dir=sandbox_dir))
 
         # Create agent with system message explaining available tools
         system_message = (
