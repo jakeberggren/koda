@@ -1,4 +1,5 @@
 import asyncio
+import importlib.resources
 import random
 import sys
 from pathlib import Path
@@ -125,7 +126,8 @@ def run(
         tool_registry.register(filesystem.ListDirectoryTool(sandbox_dir=sandbox_dir))
         tool_registry.register(filesystem.FileExistsTool(sandbox_dir=sandbox_dir))
 
-        system_message = Path("src/koda/cli/system_message.md").read_text(encoding="utf-8")
+        system_message_path = importlib.resources.files("koda.cli").joinpath("system_message.md")
+        system_message = system_message_path.read_text(encoding="utf-8")
 
         agent = core.agent.Agent(
             provider=provider_instance,
