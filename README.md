@@ -11,6 +11,12 @@
 </pre>
 </div>
 
+KODA is an agentic coding assistant designed for the terminal. KODA is built to understand,
+navigate and safely modify real codebases, as a complete coding companion for end-to-end software creation.
+
+The current state of KODA is a lightweight, provider-agnostic agent framework with a simple CLI for running
+and testing interactive chat agents. Future improvements include persistent sessions, a fully built-out TUI, and
+more advanced tooling for improved codebase navigation and safe editing capabilities.
 
 ## CLI Usage
 
@@ -31,27 +37,6 @@ With provider and model options:
 ```bash
 koda --provider openai --model gpt-5.1
 koda -p anthropic -m claude-opus-4-5
-```
-
-#### Streaming Responses
-
-Enable streaming mode in the interactive session:
-
-```bash
-koda --stream
-```
-
-Or use the short flag:
-
-```bash
-koda -s
-```
-
-With provider and model options:
-
-```bash
-koda --stream --provider openai --model gpt-4
-koda -s -p anthropic -m claude-3-opus
 ```
 
 Type `exit`, `quit`, or `q` to end the session.
