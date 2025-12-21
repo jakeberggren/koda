@@ -55,6 +55,12 @@ class Agent:
                 elif isinstance(chunk, ToolCallRequested):
                     pending_tool_calls.append(chunk.call)
 
+            # Save assistant message with text content if any, even when tool calls are present
+            response_text = "".join(response_chunks)
+            if response_text:
+                assistant_message = message.AssistantMessage(content=response_text)
+                self._history.append(assistant_message)
+
             if pending_tool_calls:
                 tool_results = await self._execute_tools(pending_tool_calls)
 
@@ -72,10 +78,6 @@ class Agent:
 
                 continue
 
-            response_text = "".join(response_chunks)
-            if response_text:
-                assistant_message = message.AssistantMessage(content=response_text)
-                self._history.append(assistant_message)
             return
 
         # Max iterations exceeded
