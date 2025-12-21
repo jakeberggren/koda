@@ -6,9 +6,7 @@ updates:
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "sunday"
-      time: "09:00"
+      interval: "daily"
     commit-message:
       prefix: "chore"
       include: "scope"
@@ -16,9 +14,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "sunday"
-      time: "09:00"
+      interval: "daily"
     commit-message:
       prefix: "chore"
       include: "scope"
