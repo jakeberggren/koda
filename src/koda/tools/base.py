@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Tool(Protocol):
@@ -23,11 +23,13 @@ class Tool(Protocol):
 
 
 class ToolDefinition(BaseModel):
-    """Serializable definition of a tool for provider communication."""
+    """Provider-agnostic tool definition."""
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: str
     description: str
-    parameters: dict[str, Any]
+    parameters_model: type[BaseModel] = Field(exclude=True)
 
 
 class ToolCall(BaseModel):
