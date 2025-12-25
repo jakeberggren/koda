@@ -2,18 +2,17 @@ from collections.abc import AsyncIterator
 from typing import Protocol
 
 from koda.core import message
+from koda.providers.adapter import ProviderAdapter
 from koda.providers.events import ProviderEvent
-from koda.tools.base import ToolCall, ToolDefinition
-
-
-class ToolCallResponse:
-    """Response containing tool calls instead of text."""
-
-    def __init__(self, tool_calls: list[ToolCall]) -> None:
-        self.tool_calls = tool_calls
+from koda.tools.base import ToolDefinition
 
 
 class Provider(Protocol):
+    """Protocol for AI providers."""
+
+    adapter: ProviderAdapter
+    """Adapter for converting to/from provider-specific formats."""
+
     def stream(
         self, messages: list[message.Message], tools: list[ToolDefinition] | None = None
     ) -> AsyncIterator[ProviderEvent]: ...

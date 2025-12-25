@@ -1,7 +1,6 @@
 from typing import Any
 
 from koda.tools.base import Tool, ToolDefinition
-from koda.tools.utils import pydantic_model_to_json_schema
 
 
 class ToolRegistry:
@@ -26,17 +25,14 @@ class ToolRegistry:
 
     def get_definitions(self) -> list[ToolDefinition]:
         """Get tool definitions for all registered tools."""
-        definitions = []
-        for tool in self._tools.values():
-            schema = pydantic_model_to_json_schema(tool.parameters_model)
-            definitions.append(
-                ToolDefinition(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=schema,
-                )
+        return [
+            ToolDefinition(
+                name=tool.name,
+                description=tool.description,
+                parameters_model=tool.parameters_model,
             )
-        return definitions
+            for tool in self._tools.values()
+        ]
 
     def clear(self) -> None:
         """Clear all registered tools."""
