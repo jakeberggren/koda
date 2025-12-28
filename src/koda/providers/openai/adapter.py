@@ -75,7 +75,7 @@ class OpenAIAdapter(ProviderAdapter):
         self, tools: list[ToolDefinition] | None
     ) -> list[FunctionToolParam] | Omit:
         """Convert tool definitions to OpenAI format."""
-        if tools is None:
+        if not tools:
             return omit
         return [self.adapt_tool_definition(tool) for tool in tools]
 
