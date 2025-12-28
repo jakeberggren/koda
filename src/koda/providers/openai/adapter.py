@@ -62,10 +62,6 @@ class OpenAIAdapter(ProviderAdapter):
             parameters=fn["parameters"],
             strict=fn.get("strict", True),
         )
-
-        import pprint
-
-        pprint.pprint(tool_param)
         return tool_param
 
     def adapt_tool_definitions(
