@@ -95,8 +95,6 @@ class Agent:
         if system_msg:
             self._history.append(system_msg)
 
-        self._tool_definitions = None
-
     def reset(self) -> None:
         self.clear_history()
 
