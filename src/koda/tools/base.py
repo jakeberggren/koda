@@ -37,7 +37,7 @@ class ToolCall(BaseModel):
 
     tool_name: str
     arguments: dict[str, Any]
-    call_id: str | None = None
+    call_id: str
 
 
 class ToolResult(BaseModel):
