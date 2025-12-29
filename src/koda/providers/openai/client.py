@@ -47,7 +47,7 @@ class OpenAIProvider(Provider):
 
         # Use adapter to convert messages and tools
         openai_input = self.adapter.adapt_messages(messages)
-        openai_tools = self.adapter.adapt_tool_definitions(tools)
+        openai_tools = self.adapter.adapt_tools(tools)
 
         try:
             stream = await self.client.responses.create(

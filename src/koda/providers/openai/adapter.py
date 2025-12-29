@@ -53,8 +53,8 @@ class OpenAIAdapter(ProviderAdapter):
                 )
         return result
 
-    def adapt_tool_definition(self, tool: ToolDefinition) -> FunctionToolParam:
-        """Convert tool definition to OpenAI format."""
+    def _adapt_tool(self, tool: ToolDefinition) -> FunctionToolParam:
+        """Convert a single tool definition to OpenAI format."""
         chat_tool = openai.pydantic_function_tool(
             tool.parameters_model,
             name=tool.name,
@@ -71,13 +71,11 @@ class OpenAIAdapter(ProviderAdapter):
         )
         return tool_param
 
-    def adapt_tool_definitions(
-        self, tools: list[ToolDefinition] | None
-    ) -> list[FunctionToolParam] | Omit:
+    def adapt_tools(self, tools: list[ToolDefinition] | None) -> list[FunctionToolParam] | Omit:
         """Convert tool definitions to OpenAI format."""
         if not tools:
             return omit
-        return [self.adapt_tool_definition(tool) for tool in tools]
+        return [self._adapt_tool(tool) for tool in tools]
 
     def parse_tool_calls(self, response: Response) -> list[ToolCall]:
         """Parse tool calls from OpenAI response."""
