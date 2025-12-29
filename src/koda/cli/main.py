@@ -8,7 +8,7 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from typer.main import Typer
 
-from koda import core, observability
+from koda import core
 from koda.config import settings
 from koda.providers import OpenAIProvider, Provider, TextDelta
 from koda.tools import filesystem, registry
@@ -108,7 +108,6 @@ def run(
     typer.echo("Type 'exit' or 'quit' to end the session.\n")
 
     app_settings = settings.get_settings()
-    _observer: observability.LangfuseObserver = observability.create_observer(settings=app_settings)
     try:
         provider = provider or app_settings.KODA_DEFAULT_PROVIDER
         model = model or app_settings.KODA_DEFAULT_MODEL

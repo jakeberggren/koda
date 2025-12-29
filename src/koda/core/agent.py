@@ -1,8 +1,6 @@
 import asyncio
 from collections.abc import AsyncIterator
 
-from langfuse import observe
-
 from koda import providers
 from koda.core import message
 from koda.providers import ProviderEvent, TextDelta, ToolCallRequested
@@ -28,7 +26,6 @@ class Agent:
         if system_message:
             self._history.append(message.SystemMessage(content=system_message))
 
-    @observe(name="agent.run", as_type="agent")
     async def run(self, user_text: str) -> AsyncIterator[ProviderEvent]:
         if not user_text or not user_text.strip():
             raise exceptions.ProviderValidationError("Message cannot be empty")

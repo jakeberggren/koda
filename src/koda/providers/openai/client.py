@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterator
 
-from langfuse import observe
 from openai import (
     APIConnectionError,
     APIError,
@@ -36,7 +35,6 @@ class OpenAIProvider(Provider):
         self.adapter: OpenAIAdapter = OpenAIAdapter()
         self._last_response_id: str | None = None
 
-    @observe(name="openai.stream", as_type="generation")
     async def stream(
         self,
         messages: list[message.Message],
