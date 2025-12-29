@@ -14,7 +14,8 @@ from openai.types.responses import (
 )
 
 from koda.core import message
-from koda.providers import Provider, TextDelta, ToolCallRequested
+from koda.providers.base import Provider
+from koda.providers.events import TextDelta, ToolCallRequested
 from koda.providers.openai.adapter import OpenAIAdapter
 from koda.tools import ToolDefinition
 from koda.utils import exceptions
@@ -55,6 +56,14 @@ class OpenAIProvider(Provider):
                 tools=openai_tools,
                 input=openai_input,
             )
+            async for event in stream:
+                if isinstance(event, ResponseTextDeltaEvent):
+                    yield TextDelta(text=event.delta)
+                elif isinstance(event, ResponseCompletedEvent):
+                    self._last_response_id = event.response.id
+                    tool_calls = self.adapter.parse_tool_calls(event.response)
+                    for call in tool_calls:
+                        yield ToolCallRequested(call=call)
         except RateLimitError as e:
             raise exceptions.ProviderRateLimitError(f"OpenAI rate limit exceeded: {e}") from e
         except AuthenticationError as e:
@@ -64,15 +73,6 @@ class OpenAIProvider(Provider):
             raise exceptions.ProviderAPIError(f"OpenAI connection error: {e}") from e
         except APIError as e:
             raise exceptions.ProviderAPIError(f"OpenAI API error: {e}") from e
-
-        async for event in stream:
-            if isinstance(event, ResponseTextDeltaEvent):
-                yield TextDelta(text=event.delta)
-            elif isinstance(event, ResponseCompletedEvent):
-                self._last_response_id = event.response.id
-                tool_calls = self.adapter.parse_tool_calls(event.response)
-                for call in tool_calls:
-                    yield ToolCallRequested(call=call)
 
     def reset_state(self) -> None:
         self._last_response_id = None

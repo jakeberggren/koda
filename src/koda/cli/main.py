@@ -10,7 +10,7 @@ from typer.main import Typer
 
 from koda.config import settings
 from koda.core.agent import Agent
-from koda.providers import OpenAIProvider, Provider, TextDelta
+from koda.providers import Provider, TextDelta, get_provider_registry
 from koda.tools import filesystem, registry
 from koda.utils import exceptions
 
@@ -22,19 +22,10 @@ app: Typer = typer.Typer(
 
 
 def _create_provider(
-    provider_name: str | None, model: str | None, settings: settings.Settings
+    provider_name: str | None, model: str | None, app_settings: settings.Settings
 ) -> Provider:
-    # Default to OpenAI if no provider specified
-    provider_name = (provider_name or "openai").lower()
-
-    if provider_name == "openai":
-        api_key = settings.OPENAI_API_KEY.get_secret_value()
-        provider_model = model or settings.KODA_DEFAULT_MODEL
-        return OpenAIProvider(api_key=api_key, model=provider_model)
-    else:
-        typer.echo(f"Error: Provider '{provider_name}' is not supported yet.", err=True)
-        typer.echo("Supported providers: openai", err=True)
-        raise typer.Exit(1)
+    provider_name = (provider_name or app_settings.KODA_DEFAULT_PROVIDER).lower()
+    return get_provider_registry().create(provider_name, app_settings, model=model)
 
 
 def _get_random_thinking_message() -> str:
@@ -109,12 +100,10 @@ def run(
 
     app_settings = settings.get_settings()
     try:
-        provider = provider or app_settings.KODA_DEFAULT_PROVIDER
-        model = model or app_settings.KODA_DEFAULT_MODEL
         provider_instance = _create_provider(provider, model, app_settings)
 
-        typer.echo(f"Using provider: {provider}")
-        typer.echo(f"Using model: {model}")
+        typer.echo(f"Using provider: {(provider or app_settings.KODA_DEFAULT_PROVIDER)}")
+        typer.echo(f"Using model: {(model or app_settings.KODA_DEFAULT_MODEL)}")
         typer.echo()
 
         # Create tool registry and register tools within the sandbox
@@ -136,6 +125,9 @@ def run(
 
         asyncio.run(_run_chat_loop(agent))
 
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1) from e
     except exceptions.ProviderValidationError as e:
         typer.echo(f"Error: {e}", err=True)
         raise typer.Exit(1) from e
