@@ -33,5 +33,4 @@ class SystemMessage(Message):
 class ToolMessage(Message):
     role: MessageRole = Field(default=MessageRole.TOOL, frozen=True)
     tool_name: str = Field()
-    result: ToolResult = Field()
-    call_id: str = Field()
+    tool_result: ToolResult = Field()

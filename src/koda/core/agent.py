@@ -6,7 +6,7 @@ from langfuse import observe
 from koda import providers
 from koda.core import message
 from koda.providers import ProviderEvent, TextDelta, ToolCallRequested
-from koda.tools.base import ToolCall, ToolResult
+from koda.tools.base import ToolCall, ToolOutput, ToolResult
 from koda.tools.registry import ToolRegistry
 from koda.utils import exceptions
 
@@ -67,8 +67,7 @@ class Agent:
                     self._history.append(
                         message.ToolMessage(
                             tool_name=tool_call.tool_name,
-                            result=tool_result,
-                            call_id=tool_call.call_id,
+                            tool_result=tool_result,
                         )
                     )
                 continue
@@ -108,9 +107,7 @@ class Agent:
         if self.tool_registry is None:
             return [
                 ToolResult(
-                    content=None,
-                    is_error=True,
-                    error_message="No tool registry configured",
+                    output=ToolOutput(is_error=True, error_message="No tool registry configured"),
                     call_id=call.call_id,
                 )
                 for call in tool_calls
@@ -122,9 +119,10 @@ class Agent:
             tool = registry.get(tool_call.tool_name)
             if not tool:
                 return ToolResult(
-                    content=None,
-                    is_error=True,
-                    error_message=f"Tool '{tool_call.tool_name}' not found",
+                    output=ToolOutput(
+                        is_error=True,
+                        error_message=f"Tool '{tool_call.tool_name}' not found",
+                    ),
                     call_id=tool_call.call_id,
                 )
 
@@ -132,21 +130,16 @@ class Agent:
                 params = tool.parameters_model.model_validate(tool_call.arguments)
             except Exception as e:
                 return ToolResult(
-                    content=None,
-                    is_error=True,
-                    error_message=f"Validation error: {e}",
+                    output=ToolOutput(is_error=True, error_message=f"Validation error: {e}"),
                     call_id=tool_call.call_id,
                 )
 
             try:
-                result = await tool.execute(params)
-                result.call_id = tool_call.call_id
-                return result
+                output = await tool.execute(params)
+                return ToolResult(output=output, call_id=tool_call.call_id)
             except Exception as e:
                 return ToolResult(
-                    content=None,
-                    is_error=True,
-                    error_message=f"Execution error: {e}",
+                    output=ToolOutput(is_error=True, error_message=f"Execution error: {e}"),
                     call_id=tool_call.call_id,
                 )
 

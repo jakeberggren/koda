@@ -1,5 +1,3 @@
-from typing import Any
-
 from koda.tools.base import Tool, ToolDefinition
 
 
@@ -9,7 +7,7 @@ class ToolRegistry:
     def __init__(self) -> None:
         self._tools: dict[str, Tool] = {}
 
-    def register(self, tool: Any) -> None:
+    def register(self, tool: Tool) -> None:
         """Register a tool in the registry."""
         if tool.name in self._tools:
             raise ValueError(f"Tool '{tool.name}' is already registered")

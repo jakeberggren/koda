@@ -7,7 +7,7 @@ from openai.types.responses.response_input_param import FunctionCallOutput
 
 from koda.core import message
 from koda.providers.openai.adapter import OpenAIAdapter
-from koda.tools.base import ToolResult
+from koda.tools.base import ToolOutput, ToolResult
 
 
 def test_adapt_messages_includes_tool_error_metadata() -> None:
@@ -15,11 +15,11 @@ def test_adapt_messages_includes_tool_error_metadata() -> None:
 
     tool_msg = message.ToolMessage(
         tool_name="some_tool",
-        call_id="call_123",
-        result=ToolResult(
-            content=None,
-            is_error=True,
-            error_message="boom",
+        tool_result=ToolResult(
+            output=ToolOutput(
+                is_error=True,
+                error_message="boom",
+            ),
             call_id="call_123",
         ),
     )
@@ -32,7 +32,7 @@ def test_adapt_messages_includes_tool_error_metadata() -> None:
     assert item["call_id"] == "call_123"
 
     payload = json.loads(cast(str, item["output"]))
-    assert payload == {"content": None, "is_error": True, "error_message": "boom"}
+    assert payload == {"content": {}, "is_error": True, "error_message": "boom"}
 
 
 def test_adapt_messages_omits_error_message_when_none() -> None:
@@ -40,9 +40,9 @@ def test_adapt_messages_omits_error_message_when_none() -> None:
 
     tool_msg = message.ToolMessage(
         tool_name="some_tool",
-        call_id="call_123",
-        result=ToolResult(
-            content={"ok": True}, is_error=False, error_message=None, call_id="call_123"
+        tool_result=ToolResult(
+            output=ToolOutput(content={"ok": True}),
+            call_id="call_123",
         ),
     )
 

@@ -37,16 +37,17 @@ class OpenAIAdapter(ProviderAdapter):
                     EasyInputMessageParam(role="system", content=msg.content, type="message")
                 )
             if isinstance(msg, message.ToolMessage):
+                tool_output = msg.tool_result.output
                 output_data: dict[str, Any] = {
-                    "content": msg.result.content,
-                    "is_error": msg.result.is_error,
+                    "content": tool_output.content,
+                    "is_error": tool_output.is_error,
                 }
-                if msg.result.error_message:
-                    output_data["error_message"] = msg.result.error_message
+                if tool_output.error_message:
+                    output_data["error_message"] = tool_output.error_message
 
                 result.append(
                     FunctionCallOutput(
-                        call_id=msg.call_id,
+                        call_id=msg.tool_result.call_id,
                         output=json.dumps(output_data),
                         type="function_call_output",
                     )

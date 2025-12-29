@@ -1,23 +1,25 @@
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
+ParamsType = TypeVar("ParamsType", bound=BaseModel)
 
-class Tool(Protocol):
+
+class Tool(Protocol[ParamsType]):
     """Protocol for all tools that can be executed by the agent."""
 
     name: str
     """Unique identifier for the tool."""
 
     description: str
-    """Human-readable description of what the tool does."""
+    """Agent-readable description of what the tool does."""
 
-    parameters_model: type[BaseModel]
+    parameters_model: type[ParamsType]
     """Pydantic model for validating tool parameters."""
 
-    async def execute(self, params: BaseModel) -> ToolResult:
+    async def execute(self, params: ParamsType) -> ToolOutput:
         """Execute the tool with validated parameters."""
         ...
 
@@ -40,10 +42,16 @@ class ToolCall(BaseModel):
     call_id: str
 
 
+class ToolOutput(BaseModel):
+    """Pure execution result of a tool."""
+
+    content: dict[str, Any] = Field(default_factory=dict)
+    is_error: bool = False
+    error_message: str | None = None
+
+
 class ToolResult(BaseModel):
     """Represents the result of tool execution."""
 
-    content: str | dict[str, Any] | list[Any] | None
-    is_error: bool = False
-    error_message: str | None = None
-    call_id: str | None = None
+    output: ToolOutput
+    call_id: str

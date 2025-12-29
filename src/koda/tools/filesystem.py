@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from koda.tools.base import ToolResult
+from koda.tools.base import ToolOutput
 from koda.utils import exceptions
 
 BLACKLISTED_FILES = [".env", ".env.local", ".DS_Store", ".ds_store", ".gitignore"]
@@ -39,7 +39,7 @@ class ReadFileTool:
             Path(sandbox_dir).resolve() if sandbox_dir else Path.cwd().resolve()
         )
 
-    async def execute(self, params: ReadFileParams) -> ToolResult:
+    async def execute(self, params: ReadFileParams) -> ToolOutput:
         """Execute the read_file tool. Reading .env files is explicitly forbidden."""
         file_path = Path(params.path)
         file_path = file_path.resolve()
@@ -48,16 +48,14 @@ class ReadFileTool:
         _validate_path_in_sandbox(file_path, self.sandbox_dir)
 
         # Deny reading of .env files regardless of location or casing
-        # This is a business rule, so return ToolResult directly
         if file_path.name.lower() in BLACKLISTED_FILES:
-            return ToolResult(
-                content=None,
+            return ToolOutput(
                 is_error=True,
                 error_message=f"Reading {file_path.name} is not allowed.",
             )
 
         # Let filesystem operations raise their natural exceptions
-        # The agent will catch and convert them to ToolResult
+        # The agent will catch and convert them to ToolOutput
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {params.path}")
 
@@ -65,8 +63,8 @@ class ReadFileTool:
             raise IsADirectoryError(f"Path is not a file: {params.path}")
 
         # read_text will raise PermissionError if needed
-        content = file_path.read_text(encoding="utf-8")
-        return ToolResult(content=content, is_error=False)
+        text_content = file_path.read_text(encoding="utf-8")
+        return ToolOutput(content={"text": text_content})
 
 
 class WriteFileParams(BaseModel):
@@ -87,7 +85,7 @@ class WriteFileTool:
             Path(sandbox_dir).resolve() if sandbox_dir else Path.cwd().resolve()
         )
 
-    async def execute(self, params: WriteFileParams) -> ToolResult:
+    async def execute(self, params: WriteFileParams) -> ToolOutput:
         """Execute the write_file tool."""
         file_path = Path(params.path)
         file_path = file_path.resolve()
@@ -97,8 +95,7 @@ class WriteFileTool:
 
         # Business rule: deny writing to blacklisted files
         if file_path.name.lower() in BLACKLISTED_FILES:
-            return ToolResult(
-                content=None,
+            return ToolOutput(
                 is_error=True,
                 error_message=f"Writing to {file_path.name} is not allowed.",
             )
@@ -111,10 +108,7 @@ class WriteFileTool:
 
         # write_text will raise PermissionError if needed
         file_path.write_text(params.content, encoding="utf-8")
-        return ToolResult(
-            content={"success": True, "path": str(file_path)},
-            is_error=False,
-        )
+        return ToolOutput(content={"success": True, "path": str(file_path)})
 
 
 class ListDirectoryParams(BaseModel):
@@ -134,7 +128,7 @@ class ListDirectoryTool:
             Path(sandbox_dir).resolve() if sandbox_dir else Path.cwd().resolve()
         )
 
-    async def execute(self, params: ListDirectoryParams) -> ToolResult:
+    async def execute(self, params: ListDirectoryParams) -> ToolOutput:
         """Execute the list_directory tool."""
         dir_path = Path(params.path)
         dir_path = dir_path.resolve()
@@ -166,7 +160,7 @@ class ListDirectoryTool:
                 }
             )
 
-        return ToolResult(content=items, is_error=False)
+        return ToolOutput(content={"items": items})
 
 
 class FileExistsParams(BaseModel):
@@ -186,7 +180,7 @@ class FileExistsTool:
             Path(sandbox_dir).resolve() if sandbox_dir else Path.cwd().resolve()
         )
 
-    async def execute(self, params: FileExistsParams) -> ToolResult:
+    async def execute(self, params: FileExistsParams) -> ToolOutput:
         """Execute the file_exists tool."""
         file_path = Path(params.path)
         file_path = file_path.resolve()
@@ -196,7 +190,4 @@ class FileExistsTool:
 
         # exists() shouldn't raise exceptions, but if it does, let it propagate
         exists = file_path.exists()
-        return ToolResult(
-            content={"exists": exists, "path": str(file_path)},
-            is_error=False,
-        )
+        return ToolOutput(content={"exists": exists, "path": str(file_path)})
