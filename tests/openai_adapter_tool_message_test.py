@@ -1,5 +1,3 @@
-# ruff: noqa: S101
-
 import json
 from typing import cast
 

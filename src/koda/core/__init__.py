@@ -1,6 +1,5 @@
-from koda.core import agent, message
+from koda.core import message
 
 __all__ = [
-    "agent",
     "message",
 ]

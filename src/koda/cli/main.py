@@ -8,8 +8,8 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from typer.main import Typer
 
-from koda import core
 from koda.config import settings
+from koda.core.agent import Agent
 from koda.providers import OpenAIProvider, Provider, TextDelta
 from koda.tools import filesystem, registry
 from koda.utils import exceptions
@@ -51,7 +51,7 @@ def _get_random_thinking_message() -> str:
     )
 
 
-async def _run_chat_loop(agent: core.agent.Agent) -> None:
+async def _run_chat_loop(agent: Agent) -> None:
     while True:
         try:
             user_input = typer.prompt("You")
@@ -128,7 +128,7 @@ def run(
         system_message_path = importlib.resources.files("koda.cli").joinpath("system_message.md")
         system_message = system_message_path.read_text(encoding="utf-8")
 
-        agent = core.agent.Agent(
+        agent = Agent(
             provider=provider_instance,
             tool_registry=tool_registry,
             system_message=system_message,
