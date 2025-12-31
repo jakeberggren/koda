@@ -8,10 +8,11 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from typer.main import Typer
 
+from koda.agents import Agent
 from koda.config import settings
-from koda.core.agent import Agent
-from koda.providers import Provider, TextDelta, get_provider_registry
-from koda.tools import filesystem, registry
+from koda.providers import Provider, get_provider_registry
+from koda.providers.events import TextDelta
+from koda.tools import ToolRegistry, filesystem
 from koda.utils import exceptions
 
 app: Typer = typer.Typer(
@@ -108,7 +109,7 @@ def run(
 
         # Create tool registry and register tools within the sandbox
         sandbox_dir = Path.cwd().resolve()
-        tool_registry = registry.ToolRegistry()
+        tool_registry = ToolRegistry()
         tool_registry.register(filesystem.ReadFileTool(sandbox_dir=sandbox_dir))
         tool_registry.register(filesystem.WriteFileTool(sandbox_dir=sandbox_dir))
         tool_registry.register(filesystem.ListDirectoryTool(sandbox_dir=sandbox_dir))

@@ -12,31 +12,31 @@ from openai.types.responses import (
 )
 from openai.types.responses.response_input_param import FunctionCallOutput
 
-from koda.core import message
+from koda.agents.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
 from koda.providers.adapter import ProviderAdapter
-from koda.tools.base import ToolCall, ToolDefinition
+from koda.tools import ToolCall, ToolDefinition
 
 
 class OpenAIAdapter(ProviderAdapter):
     """Adapter for converting to/from OpenAI's API format."""
 
-    def adapt_messages(self, messages: list[message.Message]) -> ResponseInputParam:
+    def adapt_messages(self, messages: list[Message]) -> ResponseInputParam:
         """Convert messages to OpenAI format."""
         result: ResponseInputParam = []
         for msg in messages:
-            if isinstance(msg, message.UserMessage):
+            if isinstance(msg, UserMessage):
                 result.append(
                     EasyInputMessageParam(role="user", content=msg.content, type="message")
                 )
-            elif isinstance(msg, message.AssistantMessage):
+            elif isinstance(msg, AssistantMessage):
                 result.append(
                     EasyInputMessageParam(role="assistant", content=msg.content, type="message")
                 )
-            elif isinstance(msg, message.SystemMessage):
+            elif isinstance(msg, SystemMessage):
                 result.append(
                     EasyInputMessageParam(role="system", content=msg.content, type="message")
                 )
-            elif isinstance(msg, message.ToolMessage):
+            elif isinstance(msg, ToolMessage):
                 tool_output = msg.tool_result.output
                 output_data: dict[str, Any] = {
                     "content": tool_output.content,

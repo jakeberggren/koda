@@ -1,3 +1,3 @@
-from koda.config import settings
+from koda.config.settings import Settings
 
-__all__ = ["settings"]
+__all__ = ["Settings"]

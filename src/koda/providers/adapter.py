@@ -1,13 +1,13 @@
 from typing import Any, Protocol
 
-from koda.core import message
-from koda.tools.base import ToolCall, ToolDefinition
+from koda.agents.messages import Message
+from koda.tools import ToolCall, ToolDefinition
 
 
 class ProviderAdapter(Protocol):
     """Protocol for converting between internal and provider-specific formats."""
 
-    def adapt_messages(self, messages: list[message.Message]) -> Any:
+    def adapt_messages(self, messages: list[Message]) -> Any:
         """Convert internal messages to provider-specific format."""
         ...
 

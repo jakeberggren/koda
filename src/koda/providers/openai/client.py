@@ -13,10 +13,10 @@ from openai.types.responses import (
     ResponseTextDeltaEvent,
 )
 
-from koda.core import message
-from koda.providers.base import Provider
+from koda.agents.messages import Message
+from koda.providers import Provider
 from koda.providers.events import TextDelta, ToolCallRequested
-from koda.providers.openai.adapter import OpenAIAdapter
+from koda.providers.openai import OpenAIAdapter
 from koda.tools import ToolDefinition
 from koda.utils import exceptions
 
@@ -38,7 +38,7 @@ class OpenAIProvider(Provider):
 
     async def stream(
         self,
-        messages: list[message.Message],
+        messages: list[Message],
         tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[TextDelta | ToolCallRequested]:
         if not messages:

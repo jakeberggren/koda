@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 
-from koda.tools.base import ToolCall
+from koda.tools import ToolCall
 
 
 @dataclass(frozen=True, slots=True)

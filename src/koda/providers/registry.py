@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 from collections.abc import Callable
 
-from koda.config.settings import Settings
-from koda.providers.base import Provider
+from koda.config import Settings
+from koda.providers import Provider
 
 type ProviderFactory = Callable[[Settings, str | None], Provider]
 

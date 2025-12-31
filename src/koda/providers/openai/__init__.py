@@ -1,4 +1,5 @@
 from koda.config.settings import Settings
+from koda.providers.openai.adapter import OpenAIAdapter
 from koda.providers.openai.client import OpenAIProvider
 from koda.providers.registry import get_provider_registry
 
@@ -14,4 +15,4 @@ def _create_openai_provider(settings: Settings, model: str | None) -> OpenAIProv
 # Self-register on import
 get_provider_registry().register("openai", _create_openai_provider)
 
-__all__ = ["OpenAIProvider"]
+__all__ = ["OpenAIAdapter", "OpenAIProvider"]

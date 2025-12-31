@@ -1,4 +1,4 @@
-from koda.tools.base import Tool, ToolDefinition
+from koda.tools import Tool, ToolDefinition
 
 
 class ToolRegistry:

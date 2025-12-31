@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from koda.tools.base import ToolCall, ToolResult
+from koda.tools import ToolCall, ToolResult
 
 
 class MessageRole(str, Enum):

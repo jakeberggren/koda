@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from koda.tools.base import ToolOutput
+from koda.tools import ToolOutput
 from koda.utils import exceptions
 
 BLACKLISTED_FILES = [".env", ".env.local", ".DS_Store", ".ds_store", ".gitignore"]

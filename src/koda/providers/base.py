@@ -1,10 +1,10 @@
 from collections.abc import AsyncIterator
 from typing import Protocol
 
-from koda.core import message
+from koda.agents.messages import Message
 from koda.providers.adapter import ProviderAdapter
 from koda.providers.events import ProviderEvent
-from koda.tools.base import ToolDefinition
+from koda.tools import ToolDefinition
 
 
 class Provider(Protocol):
@@ -14,5 +14,5 @@ class Provider(Protocol):
     """Adapter for converting to/from provider-specific formats."""
 
     def stream(
-        self, messages: list[message.Message], tools: list[ToolDefinition] | None = None
+        self, messages: list[Message], tools: list[ToolDefinition] | None = None
     ) -> AsyncIterator[ProviderEvent]: ...

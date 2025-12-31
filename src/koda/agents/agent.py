@@ -3,36 +3,35 @@ from collections.abc import AsyncIterator
 
 from pydantic import ValidationError
 
-from koda import providers
-from koda.core import message
-from koda.providers import ProviderEvent, TextDelta, ToolCallRequested
-from koda.tools.base import ToolCall, ToolOutput, ToolResult
-from koda.tools.registry import ToolRegistry
+from koda.agents.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
+from koda.providers import Provider
+from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested
+from koda.tools import ToolCall, ToolOutput, ToolRegistry, ToolResult
 from koda.utils import exceptions
 
 
 class Agent:
     def __init__(
         self,
-        provider: providers.Provider,
+        provider: Provider,
         system_message: str | None = None,
         tool_registry: ToolRegistry | None = None,
         max_tool_iterations: int = 30,
     ) -> None:
-        self.provider: providers.Provider = provider
+        self.provider: Provider = provider
         self.system_message: str | None = system_message
         self.tool_registry: ToolRegistry | None = tool_registry
         self.max_tool_iterations: int = max_tool_iterations
-        self._history: list[message.Message] = []
+        self._history: list[Message] = []
 
         if system_message:
-            self._history.append(message.SystemMessage(content=system_message))
+            self._history.append(SystemMessage(content=system_message))
 
     async def run(self, user_text: str) -> AsyncIterator[ProviderEvent]:
         if not user_text or not user_text.strip():
             raise exceptions.ProviderValidationError("Message cannot be empty")
 
-        user_message = message.UserMessage(content=user_text.strip())
+        user_message = UserMessage(content=user_text.strip())
         self._history.append(user_message)
         tools = self.tool_registry.get_definitions() if self.tool_registry else None
 
@@ -53,7 +52,7 @@ class Agent:
                     yield event
 
             result_text = "".join(response_chunks)
-            assistant_message = message.AssistantMessage(
+            assistant_message = AssistantMessage(
                 content=result_text,
                 tool_calls=pending_tool_calls,
             )
@@ -64,7 +63,7 @@ class Agent:
                 tool_results = await self._execute_tools(pending_tool_calls)
                 for tool_call, tool_result in zip(pending_tool_calls, tool_results, strict=True):
                     self._history.append(
-                        message.ToolMessage(
+                        ToolMessage(
                             tool_name=tool_call.tool_name,
                             tool_result=tool_result,
                         )
@@ -77,10 +76,10 @@ class Agent:
             f"Maximum tool call iterations ({self.max_tool_iterations}) exceeded"
         )
 
-    def add_message(self, message_to_add: message.Message) -> None:
+    def add_message(self, message_to_add: Message) -> None:
         self._history.append(message_to_add)
 
-    def get_history(self) -> list[message.Message]:
+    def get_history(self) -> list[Message]:
         return self._history.copy()
 
     def clear_history(self) -> None:
