@@ -38,8 +38,8 @@ class Agent:
         iteration = 0
         while iteration < self.max_tool_iterations:
             iteration += 1
-            messages = self._history.copy()
-            stream = self.provider.stream(messages, tools)
+            messages: list[Message] = self._history.copy()
+            stream: AsyncIterator[ProviderEvent] = self.provider.stream(messages, tools)
 
             response_chunks: list[str] = []
             pending_tool_calls: list[ToolCall] = []
