@@ -1,6 +1,8 @@
 import asyncio
 from collections.abc import AsyncIterator
 
+from pydantic import ValidationError
+
 from koda import providers
 from koda.core import message
 from koda.providers import ProviderEvent, TextDelta, ToolCallRequested
@@ -125,9 +127,9 @@ class Agent:
 
             try:
                 params = tool.parameters_model.model_validate(tool_call.arguments)
-            except Exception as e:
+            except ValidationError as e:
                 return ToolResult(
-                    output=ToolOutput(is_error=True, error_message=f"Validation error: {e}"),
+                    output=ToolOutput(is_error=True, error_message=str(e)),
                     call_id=tool_call.call_id,
                 )
 
@@ -136,9 +138,9 @@ class Agent:
                 return ToolResult(output=output, call_id=tool_call.call_id)
             except Exception as e:
                 return ToolResult(
-                    output=ToolOutput(is_error=True, error_message=f"Execution error: {e}"),
+                    output=ToolOutput(is_error=True, error_message=f"{type(e).__name__}: {e}"),
                     call_id=tool_call.call_id,
                 )
 
-        results = await asyncio.gather(*[execute_single_tool(call) for call in tool_calls])
-        return list(results)
+        results = await asyncio.gather(*(execute_single_tool(call) for call in tool_calls))
+        return results

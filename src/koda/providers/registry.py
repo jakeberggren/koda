@@ -28,6 +28,7 @@ class ProviderRegistry:
         if factory is None:
             supported = ", ".join(self.supported()) or "(none)"
             raise ValueError(f"Provider '{key}' is not supported. Supported providers: {supported}")
+        model = model.strip() if model and model.strip() else None
         return factory(settings, model)
 
     def supported(self) -> list[str]:

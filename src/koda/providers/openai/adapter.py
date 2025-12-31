@@ -28,15 +28,15 @@ class OpenAIAdapter(ProviderAdapter):
                 result.append(
                     EasyInputMessageParam(role="user", content=msg.content, type="message")
                 )
-            if isinstance(msg, message.AssistantMessage):
+            elif isinstance(msg, message.AssistantMessage):
                 result.append(
                     EasyInputMessageParam(role="assistant", content=msg.content, type="message")
                 )
-            if isinstance(msg, message.SystemMessage):
+            elif isinstance(msg, message.SystemMessage):
                 result.append(
                     EasyInputMessageParam(role="system", content=msg.content, type="message")
                 )
-            if isinstance(msg, message.ToolMessage):
+            elif isinstance(msg, message.ToolMessage):
                 tool_output = msg.tool_result.output
                 output_data: dict[str, Any] = {
                     "content": tool_output.content,

@@ -34,7 +34,7 @@ class ReadFileTool:
     def __init__(self, sandbox_dir: Path | str | None = None) -> None:
         self.name: str = "read_file"
         self.description: str = "Read the contents of a file from the filesystem"
-        self.parameters_model: type[BaseModel] = ReadFileParams
+        self.parameters_model: type[ReadFileParams] = ReadFileParams
         self.sandbox_dir: Path = (
             Path(sandbox_dir).resolve() if sandbox_dir else Path.cwd().resolve()
         )
@@ -80,7 +80,7 @@ class WriteFileTool:
     def __init__(self, sandbox_dir: Path | str | None = None) -> None:
         self.name: str = "write_file"
         self.description: str = "Write content to a file on the filesystem"
-        self.parameters_model: type[BaseModel] = WriteFileParams
+        self.parameters_model: type[WriteFileParams] = WriteFileParams
         self.sandbox_dir: Path = (
             Path(sandbox_dir).resolve() if sandbox_dir else Path.cwd().resolve()
         )
@@ -123,7 +123,7 @@ class ListDirectoryTool:
     def __init__(self, sandbox_dir: Path | str | None = None) -> None:
         self.name: str = "list_directory"
         self.description: str = "List the contents of a directory"
-        self.parameters_model: type[BaseModel] = ListDirectoryParams
+        self.parameters_model: type[ListDirectoryParams] = ListDirectoryParams
         self.sandbox_dir: Path = (
             Path(sandbox_dir).resolve() if sandbox_dir else Path.cwd().resolve()
         )
@@ -175,7 +175,7 @@ class FileExistsTool:
     def __init__(self, sandbox_dir: Path | str | None = None) -> None:
         self.name: str = "file_exists"
         self.description: str = "Check if a file or directory exists"
-        self.parameters_model: type[BaseModel] = FileExistsParams
+        self.parameters_model: type[FileExistsParams] = FileExistsParams
         self.sandbox_dir: Path = (
             Path(sandbox_dir).resolve() if sandbox_dir else Path.cwd().resolve()
         )
