@@ -5,11 +5,9 @@ These tests define the behavioral contract that ALL provider adapters must satis
 Any new provider implementation should pass all these tests.
 """
 
-from __future__ import annotations
-
 from pydantic import BaseModel
 
-from koda.core import message
+from koda.agents.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
 from koda.providers import adapter as provider_adapter
 from koda.tools import base as tools_base
 
@@ -19,7 +17,7 @@ class TestAdaptMessages:
 
     def test_user_message_produces_output(self, adapter: provider_adapter.ProviderAdapter) -> None:
         """User messages must produce non-empty output."""
-        msg = message.UserMessage(content="Hello")
+        msg = UserMessage(content="Hello")
         result = adapter.adapt_messages([msg])
         assert result  # Non-empty
 
@@ -27,7 +25,7 @@ class TestAdaptMessages:
         self, adapter: provider_adapter.ProviderAdapter
     ) -> None:
         """Assistant messages must produce non-empty output."""
-        msg = message.AssistantMessage(content="Hi there")
+        msg = AssistantMessage(content="Hi there")
         result = adapter.adapt_messages([msg])
         assert result
 
@@ -35,7 +33,7 @@ class TestAdaptMessages:
         self, adapter: provider_adapter.ProviderAdapter
     ) -> None:
         """System messages must produce non-empty output."""
-        msg = message.SystemMessage(content="You are helpful")
+        msg = SystemMessage(content="You are helpful")
         result = adapter.adapt_messages([msg])
         assert result
 
@@ -50,10 +48,10 @@ class TestAdaptMessages:
         self, adapter: provider_adapter.ProviderAdapter
     ) -> None:
         """Multiple messages must all be included in output."""
-        messages: list[message.Message] = [
-            message.SystemMessage(content="System"),
-            message.UserMessage(content="User"),
-            message.AssistantMessage(content="Assistant"),
+        messages: list[Message] = [
+            SystemMessage(content="System"),
+            UserMessage(content="User"),
+            AssistantMessage(content="Assistant"),
         ]
         result = adapter.adapt_messages(messages)
         assert len(result) == 3
@@ -67,7 +65,7 @@ class TestToolCallRoundtrip:
     ) -> None:
         """Tool results must preserve the original call_id."""
         call_id = "call_abc123"
-        tool_msg = message.ToolMessage(
+        tool_msg = ToolMessage(
             tool_name="test_tool",
             tool_result=tools_base.ToolResult(
                 output=tools_base.ToolOutput(content={"result": "ok"}),
@@ -86,7 +84,7 @@ class TestToolCallRoundtrip:
         self, adapter: provider_adapter.ProviderAdapter
     ) -> None:
         """Error tool results must include error information."""
-        error_msg = message.ToolMessage(
+        error_msg = ToolMessage(
             tool_name="tool",
             tool_result=tools_base.ToolResult(
                 output=tools_base.ToolOutput(is_error=True, error_message="Something failed"),
@@ -104,7 +102,7 @@ class TestToolCallRoundtrip:
         self, adapter: provider_adapter.ProviderAdapter
     ) -> None:
         """Successful tool results should not include error_message field."""
-        success_msg = message.ToolMessage(
+        success_msg = ToolMessage(
             tool_name="tool",
             tool_result=tools_base.ToolResult(
                 output=tools_base.ToolOutput(content={"data": 1}),
@@ -120,15 +118,15 @@ class TestToolCallRoundtrip:
 
     def test_multiple_tool_results(self, adapter: provider_adapter.ProviderAdapter) -> None:
         """Multiple tool results in one batch must all be included."""
-        messages: list[message.Message] = [
-            message.ToolMessage(
+        messages: list[Message] = [
+            ToolMessage(
                 tool_name="tool_a",
                 tool_result=tools_base.ToolResult(
                     output=tools_base.ToolOutput(content={"a": 1}),
                     call_id="call_a",
                 ),
             ),
-            message.ToolMessage(
+            ToolMessage(
                 tool_name="tool_b",
                 tool_result=tools_base.ToolResult(
                     output=tools_base.ToolOutput(content={"b": 2}),
@@ -197,7 +195,7 @@ class TestEmptyAndEdgeCases:
 
     def test_empty_content_user_message(self, adapter: provider_adapter.ProviderAdapter) -> None:
         """User message with empty content should not raise."""
-        msg = message.UserMessage(content="")
+        msg = UserMessage(content="")
         result = adapter.adapt_messages([msg])
         assert result is not None
 
@@ -205,7 +203,7 @@ class TestEmptyAndEdgeCases:
         self, adapter: provider_adapter.ProviderAdapter
     ) -> None:
         """Assistant message with empty content should not raise."""
-        msg = message.AssistantMessage(content="")
+        msg = AssistantMessage(content="")
         result = adapter.adapt_messages([msg])
         assert result is not None
 
@@ -213,7 +211,7 @@ class TestEmptyAndEdgeCases:
         self, adapter: provider_adapter.ProviderAdapter
     ) -> None:
         """Tool result with empty content dict should not raise."""
-        tool_msg = message.ToolMessage(
+        tool_msg = ToolMessage(
             tool_name="tool",
             tool_result=tools_base.ToolResult(
                 output=tools_base.ToolOutput(content={}),
@@ -249,13 +247,13 @@ def validate_adapter_contract(adapter: provider_adapter.ProviderAdapter) -> list
 
     # Test basic message
     try:
-        adapter.adapt_messages([message.UserMessage(content="test")])
+        adapter.adapt_messages([UserMessage(content="test")])
     except Exception as e:
         failures.append(f"adapt_messages with UserMessage raised: {e}")
 
     # Test tool message with call_id
     try:
-        tool_msg = message.ToolMessage(
+        tool_msg = ToolMessage(
             tool_name="test",
             tool_result=tools_base.ToolResult(
                 output=tools_base.ToolOutput(content={"ok": True}),

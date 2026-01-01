@@ -3,7 +3,7 @@ from typing import cast
 
 from openai.types.responses.response_input_param import FunctionCallOutput
 
-from koda.core import message
+from koda.agents.messages import ToolMessage
 from koda.providers.openai.adapter import OpenAIAdapter
 from koda.tools.base import ToolOutput, ToolResult
 
@@ -11,7 +11,7 @@ from koda.tools.base import ToolOutput, ToolResult
 def test_adapt_messages_includes_tool_error_metadata() -> None:
     adapter = OpenAIAdapter()
 
-    tool_msg = message.ToolMessage(
+    tool_msg = ToolMessage(
         tool_name="some_tool",
         tool_result=ToolResult(
             output=ToolOutput(
@@ -36,7 +36,7 @@ def test_adapt_messages_includes_tool_error_metadata() -> None:
 def test_adapt_messages_omits_error_message_when_none() -> None:
     adapter = OpenAIAdapter()
 
-    tool_msg = message.ToolMessage(
+    tool_msg = ToolMessage(
         tool_name="some_tool",
         tool_result=ToolResult(
             output=ToolOutput(content={"ok": True}),

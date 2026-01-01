@@ -1,21 +1,13 @@
-[build-system]
-requires = ["uv_build>=0.9.13,<0.10.0"]
-build-backend = "uv_build"
-
 [project]
-name = "koda"
+name = "koda-workspace"
 version = "0.1.0"
-description = "KODA; a coding agent toolkit, CLI and extensible agent framework."
-readme = "README.md"
+description = "KODA coding agent"
 requires-python = ">=3.13"
-dependencies = [
-    "openai~=2.14.0",
-    "pydantic~=2.12.5",
-    "pydantic-settings~=2.12.0",
-    "typer~=0.21.0",
-]
-[project.scripts]
-koda = "koda.cli.main:main"
+dependencies = ["koda", "koda-tui"]
+
+[tool.uv.sources]
+koda = { workspace = true }
+koda-tui = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -23,6 +15,11 @@ dev = [
     "pytest~=9.0.1",
     "ruff~=0.14.7",
     "ty~=0.0.1a29",
+]
+
+[tool.uv.workspace]
+members = [
+    "packages/*",
 ]
 
 [tool.ruff]
@@ -43,14 +40,14 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**/*.py" = ["S101"]  # Allow assert in tests
+"*/tests/**/*.py" = ["S101"]  # Allow assert in tests
 
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.isort]
-known-first-party = ["koda"]
+known-first-party = ["koda", "koda_tui"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 5

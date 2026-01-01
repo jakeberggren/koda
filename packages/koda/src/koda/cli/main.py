@@ -8,8 +8,8 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from typer.main import Typer
 
-from koda.agents import Agent
-from koda.config import settings
+from koda.agents.agent import Agent
+from koda.config import Settings, get_settings
 from koda.providers import Provider, get_provider_registry
 from koda.providers.events import TextDelta
 from koda.tools import ToolRegistry, filesystem
@@ -23,7 +23,7 @@ app: Typer = typer.Typer(
 
 
 def _create_provider(
-    provider_name: str | None, model: str | None, app_settings: settings.Settings
+    provider_name: str | None, model: str | None, app_settings: Settings
 ) -> Provider:
     provider_name = (provider_name or app_settings.KODA_DEFAULT_PROVIDER).lower()
     return get_provider_registry().create(provider_name, app_settings, model=model)
@@ -99,7 +99,7 @@ def run(
     typer.echo("Starting interactive chat session...")
     typer.echo("Type 'exit' or 'quit' to end the session.\n")
 
-    app_settings = settings.get_settings()
+    app_settings = get_settings()
     try:
         provider_instance = _create_provider(provider, model, app_settings)
 

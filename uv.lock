@@ -2,6 +2,13 @@ version = 1
 revision = 3
 requires-python = ">=3.13"
 
+[manifest]
+members = [
+    "koda",
+    "koda-tui",
+    "koda-workspace",
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -207,12 +214,40 @@ wheels = [
 [[package]]
 name = "koda"
 version = "0.1.0"
-source = { editable = "." }
+source = { editable = "packages/koda" }
 dependencies = [
     { name = "openai" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "openai", specifier = "~=2.14.0" },
+    { name = "pydantic", specifier = "~=2.12.5" },
+    { name = "pydantic-settings", specifier = "~=2.12.0" },
+    { name = "typer", specifier = "~=0.21.0" },
+]
+
+[[package]]
+name = "koda-tui"
+version = "0.1.0"
+source = { editable = "packages/koda-tui" }
+dependencies = [
+    { name = "koda" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "koda", editable = "packages/koda" }]
+
+[[package]]
+name = "koda-workspace"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "koda" },
+    { name = "koda-tui" },
 ]
 
 [package.dev-dependencies]
@@ -225,10 +260,8 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "openai", specifier = "~=2.14.0" },
-    { name = "pydantic", specifier = "~=2.12.5" },
-    { name = "pydantic-settings", specifier = "~=2.12.0" },
-    { name = "typer", specifier = "~=0.21.0" },
+    { name = "koda", editable = "packages/koda" },
+    { name = "koda-tui", editable = "packages/koda-tui" },
 ]
 
 [package.metadata.requires-dev]
