@@ -7,7 +7,7 @@ Any new provider implementation should pass all these tests.
 
 from pydantic import BaseModel
 
-from koda.agents.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
+from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
 from koda.providers import adapter as provider_adapter
 from koda.tools import base as tools_base
 

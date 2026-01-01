@@ -3,7 +3,7 @@ from typing import cast
 
 from openai.types.responses.response_input_param import FunctionCallOutput
 
-from koda.agents.messages import ToolMessage
+from koda.messages import ToolMessage
 from koda.providers.openai.adapter import OpenAIAdapter
 from koda.tools.base import ToolOutput, ToolResult
 

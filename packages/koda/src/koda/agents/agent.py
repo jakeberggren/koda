@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 from collections.abc import AsyncIterator
 
 from pydantic import ValidationError
 
-from koda.agents.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
+from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
 from koda.providers import Provider
 from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested
 from koda.tools import ToolCall, ToolOutput, ToolRegistry, ToolResult

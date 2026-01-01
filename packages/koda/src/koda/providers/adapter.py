@@ -1,6 +1,6 @@
 from typing import Any, Protocol
 
-from koda.agents.messages import Message
+from koda.messages import Message
 from koda.tools import ToolCall, ToolDefinition
 
 

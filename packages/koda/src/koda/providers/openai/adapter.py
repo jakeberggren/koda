@@ -12,7 +12,7 @@ from openai.types.responses import (
 )
 from openai.types.responses.response_input_param import FunctionCallOutput
 
-from koda.agents.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
+from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
 from koda.providers.adapter import ProviderAdapter
 from koda.tools import ToolCall, ToolDefinition
 

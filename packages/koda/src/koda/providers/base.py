@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from collections.abc import AsyncIterator
 from typing import Protocol
 
-from koda.agents.messages import Message
+from koda.messages import Message
 from koda.providers.adapter import ProviderAdapter
 from koda.providers.events import ProviderEvent
 from koda.tools import ToolDefinition

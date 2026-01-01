@@ -13,7 +13,7 @@ from openai.types.responses import (
     ResponseTextDeltaEvent,
 )
 
-from koda.agents.messages import Message
+from koda.messages import Message
 from koda.providers import Provider
 from koda.providers.events import TextDelta, ToolCallRequested
 from koda.providers.openai import OpenAIAdapter
