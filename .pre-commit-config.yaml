@@ -53,6 +53,22 @@ repos:
         language: system
         types: [python]
 
+      - id: pytest-koda # unit tests for koda (pre-push)
+        name: pytest koda
+        entry: uv run pytest packages/koda
+        language: system
+        files: ^packages/koda/
+        stages: [pre-push]
+        pass_filenames: false
+
+      - id: pytest-koda-tui # unit tests for koda-tui (pre-push)
+        name: pytest koda-tui
+        entry: uv run pytest packages/koda-tui
+        language: system
+        files: ^packages/koda-tui/
+        stages: [pre-push]
+        pass_filenames: false
+
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.3.0
     hooks:
