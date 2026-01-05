@@ -243,8 +243,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "koda", editable = "packages/koda" },
-    { name = "prompt-toolkit", specifier = ">=3.0.52" },
-    { name = "rich", specifier = ">=14.2.0" },
+    { name = "prompt-toolkit", specifier = "~=3.0.52" },
+    { name = "rich", specifier = "~=14.2.0" },
 ]
 
 [[package]]
