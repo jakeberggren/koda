@@ -51,3 +51,7 @@ known-first-party = ["koda", "koda_tui"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 5
+
+[tool.pytest.ini_options]
+testpaths = ["packages/koda/tests", "packages/koda-tui/tests"]
+addopts = "--import-mode=importlib"
