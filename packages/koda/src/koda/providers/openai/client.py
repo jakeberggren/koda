@@ -15,7 +15,7 @@ from openai.types.responses import (
 
 from koda.messages import Message
 from koda.providers import Provider
-from koda.providers.events import TextDelta, ToolCallRequested
+from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested
 from koda.providers.openai import OpenAIAdapter
 from koda.tools import ToolDefinition
 from koda.utils import exceptions
@@ -40,7 +40,7 @@ class OpenAIProvider(Provider):
         self,
         messages: list[Message],
         tools: list[ToolDefinition] | None = None,
-    ) -> AsyncIterator[TextDelta | ToolCallRequested]:
+    ) -> AsyncIterator[ProviderEvent]:
         if not messages:
             raise exceptions.ProviderValidationError("Messages list cannot be empty")
 
