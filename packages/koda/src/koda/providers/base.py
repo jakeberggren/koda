@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from koda.messages import Message
-from koda.providers.adapter import ProviderAdapter
-from koda.providers.events import ProviderEvent
-from koda.tools import ToolDefinition
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from koda.messages import Message
+    from koda.providers.adapter import ProviderAdapter
+    from koda.providers.events import ProviderEvent
+    from koda.tools import ToolDefinition
 
 
 class Provider(Protocol):
@@ -16,5 +18,7 @@ class Provider(Protocol):
     """Adapter for converting to/from provider-specific formats."""
 
     def stream(
-        self, messages: list[Message], tools: list[ToolDefinition] | None = None
+        self,
+        messages: list[Message],
+        tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[ProviderEvent]: ...

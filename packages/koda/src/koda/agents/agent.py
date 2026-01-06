@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
 from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
-from koda.providers import Provider
 from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested
 from koda.tools import ToolCall, ToolOutput, ToolRegistry, ToolResult
 from koda.utils import exceptions
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from koda.providers import Provider
 
 
 class Agent:
@@ -68,14 +72,14 @@ class Agent:
                         ToolMessage(
                             tool_name=tool_call.tool_name,
                             tool_result=tool_result,
-                        )
+                        ),
                     )
                 continue
 
             return
 
         raise exceptions.MaxIterationsExceededError(
-            f"Maximum tool call iterations ({self.max_tool_iterations}) exceeded"
+            f"Maximum tool call iterations ({self.max_tool_iterations}) exceeded",
         )
 
     def add_message(self, message_to_add: Message) -> None:
@@ -143,5 +147,4 @@ class Agent:
                     call_id=tool_call.call_id,
                 )
 
-        results = await asyncio.gather(*(execute_single_tool(call) for call in tool_calls))
-        return results
+        return await asyncio.gather(*(execute_single_tool(call) for call in tool_calls))

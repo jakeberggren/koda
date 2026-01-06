@@ -26,15 +26,15 @@ class OpenAIAdapter(ProviderAdapter):
         for msg in messages:
             if isinstance(msg, UserMessage):
                 result.append(
-                    EasyInputMessageParam(role="user", content=msg.content, type="message")
+                    EasyInputMessageParam(role="user", content=msg.content, type="message"),
                 )
             elif isinstance(msg, AssistantMessage):
                 result.append(
-                    EasyInputMessageParam(role="assistant", content=msg.content, type="message")
+                    EasyInputMessageParam(role="assistant", content=msg.content, type="message"),
                 )
             elif isinstance(msg, SystemMessage):
                 result.append(
-                    EasyInputMessageParam(role="system", content=msg.content, type="message")
+                    EasyInputMessageParam(role="system", content=msg.content, type="message"),
                 )
             elif isinstance(msg, ToolMessage):
                 tool_output = msg.tool_result.output
@@ -50,7 +50,7 @@ class OpenAIAdapter(ProviderAdapter):
                         call_id=msg.tool_result.call_id,
                         output=json.dumps(output_data),
                         type="function_call_output",
-                    )
+                    ),
                 )
         return result
 
@@ -63,14 +63,13 @@ class OpenAIAdapter(ProviderAdapter):
         )
 
         fn = chat_tool["function"]
-        tool_param = FunctionToolParam(
+        return FunctionToolParam(
             type="function",
             name=fn["name"],
             description=fn.get("description"),
             parameters=fn["parameters"],
             strict=fn.get("strict", True),
         )
-        return tool_param
 
     def adapt_tools(self, tools: list[ToolDefinition] | None) -> list[FunctionToolParam] | Omit:
         """Convert tool definitions to OpenAI format."""
@@ -92,7 +91,7 @@ class OpenAIAdapter(ProviderAdapter):
                         tool_name=tool_name,
                         arguments=arguments,
                         call_id=call_id,
-                    )
+                    ),
                 )
 
         return calls

@@ -22,7 +22,8 @@ class TestAdaptMessages:
         assert result  # Non-empty
 
     def test_assistant_message_produces_output(
-        self, adapter: provider_adapter.ProviderAdapter
+        self,
+        adapter: provider_adapter.ProviderAdapter,
     ) -> None:
         """Assistant messages must produce non-empty output."""
         msg = AssistantMessage(content="Hi there")
@@ -30,7 +31,8 @@ class TestAdaptMessages:
         assert result
 
     def test_system_message_produces_output(
-        self, adapter: provider_adapter.ProviderAdapter
+        self,
+        adapter: provider_adapter.ProviderAdapter,
     ) -> None:
         """System messages must produce non-empty output."""
         msg = SystemMessage(content="You are helpful")
@@ -38,14 +40,16 @@ class TestAdaptMessages:
         assert result
 
     def test_empty_message_list_returns_empty(
-        self, adapter: provider_adapter.ProviderAdapter
+        self,
+        adapter: provider_adapter.ProviderAdapter,
     ) -> None:
         """Empty input must return empty output (not None or error)."""
         result = adapter.adapt_messages([])
-        assert result == [] or result == ()
+        assert result in ([], ())
 
     def test_multiple_messages_preserves_count(
-        self, adapter: provider_adapter.ProviderAdapter
+        self,
+        adapter: provider_adapter.ProviderAdapter,
     ) -> None:
         """Multiple messages must all be included in output."""
         messages: list[Message] = [
@@ -54,14 +58,15 @@ class TestAdaptMessages:
             AssistantMessage(content="Assistant"),
         ]
         result = adapter.adapt_messages(messages)
-        assert len(result) == 3
+        assert len(result) == len(messages)
 
 
 class TestToolCallRoundtrip:
     """Contract tests for tool call -> tool result roundtrip."""
 
     def test_call_id_preserved_in_tool_message(
-        self, adapter: provider_adapter.ProviderAdapter
+        self,
+        adapter: provider_adapter.ProviderAdapter,
     ) -> None:
         """Tool results must preserve the original call_id."""
         call_id = "call_abc123"
@@ -81,7 +86,8 @@ class TestToolCallRoundtrip:
         assert call_id in result_str, f"call_id '{call_id}' not found in adapted output"
 
     def test_tool_error_includes_error_state(
-        self, adapter: provider_adapter.ProviderAdapter
+        self,
+        adapter: provider_adapter.ProviderAdapter,
     ) -> None:
         """Error tool results must include error information."""
         error_msg = ToolMessage(
@@ -99,7 +105,8 @@ class TestToolCallRoundtrip:
         assert "error" in result_str or "fail" in result_str
 
     def test_tool_success_does_not_include_error_message(
-        self, adapter: provider_adapter.ProviderAdapter
+        self,
+        adapter: provider_adapter.ProviderAdapter,
     ) -> None:
         """Successful tool results should not include error_message field."""
         success_msg = ToolMessage(
@@ -136,7 +143,7 @@ class TestToolCallRoundtrip:
         ]
 
         result = adapter.adapt_messages(messages)
-        assert len(result) == 2
+        assert len(result) == len(messages)
 
         # Both call_ids should be present
         result_str = str(result)
@@ -183,11 +190,12 @@ class TestAdaptTools:
             parameters_model=OtherParams,
         )
 
-        result = adapter.adapt_tools([sample_tool_definition, other_tool])
+        tools = [sample_tool_definition, other_tool]
+        result = adapter.adapt_tools(tools)
 
         # If result is a list, it should have 2 items
         if isinstance(result, list):
-            assert len(result) == 2
+            assert len(result) == len(tools)
 
 
 class TestEmptyAndEdgeCases:
@@ -200,7 +208,8 @@ class TestEmptyAndEdgeCases:
         assert result is not None
 
     def test_empty_content_assistant_message(
-        self, adapter: provider_adapter.ProviderAdapter
+        self,
+        adapter: provider_adapter.ProviderAdapter,
     ) -> None:
         """Assistant message with empty content should not raise."""
         msg = AssistantMessage(content="")
@@ -208,7 +217,8 @@ class TestEmptyAndEdgeCases:
         assert result is not None
 
     def test_tool_result_with_empty_content(
-        self, adapter: provider_adapter.ProviderAdapter
+        self,
+        adapter: provider_adapter.ProviderAdapter,
     ) -> None:
         """Tool result with empty content dict should not raise."""
         tool_msg = ToolMessage(

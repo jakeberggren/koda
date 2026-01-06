@@ -21,7 +21,7 @@ class NonEmptyValidator(Validator):
     def validate(self, document) -> None:
         text = document.text.strip()
         if not text:
-            raise ValidationError()
+            raise ValidationError
 
 
 class PromptToolkitInput(InputHandler):

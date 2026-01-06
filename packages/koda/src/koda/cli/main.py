@@ -23,7 +23,9 @@ app: Typer = typer.Typer(
 
 
 def _create_provider(
-    provider_name: str | None, model: str | None, app_settings: Settings
+    provider_name: str | None,
+    model: str | None,
+    app_settings: Settings,
 ) -> Provider:
     provider_name = (provider_name or app_settings.KODA_DEFAULT_PROVIDER).lower()
     return get_provider_registry().create(provider_name, app_settings, model=model)
@@ -39,7 +41,7 @@ def _get_random_thinking_message() -> str:
             "Koda is on it...",
             "Koda is plotting next move...",
             "Koda is deep in the weeds...",
-        ]
+        ],
     )
 
 
@@ -90,10 +92,16 @@ async def _run_chat_loop(agent: Agent) -> None:
 @app.command()
 def run(
     provider: str | None = typer.Option(
-        None, "--provider", "-p", help="Provider to use (e.g., openai, anthropic)"
+        None,
+        "--provider",
+        "-p",
+        help="Provider to use (e.g., openai, anthropic)",
     ),
     model: str | None = typer.Option(
-        None, "--model", "-m", help="Model to use (provider-specific)"
+        None,
+        "--model",
+        "-m",
+        help="Model to use (provider-specific)",
     ),
 ) -> None:
     typer.echo("Starting interactive chat session...")

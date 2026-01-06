@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING
 
-from koda.agents import Agent
-from koda.providers.events import ProviderEvent
 from koda_tui.backends.base import Backend
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from koda.agents import Agent
+    from koda.providers.events import ProviderEvent
 
 
 class LocalBackend(Backend):

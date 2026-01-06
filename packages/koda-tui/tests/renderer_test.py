@@ -18,7 +18,9 @@ class TestRichRendererPrint:
         assert "Hello world" in output
 
     def test_print_assistant_includes_prefix(
-        self, renderer: RichRenderer, captured_console: Console
+        self,
+        renderer: RichRenderer,
+        captured_console: Console,
     ) -> None:
         """print_assistant() should include 'Koda:' prefix."""
         renderer.print_assistant("I can help with that")
@@ -27,7 +29,9 @@ class TestRichRendererPrint:
         assert "I can help with that" in output
 
     def test_print_error_includes_error_prefix(
-        self, renderer: RichRenderer, captured_console: Console
+        self,
+        renderer: RichRenderer,
+        captured_console: Console,
     ) -> None:
         """print_error() should include 'Error:' in output."""
         renderer.print_error("Something went wrong")
@@ -36,7 +40,9 @@ class TestRichRendererPrint:
         assert "Something went wrong" in output
 
     def test_print_info_outputs_message(
-        self, renderer: RichRenderer, captured_console: Console
+        self,
+        renderer: RichRenderer,
+        captured_console: Console,
     ) -> None:
         """print_info() should output the message."""
         renderer.print_info("Some info")
@@ -48,7 +54,9 @@ class TestRichRendererToolCall:
     """Tests for tool call rendering."""
 
     def test_print_tool_call_shows_tool_name(
-        self, renderer: RichRenderer, captured_console: Console
+        self,
+        renderer: RichRenderer,
+        captured_console: Console,
     ) -> None:
         """print_tool_call() should display the tool name."""
         tool_call = ToolCall(
@@ -61,7 +69,9 @@ class TestRichRendererToolCall:
         assert "search" in output
 
     def test_print_tool_call_includes_label(
-        self, renderer: RichRenderer, captured_console: Console
+        self,
+        renderer: RichRenderer,
+        captured_console: Console,
     ) -> None:
         """print_tool_call() should include 'Tool call:' label."""
         tool_call = ToolCall(

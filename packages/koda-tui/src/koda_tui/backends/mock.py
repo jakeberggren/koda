@@ -28,7 +28,7 @@ class MockBackend(Backend):
         self._response_delay = response_delay
         self._chunk_delay = chunk_delay
 
-    async def chat(self, message: str) -> AsyncGenerator[ProviderEvent]:
+    async def chat(self, message: str) -> AsyncGenerator[ProviderEvent]:  # noqa: ARG002 - unused argument
         """Stream back a fake response character by character."""
         await asyncio.sleep(self._response_delay)
 

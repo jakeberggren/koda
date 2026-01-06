@@ -1,11 +1,12 @@
 import json
-from typing import cast
-
-from openai.types.responses.response_input_param import FunctionCallOutput
+from typing import TYPE_CHECKING, cast
 
 from koda.messages import ToolMessage
 from koda.providers.openai.adapter import OpenAIAdapter
 from koda.tools.base import ToolOutput, ToolResult
+
+if TYPE_CHECKING:
+    from openai.types.responses.response_input_param import FunctionCallOutput
 
 
 def test_adapt_messages_includes_tool_error_metadata() -> None:
@@ -25,11 +26,11 @@ def test_adapt_messages_includes_tool_error_metadata() -> None:
     items = adapter.adapt_messages([tool_msg])
     assert len(items) == 1
 
-    item = cast(FunctionCallOutput, items[0])
+    item = cast("FunctionCallOutput", items[0])
     assert item["type"] == "function_call_output"
     assert item["call_id"] == "call_123"
 
-    payload = json.loads(cast(str, item["output"]))
+    payload = json.loads(cast("str", item["output"]))
     assert payload == {"content": {}, "is_error": True, "error_message": "boom"}
 
 
@@ -45,7 +46,7 @@ def test_adapt_messages_omits_error_message_when_none() -> None:
     )
 
     items = adapter.adapt_messages([tool_msg])
-    item = cast(FunctionCallOutput, items[0])
-    payload = json.loads(cast(str, item["output"]))
+    item = cast("FunctionCallOutput", items[0])
+    payload = json.loads(cast("str", item["output"]))
 
     assert payload == {"content": {"ok": True}, "is_error": False}

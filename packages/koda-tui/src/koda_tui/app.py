@@ -86,7 +86,9 @@ class KodaTuiApp:
             self.renderer.print_tool_call(event.call)
 
     async def _process_stream(
-        self, stream_iter: AsyncIterator[ProviderEvent], first_chunk: ProviderEvent
+        self,
+        stream_iter: AsyncIterator[ProviderEvent],
+        first_chunk: ProviderEvent,
     ) -> None:
         """Process and render the response stream."""
         self._render_event(first_chunk)

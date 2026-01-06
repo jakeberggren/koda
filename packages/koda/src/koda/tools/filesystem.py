@@ -18,7 +18,7 @@ def _validate_path_in_sandbox(file_path: Path, sandbox_dir: Path) -> None:
 
     if not resolved_path.is_relative_to(resolved_sandbox):
         raise exceptions.ToolValidationError(
-            f"Path '{resolved_path}' is outside the sandbox directory '{resolved_sandbox}'"
+            f"Path '{resolved_path}' is outside the sandbox directory '{resolved_sandbox}'",
         )
 
 
@@ -157,7 +157,7 @@ class ListDirectoryTool:
                     "name": item.name,
                     "type": "directory" if item.is_dir() else "file",
                     "path": str(item),
-                }
+                },
             )
 
         return ToolOutput(content={"items": items})

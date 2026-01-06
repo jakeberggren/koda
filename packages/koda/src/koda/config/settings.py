@@ -6,16 +6,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     OPENAI_API_KEY: SecretStr = Field(
-        default=SecretStr(""), description="The API key for the OpenAI API"
+        default=SecretStr(""),
+        description="The API key for the OpenAI API",
     )
     ANTHROPIC_API_KEY: SecretStr = Field(
-        default=SecretStr(""), description="The API key for the Anthropic API"
+        default=SecretStr(""),
+        description="The API key for the Anthropic API",
     )
     KODA_DEFAULT_PROVIDER: str = Field(
-        default="openai", description="The default provider to use for the Koda agent"
+        default="openai",
+        description="The default provider to use for the Koda agent",
     )
     KODA_DEFAULT_MODEL: str = Field(
-        default="gpt-5.2", description="The default model to use for the Koda agent"
+        default="gpt-5.2",
+        description="The default model to use for the Koda agent",
     )
 
     model_config = SettingsConfigDict(
