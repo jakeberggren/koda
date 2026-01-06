@@ -49,13 +49,8 @@ class Agent:
 
             response_chunks: list[str] = []
             pending_tool_calls: list[ToolCall] = []
-            async for event in stream:
-                if isinstance(event, TextDelta):
-                    response_chunks.append(event.text)
-                    yield event
-                elif isinstance(event, ToolCallRequested):
-                    pending_tool_calls.append(event.call)
-                    yield event
+            async for event in self._process_events(stream, response_chunks, pending_tool_calls):
+                yield event
 
             result_text = "".join(response_chunks)
             assistant_message = AssistantMessage(
@@ -66,16 +61,8 @@ class Agent:
             self._history.append(assistant_message)
 
             if pending_tool_calls:
-                tool_results = await self._execute_tools(pending_tool_calls)
-                for tool_call, tool_result in zip(pending_tool_calls, tool_results, strict=True):
-                    self._history.append(
-                        ToolMessage(
-                            tool_name=tool_call.tool_name,
-                            tool_result=tool_result,
-                        ),
-                    )
+                await self._handle_tool_calls(tool_calls=pending_tool_calls)
                 continue
-
             return
 
         raise exceptions.MaxIterationsExceededError(
@@ -105,6 +92,30 @@ class Agent:
         if reset_state is not None and callable(reset_state):
             reset_state()
 
+    async def _process_events(
+        self,
+        stream: AsyncIterator[ProviderEvent],
+        response_chunks: list[str],
+        pending_tool_calls: list[ToolCall],
+    ) -> AsyncIterator[ProviderEvent]:
+        async for event in stream:
+            if isinstance(event, TextDelta):
+                response_chunks.append(event.text)
+                yield event
+            elif isinstance(event, ToolCallRequested):
+                pending_tool_calls.append(event.call)
+                yield event
+
+    async def _handle_tool_calls(self, tool_calls: list[ToolCall]) -> None:
+        tool_results = await self._execute_tools(tool_calls)
+        for tool_call, tool_result in zip(tool_calls, tool_results, strict=True):
+            self._history.append(
+                ToolMessage(
+                    tool_name=tool_call.tool_name,
+                    tool_result=tool_result,
+                ),
+            )
+
     async def _execute_tools(self, tool_calls: list[ToolCall]) -> list[ToolResult]:
         """Execute multiple tools in parallel."""
 
@@ -117,34 +128,36 @@ class Agent:
                 for call in tool_calls
             ]
 
-        registry = self.tool_registry
+        return await asyncio.gather(
+            *[self._execute_single_tool(self.tool_registry, call) for call in tool_calls],
+        )
 
-        async def execute_single_tool(tool_call: ToolCall) -> ToolResult:
-            tool = registry.get(tool_call.tool_name)
-            if not tool:
-                return ToolResult(
-                    output=ToolOutput(
-                        is_error=True,
-                        error_message=f"Tool '{tool_call.tool_name}' not found",
-                    ),
-                    call_id=tool_call.call_id,
-                )
+    async def _execute_single_tool(
+        self, tool_registry: ToolRegistry, tool_call: ToolCall
+    ) -> ToolResult:
+        tool = tool_registry.get(tool_call.tool_name)
+        if not tool:
+            return ToolResult(
+                output=ToolOutput(
+                    is_error=True,
+                    error_message=f"Tool '{tool_call.tool_name}' not found",
+                ),
+                call_id=tool_call.call_id,
+            )
 
-            try:
-                params = tool.parameters_model.model_validate(tool_call.arguments)
-            except ValidationError as e:
-                return ToolResult(
-                    output=ToolOutput(is_error=True, error_message=str(e)),
-                    call_id=tool_call.call_id,
-                )
+        try:
+            params = tool.parameters_model.model_validate(tool_call.arguments)
+        except ValidationError as e:
+            return ToolResult(
+                output=ToolOutput(is_error=True, error_message=str(e)),
+                call_id=tool_call.call_id,
+            )
 
-            try:
-                output = await tool.execute(params)
-                return ToolResult(output=output, call_id=tool_call.call_id)
-            except Exception as e:
-                return ToolResult(
-                    output=ToolOutput(is_error=True, error_message=f"{type(e).__name__}: {e}"),
-                    call_id=tool_call.call_id,
-                )
-
-        return await asyncio.gather(*(execute_single_tool(call) for call in tool_calls))
+        try:
+            output = await tool.execute(params)
+            return ToolResult(output=output, call_id=tool_call.call_id)
+        except Exception as e:
+            return ToolResult(
+                output=ToolOutput(is_error=True, error_message=f"{type(e).__name__}: {e}"),
+                call_id=tool_call.call_id,
+            )

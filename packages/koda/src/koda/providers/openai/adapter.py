@@ -12,7 +12,13 @@ from openai.types.responses import (
 )
 from openai.types.responses.response_input_param import FunctionCallOutput
 
-from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
+from koda.messages import (
+    AssistantMessage,
+    Message,
+    SystemMessage,
+    ToolMessage,
+    UserMessage,
+)
 from koda.providers.adapter import ProviderAdapter
 from koda.tools import ToolCall, ToolDefinition
 
@@ -20,38 +26,37 @@ from koda.tools import ToolCall, ToolDefinition
 class OpenAIAdapter(ProviderAdapter):
     """Adapter for converting to/from OpenAI's API format."""
 
+    def _adapt_tool_message(self, message: ToolMessage) -> FunctionCallOutput:
+        tool_output = message.tool_result.output
+        output_data: dict[str, Any] = {
+            "content": tool_output.content,
+            "is_error": tool_output.is_error,
+        }
+        if tool_output.error_message:
+            output_data["error_message"] = tool_output.error_message
+        return FunctionCallOutput(
+            call_id=message.tool_result.call_id,
+            output=json.dumps(output_data),
+            type="function_call_output",
+        )
+
+    def _adapt_message(self, message: Message) -> EasyInputMessageParam | FunctionCallOutput:
+        if isinstance(message, UserMessage):
+            return EasyInputMessageParam(role="user", content=message.content, type="message")
+        if isinstance(message, AssistantMessage):
+            return EasyInputMessageParam(role="assistant", content=message.content, type="message")
+        if isinstance(message, SystemMessage):
+            return EasyInputMessageParam(role="system", content=message.content, type="message")
+        raise ValueError(f"Unknown message type: {type(message)}")
+
     def adapt_messages(self, messages: list[Message]) -> ResponseInputParam:
         """Convert messages to OpenAI format."""
         result: ResponseInputParam = []
         for msg in messages:
-            if isinstance(msg, UserMessage):
-                result.append(
-                    EasyInputMessageParam(role="user", content=msg.content, type="message"),
-                )
-            elif isinstance(msg, AssistantMessage):
-                result.append(
-                    EasyInputMessageParam(role="assistant", content=msg.content, type="message"),
-                )
-            elif isinstance(msg, SystemMessage):
-                result.append(
-                    EasyInputMessageParam(role="system", content=msg.content, type="message"),
-                )
-            elif isinstance(msg, ToolMessage):
-                tool_output = msg.tool_result.output
-                output_data: dict[str, Any] = {
-                    "content": tool_output.content,
-                    "is_error": tool_output.is_error,
-                }
-                if tool_output.error_message:
-                    output_data["error_message"] = tool_output.error_message
-
-                result.append(
-                    FunctionCallOutput(
-                        call_id=msg.tool_result.call_id,
-                        output=json.dumps(output_data),
-                        type="function_call_output",
-                    ),
-                )
+            if isinstance(msg, ToolMessage):
+                result.append(self._adapt_tool_message(msg))
+            else:
+                result.append(self._adapt_message(msg))
         return result
 
     def _adapt_tool(self, tool: ToolDefinition) -> FunctionToolParam:

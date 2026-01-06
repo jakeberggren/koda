@@ -96,6 +96,16 @@ class KodaTuiApp:
             self._render_event(chunk)
         self.renderer.flush()
 
+    def _handle_exception(self, e: Exception) -> None:
+        if isinstance(e, exceptions.ProviderRateLimitError):
+            self.renderer.print_error(f"Rate limit exceeded. {e}")
+        elif isinstance(e, exceptions.ProviderAuthenticationError):
+            self.renderer.print_error(f"Authentication failed. {e}")
+        elif isinstance(e, exceptions.ProviderAPIError):
+            self.renderer.print_error(f"API error occurred. {e}")
+        elif isinstance(e, (exceptions.ProviderError, exceptions.ToolError)):
+            self.renderer.print_error(str(e))
+
     async def _handle_message(self, user_input: str) -> None:
         """Process a single user message and render the response."""
         try:
@@ -104,16 +114,8 @@ class KodaTuiApp:
                 stream_iter = self.backend.chat(user_input)
                 first_chunk = await anext(stream_iter)
             await self._process_stream(stream_iter, first_chunk)
-        except exceptions.ProviderRateLimitError as e:
-            self.renderer.print_error(f"Rate limit exceeded. {e}")
-        except exceptions.ProviderAuthenticationError as e:
-            self.renderer.print_error(f"Authentication failed. {e}")
-        except exceptions.ProviderAPIError as e:
-            self.renderer.print_error(f"API error occurred. {e}")
-        except exceptions.ProviderError as e:
-            self.renderer.print_error(str(e))
-        except exceptions.ToolError as e:
-            self.renderer.print_error(str(e))
+        except Exception as e:
+            self._handle_exception(e)
 
     async def _chat_loop(self) -> None:
         """Main chat loop."""

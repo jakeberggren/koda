@@ -54,7 +54,7 @@ select = [
     "RUF", # ruff-specific rules
     "COM", # flake8-commas
     # "TRY",   # tryceratops
-    # "C90",   # mccabe complexity
+    "C90",   # mccabe complexity
     "PERF",  # perflint performance rules
     "ASYNC", # flake8-async
 ]

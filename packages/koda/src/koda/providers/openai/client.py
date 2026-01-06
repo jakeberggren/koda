@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 
 from openai import (
     APIConnectionError,
@@ -10,6 +10,7 @@ from openai import (
 )
 from openai.types.responses import (
     ResponseCompletedEvent,
+    ResponseStreamEvent,
     ResponseTextDeltaEvent,
 )
 
@@ -57,22 +58,34 @@ class OpenAIProvider(Provider):
                 input=openai_input,
             )
             async for event in stream:
-                if isinstance(event, ResponseTextDeltaEvent):
-                    yield TextDelta(text=event.delta)
-                elif isinstance(event, ResponseCompletedEvent):
-                    self._last_response_id = event.response.id
-                    tool_calls = self.adapter.parse_tool_calls(event.response)
-                    for call in tool_calls:
-                        yield ToolCallRequested(call=call)
-        except RateLimitError as e:
-            raise exceptions.ProviderRateLimitError(f"OpenAI rate limit exceeded: {e}") from e
-        except AuthenticationError as e:
-            auth_error_msg = f"OpenAI authentication failed: {e}"
-            raise exceptions.ProviderAuthenticationError(auth_error_msg) from e
-        except (APIConnectionError, APITimeoutError) as e:
-            raise exceptions.ProviderAPIError(f"OpenAI connection error: {e}") from e
-        except APIError as e:
-            raise exceptions.ProviderAPIError(f"OpenAI API error: {e}") from e
+                for processed_event in self._process_event(event):
+                    yield processed_event
+        except Exception as e:
+            self._handle_provider_exceptions(e)
 
     def reset_state(self) -> None:
         self._last_response_id = None
+
+    def _process_event(
+        self,
+        event: ResponseStreamEvent,
+    ) -> Iterator[ProviderEvent]:
+        if isinstance(event, ResponseTextDeltaEvent):
+            yield TextDelta(text=event.delta)
+        elif isinstance(event, ResponseCompletedEvent):
+            self._last_response_id = event.response.id
+            tool_calls = self.adapter.parse_tool_calls(event.response)
+            for call in tool_calls:
+                yield ToolCallRequested(call=call)
+
+    def _handle_provider_exceptions(self, e: Exception) -> None:
+        if isinstance(e, RateLimitError):
+            raise exceptions.ProviderRateLimitError(f"OpenAI rate limit exceeded: {e}") from e
+        if isinstance(e, AuthenticationError):
+            auth_error_msg = f"OpenAI authentication failed: {e}"
+            raise exceptions.ProviderAuthenticationError(auth_error_msg) from e
+        if isinstance(e, (APIConnectionError, APITimeoutError)):
+            raise exceptions.ProviderAPIError(f"OpenAI connection error: {e}") from e
+        if isinstance(e, APIError):
+            raise exceptions.ProviderAPIError(f"OpenAI API error: {e}") from e
+        raise exceptions.ProviderError(f"OpenAI error: {e}") from e

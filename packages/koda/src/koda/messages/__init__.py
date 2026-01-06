@@ -1,6 +1,7 @@
 from koda.messages.messages import (
     AssistantMessage,
     Message,
+    MessageRole,
     SystemMessage,
     ToolMessage,
     UserMessage,
@@ -9,6 +10,7 @@ from koda.messages.messages import (
 __all__ = [
     "AssistantMessage",
     "Message",
+    "MessageRole",
     "SystemMessage",
     "ToolMessage",
     "UserMessage",

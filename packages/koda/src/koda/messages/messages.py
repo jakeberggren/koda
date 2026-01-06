@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 
 from pydantic import BaseModel, Field
 
@@ -6,10 +6,10 @@ from koda.tools import ToolCall, ToolResult
 
 
 class MessageRole(str, Enum):
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
-    TOOL = "tool"
+    USER = auto()
+    ASSISTANT = auto()
+    SYSTEM = auto()
+    TOOL = auto()
 
 
 class Message(BaseModel):

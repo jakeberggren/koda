@@ -232,16 +232,11 @@ class TestEmptyAndEdgeCases:
         assert result is not None
 
 
-def validate_adapter_contract(adapter: provider_adapter.ProviderAdapter) -> list[str]:
-    """
-    Validate an adapter implementation meets the contract.
-
-    Returns list of failures (empty = all passed).
-    Useful for runtime validation when adding new providers.
-    """
-    failures: list[str] = []
-
-    # Test empty messages
+def _validate_empty_messages(
+    adapter: provider_adapter.ProviderAdapter,
+    failures: list[str],
+) -> None:
+    """Validate that empty messages are handled correctly."""
     try:
         result = adapter.adapt_messages([])
         if result is None:
@@ -249,19 +244,34 @@ def validate_adapter_contract(adapter: provider_adapter.ProviderAdapter) -> list
     except Exception as e:
         failures.append(f"adapt_messages([]) raised: {e}")
 
-    # Test None tools
+
+def _validate_none_tools(
+    adapter: provider_adapter.ProviderAdapter,
+    failures: list[str],
+) -> None:
+    """Validate that None tools are handled correctly."""
     try:
         adapter.adapt_tools(None)
     except Exception as e:
         failures.append(f"adapt_tools(None) raised: {e}")
 
-    # Test basic message
+
+def _validate_user_message(
+    adapter: provider_adapter.ProviderAdapter,
+    failures: list[str],
+) -> None:
+    """Validate that user messages are handled correctly."""
     try:
         adapter.adapt_messages([UserMessage(content="test")])
     except Exception as e:
         failures.append(f"adapt_messages with UserMessage raised: {e}")
 
-    # Test tool message with call_id
+
+def _validate_tool_message(
+    adapter: provider_adapter.ProviderAdapter,
+    failures: list[str],
+) -> None:
+    """Validate that tool messages preserve call_id."""
     try:
         tool_msg = ToolMessage(
             tool_name="test",
@@ -276,4 +286,17 @@ def validate_adapter_contract(adapter: provider_adapter.ProviderAdapter) -> list
     except Exception as e:
         failures.append(f"adapt_messages with ToolMessage raised: {e}")
 
+
+def validate_adapter_contract(adapter: provider_adapter.ProviderAdapter) -> list[str]:
+    """
+    Validate an adapter implementation meets the contract.
+
+    Returns list of failures (empty = all passed).
+    Useful for runtime validation when adding new providers.
+    """
+    failures: list[str] = []
+    _validate_empty_messages(adapter, failures)
+    _validate_none_tools(adapter, failures)
+    _validate_user_message(adapter, failures)
+    _validate_tool_message(adapter, failures)
     return failures

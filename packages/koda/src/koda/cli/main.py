@@ -45,7 +45,7 @@ def _get_random_thinking_message() -> str:
     )
 
 
-async def _run_chat_loop(agent: Agent) -> None:
+async def _run_chat_loop(agent: Agent) -> None:  # noqa: C901
     while True:
         try:
             user_input = typer.prompt("You")
