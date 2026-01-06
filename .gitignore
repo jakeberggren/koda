@@ -17,3 +17,6 @@ wheels/
 
 # macOS files
 .DS_Store
+
+# Coverage
+.coverage
