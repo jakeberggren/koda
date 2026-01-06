@@ -13,6 +13,6 @@ alwaysApply: true
 - Keep modules and functions short; extract helpers instead of deep nesting; maintain clear dependency direction.
 - Use logging over `print`; choose appropriate log levels for signal vs noise.
 - Write focused, deterministic tests alongside changes, covering edge cases and error paths.
-- Use absolute imports; prefer importing modules over individual functions to preserve namespace context and clarity (e.g., `from . import utils` then `utils.validate()` rather than `from .utils import validate`).
+- Use absolute imports.
 - Validate data at system boundaries using Pydantic models; fail fast with clear validation errors on external inputs (APIs, files, user data).
 - Prioritize clarity over premature optimization; profile before optimizing hot paths; document performance-critical sections and trade-offs.
