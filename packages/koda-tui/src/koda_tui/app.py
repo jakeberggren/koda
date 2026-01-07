@@ -7,10 +7,11 @@ from pathlib import Path
 
 from koda.agents import Agent
 from koda.config import Settings, get_settings
+from koda.providers import exceptions as provider_exceptions
 from koda.providers import get_provider_registry
 from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested
 from koda.tools import ToolRegistry, filesystem
-from koda.utils import exceptions
+from koda.tools import exceptions as tool_exceptions
 from koda_tui.backends import Backend, LocalBackend
 from koda_tui.input import InputHandler, PromptToolkitInput
 from koda_tui.renderer import Renderer, RichRenderer
@@ -97,13 +98,13 @@ class KodaTuiApp:
         self.renderer.flush()
 
     def _handle_exception(self, e: Exception) -> None:
-        if isinstance(e, exceptions.ProviderRateLimitError):
+        if isinstance(e, provider_exceptions.ProviderRateLimitError):
             self.renderer.print_error(f"Rate limit exceeded. {e}")
-        elif isinstance(e, exceptions.ProviderAuthenticationError):
+        elif isinstance(e, provider_exceptions.ProviderAuthenticationError):
             self.renderer.print_error(f"Authentication failed. {e}")
-        elif isinstance(e, exceptions.ProviderAPIError):
+        elif isinstance(e, provider_exceptions.ProviderAPIError):
             self.renderer.print_error(f"API error occurred. {e}")
-        elif isinstance(e, (exceptions.ProviderError, exceptions.ToolError)):
+        elif isinstance(e, (provider_exceptions.ProviderError, tool_exceptions.ToolError)):
             self.renderer.print_error(str(e))
 
     async def _handle_message(self, user_input: str) -> None:

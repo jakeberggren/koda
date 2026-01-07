@@ -3,7 +3,7 @@
 import pytest
 from pydantic import BaseModel
 
-from koda.providers import adapter as provider_adapter
+from koda.providers import ProviderAdapter
 from koda.providers.openai import adapter as openai_adapter
 from koda.tools import base as tools_base
 
@@ -26,9 +26,9 @@ def sample_tool_definition() -> tools_base.ToolDefinition:
 
 
 @pytest.fixture(params=["openai"])  # Add "anthropic" when implemented
-def adapter(request: pytest.FixtureRequest) -> provider_adapter.ProviderAdapter:
+def adapter(request: pytest.FixtureRequest) -> ProviderAdapter:
     """Parametrized fixture providing all adapter implementations."""
-    adapters: dict[str, provider_adapter.ProviderAdapter] = {
+    adapters: dict[str, ProviderAdapter] = {
         "openai": openai_adapter.OpenAIAdapter(),
         # "anthropic": AnthropicAdapter(),
     }

@@ -8,14 +8,14 @@ Any new provider implementation should pass all these tests.
 from pydantic import BaseModel
 
 from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
-from koda.providers import adapter as provider_adapter
+from koda.providers import ProviderAdapter
 from koda.tools import base as tools_base
 
 
 class TestAdaptMessages:
     """Contract tests for adapt_messages()."""
 
-    def test_user_message_produces_output(self, adapter: provider_adapter.ProviderAdapter) -> None:
+    def test_user_message_produces_output(self, adapter: ProviderAdapter) -> None:
         """User messages must produce non-empty output."""
         msg = UserMessage(content="Hello")
         result = adapter.adapt_messages([msg])
@@ -23,7 +23,7 @@ class TestAdaptMessages:
 
     def test_assistant_message_produces_output(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
     ) -> None:
         """Assistant messages must produce non-empty output."""
         msg = AssistantMessage(content="Hi there")
@@ -32,7 +32,7 @@ class TestAdaptMessages:
 
     def test_system_message_produces_output(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
     ) -> None:
         """System messages must produce non-empty output."""
         msg = SystemMessage(content="You are helpful")
@@ -41,7 +41,7 @@ class TestAdaptMessages:
 
     def test_empty_message_list_returns_empty(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
     ) -> None:
         """Empty input must return empty output (not None or error)."""
         result = adapter.adapt_messages([])
@@ -49,7 +49,7 @@ class TestAdaptMessages:
 
     def test_multiple_messages_preserves_count(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
     ) -> None:
         """Multiple messages must all be included in output."""
         messages: list[Message] = [
@@ -66,7 +66,7 @@ class TestToolCallRoundtrip:
 
     def test_call_id_preserved_in_tool_message(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
     ) -> None:
         """Tool results must preserve the original call_id."""
         call_id = "call_abc123"
@@ -87,7 +87,7 @@ class TestToolCallRoundtrip:
 
     def test_tool_error_includes_error_state(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
     ) -> None:
         """Error tool results must include error information."""
         error_msg = ToolMessage(
@@ -106,7 +106,7 @@ class TestToolCallRoundtrip:
 
     def test_tool_success_does_not_include_error_message(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
     ) -> None:
         """Successful tool results should not include error_message field."""
         success_msg = ToolMessage(
@@ -123,7 +123,7 @@ class TestToolCallRoundtrip:
         # error_message key should not appear (it's None)
         assert "error_message" not in result_str
 
-    def test_multiple_tool_results(self, adapter: provider_adapter.ProviderAdapter) -> None:
+    def test_multiple_tool_results(self, adapter: ProviderAdapter) -> None:
         """Multiple tool results in one batch must all be included."""
         messages: list[Message] = [
             ToolMessage(
@@ -154,18 +154,18 @@ class TestToolCallRoundtrip:
 class TestAdaptTools:
     """Contract tests for adapt_tools()."""
 
-    def test_none_tools_does_not_raise(self, adapter: provider_adapter.ProviderAdapter) -> None:
+    def test_none_tools_does_not_raise(self, adapter: ProviderAdapter) -> None:
         """Passing None for tools must not raise an exception."""
         # Should not raise - result may be empty list, None, or sentinel
         adapter.adapt_tools(None)
 
-    def test_empty_tools_does_not_raise(self, adapter: provider_adapter.ProviderAdapter) -> None:
+    def test_empty_tools_does_not_raise(self, adapter: ProviderAdapter) -> None:
         """Passing empty list for tools must not raise an exception."""
         adapter.adapt_tools([])
 
     def test_single_tool_produces_output(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
         sample_tool_definition: tools_base.ToolDefinition,
     ) -> None:
         """A single tool definition must be processable without error."""
@@ -176,7 +176,7 @@ class TestAdaptTools:
 
     def test_multiple_tools_all_included(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
         sample_tool_definition: tools_base.ToolDefinition,
     ) -> None:
         """Multiple tools must all be adapted."""
@@ -201,7 +201,7 @@ class TestAdaptTools:
 class TestEmptyAndEdgeCases:
     """Contract tests for edge cases and empty inputs."""
 
-    def test_empty_content_user_message(self, adapter: provider_adapter.ProviderAdapter) -> None:
+    def test_empty_content_user_message(self, adapter: ProviderAdapter) -> None:
         """User message with empty content should not raise."""
         msg = UserMessage(content="")
         result = adapter.adapt_messages([msg])
@@ -209,7 +209,7 @@ class TestEmptyAndEdgeCases:
 
     def test_empty_content_assistant_message(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
     ) -> None:
         """Assistant message with empty content should not raise."""
         msg = AssistantMessage(content="")
@@ -218,7 +218,7 @@ class TestEmptyAndEdgeCases:
 
     def test_tool_result_with_empty_content(
         self,
-        adapter: provider_adapter.ProviderAdapter,
+        adapter: ProviderAdapter,
     ) -> None:
         """Tool result with empty content dict should not raise."""
         tool_msg = ToolMessage(
@@ -233,7 +233,7 @@ class TestEmptyAndEdgeCases:
 
 
 def _validate_empty_messages(
-    adapter: provider_adapter.ProviderAdapter,
+    adapter: ProviderAdapter,
     failures: list[str],
 ) -> None:
     """Validate that empty messages are handled correctly."""
@@ -246,7 +246,7 @@ def _validate_empty_messages(
 
 
 def _validate_none_tools(
-    adapter: provider_adapter.ProviderAdapter,
+    adapter: ProviderAdapter,
     failures: list[str],
 ) -> None:
     """Validate that None tools are handled correctly."""
@@ -257,7 +257,7 @@ def _validate_none_tools(
 
 
 def _validate_user_message(
-    adapter: provider_adapter.ProviderAdapter,
+    adapter: ProviderAdapter,
     failures: list[str],
 ) -> None:
     """Validate that user messages are handled correctly."""
@@ -268,7 +268,7 @@ def _validate_user_message(
 
 
 def _validate_tool_message(
-    adapter: provider_adapter.ProviderAdapter,
+    adapter: ProviderAdapter,
     failures: list[str],
 ) -> None:
     """Validate that tool messages preserve call_id."""
@@ -287,7 +287,7 @@ def _validate_tool_message(
         failures.append(f"adapt_messages with ToolMessage raised: {e}")
 
 
-def validate_adapter_contract(adapter: provider_adapter.ProviderAdapter) -> list[str]:
+def validate_adapter_contract(adapter: ProviderAdapter) -> list[str]:
     """
     Validate an adapter implementation meets the contract.
 

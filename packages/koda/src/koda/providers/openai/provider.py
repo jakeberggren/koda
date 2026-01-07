@@ -15,11 +15,10 @@ from openai.types.responses import (
 )
 
 from koda.messages import Message
-from koda.providers import Provider
+from koda.providers import Provider, exceptions
 from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested
 from koda.providers.openai import OpenAIAdapter
 from koda.tools import ToolDefinition
-from koda.utils import exceptions
 
 
 class OpenAIProvider(Provider):

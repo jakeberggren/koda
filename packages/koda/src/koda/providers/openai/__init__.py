@@ -1,6 +1,6 @@
 from koda.config.settings import Settings
 from koda.providers.openai.adapter import OpenAIAdapter
-from koda.providers.openai.client import OpenAIProvider
+from koda.providers.openai.provider import OpenAIProvider
 from koda.providers.registry import get_provider_registry
 
 

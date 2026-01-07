@@ -19,7 +19,7 @@ from koda.messages import (
     ToolMessage,
     UserMessage,
 )
-from koda.providers.adapter import ProviderAdapter
+from koda.providers.base import ProviderAdapter
 from koda.tools import ToolCall, ToolDefinition
 
 

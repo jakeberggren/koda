@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING
 from pydantic import ValidationError
 
 from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
+from koda.providers import exceptions as provider_exceptions
 from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested
 from koda.tools import ToolCall, ToolOutput, ToolRegistry, ToolResult
-from koda.utils import exceptions
+from koda.tools import exceptions as tool_exceptions
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -35,7 +36,7 @@ class Agent:
 
     async def run(self, user_text: str) -> AsyncIterator[ProviderEvent]:
         if not user_text or not user_text.strip():
-            raise exceptions.ProviderValidationError("Message cannot be empty")
+            raise provider_exceptions.ProviderValidationError("Message cannot be empty")
 
         user_message = UserMessage(content=user_text.strip())
         self._history.append(user_message)
@@ -65,7 +66,7 @@ class Agent:
                 continue
             return
 
-        raise exceptions.MaxIterationsExceededError(
+        raise tool_exceptions.MaxIterationsExceededError(
             f"Maximum tool call iterations ({self.max_tool_iterations}) exceeded",
         )
 

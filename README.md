@@ -40,8 +40,7 @@ packages/
 │   ├── config/     # Configuration and settings
 │   ├── messages/   # Message types and handling
 │   ├── providers/  # LLM provider adapters (OpenAI, Anthropic)
-│   ├── tools/      # Agent tools (filesystem operations, etc.)
-│   └── utils/      # Utilities and exceptions
+│   └── tools/      # Agent tools (filesystem operations, etc.)
 │
 └── koda-tui/       # Terminal user interface
     ├── app.py      # Main TUI application
