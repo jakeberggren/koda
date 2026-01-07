@@ -5,11 +5,11 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/src"
+        "PYTHONPATH": "${workspaceFolder}/packages/koda-tui/src:${workspaceFolder}/packages/koda/src"
       },
       "justMyCode": false,
-      "module": "koda.cli.main",
-      "name": "Python: Debug CLI",
+      "module": "koda_tui",
+      "name": "Python: Debug TUI",
       "python": "${workspaceFolder}/.venv/bin/python",
       "request": "launch",
       "type": "debugpy"

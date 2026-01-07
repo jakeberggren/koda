@@ -11,20 +11,12 @@
 </pre>
 </div>
 
-KODA is an agentic coding assistant designed for the terminal. KODA is built to understand,
-navigate and safely modify real codebases, as a complete coding companion for end-to-end software creation.
+KODA is a lightweight agentic coding assistant designed for the terminal. KODA is built to be a complete coding companion capable of navigating, understanding, and modifying codebases and completing coding tasks for end-to-end software creation.
 
-The current state of KODA is a lightweight, provider-agnostic agent framework with a simple CLI for running
-and testing interactive chat agents. Future improvements include persistent sessions, a fully built-out TUI, and
+The current state of KODA is a lightweight, provider-agnostic agent framework combined with a simple Terminal UI (TUI). Future improvements include persistent sessions, enhanced TUI features, and
 more advanced tooling for improved codebase navigation and safe editing capabilities.
 
-## CLI Usage
-
-KODA provides a basic CLI tool for testing and interacting with agents.
-
-### Basic Commands
-
-#### Interactive Chat Session
+## Usage
 
 Start an interactive chat session (default mode):
 
@@ -32,19 +24,28 @@ Start an interactive chat session (default mode):
 koda
 ```
 
-With provider and model options:
+Press Ctrl+C twice to exit the session.
 
-```bash
-koda --provider openai --model gpt-5.1
-koda -p anthropic -m claude-opus-4-5
+## Project Structure
+
+Koda is a monorepo workspace managed by uv, containing two main packages:
+
+- koda: Provider-agnostic core library that handles agent logic, tool execution, and LLM provider integration
+- koda-tui: Interactive terminal interface.
+
 ```
-
-Type `exit`, `quit`, or `q` to end the session.
-
-### Help
-
-Get help for any command:
-
-```bash
-koda --help
+packages/
+├── koda/           # Core agent framework
+│   ├── agents/     # Agent orchestration
+│   ├── config/     # Configuration and settings
+│   ├── messages/   # Message types and handling
+│   ├── providers/  # LLM provider adapters (OpenAI, Anthropic)
+│   ├── tools/      # Agent tools (filesystem operations, etc.)
+│   └── utils/      # Utilities and exceptions
+│
+└── koda-tui/       # Terminal user interface
+    ├── app.py      # Main TUI application
+    ├── backends/   # Backend implementations (local, mock)
+    ├── input.py    # Input handling
+    └── renderer.py # Output rendering with Rich
 ```
