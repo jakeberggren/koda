@@ -8,15 +8,26 @@ BLACKLISTED_FILES = [".env", ".env.local", ".DS_Store", ".ds_store", ".gitignore
 
 
 def _validate_path_in_sandbox(file_path: Path, sandbox_dir: Path) -> None:
-    """Validate that a resolved path is within the sandbox directory.
-
-    Raises ToolValidationError if the path is outside the sandbox.
-    """
     resolved_path = file_path.resolve()
     resolved_sandbox = sandbox_dir.resolve()
 
     if not resolved_path.is_relative_to(resolved_sandbox):
         raise exceptions.PathOutsideSandboxError(resolved_path, resolved_sandbox)
+
+
+def _validate_path_exists(path: Path) -> None:
+    if not path.exists():
+        raise exceptions.ToolFileNotFoundError(path)
+
+
+def _validate_path_is_file(path: Path) -> None:
+    if not path.is_file():
+        raise exceptions.ToolPathTypeError(path, "file")
+
+
+def _validate_path_is_dir(path: Path) -> None:
+    if not path.is_dir():
+        raise exceptions.ToolPathTypeError(path, "directory")
 
 
 class ReadFileParams(BaseModel):
@@ -51,16 +62,15 @@ class ReadFileTool:
                 error_message=f"Reading {file_path.name} is not allowed.",
             )
 
-        # Let filesystem operations raise their natural exceptions
-        # The agent will catch and convert them to ToolOutput
-        if not file_path.exists():
-            raise exceptions.ToolFileNotFoundError(params.path)
+        _validate_path_exists(file_path)
+        _validate_path_is_file(file_path)
 
-        if not file_path.is_file():
-            raise exceptions.ToolPathTypeError(params.path, "file")
-
-        # read_text will raise PermissionError if needed
-        text_content = file_path.read_text(encoding="utf-8")
+        try:
+            text_content = file_path.read_text(encoding="utf-8")
+        except PermissionError as e:
+            raise exceptions.ToolPermissionError(file_path) from e
+        except OSError as e:
+            raise exceptions.ToolReadError(file_path, e) from e
         return ToolOutput(content={"text": text_content})
 
 
@@ -100,11 +110,14 @@ class WriteFileTool:
         # Create parent directories if they don't exist
         # Validate parent directory is also within sandbox
         _validate_path_in_sandbox(file_path.parent, self.sandbox_dir)
-        # mkdir may raise PermissionError - let it propagate
-        file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # write_text will raise PermissionError if needed
-        file_path.write_text(params.content, encoding="utf-8")
+        try:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(params.content, encoding="utf-8")
+        except PermissionError as e:
+            raise exceptions.ToolPermissionError(file_path) from e
+        except OSError as e:
+            raise exceptions.ToolWriteError(file_path, e) from e
         return ToolOutput(content={"success": True, "path": str(file_path)})
 
 
@@ -130,18 +143,19 @@ class ListDirectoryTool:
         dir_path = Path(params.path)
         dir_path = dir_path.resolve()
 
-        # Validate path is within sandbox
         _validate_path_in_sandbox(dir_path, self.sandbox_dir)
+        _validate_path_exists(dir_path)
+        _validate_path_is_dir(dir_path)
 
-        if not dir_path.exists():
-            raise exceptions.ToolFileNotFoundError(params.path)
+        try:
+            dir_items = list(dir_path.iterdir())
+        except PermissionError as e:
+            raise exceptions.ToolPermissionError(dir_path) from e
+        except OSError as e:
+            raise exceptions.ToolListDirectoryError(dir_path, e) from e
 
-        if not dir_path.is_dir():
-            raise exceptions.ToolPathTypeError(params.path, "directory")
-
-        # iterdir will raise PermissionError if needed
         items = []
-        for item in dir_path.iterdir():
+        for item in dir_items:
             # Ensure listed items are also within sandbox (defense in depth)
             item_resolved = item.resolve()
             try:

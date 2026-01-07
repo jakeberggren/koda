@@ -85,4 +85,4 @@ class OpenAIProvider(Provider):
             raise exceptions.ProviderConnectionError("OpenAI", e) from e
         if isinstance(e, APIError):
             raise exceptions.ProviderAPIError("OpenAI", e) from e
-        raise exceptions.ProviderGenericError("OpenAI", e) from e
+        raise exceptions.ProviderAPIError("OpenAI", e) from e
