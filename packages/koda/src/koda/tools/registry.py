@@ -1,4 +1,4 @@
-from koda.tools import Tool, ToolDefinition
+from koda.tools import Tool, ToolDefinition, exceptions
 
 
 class ToolRegistry:
@@ -10,7 +10,7 @@ class ToolRegistry:
     def register(self, tool: Tool) -> None:
         """Register a tool in the registry."""
         if tool.name in self._tools:
-            raise ValueError(f"Tool '{tool.name}' is already registered")
+            raise exceptions.ToolAlreadyRegisteredError(tool.name)
         self._tools[tool.name] = tool
 
     def get(self, name: str) -> Tool | None:

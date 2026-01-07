@@ -36,7 +36,7 @@ class Agent:
 
     async def run(self, user_text: str) -> AsyncIterator[ProviderEvent]:
         if not user_text or not user_text.strip():
-            raise provider_exceptions.ProviderValidationError("Message cannot be empty")
+            raise provider_exceptions.EmptyMessageError
 
         user_message = UserMessage(content=user_text.strip())
         self._history.append(user_message)
@@ -66,9 +66,7 @@ class Agent:
                 continue
             return
 
-        raise tool_exceptions.MaxIterationsExceededError(
-            f"Maximum tool call iterations ({self.max_tool_iterations}) exceeded",
-        )
+        raise tool_exceptions.MaxIterationsExceededError(self.max_tool_iterations)
 
     def add_message(self, message_to_add: Message) -> None:
         self._history.append(message_to_add)

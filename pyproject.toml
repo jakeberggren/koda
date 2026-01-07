@@ -28,32 +28,32 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = [
-    "E",   # pycodestyle errors
-    "W",   # pycodestyle warnings
-    "F",   # pyflakes
-    "I",   # isort
-    "N",   # pep8-naming
-    "Q",   # flake8-quotes
-    "B",   # flake8-bugbear
-    "S",   # flake8-bandit (security rules)
-    "C4",  # flake8-comprehensions
-    "FA",  # flake8-future-annotations
-    "UP",  # pyupgrade
-    "PL",  # pylint
-    "PT",  # flake8-pytest-style
-    "TC",  # flake8-type-checking
-    "PIE", # flake8-pie (best practices)
-    "SIM", # flake8-simplify
-    "RSE", # flake8-raise
-    "RET", # flake8-return
-    "SLF", # flake8-self
-    "TID", # flake8-tidy-imports
-    "ARG", # flake8-unused-arguments
-    "PTH", # flake8-use-pathlib
-    "FBT", # flake8-boolean-trap
-    "RUF", # ruff-specific rules
-    "COM", # flake8-commas
-    # "TRY",   # tryceratops
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "N",     # pep8-naming
+    "Q",     # flake8-quotes
+    "B",     # flake8-bugbear
+    "S",     # flake8-bandit (security rules)
+    "C4",    # flake8-comprehensions
+    "FA",    # flake8-future-annotations
+    "UP",    # pyupgrade
+    "PL",    # pylint
+    "PT",    # flake8-pytest-style
+    "TC",    # flake8-type-checking
+    "PIE",   # flake8-pie (best practices)
+    "SIM",   # flake8-simplify
+    "RSE",   # flake8-raise
+    "RET",   # flake8-return
+    "SLF",   # flake8-self
+    "TID",   # flake8-tidy-imports
+    "ARG",   # flake8-unused-arguments
+    "PTH",   # flake8-use-pathlib
+    "FBT",   # flake8-boolean-trap
+    "RUF",   # ruff-specific rules
+    "COM",   # flake8-commas
+    "TRY",   # tryceratops
     "C90",   # mccabe complexity
     "PERF",  # perflint performance rules
     "ASYNC", # flake8-async

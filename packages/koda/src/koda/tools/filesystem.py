@@ -16,9 +16,7 @@ def _validate_path_in_sandbox(file_path: Path, sandbox_dir: Path) -> None:
     resolved_sandbox = sandbox_dir.resolve()
 
     if not resolved_path.is_relative_to(resolved_sandbox):
-        raise exceptions.ToolValidationError(
-            f"Path '{resolved_path}' is outside the sandbox directory '{resolved_sandbox}'",
-        )
+        raise exceptions.PathOutsideSandboxError(resolved_path, resolved_sandbox)
 
 
 class ReadFileParams(BaseModel):
@@ -56,10 +54,10 @@ class ReadFileTool:
         # Let filesystem operations raise their natural exceptions
         # The agent will catch and convert them to ToolOutput
         if not file_path.exists():
-            raise FileNotFoundError(f"File not found: {params.path}")
+            raise exceptions.ToolFileNotFoundError(params.path)
 
         if not file_path.is_file():
-            raise IsADirectoryError(f"Path is not a file: {params.path}")
+            raise exceptions.ToolPathTypeError(params.path, "file")
 
         # read_text will raise PermissionError if needed
         text_content = file_path.read_text(encoding="utf-8")
@@ -136,10 +134,10 @@ class ListDirectoryTool:
         _validate_path_in_sandbox(dir_path, self.sandbox_dir)
 
         if not dir_path.exists():
-            raise FileNotFoundError(f"Directory not found: {params.path}")
+            raise exceptions.ToolFileNotFoundError(params.path)
 
         if not dir_path.is_dir():
-            raise NotADirectoryError(f"Path is not a directory: {params.path}")
+            raise exceptions.ToolPathTypeError(params.path, "directory")
 
         # iterdir will raise PermissionError if needed
         items = []

@@ -20,6 +20,7 @@ from koda.messages import (
     UserMessage,
 )
 from koda.providers.base import ProviderAdapter
+from koda.providers.exceptions import UnknownMessageTypeError
 from koda.tools import ToolCall, ToolDefinition
 
 
@@ -47,7 +48,7 @@ class OpenAIAdapter(ProviderAdapter):
             return EasyInputMessageParam(role="assistant", content=message.content, type="message")
         if isinstance(message, SystemMessage):
             return EasyInputMessageParam(role="system", content=message.content, type="message")
-        raise ValueError(f"Unknown message type: {type(message)}")
+        raise UnknownMessageTypeError(type(message))
 
     def adapt_messages(self, messages: list[Message]) -> ResponseInputParam:
         """Convert messages to OpenAI format."""

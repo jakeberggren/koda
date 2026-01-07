@@ -29,7 +29,7 @@ class OpenAIProvider(Provider):
         base_url: str | None = None,
     ) -> None:
         if not api_key or not api_key.strip():
-            raise exceptions.ProviderValidationError("OpenAI API key cannot be empty")
+            raise exceptions.EmptyApiKeyError("OpenAI")
 
         self.client: AsyncOpenAI = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self.model: str = model
@@ -42,9 +42,8 @@ class OpenAIProvider(Provider):
         tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[ProviderEvent]:
         if not messages:
-            raise exceptions.ProviderValidationError("Messages list cannot be empty")
+            raise exceptions.EmptyMessagesListError
 
-        # Use adapter to convert messages and tools
         openai_input = self.adapter.adapt_messages(messages)
         openai_tools = self.adapter.adapt_tools(tools)
 
@@ -79,12 +78,11 @@ class OpenAIProvider(Provider):
 
     def _handle_provider_exceptions(self, e: Exception) -> None:
         if isinstance(e, RateLimitError):
-            raise exceptions.ProviderRateLimitError(f"OpenAI rate limit exceeded: {e}") from e
+            raise exceptions.ProviderRateLimitError("OpenAI", e) from e
         if isinstance(e, AuthenticationError):
-            auth_error_msg = f"OpenAI authentication failed: {e}"
-            raise exceptions.ProviderAuthenticationError(auth_error_msg) from e
+            raise exceptions.ProviderAuthenticationError("OpenAI", e) from e
         if isinstance(e, (APIConnectionError, APITimeoutError)):
-            raise exceptions.ProviderAPIError(f"OpenAI connection error: {e}") from e
+            raise exceptions.ProviderConnectionError("OpenAI", e) from e
         if isinstance(e, APIError):
-            raise exceptions.ProviderAPIError(f"OpenAI API error: {e}") from e
-        raise exceptions.ProviderError(f"OpenAI error: {e}") from e
+            raise exceptions.ProviderAPIError("OpenAI", e) from e
+        raise exceptions.ProviderGenericError("OpenAI", e) from e
