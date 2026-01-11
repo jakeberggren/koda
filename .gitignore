@@ -20,3 +20,6 @@ wheels/
 
 # Coverage
 .coverage
+
+# Claude local settings
+settings.local.json
