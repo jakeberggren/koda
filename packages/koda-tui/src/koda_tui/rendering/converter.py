@@ -2,17 +2,41 @@
 
 import time
 from io import StringIO
+from typing import ClassVar
 
 from prompt_toolkit.formatted_text import FormattedText, to_formatted_text
 from prompt_toolkit.formatted_text.ansi import ANSI
-from rich.console import Console
+from rich.console import Console, ConsoleOptions, RenderResult
+from rich.markdown import CodeBlock, Markdown
 from rich.panel import Panel
+from rich.syntax import Syntax
 from rich.text import Text
 
 from koda.tools import ToolCall
 from koda_tui.app.state import Message, MessageRole
 
+CODE_THEME = "dracula"
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+
+class NoBackgroundCodeBlock(CodeBlock):
+    """Code block without background color."""
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        code = str(self.text).rstrip()
+        yield Syntax(
+            code,
+            self.lexer_name,
+            theme=CODE_THEME,
+            background_color="default",
+            line_numbers=True,
+        )
+
+
+class StyledMarkdown(Markdown):
+    """Markdown with code blocks without background."""
+
+    elements: ClassVar = {**Markdown.elements, "fence": NoBackgroundCodeBlock}
 
 
 class RichToPromptToolkit:
@@ -45,13 +69,16 @@ class RichToPromptToolkit:
     def render_message(self, message: Message) -> FormattedText:
         """Render a single message to FormattedText."""
         if message.role == MessageRole.USER:
-            text = Text()
-            text.append(message.content)
-            return self.convert(text)
+            return self.convert(StyledMarkdown(message.content))
         if message.role == MessageRole.ASSISTANT:
-            text = Text()
-            text.append(message.content)
-            return self.convert(text)
+            md = StyledMarkdown(message.content)
+            panel = Panel(
+                md,
+                title="KODA",
+                title_align="left",
+                border_style="magenta",
+            )
+            return self.convert(panel)
         if message.role == MessageRole.TOOL:
             if message.tool_call:
                 return self.render_tool_call(message.tool_call)
@@ -64,16 +91,19 @@ class RichToPromptToolkit:
             f"[bold]{tool_call.tool_name}[/bold]",
             title="Tool Call",
             border_style="yellow",
-            expand=False,
         )
         return self.convert(panel)
 
     def render_streaming_content(self, content: str) -> FormattedText:
-        """Render currently streaming content with cursor."""
-        text = Text()
-        text.append(content)
-        text.append("\u2588", style="blink")  # Blinking cursor block
-        return self.convert(text)
+        """Render currently streaming content with cursor inside a panel."""
+        md = StyledMarkdown(content + "\u2588")  # Blinking cursor block
+        panel = Panel(
+            md,
+            title="KODA",
+            title_align="left",
+            border_style="magenta",
+        )
+        return self.convert(panel)
 
     def render_thinking_spinner(self, text: str = "Working...") -> FormattedText:
         """Render an animated thinking spinner."""
