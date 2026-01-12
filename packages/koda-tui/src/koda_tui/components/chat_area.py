@@ -110,10 +110,10 @@ class ChatAreaControl(UIControl):
     def mouse_handler(self, mouse_event: MouseEvent) -> None:
         """Handle mouse scroll events."""
         if mouse_event.event_type == MouseEventType.SCROLL_UP:
-            self._scroll_offset = max(0, self._scroll_offset - 3)
+            self._scroll_offset = max(0, self._scroll_offset - 1)
         elif mouse_event.event_type == MouseEventType.SCROLL_DOWN:
             max_offset = max(0, self._total_lines - self._view_height)
-            self._scroll_offset = min(self._scroll_offset + 3, max_offset)
+            self._scroll_offset = min(self._scroll_offset + 1, max_offset)
 
     def _split_into_lines(self, text: FormattedText, width: int) -> list[FormattedText]:  # noqa: C901 - complexity
         """Split formatted text into lines respecting width."""
