@@ -134,12 +134,7 @@ class KodaTuiApp:
                 self.state.append_delta(event.text)
                 self.invalidate()
             elif isinstance(event, ToolCallRequested):
-                # Finalize current streaming content before tool
-                if self.state.current_streaming_content:
-                    self.state.finish_streaming()
-                    self.state.start_streaming()
-
-                self.state.set_active_tool(event.call)
+                self.state.transition_to_tool(event.call)
                 self.invalidate()
 
     def invalidate(self) -> None:
@@ -149,15 +144,7 @@ class KodaTuiApp:
 
     async def send_message(self, text: str) -> None:
         """Send a message and process the response stream."""
-        # Reset exit request when user sends a message
-        self.state.reset_exit_request()
-
-        # Add user message to history
-        self.state.add_user_message(text)
-        self.invalidate()
-
-        # Start streaming response
-        self.state.start_streaming()
+        self.state.begin_response(text)
         self._start_spinner()
         self.invalidate()
 
@@ -165,15 +152,13 @@ class KodaTuiApp:
             self._streaming_task = asyncio.create_task(self._process_stream(text))
             await self._streaming_task
         except asyncio.CancelledError:
-            # Streaming was cancelled
             pass
         except Exception as e:
             error_msg = f"\n\n**Error:** {type(e).__name__}: {e}"
             self.state.append_delta(error_msg)
         finally:
             await self._stop_spinner()
-            self.state.finish_streaming()
-            self.state.set_active_tool(None)
+            self.state.end_response()
             self._streaming_task = None
             self.invalidate()
 

@@ -22,7 +22,6 @@ class Message:
     role: MessageRole
     content: str
     tool_call: ToolCall | None = None
-    is_streaming: bool = False
     tool_running: bool = False
 
 
@@ -37,50 +36,11 @@ class AppState:
     active_tool: ToolCall | None = None
     model_name: str = ""
     provider_name: str = ""
-    error_message: str | None = None
     exit_requested: bool = False
-
-    def start_streaming(self) -> None:
-        """Begin a new assistant response."""
-        self.is_streaming = True
-        self.current_streaming_content = ""
 
     def append_delta(self, text: str) -> None:
         """Append text to current streaming message."""
         self.current_streaming_content += text
-
-    def finish_streaming(self) -> None:
-        """Finalize streaming and add to history."""
-        if self.current_streaming_content:
-            self.messages.append(
-                Message(
-                    role=MessageRole.ASSISTANT,
-                    content=self.current_streaming_content,
-                )
-            )
-        self.is_streaming = False
-        self.current_streaming_content = ""
-
-    def set_active_tool(self, tool_call: ToolCall | None) -> None:
-        """Set or clear the active tool and add inline tool message."""
-        # Complete the previous tool if there was one
-        if self.active_tool:
-            self.complete_tool_message(self.active_tool)
-
-        self.active_tool = tool_call
-        if tool_call:
-            self.messages.append(
-                Message(
-                    role=MessageRole.TOOL,
-                    content=f"Tool: {tool_call.tool_name}",
-                    tool_call=tool_call,
-                    tool_running=True,
-                )
-            )
-
-    def add_user_message(self, content: str) -> None:
-        """Add a user message to history."""
-        self.messages.append(Message(role=MessageRole.USER, content=content))
 
     def complete_tool_message(self, tool_call: ToolCall) -> None:
         """Mark the running tool message as complete."""
@@ -100,6 +60,56 @@ class AppState:
         self.exit_requested = True
         return False
 
-    def reset_exit_request(self) -> None:
-        """Reset the exit request flag."""
+    def begin_response(self, user_message: str) -> None:
+        """Atomically begin a new response cycle."""
         self.exit_requested = False
+        self.messages.append(Message(role=MessageRole.USER, content=user_message))
+        self.is_streaming = True
+        self.current_streaming_content = ""
+
+    def transition_to_tool(self, tool_call: ToolCall) -> None:
+        """Atomically transition from streaming content to tool execution."""
+        # Finalize any pending content
+        if self.current_streaming_content:
+            self.messages.append(
+                Message(
+                    role=MessageRole.ASSISTANT,
+                    content=self.current_streaming_content,
+                )
+            )
+            self.current_streaming_content = ""
+
+        # Complete previous tool if any
+        if self.active_tool:
+            self.complete_tool_message(self.active_tool)
+
+        # Set new tool
+        self.active_tool = tool_call
+        self.messages.append(
+            Message(
+                role=MessageRole.TOOL,
+                content=f"Tool: {tool_call.tool_name}",
+                tool_call=tool_call,
+                tool_running=True,
+            )
+        )
+
+    def end_response(self) -> None:
+        """Atomically end the response cycle."""
+        # Finalize any pending content
+        if self.current_streaming_content:
+            self.messages.append(
+                Message(
+                    role=MessageRole.ASSISTANT,
+                    content=self.current_streaming_content,
+                )
+            )
+
+        # Complete active tool if any
+        if self.active_tool:
+            self.complete_tool_message(self.active_tool)
+
+        # Reset state
+        self.is_streaming = False
+        self.current_streaming_content = ""
+        self.active_tool = None
