@@ -43,9 +43,9 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901 - complexi
         """Insert newline on Ctrl+Enter."""
         event.current_buffer.insert_text("\n")
 
-    @kb.add(Keys.Escape, Keys.Enter)  # Ctrl+Enter / Ctrl+J
+    @kb.add(Keys.Escape, Keys.Enter)
     def _(event) -> None:
-        """Insert newline on Ctrl+Enter."""
+        """Insert newline on Escape+Enter."""
         event.current_buffer.insert_text("\n")
 
     @kb.add(Keys.ControlC)
