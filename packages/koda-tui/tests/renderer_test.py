@@ -102,36 +102,23 @@ class TestRichToPromptToolkitStreaming:
 class TestAppState:
     """Tests for application state management."""
 
-    def test_add_user_message(self, state: AppState) -> None:
-        """add_user_message() should add message to history."""
-        state.add_user_message("Hello")
-        assert len(state.messages) == 1
-        assert state.messages[0].role == MessageRole.USER
-        assert state.messages[0].content == "Hello"
-
     def test_streaming_lifecycle(self, state: AppState) -> None:
-        """Streaming should go through start, append, finish cycle."""
-        state.start_streaming()
+        """Streaming should go through begin, append, end cycle."""
+        state.begin_response("user message")
         assert state.is_streaming is True
         assert state.current_streaming_content == ""
+        assert len(state.messages) == 1  # User message added
 
         state.append_delta("Hello ")
         state.append_delta("world")
         assert state.current_streaming_content == "Hello world"
 
-        state.finish_streaming()
+        state.end_response()
         assert state.is_streaming is False
         assert state.current_streaming_content == ""
-        assert len(state.messages) == 1
-        assert state.messages[0].content == "Hello world"
+        assert state.messages[1].content == "Hello world"
 
     def test_exit_request(self, state: AppState) -> None:
         """request_exit() should require two calls to exit."""
         assert state.request_exit() is False
         assert state.request_exit() is True
-
-    def test_reset_exit_request(self, state: AppState) -> None:
-        """reset_exit_request() should reset the exit flag."""
-        state.request_exit()
-        state.reset_exit_request()
-        assert state.request_exit() is False
