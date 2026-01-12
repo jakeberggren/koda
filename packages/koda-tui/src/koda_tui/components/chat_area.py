@@ -93,7 +93,7 @@ class ChatAreaControl(UIControl):
 
         for message in self._state.messages:
             fragments.append(self._renderer.render_message(message))
-            fragments.append(FormattedText([("", "\n\n")]))
+            fragments.append(FormattedText([("", "\n")]))
 
         if self._state.is_streaming and self._state.current_streaming_content:
             fragments.append(
@@ -123,13 +123,15 @@ class ChatAreaControl(UIControl):
         merged = to_formatted_text(merge_formatted_text(fragments))
         return self._split_into_lines(merged, width)
 
-    def _update_scroll(self, height: int) -> None:
+    def _update_scroll(self, height: int, *, was_at_bottom: bool) -> None:
         """Update scroll offset with auto-scroll and clamping."""
-        if self._state.is_streaming or self._state.active_tool:
-            self._scroll_offset = max(0, self._total_lines - height)
-
         max_offset = max(0, self._total_lines - height)
-        self._scroll_offset = min(self._scroll_offset, max_offset)
+
+        # Auto-scroll if streaming, or if user was already at bottom
+        if self._state.is_streaming or self._state.active_tool or was_at_bottom:
+            self._scroll_offset = max_offset
+        else:
+            self._scroll_offset = min(self._scroll_offset, max_offset)
 
     def _build_ui_content(self, height: int) -> UIContent:
         """Build the final UIContent with line getter and cursor."""
@@ -155,15 +157,23 @@ class ChatAreaControl(UIControl):
             max_offset = max(0, self._total_lines - self._view_height)
             self._scroll_offset = min(self._scroll_offset + 1, max_offset)
 
+    def _is_at_bottom(self, height: int) -> bool:
+        """Check if scroll is at or near the bottom."""
+        max_offset = max(0, self._total_lines - height)
+        return self._scroll_offset >= max_offset
+
     def create_content(self, width: int, height: int) -> UIContent:
         """Create the content for the chat area."""
         self._view_height = height
         self._renderer.set_width(width)
 
+        # Check if at bottom before content changes
+        was_at_bottom = self._is_at_bottom(height)
+
         fragments = self._render_fragments()
         self._lines = self._merge_and_split(fragments, width)
         self._total_lines = len(self._lines)
-        self._update_scroll(height)
+        self._update_scroll(height, was_at_bottom=was_at_bottom)
 
         return self._build_ui_content(height)
 
