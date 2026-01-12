@@ -99,15 +99,15 @@ class RichToPromptToolkit:
 
     def render_message(self, message: Message) -> FormattedText:
         """Render a single message to FormattedText."""
-        if message.role == MessageRole.USER:
-            return self.convert(UserMarkdown("> " + message.content))
-        if message.role == MessageRole.ASSISTANT:
-            return self.convert(StyledMarkdown(message.content))
-        if message.role == MessageRole.TOOL:
-            if message.tool_call:
-                return self.render_tool_call(message.tool_call, running=message.tool_running)
-            return FormattedText([])
-        return FormattedText([])
+        match message.role:
+            case MessageRole.USER:
+                return self.convert(UserMarkdown("> " + message.content))
+            case MessageRole.ASSISTANT:
+                return self.convert(StyledMarkdown(message.content))
+            case MessageRole.TOOL:
+                if message.tool_call:
+                    return self.render_tool_call(message.tool_call, running=message.tool_running)
+                return FormattedText([])
 
     def render_tool_call(self, tool_call: ToolCall, *, running: bool = False) -> FormattedText:
         """Render a tool call indicator."""
