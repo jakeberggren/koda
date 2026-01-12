@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
+from pathlib import Path
 
 from koda.tools import ToolCall
 
@@ -30,6 +31,7 @@ class AppState:
     """Central application state."""
 
     messages: list[Message] = field(default_factory=list)
+    cwd: Path = field(default_factory=lambda: Path.cwd())
     current_streaming_content: str = ""
     is_streaming: bool = False
     active_tool: ToolCall | None = None

@@ -1,5 +1,7 @@
 """Status bar component for Koda TUI."""
 
+from pathlib import Path
+
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.layout import UIContent, UIControl
 
@@ -12,16 +14,22 @@ class StatusBarControl(UIControl):
     def __init__(self, state: AppState) -> None:
         self._state = state
 
+    def _path_relative_to_home(self) -> Path:
+        """Return the path relative to the repository root."""
+        return self._state.cwd.relative_to(Path.home())
+
     def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002 - unused argument
         """Create the status bar content."""
         # Left side: provider/model info
-        left = f" {self._state.provider_name}/{self._state.model_name}"
+        path = f" ~/{self._path_relative_to_home()}"
+        provider_and_model = f"{self._state.provider_name}/{self._state.model_name}"
+        left = f"{path} | {provider_and_model}"
 
         # Right side: status
         if self._state.active_tool:
             status = f"Running: {self._state.active_tool.tool_name}"
         elif self._state.is_streaming:
-            status = "Streaming..."
+            status = "Streaming"
         elif self._state.exit_requested:
             status = "Press Ctrl+C again to exit"
         else:
