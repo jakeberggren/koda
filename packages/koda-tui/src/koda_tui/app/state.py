@@ -22,6 +22,7 @@ class Message:
     content: str
     tool_call: ToolCall | None = None
     is_streaming: bool = False
+    tool_running: bool = False
 
 
 @dataclass
@@ -59,22 +60,36 @@ class AppState:
         self.current_streaming_content = ""
 
     def set_active_tool(self, tool_call: ToolCall | None) -> None:
-        """Set or clear the active tool."""
+        """Set or clear the active tool and add inline tool message."""
+        # Complete the previous tool if there was one
+        if self.active_tool:
+            self.complete_tool_message(self.active_tool)
+
         self.active_tool = tool_call
+        if tool_call:
+            self.messages.append(
+                Message(
+                    role=MessageRole.TOOL,
+                    content=f"Tool: {tool_call.tool_name}",
+                    tool_call=tool_call,
+                    tool_running=True,
+                )
+            )
 
     def add_user_message(self, content: str) -> None:
         """Add a user message to history."""
         self.messages.append(Message(role=MessageRole.USER, content=content))
 
-    def add_tool_message(self, tool_call: ToolCall) -> None:
-        """Add a tool call message to history."""
-        self.messages.append(
-            Message(
-                role=MessageRole.TOOL,
-                content=f"Tool: {tool_call.tool_name}",
-                tool_call=tool_call,
-            )
-        )
+    def complete_tool_message(self, tool_call: ToolCall) -> None:
+        """Mark the running tool message as complete."""
+        for message in reversed(self.messages):
+            if (
+                message.role == MessageRole.TOOL
+                and message.tool_call
+                and message.tool_call.call_id == tool_call.call_id
+            ):
+                message.tool_running = False
+                break
 
     def request_exit(self) -> bool:
         """Request application exit. Returns True if should exit immediately."""

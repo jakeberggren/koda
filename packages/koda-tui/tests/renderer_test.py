@@ -38,11 +38,10 @@ class TestRichToPromptToolkitMessages:
         assert "Hello" in content
 
     def test_render_assistant_message(self, converter: RichToPromptToolkit) -> None:
-        """render_message() should render assistant messages in a KODA panel."""
+        """render_message() should render assistant messages as markdown."""
         message = Message(role=MessageRole.ASSISTANT, content="I can help")
         result = converter.render_message(message)
         content = "".join(t[1] for t in result)
-        assert "KODA" in content
         assert "I can help" in content
 
     def test_render_tool_message(self, converter: RichToPromptToolkit) -> None:
@@ -76,22 +75,25 @@ class TestRichToPromptToolkitToolCalls:
         content = "".join(t[1] for t in result)
         assert "read_file" in content
 
-    def test_render_tool_spinner(self, converter: RichToPromptToolkit) -> None:
-        """render_tool_spinner() should show running indicator."""
-        result = converter.render_tool_spinner("search")
+    def test_render_tool_call_running(self, converter: RichToPromptToolkit) -> None:
+        """render_tool_call() with running=True should display the tool name."""
+        tool_call = ToolCall(
+            tool_name="search",
+            arguments={},
+            call_id="call_789",
+        )
+        result = converter.render_tool_call(tool_call, running=True)
         content = "".join(t[1] for t in result)
         assert "search" in content
-        assert "Running" in content
 
 
 class TestRichToPromptToolkitStreaming:
     """Tests for streaming content rendering."""
 
     def test_render_streaming_content(self, converter: RichToPromptToolkit) -> None:
-        """render_streaming_content() should show content with cursor in KODA panel."""
+        """render_streaming_content() should show content with cursor."""
         result = converter.render_streaming_content("Hello wor")
         content = "".join(t[1] for t in result)
-        assert "KODA" in content
         assert "Hello wor" in content
         # Should have cursor block
         assert "\u2588" in content

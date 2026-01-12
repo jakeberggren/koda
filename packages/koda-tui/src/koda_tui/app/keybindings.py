@@ -43,6 +43,11 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901 - complexi
         """Insert newline on Ctrl+Enter."""
         event.current_buffer.insert_text("\n")
 
+    @kb.add(Keys.Escape, Keys.Enter)  # Ctrl+Enter / Ctrl+J
+    def _(event) -> None:
+        """Insert newline on Ctrl+Enter."""
+        event.current_buffer.insert_text("\n")
+
     @kb.add(Keys.ControlC)
     def _(_) -> None:
         """Handle Ctrl+C - cancel current operation or request exit."""
@@ -57,17 +62,5 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901 - complexi
     def _(_) -> None:
         if app.state.is_streaming:
             app.cancel_streaming()
-
-    @kb.add(Keys.Up)
-    def _(_) -> None:
-        """Scroll chat area up."""
-        app.layout.chat_area.scroll_up()
-        app.invalidate()
-
-    @kb.add(Keys.Down)
-    def _(_) -> None:
-        """Scroll chat area down."""
-        app.layout.chat_area.scroll_down()
-        app.invalidate()
 
     return kb

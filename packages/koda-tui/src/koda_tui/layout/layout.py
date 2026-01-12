@@ -9,7 +9,7 @@ from prompt_toolkit.layout import (
 )
 
 from koda_tui.app.state import AppState
-from koda_tui.components import ChatAreaControl, InputArea, StatusBarControl
+from koda_tui.components import ChatAreaControl, ChatScrollbarMargin, InputArea, StatusBarControl
 from koda_tui.rendering import RichToPromptToolkit
 
 
@@ -32,6 +32,7 @@ class TUILayout:
             content=self.chat_area,
             wrap_lines=True,
             style="class:chat-area",
+            right_margins=[ChatScrollbarMargin(self.chat_area)],
         )
 
         # Separator line

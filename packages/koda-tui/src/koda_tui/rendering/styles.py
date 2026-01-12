@@ -14,6 +14,9 @@ TUI_STYLE = Style.from_dict(
         "status-bar": "bg:ansiblue fg:ansiwhite",
         "status-bar.left": "bg:ansiblue fg:white bold",
         "status-bar.right": "bg:ansiblue fg:ansiyellow",
+        # Scrollbar
+        "scrollbar.track": "fg:ansibrightblack",
+        "scrollbar.thumb": "fg:ansiwhite",
         # Error display
         "error": "fg:ansired bold",
     }

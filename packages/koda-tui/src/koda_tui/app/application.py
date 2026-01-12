@@ -168,7 +168,6 @@ class KodaTuiApp:
                     self.state.finish_streaming()
                     self.state.start_streaming()
 
-                self.state.add_tool_message(event.call)
                 self.state.set_active_tool(event.call)
                 self.invalidate()
 

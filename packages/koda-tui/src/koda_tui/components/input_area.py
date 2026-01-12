@@ -1,5 +1,7 @@
 """Input area component for Koda TUI."""
 
+from __future__ import annotations
+
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.layout import BufferControl, Window
 from prompt_toolkit.layout.dimension import Dimension
@@ -19,7 +21,7 @@ class InputArea:
         self._control = BufferControl(buffer=self.buffer)
 
     def get_height(self) -> Dimension:
-        """Calculate height based on content."""
+        """Calculate height based on line count."""
         line_count = self.buffer.document.line_count
         height = max(self.MIN_HEIGHT, min(line_count, self.MAX_HEIGHT))
         return Dimension(min=self.MIN_HEIGHT, max=self.MAX_HEIGHT, preferred=height)
