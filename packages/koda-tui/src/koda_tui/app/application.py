@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -104,11 +105,6 @@ class KodaTuiApp:
             mouse_support=True,
         )
 
-    def invalidate(self) -> None:
-        """Trigger a UI refresh."""
-        if self._app:
-            self._app.invalidate()
-
     async def _run_spinner(self) -> None:
         """Periodically refresh UI to animate the spinner."""
         while True:
@@ -120,11 +116,36 @@ class KodaTuiApp:
         if self._spinner_task is None:
             self._spinner_task = asyncio.create_task(self._run_spinner())
 
-    def _stop_spinner(self) -> None:
+    async def _stop_spinner(self) -> None:
         """Stop the spinner animation task."""
         if self._spinner_task:
             self._spinner_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._spinner_task
             self._spinner_task = None
+
+    async def _process_stream(self, message: str) -> None:
+        """Process the response stream from backend."""
+        stream = self.backend.chat(message)
+
+        async for event in stream:
+            if isinstance(event, TextDelta):
+                await self._stop_spinner()  # Stop spinner once content arrives
+                self.state.append_delta(event.text)
+                self.invalidate()
+            elif isinstance(event, ToolCallRequested):
+                # Finalize current streaming content before tool
+                if self.state.current_streaming_content:
+                    self.state.finish_streaming()
+                    self.state.start_streaming()
+
+                self.state.set_active_tool(event.call)
+                self.invalidate()
+
+    def invalidate(self) -> None:
+        """Trigger a UI refresh."""
+        if self._app:
+            self._app.invalidate()
 
     async def send_message(self, text: str) -> None:
         """Send a message and process the response stream."""
@@ -146,30 +167,15 @@ class KodaTuiApp:
         except asyncio.CancelledError:
             # Streaming was cancelled
             pass
+        except Exception as e:
+            error_msg = f"\n\n**Error:** {type(e).__name__}: {e}"
+            self.state.append_delta(error_msg)
         finally:
-            self._stop_spinner()
+            await self._stop_spinner()
             self.state.finish_streaming()
             self.state.set_active_tool(None)
             self._streaming_task = None
             self.invalidate()
-
-    async def _process_stream(self, message: str) -> None:
-        """Process the response stream from backend."""
-        stream = self.backend.chat(message)
-
-        async for event in stream:
-            if isinstance(event, TextDelta):
-                self._stop_spinner()  # Stop spinner once content arrives
-                self.state.append_delta(event.text)
-                self.invalidate()
-            elif isinstance(event, ToolCallRequested):
-                # Finalize current streaming content before tool
-                if self.state.current_streaming_content:
-                    self.state.finish_streaming()
-                    self.state.start_streaming()
-
-                self.state.set_active_tool(event.call)
-                self.invalidate()
 
     def cancel_streaming(self) -> None:
         """Cancel the current streaming operation."""
