@@ -87,70 +87,22 @@ class ChatAreaControl(UIControl):
         """Height of the visible viewport."""
         return self._view_height
 
-    def create_content(self, width: int, height: int) -> UIContent:  # noqa: C901 - complexity
-        """Create the content for the chat area."""
-        self._view_height = height
-        self._renderer.set_width(width)
-
-        # Render all messages
+    def _render_fragments(self) -> list[FormattedText]:
+        """Render all messages and streaming content into fragments."""
         fragments: list[FormattedText] = []
 
         for message in self._state.messages:
-            rendered = self._renderer.render_message(message)
-            fragments.append(rendered)
+            fragments.append(self._renderer.render_message(message))
             fragments.append(FormattedText([("", "\n\n")]))
 
-        # Add streaming content if active
         if self._state.is_streaming and self._state.current_streaming_content:
-            streaming = self._renderer.render_streaming_content(
-                self._state.current_streaming_content
+            fragments.append(
+                self._renderer.render_streaming_content(self._state.current_streaming_content)
             )
-            fragments.append(streaming)
         elif self._state.is_streaming:
-            spinner = self._renderer.render_thinking_spinner()
-            fragments.append(spinner)
+            fragments.append(self._renderer.render_thinking_spinner())
 
-        # Merge fragments and convert to list of tuples
-        if fragments:
-            merged = to_formatted_text(merge_formatted_text(fragments))
-        else:
-            merged = FormattedText([])
-
-        # Split into lines for UIContent
-        self._lines = self._split_into_lines(merged, width)
-        self._total_lines = len(self._lines)
-
-        # Auto-scroll to bottom when streaming
-        if self._state.is_streaming or self._state.active_tool:
-            self._scroll_offset = max(0, self._total_lines - height)
-
-        # Clamp scroll offset
-        max_offset = max(0, self._total_lines - height)
-        self._scroll_offset = min(self._scroll_offset, max_offset)
-
-        # Use cursor position to indicate scroll location for scrollbar
-        cursor_y = min(self._scroll_offset + height - 1, self._total_lines - 1)
-        cursor_pos = Point(x=0, y=max(0, cursor_y))
-
-        def get_line(i: int) -> FormattedText:
-            actual_line = i + self._scroll_offset
-            if 0 <= actual_line < self._total_lines:
-                return self._lines[actual_line]
-            return FormattedText([])
-
-        return UIContent(
-            get_line=get_line,
-            line_count=min(height, max(self._total_lines, 1)),
-            cursor_position=cursor_pos,
-        )
-
-    def mouse_handler(self, mouse_event: MouseEvent) -> None:
-        """Handle mouse scroll events."""
-        if mouse_event.event_type == MouseEventType.SCROLL_UP:
-            self._scroll_offset = max(0, self._scroll_offset - 1)
-        elif mouse_event.event_type == MouseEventType.SCROLL_DOWN:
-            max_offset = max(0, self._total_lines - self._view_height)
-            self._scroll_offset = min(self._scroll_offset + 1, max_offset)
+        return fragments
 
     def _split_into_lines(self, text: FormattedText, width: int) -> list[FormattedText]:
         """Split formatted text into lines respecting width."""
@@ -163,6 +115,57 @@ class ChatAreaControl(UIControl):
                 else:
                     builder.add_char(style, char)
         return builder.build()
+
+    def _merge_and_split(self, fragments: list[FormattedText], width: int) -> list[FormattedText]:
+        """Merge fragments and split into wrapped lines."""
+        if not fragments:
+            return [FormattedText([])]
+        merged = to_formatted_text(merge_formatted_text(fragments))
+        return self._split_into_lines(merged, width)
+
+    def _update_scroll(self, height: int) -> None:
+        """Update scroll offset with auto-scroll and clamping."""
+        if self._state.is_streaming or self._state.active_tool:
+            self._scroll_offset = max(0, self._total_lines - height)
+
+        max_offset = max(0, self._total_lines - height)
+        self._scroll_offset = min(self._scroll_offset, max_offset)
+
+    def _build_ui_content(self, height: int) -> UIContent:
+        """Build the final UIContent with line getter and cursor."""
+        cursor_y = min(self._scroll_offset + height - 1, self._total_lines - 1)
+
+        def get_line(i: int) -> FormattedText:
+            actual_line = i + self._scroll_offset
+            if 0 <= actual_line < self._total_lines:
+                return self._lines[actual_line]
+            return FormattedText([])
+
+        return UIContent(
+            get_line=get_line,
+            line_count=min(height, max(self._total_lines, 1)),
+            cursor_position=Point(x=0, y=max(0, cursor_y)),
+        )
+
+    def mouse_handler(self, mouse_event: MouseEvent) -> None:
+        """Handle mouse scroll events."""
+        if mouse_event.event_type == MouseEventType.SCROLL_UP:
+            self._scroll_offset = max(0, self._scroll_offset - 1)
+        elif mouse_event.event_type == MouseEventType.SCROLL_DOWN:
+            max_offset = max(0, self._total_lines - self._view_height)
+            self._scroll_offset = min(self._scroll_offset + 1, max_offset)
+
+    def create_content(self, width: int, height: int) -> UIContent:
+        """Create the content for the chat area."""
+        self._view_height = height
+        self._renderer.set_width(width)
+
+        fragments = self._render_fragments()
+        self._lines = self._merge_and_split(fragments, width)
+        self._total_lines = len(self._lines)
+        self._update_scroll(height)
+
+        return self._build_ui_content(height)
 
 
 class ChatScrollbarMargin(Margin):
