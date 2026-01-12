@@ -14,6 +14,7 @@ from prompt_toolkit.formatted_text import (
 from prompt_toolkit.layout import UIContent, UIControl
 from prompt_toolkit.layout.margins import Margin
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
+from wcwidth import wcwidth
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -22,6 +23,42 @@ if TYPE_CHECKING:
 
     from koda_tui.app.state import AppState
     from koda_tui.rendering import RichToPromptToolkit
+
+
+class _LineBuilder:
+    """Helper to build wrapped lines from formatted text."""
+
+    def __init__(self, width: int) -> None:
+        self.width = width
+        self.lines: list[list[tuple[str, str]]] = []
+        self.current_line: list[tuple[str, str]] = []
+        self.current_width = 0
+
+    def finish_line(self) -> None:
+        """Complete the current line and start a new one."""
+        self.lines.append(self.current_line)
+        self.current_line = []
+        self.current_width = 0
+
+    def add_char(self, style: str, char: str) -> None:
+        """Add a character, wrapping to new line if needed."""
+        char_width = wcwidth(char)
+        if char_width < 0:
+            # Non-printable, include but don't count width
+            self.current_line.append((style, char))
+        elif self.current_width + char_width > self.width:
+            self.finish_line()
+            self.current_line = [(style, char)]
+            self.current_width = char_width
+        else:
+            self.current_line.append((style, char))
+            self.current_width += char_width
+
+    def build(self) -> list[FormattedText]:
+        """Return the completed list of lines."""
+        if self.current_line:
+            self.lines.append(self.current_line)
+        return [FormattedText(line) for line in self.lines] or [FormattedText([])]
 
 
 class ChatAreaControl(UIControl):
@@ -115,31 +152,17 @@ class ChatAreaControl(UIControl):
             max_offset = max(0, self._total_lines - self._view_height)
             self._scroll_offset = min(self._scroll_offset + 1, max_offset)
 
-    def _split_into_lines(self, text: FormattedText, width: int) -> list[FormattedText]:  # noqa: C901 - complexity
+    def _split_into_lines(self, text: FormattedText, width: int) -> list[FormattedText]:
         """Split formatted text into lines respecting width."""
-        lines: list[list[tuple[str, str]]] = []
-        current_line: list[tuple[str, str]] = []
-        current_width = 0
-
+        builder = _LineBuilder(width)
         for fragment in text:
             style, content = fragment[0], fragment[1]
             for char in content:
                 if char == "\n":
-                    lines.append(current_line)
-                    current_line = []
-                    current_width = 0
-                elif current_width >= width:
-                    lines.append(current_line)
-                    current_line = [(style, char)]
-                    current_width = 1
+                    builder.finish_line()
                 else:
-                    current_line.append((style, char))
-                    current_width += 1
-
-        if current_line:
-            lines.append(current_line)
-
-        return [FormattedText(line) for line in lines] or [FormattedText([])]
+                    builder.add_char(style, char)
+        return builder.build()
 
 
 class ChatScrollbarMargin(Margin):

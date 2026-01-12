@@ -288,6 +288,7 @@ dependencies = [
     { name = "koda" },
     { name = "prompt-toolkit" },
     { name = "rich" },
+    { name = "wcwidth" },
 ]
 
 [package.metadata]
@@ -295,6 +296,7 @@ requires-dist = [
     { name = "koda", editable = "packages/koda" },
     { name = "prompt-toolkit", specifier = "~=3.0.52" },
     { name = "rich", specifier = "~=14.2.0" },
+    { name = "wcwidth", specifier = "~=0.2.14" },
 ]
 
 [[package]]
