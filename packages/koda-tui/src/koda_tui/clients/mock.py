@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import AsyncGenerator
 
 from koda.providers.events import ProviderEvent, TextDelta
-from koda_tui.backends import Backend
+from koda_tui.clients import Client
 
 SAMPLE_RESPONSES = [
     "I'd be happy to help you with that! Let me think about the best approach here.",
@@ -12,8 +12,8 @@ SAMPLE_RESPONSES = [
 ]
 
 
-class MockBackend(Backend):
-    """A fake backend for testing the TUI without a real provider."""
+class MockClient(Client):
+    """A fake client for testing the TUI without a real provider."""
 
     def __init__(
         self,

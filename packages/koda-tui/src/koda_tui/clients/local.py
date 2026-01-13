@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_tui.backends.base import Backend
+from koda_tui.clients import Client
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -11,8 +11,8 @@ if TYPE_CHECKING:
     from koda.providers.events import ProviderEvent
 
 
-class LocalBackend(Backend):
-    """Backend that uses koda core directly."""
+class LocalClient(Client):
+    """Client that uses koda core directly."""
 
     def __init__(self, agent: Agent) -> None:
         self._agent = agent

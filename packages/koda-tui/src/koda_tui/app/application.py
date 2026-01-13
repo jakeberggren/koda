@@ -16,7 +16,7 @@ from koda.providers.events import TextDelta, ToolCallRequested
 from koda.tools import ToolRegistry, filesystem
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.state import AppState
-from koda_tui.backends import Backend, LocalBackend
+from koda_tui.clients import Client, LocalClient
 from koda_tui.layout import TUILayout
 from koda_tui.rendering import TUI_STYLE
 
@@ -56,7 +56,7 @@ def create_tool_registry(config: AppConfig) -> ToolRegistry:
     return registry
 
 
-def create_backend(config: AppConfig, settings: Settings) -> Backend:
+def create_backend(config: AppConfig, settings: Settings) -> Client:
     """Create and configure the backend with agent."""
     provider_name = (config.provider or settings.KODA_DEFAULT_PROVIDER).lower()
     provider = get_provider_registry().create(provider_name, settings, model=config.model)
@@ -66,7 +66,7 @@ def create_backend(config: AppConfig, settings: Settings) -> Backend:
         tool_registry=create_tool_registry(config),
     )
 
-    return LocalBackend(agent)
+    return LocalClient(agent)
 
 
 class KodaTuiApp:
@@ -75,7 +75,7 @@ class KodaTuiApp:
     def __init__(
         self,
         config: AppConfig | None = None,
-        backend: Backend | None = None,
+        backend: Client | None = None,
     ) -> None:
         self.config = config or AppConfig()
         self.settings = get_settings()
