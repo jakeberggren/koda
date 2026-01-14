@@ -1,16 +1,21 @@
 """Layout composition for Koda TUI."""
 
 from prompt_toolkit.layout import (
+    FloatContainer,
     FormattedTextControl,
     HSplit,
     Layout,
     VSplit,
     Window,
 )
+from prompt_toolkit.widgets import Box
 
 from koda_tui.app.state import AppState
 from koda_tui.components import ChatAreaControl, ChatScrollbarMargin, InputArea, StatusBarControl
 from koda_tui.rendering import RichToPromptToolkit
+
+SEPARATOR_HEIGHT = 1
+STATUS_BAR_HEIGHT = 1
 
 
 class TUILayout:
@@ -27,55 +32,48 @@ class TUILayout:
 
     def create_layout(self) -> Layout:
         """Create the full-screen layout."""
-        # Chat area
-        chat_window = Window(
+        chat_area = Window(
             content=self.chat_area,
             wrap_lines=True,
             style="class:chat-area",
             right_margins=[ChatScrollbarMargin(self.chat_area)],
         )
 
-        # Separator line
         separator = Window(
-            height=1,
+            height=SEPARATOR_HEIGHT,
             char="\u2500",  # Horizontal line character
             style="class:separator",
         )
 
-        # Input prompt label
         input_prompt = Window(
             content=FormattedTextControl(text=[("class:prompt", "❯")]),  # noqa: RUF001 - allow confusable
             width=2,
             dont_extend_width=True,
         )
 
-        # Input area with prompt
-        input_row = VSplit(
-            [
-                input_prompt,
-                self.input_area.create_window(),
-            ]
-        )
+        input = VSplit([input_prompt, self.input_area.create_window()])
 
-        # Status bar
-        status_window = Window(
+        status_bar = Window(
             content=self.status_bar,
-            height=1,
+            height=STATUS_BAR_HEIGHT,
             style="class:status-bar",
         )
 
-        # Main layout
-        root = HSplit(
-            [
-                chat_window,  # Takes remaining space
-                separator,
-                input_row,  # Dynamic height 1-10 lines
-                separator,
-                status_window,  # Fixed 1 line
-            ]
+        # Main layout body. Wrapped in FloatContainer for command palette support
+        self.root_container = FloatContainer(
+            content=HSplit(
+                [
+                    Box(chat_area, padding=0, padding_left=1),
+                    separator,
+                    input,  # Dynamic height 1-10 lines
+                    separator,
+                    status_bar,  # Fixed 1 line
+                ]
+            ),
+            floats=[],  # Floats added dynamically for palette
         )
 
         return Layout(
-            container=root,
+            container=self.root_container,
             focused_element=self.input_area.buffer,
         )

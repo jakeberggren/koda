@@ -37,6 +37,7 @@ class AppState:
     model_name: str = ""
     provider_name: str = ""
     exit_requested: bool = False
+    palette_open: bool = False
 
     def append_delta(self, text: str) -> None:
         """Append text to current streaming message."""

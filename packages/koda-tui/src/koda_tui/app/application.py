@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from prompt_toolkit import Application
+from prompt_toolkit.layout import Float
 
 from koda.agents import Agent
 from koda.config import Settings, get_settings
@@ -17,6 +19,7 @@ from koda.tools import ToolRegistry, filesystem
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.state import AppState
 from koda_tui.clients import Client, LocalClient
+from koda_tui.components.command_palette import Command, CommandPalette
 from koda_tui.layout import TUILayout
 from koda_tui.rendering import TUI_STYLE
 
@@ -56,8 +59,8 @@ def create_tool_registry(config: AppConfig) -> ToolRegistry:
     return registry
 
 
-def create_backend(config: AppConfig, settings: Settings) -> Client:
-    """Create and configure the backend with agent."""
+def create_client(config: AppConfig, settings: Settings) -> Client:
+    """Create and configure the client with agent."""
     provider_name = (config.provider or settings.KODA_DEFAULT_PROVIDER).lower()
     provider = get_provider_registry().create(provider_name, settings, model=config.model)
 
@@ -75,11 +78,11 @@ class KodaTuiApp:
     def __init__(
         self,
         config: AppConfig | None = None,
-        backend: Client | None = None,
+        client: Client | None = None,
     ) -> None:
         self.config = config or AppConfig()
         self.settings = get_settings()
-        self.backend = backend or create_backend(self.config, self.settings)
+        self.backend = client or create_client(self.config, self.settings)
 
         # Initialize state
         self.state = AppState(
@@ -95,15 +98,21 @@ class KodaTuiApp:
         self._streaming_task: asyncio.Task | None = None
         self._spinner_task: asyncio.Task | None = None
 
+        # Command palette
+        self._palette: CommandPalette | None = None
+        self._palette_float: Float | None = None
+
     def _create_application(self) -> Application:
         """Create the prompt_toolkit Application."""
-        return Application(
+        app = Application(
             layout=self.layout.create_layout(),
             key_bindings=create_keybindings(self),
             style=TUI_STYLE,
             full_screen=True,
             mouse_support=True,
         )
+        app.ttimeoutlen = 0.01  # Reduce escape key delay (default 0.5s)
+        return app
 
     async def _run_spinner(self) -> None:
         """Periodically refresh UI to animate the spinner."""
@@ -171,6 +180,75 @@ class KodaTuiApp:
         """Exit the application."""
         if self._app:
             self._app.exit()
+
+    # Command palette methods
+
+    def toggle_palette(self) -> None:
+        """Toggle command palette visibility."""
+        if self.state.palette_open:
+            self.close_palette()
+        else:
+            self.open_palette()
+
+    def open_palette(self) -> None:
+        """Show the command palette."""
+        if not self._app:
+            return
+
+        # Calculate palette width: 50% of terminal, min 40, max 80
+        term_width = shutil.get_terminal_size().columns
+        term_height = shutil.get_terminal_size().lines
+        palette_width = max(40, min(80, term_width // 2))
+        palette_height = max(5, min(20, term_height // 2))
+
+        self.state.palette_open = True
+        self._palette = CommandPalette(
+            commands=self._get_palette_commands(),
+            on_close=self.close_palette,
+            height=palette_height,
+        )
+
+        self._palette_float = Float(
+            content=self._palette,
+            width=palette_width,
+        )
+        self.layout.root_container.floats.append(self._palette_float)
+        self._app.layout.focus(self._palette.search_buffer)
+        self.invalidate()
+
+    def close_palette(self) -> None:
+        """Hide the command palette."""
+        if not self._app:
+            return
+
+        self.state.palette_open = False
+        if self._palette_float and self._palette_float in self.layout.root_container.floats:
+            self.layout.root_container.floats.remove(self._palette_float)
+        self._palette = None
+        self._palette_float = None
+        self._app.layout.focus(self.layout.input_area.buffer)
+        self.invalidate()
+
+    def _get_palette_commands(self) -> list[Command]:
+        """Get the list of commands for the palette."""
+        return [
+            Command("Change Model", self._cmd_change_model, "Select a different model"),
+            Command("Change Provider", self._cmd_change_provider, "Switch LLM provider"),
+            Command("New Session", self._cmd_new_session, "Clear chat and start fresh"),
+            Command("List Sessions", self._cmd_list_sessions, "View previous sessions"),
+        ]
+
+    def _cmd_change_model(self) -> None:
+        """Handle change model command. Not yet implemented."""
+
+    def _cmd_change_provider(self) -> None:
+        """Handle change provider command. Not yet implemented."""
+
+    def _cmd_new_session(self) -> None:
+        """Handle new session command."""
+
+    def _cmd_list_sessions(self) -> None:
+        """Handle list sessions command. Not yet implemented."""
 
     async def run(self) -> None:
         """Start the TUI application."""

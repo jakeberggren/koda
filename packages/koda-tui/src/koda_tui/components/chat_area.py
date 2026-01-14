@@ -123,12 +123,16 @@ class ChatAreaControl(UIControl):
         merged = to_formatted_text(merge_formatted_text(fragments))
         return self._split_into_lines(merged, width)
 
-    def _update_scroll(self, height: int, *, was_at_bottom: bool) -> None:
+    def _is_at_bottom(self, height: int) -> bool:
+        """Check if scroll is at or near the bottom."""
+        max_offset = max(0, self._total_lines - height)
+        return self._scroll_offset >= max_offset
+
+    def _update_scroll(self, height: int, *, is_at_bottom: bool) -> None:
         """Update scroll offset with auto-scroll and clamping."""
         max_offset = max(0, self._total_lines - height)
 
-        # Auto-scroll if streaming, or if user was already at bottom
-        if self._state.is_streaming or self._state.active_tool or was_at_bottom:
+        if is_at_bottom:
             self._scroll_offset = max_offset
         else:
             self._scroll_offset = min(self._scroll_offset, max_offset)
@@ -149,31 +153,34 @@ class ChatAreaControl(UIControl):
             cursor_position=Point(x=0, y=max(0, cursor_y)),
         )
 
+    def scroll_up(self, scroll_amount: int = 1) -> None:
+        """Scroll up by given amount."""
+        self._scroll_offset = max(0, self._scroll_offset - scroll_amount)
+
+    def scroll_down(self, scroll_amount: int = 1) -> None:
+        """Scroll down by given amount."""
+        max_offset = max(0, self._total_lines - self._view_height)
+        self._scroll_offset = min(self._scroll_offset + scroll_amount, max_offset)
+
     def mouse_handler(self, mouse_event: MouseEvent) -> None:
         """Handle mouse scroll events."""
         if mouse_event.event_type == MouseEventType.SCROLL_UP:
-            self._scroll_offset = max(0, self._scroll_offset - 1)
+            self.scroll_up()
         elif mouse_event.event_type == MouseEventType.SCROLL_DOWN:
-            max_offset = max(0, self._total_lines - self._view_height)
-            self._scroll_offset = min(self._scroll_offset + 1, max_offset)
-
-    def _is_at_bottom(self, height: int) -> bool:
-        """Check if scroll is at or near the bottom."""
-        max_offset = max(0, self._total_lines - height)
-        return self._scroll_offset >= max_offset
+            self.scroll_down()
 
     def create_content(self, width: int, height: int) -> UIContent:
         """Create the content for the chat area."""
         self._view_height = height
         self._renderer.set_width(width)
 
-        # Check if at bottom before content changes
-        was_at_bottom = self._is_at_bottom(height)
+        # Check if at bottom BEFORE content changes
+        at_bottom = self._is_at_bottom(height)
 
         fragments = self._render_fragments()
         self._lines = self._merge_and_split(fragments, width)
         self._total_lines = len(self._lines)
-        self._update_scroll(height, was_at_bottom=was_at_bottom)
+        self._update_scroll(height, is_at_bottom=at_bottom)
 
         return self._build_ui_content(height)
 
