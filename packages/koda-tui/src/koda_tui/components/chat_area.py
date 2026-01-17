@@ -188,8 +188,7 @@ class ChatAreaControl(UIControl):
 class ChatScrollbarMargin(Margin):
     """Custom scrollbar that tracks ChatAreaControl's scroll state."""
 
-    THUMB_CHAR = "█"
-    TRACK_CHAR = "┃"
+    SCROLLBAR_CHAR = "█"
 
     def __init__(self, chat_control: ChatAreaControl) -> None:
         self._chat = chat_control
@@ -212,7 +211,7 @@ class ChatScrollbarMargin(Margin):
 
         if total <= view_height or height == 0:
             # No scrollbar needed - content fits
-            result.extend([("class:scrollbar.track", self.TRACK_CHAR + "\n")] * height)
+            result.extend([("class:scrollbar.track", self.SCROLLBAR_CHAR + "\n")] * height)
         else:
             # Calculate thumb size and position
             thumb_size = max(1, height * view_height // total)
@@ -221,9 +220,9 @@ class ChatScrollbarMargin(Margin):
 
             # Build scrollbar
             result.extend(
-                ("class:scrollbar.thumb", self.THUMB_CHAR + "\n")
+                ("class:scrollbar.thumb", self.SCROLLBAR_CHAR + "\n")
                 if thumb_pos <= i < thumb_pos + thumb_size
-                else ("class:scrollbar.track", self.TRACK_CHAR + "\n")
+                else ("class:scrollbar.track", self.SCROLLBAR_CHAR + "\n")
                 for i in range(height)
             )
 
