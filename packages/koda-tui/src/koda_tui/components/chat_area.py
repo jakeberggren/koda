@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
     from prompt_toolkit.layout import WindowRenderInfo
 
-    from koda_tui.app.state import AppState
+    from koda_tui.app.state import AppState, Message
     from koda_tui.rendering import RichToPromptToolkit
 
 
@@ -71,6 +71,11 @@ class ChatAreaControl(UIControl):
         self._scroll_offset = 0
         self._total_lines = 0
         self._view_height = 0
+        # Line-level cache invalidation tracking
+        self._cached_width = 0
+        self._cached_content_key: tuple[int, int, bool] | None = None
+        # Per-message rendering cache: message_id -> (cache_key, FormattedText)
+        self._message_cache: dict[int, tuple[tuple, FormattedText]] = {}
 
     @property
     def total_lines(self) -> int:
@@ -87,12 +92,51 @@ class ChatAreaControl(UIControl):
         """Height of the visible viewport."""
         return self._view_height
 
+    def _content_key(self) -> tuple[int, int, bool] | None:
+        """Return a key representing current content state for cache invalidation."""
+        # Always rebuild lines while spinner is showing (no streaming content yet)
+        if self._state.is_streaming and not self._state.current_streaming_content:
+            return None
+        streaming_len = len(self._state.current_streaming_content or "")
+        return (len(self._state.messages), streaming_len, self._state.is_streaming)
+
+    def _message_cache_key(self, message: Message) -> tuple:
+        """Return cache key for a single message."""
+        return (
+            message.role,
+            message.content,
+            message.tool_call.call_id if message.tool_call else None,
+            message.tool_running,
+        )
+
+    def _render_message_cached(self, message: Message) -> FormattedText:
+        """Render a message using cache if available."""
+        msg_id = id(message)
+        cache_key = self._message_cache_key(message)
+
+        cached = self._message_cache.get(msg_id)
+        if cached and cached[0] == cache_key:
+            return cached[1]
+
+        # Render and cache
+        fragment = self._renderer.render_message(message)
+        self._message_cache[msg_id] = (cache_key, fragment)
+        return fragment
+
+    def _cleanup_message_cache(self) -> None:
+        """Remove cache entries for messages no longer in state."""
+        current_ids = {id(m) for m in self._state.messages}
+        stale_ids = [mid for mid in self._message_cache if mid not in current_ids]
+        for mid in stale_ids:
+            del self._message_cache[mid]
+
     def _render_fragments(self) -> list[FormattedText]:
         """Render all messages and streaming content into fragments."""
+        self._cleanup_message_cache()
         fragments: list[FormattedText] = []
 
         for message in self._state.messages:
-            fragments.append(self._renderer.render_message(message))
+            fragments.append(self._render_message_cached(message))
             fragments.append(FormattedText([("", "\n")]))
 
         if self._state.is_streaming and self._state.current_streaming_content:
@@ -172,15 +216,29 @@ class ChatAreaControl(UIControl):
     def create_content(self, width: int, height: int) -> UIContent:
         """Create the content for the chat area."""
         self._view_height = height
-        self._renderer.set_width(width)
 
-        # Check if at bottom BEFORE content changes
-        at_bottom = self._is_at_bottom(height)
+        # Check if we need to rebuild lines (content or width changed)
+        # None content_key means always rebuild (e.g., spinner animation)
+        content_key = self._content_key()
+        needs_rebuild = (
+            content_key is None
+            or width != self._cached_width
+            or content_key != self._cached_content_key
+        )
 
-        fragments = self._render_fragments()
-        self._lines = self._merge_and_split(fragments, width)
-        self._total_lines = len(self._lines)
-        self._update_scroll(height, is_at_bottom=at_bottom)
+        if needs_rebuild:
+            self._renderer.set_width(width)
+            # Check if at bottom BEFORE content changes
+            at_bottom = self._is_at_bottom(height)
+
+            fragments = self._render_fragments()
+            self._lines = self._merge_and_split(fragments, width)
+            self._total_lines = len(self._lines)
+            self._update_scroll(height, is_at_bottom=at_bottom)
+
+            # Update cache
+            self._cached_width = width
+            self._cached_content_key = content_key
 
         return self._build_ui_content(height)
 

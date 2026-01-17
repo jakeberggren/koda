@@ -42,13 +42,11 @@ def _handle_newline(event: KeyPressEvent) -> None:
 def _handle_scroll_up(app: KodaTuiApp) -> None:
     """Scroll chat area up."""
     app.layout.chat_area.scroll_up(scroll_amount=5)
-    app.invalidate()
 
 
 def _handle_scroll_down(app: KodaTuiApp) -> None:
     """Scroll chat area down."""
     app.layout.chat_area.scroll_down(scroll_amount=5)
-    app.invalidate()
 
 
 def _handle_cancel_or_exit(app: KodaTuiApp) -> None:
