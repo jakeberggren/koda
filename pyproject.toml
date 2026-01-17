@@ -13,6 +13,7 @@ koda-tui = { workspace = true }
 dev = [
     "pre-commit~=4.5.0",
     "pytest~=9.0.1",
+    "pytest-asyncio>=1.3.0",
     "pytest-cov~=7.0.0",
     "ruff~=0.14.7",
     "ty~=0.0.1a29",
@@ -61,7 +62,12 @@ select = [
 ignore = ["COM812"]
 
 [tool.ruff.lint.per-file-ignores]
-"*/tests/**/*.py" = ["S101"] # Allow assert in tests
+"*/tests/**/*.py" = [
+    "S101",    # Allow assert in tests
+    "ARG002",  # Unused arguments in mocks/fixtures matching interfaces
+    "S108",    # Temp paths in tests
+    "TRY003",  # Long exception messages
+]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -79,6 +85,6 @@ required-environments = [
 ]
 
 [tool.pytest.ini_options]
-
+asyncio_mode = "auto"
 testpaths = ["packages/koda/tests", "packages/koda-tui/tests"]
 addopts = "--import-mode=importlib --cov=koda --cov=koda-tui  --cov-report=term"

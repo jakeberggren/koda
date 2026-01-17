@@ -30,4 +30,4 @@ class FileExistsTool:
         resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
 
         exists = resolved.exists()
-        return ToolOutput(content={"exists": exists, "path": str(resolved)})
+        return ToolOutput(content={"exists": exists, "path": params.path})

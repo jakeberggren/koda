@@ -17,7 +17,7 @@ def _load_gitignore(sandbox_dir: Path) -> pathspec.PathSpec | None:
     try:
         patterns = gitignore_path.read_text().splitlines()
         patterns = [p for p in patterns if p.strip() and not p.strip().startswith("#")]
-        return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+        return pathspec.PathSpec.from_lines("gitignore", patterns)
     except OSError:
         return None
 
@@ -73,18 +73,18 @@ class ToolPolicy:
         resolved = candidate.resolve()
 
         if not resolved.is_relative_to(self.sandbox_dir):
-            raise exceptions.PathOutsideSandboxError(resolved, sandbox=self.sandbox_dir)
+            raise exceptions.PathOutsideSandboxError(path)
 
         if self.deny_path_parts:
             parts = frozenset(resolved.parts)
             denied = parts.intersection(self.deny_path_parts)
             if denied:
                 raise exceptions.PathDeniedError(
-                    resolved, reason=f"contains denied component: {denied}"
+                    path, reason=f"path component {denied} is not allowed"
                 )
 
         if self.respect_gitignore and self._is_gitignored(resolved):
-            raise exceptions.PathDeniedError(resolved, reason="matches .gitignore pattern")
+            raise exceptions.PathDeniedError(path, reason="excluded by .gitignore")
 
         return resolved
 

@@ -1,4 +1,11 @@
-from pathlib import Path
+"""Tool exceptions with agent-friendly error messages.
+
+Design principles:
+- Show the original path the agent passed, not resolved system paths
+- Keep messages concise but actionable
+- Provide hints for common fixes
+- Avoid exposing unnecessary system details
+"""
 
 
 class ToolError(Exception):
@@ -8,51 +15,50 @@ class ToolError(Exception):
 class FileNotFoundError(ToolError):
     """File or directory not found."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: str) -> None:
         self.path = path
-        super().__init__(f"Not found: {path}")
+        super().__init__(f"File not found: '{path}' - verify the path exists")
 
 
 class NotAFileError(ToolError):
-    """Path is not a file."""
+    """Path exists but is not a file (e.g., it's a directory)."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: str) -> None:
         self.path = path
-        super().__init__(f"Not a file: {path}")
+        super().__init__(f"Not a file: '{path}' is a directory")
 
 
 class NotADirectoryError(ToolError):
-    """Path is not a directory."""
+    """Path exists but is not a directory."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: str) -> None:
         self.path = path
-        super().__init__(f"Not a directory: {path}")
+        super().__init__(f"Not a directory: '{path}' is a file")
 
 
 class PermissionError(ToolError):
-    """Permission denied during tool execution."""
+    """Permission denied by the operating system."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: str) -> None:
         self.path = path
-        super().__init__(f"Permission denied: {path}")
+        super().__init__(f"Permission denied: '{path}'")
 
 
 class PathOutsideSandboxError(ToolError):
-    """Path is outside the sandbox directory."""
+    """Path escapes the allowed directory."""
 
-    def __init__(self, path: Path, *, sandbox: Path) -> None:
+    def __init__(self, path: str) -> None:
         self.path = path
-        self.sandbox = sandbox
-        super().__init__(f"Path {path} is outside sandbox {sandbox}")
+        super().__init__(f"Access denied: '{path}' is outside the allowed directory")
 
 
 class PathDeniedError(ToolError):
-    """Path is denied by policy."""
+    """Path is denied by policy (gitignore, denied components, etc.)."""
 
-    def __init__(self, path: Path, *, reason: str) -> None:
+    def __init__(self, path: str, *, reason: str) -> None:
         self.path = path
         self.reason = reason
-        super().__init__(f"Access denied to {path}: {reason}")
+        super().__init__(f"Access denied: '{path}' - {reason}")
 
 
 class MaxIterationsExceededError(ToolError):
@@ -60,7 +66,7 @@ class MaxIterationsExceededError(ToolError):
 
     def __init__(self, max_iterations: int) -> None:
         self.max_iterations = max_iterations
-        super().__init__(f"Maximum iterations ({max_iterations}) exceeded")
+        super().__init__(f"Maximum tool iterations ({max_iterations}) exceeded")
 
 
 class ToolAlreadyRegisteredError(ToolError):
@@ -68,4 +74,4 @@ class ToolAlreadyRegisteredError(ToolError):
 
     def __init__(self, name: str) -> None:
         self.name = name
-        super().__init__(f"Tool '{name}' already registered")
+        super().__init__(f"Tool '{name}' is already registered")

@@ -68,7 +68,7 @@ class TestRichToPromptToolkitToolCalls:
         """render_tool_call() should display the tool name."""
         tool_call = ToolCall(
             tool_name="read_file",
-            arguments={"path": "/tmp/test.txt"},  # noqa: S108
+            arguments={"path": "/tmp/test.txt"},
             call_id="call_456",
         )
         result = converter.render_tool_call(tool_call)
