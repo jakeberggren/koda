@@ -8,7 +8,18 @@ from koda.tools import ToolOutput, exceptions
 from koda.tools.decorators import tool
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from koda.tools.context import ToolContext
+
+
+class ReadError(exceptions.ToolError):
+    """Failed to read file."""
+
+    def __init__(self, path: Path, *, cause: Exception) -> None:
+        self.path = path
+        self.cause = cause
+        super().__init__(f"Failed to read {path}: {cause}")
 
 
 class ReadFileParams(BaseModel):
@@ -30,16 +41,16 @@ class ReadFileTool:
         resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
 
         if not resolved.exists():
-            raise exceptions.ToolFileNotFoundError(resolved)
+            raise exceptions.FileNotFoundError(resolved)
 
         if not resolved.is_file():
-            raise exceptions.ToolPathTypeError(resolved, "file")
+            raise exceptions.NotAFileError(resolved)
 
         try:
             text_content = resolved.read_text(encoding="utf-8")
         except PermissionError as e:
-            raise exceptions.ToolPermissionError(resolved) from e
+            raise exceptions.PermissionError(resolved) from e
         except OSError as e:
-            raise exceptions.ToolReadError(resolved, e) from e
+            raise ReadError(resolved, cause=e) from e
 
         return ToolOutput(content={"text": text_content})

@@ -43,9 +43,9 @@ class ToolExecutor:
             )
         try:
             output = await tool.execute(params, ctx)
-            return ToolResult(output=output, call_id=tool_call.call_id)
         except tool_exceptions.ToolError as e:
             return ToolResult(
                 output=ToolOutput(is_error=True, error_message=str(e)),
                 call_id=tool_call.call_id,
             )
+        return ToolResult(output=output, call_id=tool_call.call_id)

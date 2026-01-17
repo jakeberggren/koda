@@ -8,7 +8,18 @@ from koda.tools import ToolOutput, exceptions
 from koda.tools.decorators import tool
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from koda.tools.context import ToolContext
+
+
+class ListDirectoryError(exceptions.ToolError):
+    """Failed to list directory."""
+
+    def __init__(self, path: Path, *, cause: Exception) -> None:
+        self.path = path
+        self.cause = cause
+        super().__init__(f"Failed to list {path}: {cause}")
 
 
 class ListDirectoryParams(BaseModel):
@@ -30,17 +41,17 @@ class ListDirectoryTool:
         resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
 
         if not resolved.exists():
-            raise exceptions.ToolFileNotFoundError(resolved, "Directory")
+            raise exceptions.FileNotFoundError(resolved)
 
         if not resolved.is_dir():
-            raise exceptions.ToolPathTypeError(resolved, "directory")
+            raise exceptions.NotADirectoryError(resolved)
 
         try:
             dir_items = list(resolved.iterdir())
         except PermissionError as e:
-            raise exceptions.ToolPermissionError(resolved) from e
+            raise exceptions.PermissionError(resolved) from e
         except OSError as e:
-            raise exceptions.ToolListDirectoryError(resolved, e) from e
+            raise ListDirectoryError(resolved, cause=e) from e
 
         items = [
             {

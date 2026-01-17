@@ -8,7 +8,18 @@ from koda.tools import ToolOutput, exceptions
 from koda.tools.decorators import tool
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from koda.tools.context import ToolContext
+
+
+class WriteError(exceptions.ToolError):
+    """Failed to write file."""
+
+    def __init__(self, path: Path, *, cause: Exception) -> None:
+        self.path = path
+        self.cause = cause
+        super().__init__(f"Failed to write {path}: {cause}")
 
 
 class WriteFileParams(BaseModel):
@@ -37,8 +48,8 @@ class WriteFileTool:
             resolved.parent.mkdir(parents=True, exist_ok=True)
             resolved.write_text(params.content, encoding="utf-8")
         except PermissionError as e:
-            raise exceptions.ToolPermissionError(resolved) from e
+            raise exceptions.PermissionError(resolved) from e
         except OSError as e:
-            raise exceptions.ToolWriteError(resolved, e) from e
+            raise WriteError(resolved, cause=e) from e
 
         return ToolOutput(content={"success": True, "path": str(resolved)})

@@ -73,16 +73,18 @@ class ToolPolicy:
         resolved = candidate.resolve()
 
         if not resolved.is_relative_to(self.sandbox_dir):
-            raise exceptions.PathOutsideSandboxError(resolved, self.sandbox_dir)
+            raise exceptions.PathOutsideSandboxError(resolved, sandbox=self.sandbox_dir)
 
         if self.deny_path_parts:
             parts = frozenset(resolved.parts)
             denied = parts.intersection(self.deny_path_parts)
             if denied:
-                raise exceptions.PathDeniedError(resolved, f"contains denied component: {denied}")
+                raise exceptions.PathDeniedError(
+                    resolved, reason=f"contains denied component: {denied}"
+                )
 
         if self.respect_gitignore and self._is_gitignored(resolved):
-            raise exceptions.PathDeniedError(resolved, "matches .gitignore pattern")
+            raise exceptions.PathDeniedError(resolved, reason="matches .gitignore pattern")
 
         return resolved
 
