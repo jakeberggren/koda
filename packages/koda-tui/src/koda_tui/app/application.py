@@ -15,7 +15,7 @@ from koda.agents import Agent
 from koda.config import Settings, get_settings
 from koda.providers import get_provider_registry
 from koda.providers.events import TextDelta, ToolCallRequested
-from koda.tools import ToolRegistry, filesystem
+from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.state import AppState
 from koda_tui.clients import Client, LocalClient
@@ -48,15 +48,12 @@ def create_app_config(
     )
 
 
-def create_tool_registry(config: AppConfig) -> ToolRegistry:
-    """Create and configure the tool registry."""
+def create_tool_config(sandbox_dir: Path) -> ToolConfig:
+    """Create and configure tools with registry and context."""
     registry = ToolRegistry()
-    sandbox_dir = config.sandbox_dir
-    registry.register(filesystem.ReadFileTool(sandbox_dir=sandbox_dir))
-    registry.register(filesystem.WriteFileTool(sandbox_dir=sandbox_dir))
-    registry.register(filesystem.ListDirectoryTool(sandbox_dir=sandbox_dir))
-    registry.register(filesystem.FileExistsTool(sandbox_dir=sandbox_dir))
-    return registry
+    registry.register_all(get_builtin_tools())
+    context = ToolContext.default(sandbox_dir=sandbox_dir)
+    return ToolConfig(registry=registry, context=context)
 
 
 def create_client(config: AppConfig, settings: Settings) -> Client:
@@ -66,7 +63,7 @@ def create_client(config: AppConfig, settings: Settings) -> Client:
 
     agent = Agent(
         provider=provider,
-        tool_registry=create_tool_registry(config),
+        tools=create_tool_config(config.sandbox_dir),
     )
 
     return LocalClient(agent)

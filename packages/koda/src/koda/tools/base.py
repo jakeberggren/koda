@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from koda.tools.context import ToolContext
 
 ParamsType = TypeVar("ParamsType", bound=BaseModel)
 
@@ -19,15 +22,15 @@ class Tool(Protocol[ParamsType]):
     parameters_model: type[ParamsType]
     """Pydantic model for validating tool parameters."""
 
-    async def execute(self, params: ParamsType) -> ToolOutput:
-        """Execute the tool with validated parameters."""
+    async def execute(self, params: ParamsType, ctx: ToolContext) -> ToolOutput:
+        """Execute the tool with validated parameters and tool context."""
         ...
 
 
 class ToolDefinition(BaseModel):
     """Provider-agnostic tool definition."""
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
     name: str
     description: str

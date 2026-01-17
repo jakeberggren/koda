@@ -1,20 +1,19 @@
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING
-
-from pydantic import ValidationError
 
 from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
 from koda.providers import exceptions as provider_exceptions
 from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested
-from koda.tools import ToolCall, ToolOutput, ToolRegistry, ToolResult
+from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda.tools import exceptions as tool_exceptions
+from koda.tools.executor import ToolExecutor
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from koda.providers import Provider
+    from koda.tools.config import ToolConfig
 
 
 class Agent:
@@ -22,12 +21,12 @@ class Agent:
         self,
         provider: Provider,
         system_message: str | None = None,
-        tool_registry: ToolRegistry | None = None,
+        tools: ToolConfig | None = None,
         max_tool_iterations: int = 30,
     ) -> None:
         self.provider: Provider = provider
         self.system_message: str | None = system_message
-        self.tool_registry: ToolRegistry | None = tool_registry
+        self.tools: ToolConfig | None = tools
         self.max_tool_iterations: int = max_tool_iterations
         self._history: list[Message] = []
 
@@ -40,13 +39,13 @@ class Agent:
 
         user_message = UserMessage(content=user_text.strip())
         self._history.append(user_message)
-        tools = self.tool_registry.get_definitions() if self.tool_registry else None
+        tool_definitions = self.tools.registry.get_definitions() if self.tools else None
 
         iteration = 0
         while iteration < self.max_tool_iterations:
             iteration += 1
             messages: list[Message] = self._history.copy()
-            stream: AsyncIterator[ProviderEvent] = self.provider.stream(messages, tools)
+            stream: AsyncIterator[ProviderEvent] = self.provider.stream(messages, tool_definitions)
 
             response_chunks: list[str] = []
             pending_tool_calls: list[ToolCall] = []
@@ -106,57 +105,32 @@ class Agent:
                 yield event
 
     async def _handle_tool_calls(self, tool_calls: list[ToolCall]) -> None:
-        tool_results = await self._execute_tools(tool_calls)
+        if self.tools is None:
+            # If provider requested tool calls but we don't have tools configured,
+            # record errors for each tool call.
+            for tool_call in tool_calls:
+                tool_result = ToolResult(
+                    call_id=tool_call.call_id,
+                    output=ToolOutput(
+                        is_error=True,
+                        error_message="No tools configured",
+                    ),
+                )
+                self._history.append(
+                    ToolMessage(
+                        tool_name=tool_call.tool_name,
+                        tool_result=tool_result,
+                    ),
+                )
+            return
+
+        executor = ToolExecutor(self.tools.registry)
+        tool_results = await executor.execute_calls(tool_calls, self.tools.context)
+
         for tool_call, tool_result in zip(tool_calls, tool_results, strict=True):
             self._history.append(
                 ToolMessage(
                     tool_name=tool_call.tool_name,
                     tool_result=tool_result,
                 ),
-            )
-
-    async def _execute_tools(self, tool_calls: list[ToolCall]) -> list[ToolResult]:
-        """Execute multiple tools in parallel."""
-
-        if self.tool_registry is None:
-            return [
-                ToolResult(
-                    output=ToolOutput(is_error=True, error_message="No tool registry configured"),
-                    call_id=call.call_id,
-                )
-                for call in tool_calls
-            ]
-
-        return await asyncio.gather(
-            *[self._execute_single_tool(self.tool_registry, call) for call in tool_calls],
-        )
-
-    async def _execute_single_tool(
-        self, tool_registry: ToolRegistry, tool_call: ToolCall
-    ) -> ToolResult:
-        tool = tool_registry.get(tool_call.tool_name)
-        if not tool:
-            return ToolResult(
-                output=ToolOutput(
-                    is_error=True,
-                    error_message=f"Tool '{tool_call.tool_name}' not found",
-                ),
-                call_id=tool_call.call_id,
-            )
-
-        try:
-            params = tool.parameters_model.model_validate(tool_call.arguments)
-        except ValidationError as e:
-            return ToolResult(
-                output=ToolOutput(is_error=True, error_message=str(e)),
-                call_id=tool_call.call_id,
-            )
-
-        try:
-            output = await tool.execute(params)
-            return ToolResult(output=output, call_id=tool_call.call_id)
-        except tool_exceptions.ToolError as e:
-            return ToolResult(
-                output=ToolOutput(is_error=True, error_message=str(e)),
-                call_id=tool_call.call_id,
             )

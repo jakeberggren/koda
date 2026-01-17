@@ -1,4 +1,5 @@
-from koda.tools import Tool, ToolDefinition, exceptions
+from koda.tools import exceptions
+from koda.tools.base import Tool, ToolDefinition
 
 
 class ToolRegistry:
@@ -12,6 +13,11 @@ class ToolRegistry:
         if tool.name in self._tools:
             raise exceptions.ToolAlreadyRegisteredError(tool.name)
         self._tools[tool.name] = tool
+
+    def register_all(self, tools: list[Tool]) -> None:
+        """Register multiple tools at once."""
+        for tool in tools:
+            self.register(tool)
 
     def get(self, name: str) -> Tool | None:
         """Get a tool by name."""

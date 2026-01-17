@@ -5,10 +5,6 @@ class ToolError(Exception):
     """Base exception for all tool-related errors."""
 
 
-class ToolValidationError(ToolError):
-    """Tool argument validation error."""
-
-
 class ToolExecutionError(ToolError):
     """Tool execution error."""
 
@@ -77,6 +73,15 @@ class PathOutsideSandboxError(ToolFileSystemError):
         super().__init__(f"Path {path} is outside the sandbox directory {sandbox}")
         self.path = path
         self.sandbox = sandbox
+
+
+class PathDeniedError(ToolFileSystemError):
+    """Path is denied by policy (gitignore, blacklist, etc.)."""
+
+    def __init__(self, path: Path, reason: str) -> None:
+        super().__init__(f"Access denied to {path}: {reason}")
+        self.path = path
+        self.reason = reason
 
 
 class MaxIterationsExceededError(ToolError):
