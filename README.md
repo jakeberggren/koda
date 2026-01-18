@@ -27,10 +27,11 @@ Press Ctrl+C twice to exit the session.
 
 ## Project Structure
 
-Koda is a monorepo workspace managed by uv, containing two main packages:
+Koda is a monorepo workspace managed by uv, containing three main packages:
 
 - **koda**: Provider-agnostic core library that handles agent logic, tool execution, and LLM provider integration
 - **koda-tui**: Interactive terminal interface
+- **koda-common**: Shared utilities including settings management
 
 ```
 packages/
@@ -43,12 +44,16 @@ packages/
 │   │   └── tools/               # Agent tools (filesystem operations, etc.)
 │   └── tests/
 │
-└── koda-tui/                     # Terminal user interface
-    ├── src/koda_tui/
-    │   ├── app/                 # TUI application entry + orchestration
-    │   ├── backends/            # Backend implementations (local, mock, etc.)
-    │   ├── components/          # UI components/widgets
-    │   ├── layout/              # Layout primitives and composition
-    │   └── rendering/           # Rendering layer
-    └── tests/
+├── koda-tui/                    # Terminal user interface
+│   ├── src/koda_tui/
+│   │   ├── app/                 # TUI application entry + orchestration
+│   │   ├── backends/            # Backend implementations (local, mock, etc.)
+│   │   ├── components/          # UI components/widgets
+│   │   ├── layout/              # Layout primitives and composition
+│   │   └── rendering/           # Rendering layer
+│   └── tests/
+│
+└── koda-common/                 # Shared utilities
+    └── src/koda_common/
+        └── settings/            # Settings management (store, manager)
 ```
