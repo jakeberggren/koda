@@ -7,6 +7,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 
 dependencies = [
+    "koda-common",
     "openai~=2.14.0",
     "pathspec~=1.0.3",
     "pydantic~=2.12.5",
@@ -16,3 +17,6 @@ dependencies = [
 [build-system]
 requires = ["uv_build>=0.9.13,<0.10.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+koda-common = { workspace = true }

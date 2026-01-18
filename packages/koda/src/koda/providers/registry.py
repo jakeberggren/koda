@@ -1,9 +1,9 @@
 from collections.abc import Callable
 
-from koda.config import Settings
 from koda.providers import Provider, exceptions
+from koda_common import SettingsManager
 
-type ProviderFactory = Callable[[Settings, str | None], Provider]
+type ProviderFactory = Callable[[SettingsManager, str | None], Provider]
 
 
 class ProviderRegistry:
@@ -20,7 +20,7 @@ class ProviderRegistry:
             raise exceptions.ProviderAlreadyRegisteredError(key)
         self._factories[key] = factory
 
-    def create(self, name: str, settings: Settings, model: str | None = None) -> Provider:
+    def create(self, name: str, settings: SettingsManager, model: str | None = None) -> Provider:
         key = name.strip().lower()
         factory = self._factories.get(key)
         if factory is None:

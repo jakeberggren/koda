@@ -57,6 +57,13 @@ class EmptyApiKeyError(ProviderValidationError):
         super().__init__(f"{provider_name} API key cannot be empty")
 
 
+class ApiKeyNotConfiguredError(ProviderValidationError):
+    """API key is not configured."""
+
+    def __init__(self, provider_name: str) -> None:
+        super().__init__(f"{provider_name} API key not configured")
+
+
 class EmptyMessagesListError(ProviderValidationError):
     """Messages list cannot be empty."""
 

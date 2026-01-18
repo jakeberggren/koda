@@ -5,50 +5,26 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import shutil
-from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from prompt_toolkit import Application
 from prompt_toolkit.layout import Float
 
 from koda.agents import Agent
-from koda.config import Settings, get_settings
 from koda.providers import get_provider_registry
 from koda.providers.events import TextDelta, ToolCallRequested
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
+from koda_common import SettingsManager
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.state import AppState
-from koda_tui.clients import Client, LocalClient
+from koda_tui.clients import Client, LocalClient, MockClient
 from koda_tui.components.command_palette import Command, CommandPalette
 from koda_tui.layout import TUILayout
 from koda_tui.rendering import TUI_STYLE
 
 
-@dataclass
-class AppConfig:
-    """Configuration for the Koda TUI application."""
-
-    provider: str | None = None
-    model: str | None = None
-    sandbox_dir: Path = field(default_factory=lambda: Path.cwd().resolve())
-
-
-def create_app_config(
-    provider: str | None = None,
-    model: str | None = None,
-    sandbox_dir: Path | None = None,
-    settings: Settings | None = None,
-) -> AppConfig:
-    """Create and configure the application configuration."""
-    settings = settings or get_settings()
-    return AppConfig(
-        provider=provider or settings.KODA_DEFAULT_PROVIDER,
-        model=model or settings.KODA_DEFAULT_MODEL,
-        sandbox_dir=sandbox_dir or Path.cwd().resolve(),
-    )
-
-
-def create_tool_config(sandbox_dir: Path) -> ToolConfig:
+def _create_tool_config(sandbox_dir: Path) -> ToolConfig:
     """Create and configure tools with registry and context."""
     registry = ToolRegistry()
     registry.register_all(get_builtin_tools())
@@ -56,16 +32,12 @@ def create_tool_config(sandbox_dir: Path) -> ToolConfig:
     return ToolConfig(registry=registry, context=context)
 
 
-def create_client(config: AppConfig, settings: Settings) -> Client:
+def _create_client(settings: SettingsManager, sandbox_dir: Path) -> Client:
     """Create and configure the client with agent."""
-    provider_name = (config.provider or settings.KODA_DEFAULT_PROVIDER).lower()
-    provider = get_provider_registry().create(provider_name, settings, model=config.model)
-
-    agent = Agent(
-        provider=provider,
-        tools=create_tool_config(config.sandbox_dir),
-    )
-
+    if settings.use_mock_client:
+        return MockClient()
+    provider = get_provider_registry().create(settings.provider, settings, model=settings.model)
+    agent = Agent(provider=provider, tools=_create_tool_config(sandbox_dir))
     return LocalClient(agent)
 
 
@@ -74,17 +46,20 @@ class KodaTuiApp:
 
     def __init__(
         self,
-        config: AppConfig | None = None,
+        sandbox_dir: Path | None = None,
         client: Client | None = None,
     ) -> None:
-        self.config = config or AppConfig()
-        self.settings = get_settings()
-        self.backend = client or create_client(self.config, self.settings)
+        self._sandbox_dir = sandbox_dir or Path.cwd().resolve()
+        self._settings = SettingsManager.get_instance()
+        self._client = client or _create_client(self._settings, self._sandbox_dir)
+
+        # Subscribe to settings changes
+        self._unsubscribe = self._settings.subscribe(self._on_settings_changed)
 
         # Initialize state
         self.state = AppState(
-            provider_name=self.config.provider or "unknown",
-            model_name=self.config.model or "default",
+            provider_name=self._settings.provider,
+            model_name=self._settings.model,
         )
 
         # Initialize layout
@@ -98,6 +73,14 @@ class KodaTuiApp:
         # Command palette
         self._palette: CommandPalette | None = None
         self._palette_float: Float | None = None
+
+    def _on_settings_changed(self, name: str, _old: Any, _new: Any) -> None:
+        """Handle settings changes."""
+        if name in ("provider", "model") or name.startswith("api_keys."):
+            self.state.provider_name = self._settings.provider
+            self.state.model_name = self._settings.model
+            self._client = _create_client(self._settings, self._sandbox_dir)
+            self.invalidate()
 
     def _create_application(self) -> Application:
         """Create the prompt_toolkit Application."""
@@ -132,7 +115,7 @@ class KodaTuiApp:
 
     async def _process_stream(self, message: str) -> None:
         """Process the response stream from backend."""
-        stream = self.backend.chat(message)
+        stream = self._client.chat(message)
 
         async for event in stream:
             if isinstance(event, TextDelta):

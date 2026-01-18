@@ -74,7 +74,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.isort]
-known-first-party = ["koda", "koda_tui"]
+known-first-party = ["koda", "koda_tui", "koda_common"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 5
