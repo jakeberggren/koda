@@ -1,8 +1,6 @@
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import SecretStr
-
 from koda_common.settings.settings import EnvSettings, Settings
 from koda_common.settings.store import (
     JsonFileSettingsStore,
@@ -35,6 +33,8 @@ class SettingsManager:
         self._settings_store = settings_store or JsonFileSettingsStore()
         self._secrets_store = secrets_store or KeyChainSecretsStore()
         self._env = EnvSettings()
+        self._api_key_cache: dict[str, str] = {}
+        self._load_api_keys_from_env()
         self._settings = self._load_layered()
         self._callbacks: list[SettingsChangeCallback] = []
 
@@ -50,33 +50,35 @@ class SettingsManager:
         """Reset the singleton instance (for testing)."""
         cls._instance = None
 
-    def _apply_env_overrides(self, data: dict[str, Any]) -> None:
-        """Apply environment variable overrides to settings data."""
+    def _load_api_keys_from_env(self) -> None:
+        """Load API key overrides from environment into cache."""
         for env_field in EnvSettings.model_fields:
             value = getattr(self._env, env_field)
-            if value is None:
-                continue
-            if env_field.endswith(_API_KEY_SUFFIX):
-                self._apply_api_key_override(data, env_field, value)
-            elif env_field.startswith(_ENV_PREFIX):
-                self._apply_setting_override(data, env_field, value)
+            if value is not None and env_field.endswith(_API_KEY_SUFFIX):
+                provider = env_field.removesuffix(_API_KEY_SUFFIX)
+                self._api_key_cache[provider] = value.get_secret_value()
 
-    def _apply_api_key_override(self, data: dict[str, Any], env_field: str, value: Any) -> None:
-        """Apply API key override from environment."""
-        provider = env_field.removesuffix(_API_KEY_SUFFIX)
-        secret_value = value.get_secret_value() if isinstance(value, SecretStr) else value
-        data["api_keys"][provider] = secret_value
-
-    def _apply_setting_override(self, data: dict[str, Any], env_field: str, value: Any) -> None:
+    def _apply_setting_override(
+        self,
+        data: dict[str, Any],
+        env_field: str,
+        value: Any,
+    ) -> None:
         """Apply setting override from environment (KODA_<field> -> <field>)."""
         settings_field = env_field.removeprefix(_ENV_PREFIX)
         if settings_field in Settings.model_fields:
             data[settings_field] = value
 
+    def _apply_env_overrides(self, data: dict[str, Any]) -> None:
+        """Apply environment variable overrides to settings data."""
+        for env_field in EnvSettings.model_fields:
+            value = getattr(self._env, env_field)
+            if value is not None and env_field.startswith(_ENV_PREFIX):
+                self._apply_setting_override(data, env_field, value)
+
     def _load_layered(self) -> Settings:
-        """Load settings: defaults -> file -> env vars. Secrets store loaded lazily."""
+        """Load settings: defaults -> file -> env vars."""
         data: dict[str, Any] = Settings().model_dump()
-        data["api_keys"] = {}  # Excluded from model_dump, add manually
         data.update(self._settings_store.load())
         self._apply_env_overrides(data)
         return Settings.model_validate(data)
@@ -100,17 +102,12 @@ class SettingsManager:
 
     def __getattr__(self, name: str) -> Any:
         """Get a setting value by name."""
-        if name.startswith("_"):
-            raise AttributeError(name)
         if name in Settings.model_fields:
             return getattr(self._settings, name)
         raise AttributeError(name)
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Set a setting value by name, with auto-save and notification."""
-        if name.startswith("_"):
-            super().__setattr__(name, value)
-            return
         if name in Settings.model_fields:
             old = getattr(self._settings, name)
             setattr(self._settings, name, value)
@@ -119,19 +116,24 @@ class SettingsManager:
             return
         super().__setattr__(name, value)
 
-    # API keys - special handling (stored in keychain)
+    # API keys - cached from keychain/env
 
     def get_api_key(self, provider: str) -> str | None:
         """Get API key for a provider. Loads from secrets store lazily if not cached."""
-        if provider not in self._settings.api_keys and (
-            key := self._secrets_store.get_key(provider)
-        ):
-            self._settings.api_keys[provider] = key
-        return self._settings.api_keys.get(provider)
+        if provider not in self._api_key_cache and (key := self._secrets_store.get_key(provider)):
+            self._api_key_cache[provider] = key
+        return self._api_key_cache.get(provider)
 
     def set_api_key(self, provider: str, key: str) -> None:
         """Set API key for a provider (saves to secrets store)."""
-        old = self._settings.api_keys.get(provider)
+        old = self._api_key_cache.get(provider)
         self._secrets_store.set_key(provider, key)
-        self._settings.api_keys[provider] = key
+        self._api_key_cache[provider] = key
         self._notify(f"api_keys.{provider}", old, key)
+
+    # Flags
+
+    @property
+    def use_mock_client(self) -> bool:
+        """Whether to use mock client (env flag, not persisted)."""
+        return self._env.koda_use_mock_client

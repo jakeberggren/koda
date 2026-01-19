@@ -3,34 +3,35 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseModel):
-    """Application settings. Add new fields here with defaults."""
+    """User preferences (persisted to JSON)."""
 
     provider: str = Field(default="openai", description="LLM provider")
     model: str = Field(default="gpt-5.2", description="Model name")
-    use_mock_client: bool = Field(default=False, description="Use mock client for testing")
-    api_keys: dict[str, str] = Field(
-        default_factory=dict,
-        description="API keys per provider",
-        exclude=True,  # Don't serialize to JSON (stored in keychain)
-    )
 
 
 class EnvSettings(BaseSettings):
-    """Environment variable overrides. These take precedence over other settings.
+    """Environment variables for settings overrides, API keys, and runtime flags.
 
-    Naming convention:
+    Setting overrides (T | None, None = don't override):
     - KODA_<field> maps to Settings.<field> (auto-mapped)
-    - <PROVIDER>_API_KEY maps to api_keys[provider] (special case)
+
+    API keys (override keychain):
+    - <PROVIDER>_API_KEY -> cached for provider
+
+    Flags (T with default, not persisted):
+    - Runtime behavior flags
     """
 
-    # Auto-mapped settings (KODA_<field> -> <field>)
+    # Setting overrides (KODA_<field> -> <field>, None = don't override)
     koda_provider: str | None = Field(default=None, description="LLM provider")
     koda_model: str | None = Field(default=None, description="Model name")
-    koda_use_mock_client: bool | None = Field(default=None, description="Use mock client")
 
-    # API keys (special case - stored in keychain, env overrides)
+    # API keys (override keychain, cached in manager)
     openai_api_key: SecretStr | None = Field(default=None, description="OpenAI API key")
     anthropic_api_key: SecretStr | None = Field(default=None, description="Anthropic API key")
+
+    # Flags
+    koda_use_mock_client: bool = Field(default=False, description="Use mock client for testing")
 
     model_config = SettingsConfigDict(
         env_file=".env",
