@@ -54,6 +54,7 @@ packages/
 │   └── tests/
 │
 └── koda-common/                 # Shared utilities
-    └── src/koda_common/
-        └── settings/            # Settings management (store, manager)
+    ├── src/koda_common/
+    │   └── settings/            # Settings management (store, manager)
+    └── tests/
 ```
