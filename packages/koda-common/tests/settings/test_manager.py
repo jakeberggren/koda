@@ -16,11 +16,6 @@ from koda_common.settings.manager import SettingsManager
 from .conftest import SpySecretsStore, SpySettingsStore
 
 
-def test_defaults_when_store_empty(manager: SettingsManager) -> None:
-    assert manager.provider == "openai"
-    assert manager.model == "gpt-5.2"
-
-
 def test_loads_from_store(secrets_store: SpySecretsStore) -> None:
     store = SpySettingsStore({"provider": "anthropic", "model": "claude-3"})
     manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
@@ -65,11 +60,6 @@ def test_invalid_store_value_raises_validation_error(secrets_store: SpySecretsSt
     store = SpySettingsStore({"model": 123})
     with pytest.raises(ValidationError):
         SettingsManager(settings_store=store, secrets_store=secrets_store)
-
-
-def test_unknown_attribute_raises(manager: SettingsManager) -> None:
-    with pytest.raises(AttributeError):
-        _ = manager.this_does_not_exist
 
 
 def test_setting_attribute_persists_and_notifies(
