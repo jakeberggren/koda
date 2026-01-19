@@ -15,7 +15,7 @@ class SettingsStore(Protocol):
 
 class JsonFileSettingsStore(SettingsStore):
     def __init__(self, path: Path | None = None):
-        self.path = path or Path.home() / ".config" / "koda" / "settings.json"
+        self.path = path or Path.home() / ".config" / "koda" / "koda.json"
 
     def load(self) -> dict[str, Any]:
         if not self.path.exists():
