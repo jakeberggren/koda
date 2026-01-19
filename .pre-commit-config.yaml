@@ -74,6 +74,14 @@ repos:
         stages: [pre-push]
         pass_filenames: false
 
+      - id: pytest-koda-common # unit tests for koda-common (pre-push)
+        name: pytest koda-common
+        entry: uv run pytest packages/koda-common
+        language: system
+        files: ^packages/koda-common/
+        stages: [pre-push]
+        pass_filenames: false
+
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.3.0
     hooks:
