@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.buffer import Buffer
@@ -24,25 +23,7 @@ if TYPE_CHECKING:
 
     from prompt_toolkit.key_binding import KeyPressEvent
 
-COMMAND_PALETTE_TITLE = "Commands"
-COMMAND_PALETTE_ITEM_SELECTED_PREFIX = "- "
-COMMAND_PALETTE_ITEM_UNSELECTED_PREFIX = "  "
-COMMAND_PALETTE_SEARCH_INPUT_HEIGHT = 1
-COMMAND_PALETTE_LIST_HEIGHT = 10
-COMMAND_PALETTE_BOX_PADDING_LEFT = 2
-COMMAND_PALETTE_BOX_PADDING_RIGHT = 2
-COMMAND_PALETTE_BOX_PADDING_TOP = 1
-COMMAND_PALETTE_BOX_PADDING_BOTTOM = 1
-COMMAND_PALLETE_SEPARATOR_HEIGHT = 1
-
-
-@dataclass
-class Command:
-    """A command that can be executed from the palette."""
-
-    label: str
-    handler: Callable[[], None]
-    description: str = ""
+    from koda_tui.components.palette.commands import Command
 
 
 class CommandPalette:
@@ -52,7 +33,7 @@ class CommandPalette:
         self,
         commands: list[Command],
         on_close: Callable[[], None],
-        height: int = COMMAND_PALETTE_LIST_HEIGHT,
+        height: int = 10,
     ) -> None:
         self.commands = commands
         self.on_close = on_close
@@ -95,10 +76,12 @@ class CommandPalette:
             self.selected_index = (self.selected_index + delta) % len(self._filtered_commands)
 
     def _execute_selected(self) -> None:
-        """Execute the currently selected command."""
+        """Execute the currently selected command.
+
+        Note: Does not auto-close. Handlers manage stack via palette_manager.
+        """
         if self._filtered_commands:
             cmd = self._filtered_commands[self.selected_index]
-            self.on_close()
             cmd.handler()
 
     def _create_keybindings(self) -> KeyBindings:
@@ -130,11 +113,7 @@ class CommandPalette:
         for i, cmd in enumerate(self._filtered_commands):
             is_selected = i == self.selected_index
             style = "class:palette.selected" if is_selected else "class:palette.item"
-            prefix = (
-                COMMAND_PALETTE_ITEM_SELECTED_PREFIX
-                if is_selected
-                else COMMAND_PALETTE_ITEM_UNSELECTED_PREFIX
-            )
+            prefix = "- " if is_selected else " "
             result.append((style, f"{prefix}{cmd.label}\n"))
 
         if not self._filtered_commands:
@@ -145,12 +124,23 @@ class CommandPalette:
     def _build_container(self) -> Box:
         """Build the palette UI container."""
         # Title
-        title = Window(
-            content=FormattedTextControl(text=[("class:palette.title", COMMAND_PALETTE_TITLE)]),
+        title_text = Window(
+            content=FormattedTextControl(text=[("class:palette.title", "Commands")]),
             height=1,
-            align=WindowAlign.CENTER,
+            align=WindowAlign.LEFT,
             dont_extend_height=True,
         )
+
+        esc_hint = Window(
+            content=FormattedTextControl(text=[("class:palette.hint", "esc")]),
+            height=1,
+            width=3,
+            dont_extend_height=True,
+            dont_extend_width=True,
+            align=WindowAlign.RIGHT,
+        )
+
+        title_row = VSplit([title_text, esc_hint])
 
         # Search input row
         search_prompt = Window(
@@ -164,13 +154,13 @@ class CommandPalette:
                 buffer=self.search_buffer,
                 key_bindings=self._kb,
             ),
-            height=COMMAND_PALETTE_SEARCH_INPUT_HEIGHT,
+            height=1,
             dont_extend_height=True,
         )
 
         search_row = VSplit([search_prompt, search_input])
 
-        separator = Window(height=COMMAND_PALLETE_SEPARATOR_HEIGHT, style="class:palette.separator")
+        separator = Window(height=1, style="class:palette.separator")
 
         # Command list
         command_list = Window(
@@ -180,13 +170,13 @@ class CommandPalette:
         )
 
         # Combine with padding and background style
-        body = HSplit([title, separator, search_row, separator, command_list])
+        body = HSplit([title_row, separator, search_row, separator, command_list])
         return Box(
             body,
-            padding_left=COMMAND_PALETTE_BOX_PADDING_LEFT,
-            padding_right=COMMAND_PALETTE_BOX_PADDING_RIGHT,
-            padding_top=COMMAND_PALETTE_BOX_PADDING_TOP,
-            padding_bottom=COMMAND_PALETTE_BOX_PADDING_BOTTOM,
+            padding_left=2,
+            padding_right=2,
+            padding_top=1,
+            padding_bottom=1,
             style="class:palette.box",
         )
 

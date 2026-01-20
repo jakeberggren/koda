@@ -23,9 +23,15 @@ TUI_STYLE = Style.from_dict(
         "palette.box": "bg:ansiblack",
         "palette.title": "fg:ansiwhite bold",
         "palette.prompt": "bold ansiblue",
+        "palette.hint": "fg:ansibrightblack",
         "palette.separator": "fg:ansibrightblack",
         "palette.item": "",
         "palette.selected": "bg:ansiblue fg:ansiwhite bold",
         "palette.empty": "fg:ansibrightblack italic",
+        "palette.connected": "fg:ansibrightblack",
+        # Dialog
+        "dialog.box": "bg:ansiblack",
+        "dialog.title": "fg:ansiwhite bold bg:ansiblack",
+        "dialog.hint": "fg:ansibrightblack bg:ansiblack",
     }
 )

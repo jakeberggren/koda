@@ -9,17 +9,17 @@ from pathlib import Path
 from typing import Any
 
 from prompt_toolkit import Application
-from prompt_toolkit.layout import Float
 
 from koda.agents import Agent
 from koda.providers import get_provider_registry
 from koda.providers.events import TextDelta, ToolCallRequested
+from koda.providers.exceptions import ProviderAuthenticationError
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_common import SettingsManager
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.state import AppState
 from koda_tui.clients import Client, LocalClient, MockClient
-from koda_tui.components.command_palette import Command, CommandPalette
+from koda_tui.components.palette import Command, CommandPalette, PaletteManager, get_main_commands
 from koda_tui.layout import TUILayout
 from koda_tui.rendering import TUI_STYLE
 
@@ -70,9 +70,8 @@ class KodaTuiApp:
         self._streaming_task: asyncio.Task | None = None
         self._spinner_task: asyncio.Task | None = None
 
-        # Command palette
-        self._palette: CommandPalette | None = None
-        self._palette_float: Float | None = None
+        # Palette manager for command palettes and dialogs
+        self._palette_manager = PaletteManager(self.layout)
 
     def _on_settings_changed(self, name: str, _old: Any, _new: Any) -> None:
         """Handle settings changes."""
@@ -142,6 +141,13 @@ class KodaTuiApp:
             await self._streaming_task
         except asyncio.CancelledError:
             pass
+        except ProviderAuthenticationError:
+            provider = self._settings.provider
+            error_msg = (
+                f"\n\n**Authentication failed for {provider.title()}.**\n\n"
+                f"Please check your API key. Press `Ctrl+P` → `Connect Provider` to update it."
+            )
+            self.state.append_delta(error_msg)
         except Exception as e:
             error_msg = f"\n\n**Error:** {type(e).__name__}: {e}"
             self.state.append_delta(error_msg)
@@ -165,72 +171,50 @@ class KodaTuiApp:
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""
-        if self.state.palette_open:
-            self.close_palette()
+        if self._palette_manager.is_open:
+            self._palette_manager.clear()
+            self.state.palette_open = False
         else:
             self.open_palette()
+        self.invalidate()
 
-    def open_palette(self) -> None:
-        """Show the command palette."""
+    def open_palette(self, commands: list[Command] | None = None) -> None:
+        """Show the command palette with given commands (or default)."""
         if not self._app:
             return
 
-        # Calculate palette width: 50% of terminal, min 40, max 80
+        # Calculate palette dimensions
         term_width = shutil.get_terminal_size().columns
         term_height = shutil.get_terminal_size().lines
         palette_width = max(40, min(80, term_width // 2))
         palette_height = max(5, min(20, term_height // 2))
 
-        self.state.palette_open = True
-        self._palette = CommandPalette(
-            commands=self._get_palette_commands(),
-            on_close=self.close_palette,
+        if commands is None:
+            commands = get_main_commands(
+                settings=self._settings,
+                palette_manager=self._palette_manager,
+                on_close=self._on_palette_close,
+                open_palette=self.open_palette,
+            )
+
+        palette = CommandPalette(
+            commands=commands,
+            on_close=self._on_palette_close,
             height=palette_height,
         )
 
-        self._palette_float = Float(
-            content=self._palette,
-            width=palette_width,
-        )
-        self.layout.root_container.floats.append(self._palette_float)
-        self._app.layout.focus(self._palette.search_buffer)
+        self._palette_manager.push(palette, width=palette_width)
+        self.state.palette_open = True
         self.invalidate()
 
-    def close_palette(self) -> None:
-        """Hide the command palette."""
-        if not self._app:
-            return
-
-        self.state.palette_open = False
-        if self._palette_float and self._palette_float in self.layout.root_container.floats:
-            self.layout.root_container.floats.remove(self._palette_float)
-        self._palette = None
-        self._palette_float = None
-        self._app.layout.focus(self.layout.input_area.buffer)
+    def _on_palette_close(self) -> None:
+        """Handle palette/dialog close (Escape pressed)."""
+        still_open = self._palette_manager.pop()
+        self.state.palette_open = still_open
         self.invalidate()
-
-    def _get_palette_commands(self) -> list[Command]:
-        """Get the list of commands for the palette."""
-        return [
-            Command("Change Model", self._cmd_change_model, "Select a different model"),
-            Command("Change Provider", self._cmd_change_provider, "Switch LLM provider"),
-            Command("New Session", self._cmd_new_session, "Clear chat and start fresh"),
-            Command("List Sessions", self._cmd_list_sessions, "View previous sessions"),
-        ]
-
-    def _cmd_change_model(self) -> None:
-        """Handle change model command. Not yet implemented."""
-
-    def _cmd_change_provider(self) -> None:
-        """Handle change provider command. Not yet implemented."""
-
-    def _cmd_new_session(self) -> None:
-        """Handle new session command."""
-
-    def _cmd_list_sessions(self) -> None:
-        """Handle list sessions command. Not yet implemented."""
 
     async def run(self) -> None:
         """Start the TUI application."""
         self._app = self._create_application()
+        self._palette_manager.set_app(self._app)
         await self._app.run_async()
