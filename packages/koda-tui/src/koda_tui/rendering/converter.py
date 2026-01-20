@@ -1,5 +1,6 @@
 """Rich to prompt_toolkit conversion utilities."""
 
+import json
 import time
 from io import StringIO
 from typing import ClassVar
@@ -109,12 +110,31 @@ class RichToPromptToolkit:
                     return self.render_tool_call(message.tool_call, running=message.tool_running)
                 return FormattedText([])
 
+    def _format_tool_args(self, arguments: dict[str, object]) -> str:
+        """Format tool arguments for display."""
+        if not arguments:
+            return ""
+
+        parts: list[str] = []
+        for key, value in arguments.items():
+            if isinstance(value, str):
+                formatted_value = value
+            else:
+                formatted_value = json.dumps(value, ensure_ascii=False)
+            parts.append(f"{key}={formatted_value}")
+        return " ".join(parts)
+
     def render_tool_call(self, tool_call: ToolCall, *, running: bool = False) -> FormattedText:
         """Render a tool call indicator."""
         text = Text()
         bullet_style = "yellow" if running else "green"
         text.append("\u25cf ", style=bullet_style)
         text.append(tool_call.tool_name, style="italic")
+
+        arguments = self._format_tool_args(tool_call.arguments)
+        if arguments:
+            text.append(f" {arguments}", style="dim")
+
         return self.convert(text)
 
     def render_streaming_content(self, content: str) -> FormattedText:
