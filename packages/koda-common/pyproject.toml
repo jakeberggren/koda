@@ -1,7 +1,7 @@
 [project]
 name = "koda-common"
 version = "0.1.0"
-description = "Common utilities for Koda"
+description = "KODA Common utilities"
 readme = "README.md"
 
 requires-python = ">=3.13"

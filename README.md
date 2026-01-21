@@ -49,7 +49,6 @@ packages/
 │   │   ├── app/                 # TUI application entry + orchestration
 │   │   ├── backends/            # Backend implementations (local, mock, etc.)
 │   │   ├── components/          # UI components/widgets
-│   │   ├── layout/              # Layout primitives and composition
 │   │   └── rendering/           # Rendering layer
 │   └── tests/
 │
