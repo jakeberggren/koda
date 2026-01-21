@@ -104,7 +104,7 @@ class RichToPromptToolkit:
             no_color=False,
         )
         console.print(renderable, end="")
-        return buffer.getvalue()
+        return buffer.getvalue().lstrip("\n")
 
     def convert(self, renderable) -> FormattedText:
         """Convert Rich renderable to prompt_toolkit FormattedText."""
