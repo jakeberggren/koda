@@ -87,4 +87,4 @@ required-environments = [
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["packages/koda/tests", "packages/koda-tui/tests", "packages/koda-common/tests"]
-addopts = "--import-mode=importlib --cov=koda --cov=koda-tui --cov=koda_common --cov-report=term"
+addopts = "--import-mode=importlib --cov=koda --cov=koda_tui --cov=koda_common --cov-report=term"
