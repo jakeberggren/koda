@@ -1,6 +1,7 @@
 """Application package for Koda TUI."""
 
 from koda_tui.app.application import KodaTuiApp
+from koda_tui.app.layout import TUILayout
 from koda_tui.app.state import AppState, Message, MessageRole
 
 __all__ = [
@@ -8,4 +9,5 @@ __all__ = [
     "KodaTuiApp",
     "Message",
     "MessageRole",
+    "TUILayout",
 ]

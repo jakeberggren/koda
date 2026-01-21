@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from prompt_toolkit.layout import Float
 
-from koda_tui.layout import TUILayout
+from koda_tui.app.layout import TUILayout
 
 if TYPE_CHECKING:
     from prompt_toolkit import Application

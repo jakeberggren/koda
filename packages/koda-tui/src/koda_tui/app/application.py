@@ -17,10 +17,10 @@ from koda.providers.exceptions import ProviderAuthenticationError
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_common import SettingsManager
 from koda_tui.app.keybindings import create_keybindings
+from koda_tui.app.layout import TUILayout
 from koda_tui.app.state import AppState
 from koda_tui.clients import Client, LocalClient, MockClient
 from koda_tui.components.palette import Command, CommandPalette, PaletteManager, get_main_commands
-from koda_tui.layout import TUILayout
 from koda_tui.rendering import TUI_STYLE
 
 

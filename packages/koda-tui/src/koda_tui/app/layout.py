@@ -63,7 +63,7 @@ class TUILayout:
         self.root_container = FloatContainer(
             content=HSplit(
                 [
-                    Box(chat_area, padding=0, padding_left=1),
+                    Box(chat_area, padding=0, padding_left=1, padding_top=1),
                     separator,
                     input,  # Dynamic height 1-10 lines
                     separator,
