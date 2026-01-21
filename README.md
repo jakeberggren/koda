@@ -31,14 +31,13 @@ Koda is a monorepo workspace managed by uv, containing three main packages:
 
 - **koda**: Provider-agnostic core library that handles agent logic, tool execution, and LLM provider integration
 - **koda-tui**: Interactive terminal interface
-- **koda-common**: Shared utilities including settings management
+- **koda-common**: Shared utilities including settings management and logging configuration
 
 ```
 packages/
 ├── koda/                        # Core agent framework
 │   ├── src/koda/
 │   │   ├── agents/              # Agent orchestration
-│   │   ├── config/              # Configuration and settings
 │   │   ├── messages/            # Message types and handling
 │   │   ├── providers/           # LLM provider adapters (OpenAI, Anthropic)
 │   │   └── tools/               # Agent tools (filesystem operations, etc.)
@@ -47,13 +46,14 @@ packages/
 ├── koda-tui/                    # Terminal user interface
 │   ├── src/koda_tui/
 │   │   ├── app/                 # TUI application entry + orchestration
-│   │   ├── backends/            # Backend implementations (local, mock, etc.)
+│   │   ├── clients/             # Client implementations (local, mock, etc.)
 │   │   ├── components/          # UI components/widgets
-│   │   └── rendering/           # Rendering layer
+│   │   └── rendering/           # Rich Rendering layer
 │   └── tests/
 │
 └── koda-common/                 # Shared utilities
     ├── src/koda_common/
+    │   ├── logging/             # Logging configuration
     │   └── settings/            # Settings management (store, manager)
     └── tests/
 ```
