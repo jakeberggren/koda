@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda_tui.components.palette.commands import model, provider
 from koda_tui.components.palette.commands.base import Command
-from koda_tui.components.palette.commands.provider import get_provider_commands
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -30,7 +30,7 @@ def get_main_commands(
     """
 
     def cmd_connect_provider() -> None:
-        commands = get_provider_commands(
+        commands = provider.get_provider_commands(
             settings=settings,
             palette_manager=palette_manager,
             on_close=on_close,
@@ -38,8 +38,11 @@ def get_main_commands(
         open_palette(commands)
 
     def cmd_switch_model() -> None:
-        # TODO: Implement model switching
-        pass
+        commands = model.get_model_commands(
+            settings=settings,
+            palette_manager=palette_manager,
+        )
+        open_palette(commands)
 
     return [
         Command("Connect Provider", cmd_connect_provider, "Configure LLM provider API keys"),

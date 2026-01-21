@@ -110,11 +110,22 @@ class CommandPalette:
         """Generate formatted text for the command list."""
         result: list[tuple[str, str]] = []
 
+        # Calculate max label width for alignment
+        max_label_width = max(
+            (len(cmd.label) for cmd in self._filtered_commands),
+            default=0,
+        )
+
         for i, cmd in enumerate(self._filtered_commands):
             is_selected = i == self.selected_index
             style = "class:palette.selected" if is_selected else "class:palette.item"
-            prefix = "- " if is_selected else " "
-            result.append((style, f"{prefix}{cmd.label}\n"))
+            dim_style = "class:palette.selected" if is_selected else "class:palette.dim"
+            prefix = "- " if is_selected else "  "
+            padded_label = cmd.label.ljust(max_label_width)
+            result.append((style, f"{prefix}{padded_label}"))
+            if cmd.description:
+                result.append((dim_style, f"  {cmd.description}"))
+            result.append((style, "\n"))
 
         if not self._filtered_commands:
             result.append(("class:palette.empty", "  No matching commands\n"))
