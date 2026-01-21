@@ -247,12 +247,15 @@ class ChatScrollbarMargin(Margin):
     """Custom scrollbar that tracks ChatAreaControl's scroll state."""
 
     SCROLLBAR_CHAR = "█"
+    SCROLLBAR_LEFT_PADDING = " "
+    SCROLLBAR_TRACK = ("class:scrollbar.track", SCROLLBAR_LEFT_PADDING + SCROLLBAR_CHAR + "\n")
+    SCROLLBAR_THUMB = ("class:scrollbar.thumb", SCROLLBAR_LEFT_PADDING + SCROLLBAR_CHAR + "\n")
 
     def __init__(self, chat_control: ChatAreaControl) -> None:
         self._chat = chat_control
 
     def get_width(self, get_ui_content: Callable[[], UIContent]) -> int:  # noqa: ARG002
-        return 1
+        return 2
 
     def create_margin(
         self,
@@ -267,21 +270,18 @@ class ChatScrollbarMargin(Margin):
         # Build scrollbar content
         result: StyleAndTextTuples = []
 
-        if total <= view_height or height == 0:
-            # No scrollbar needed - content fits
-            result.extend([("class:scrollbar.track", self.SCROLLBAR_CHAR + "\n")] * height)
-        else:
-            # Calculate thumb size and position
-            thumb_size = max(1, height * view_height // total)
-            max_offset = total - view_height
-            thumb_pos = (height - thumb_size) * offset // max_offset if max_offset > 0 else 0
+        if total <= view_height or height == 0:  # No scrollbar needed - content fits
+            return result
+        # Calculate thumb size and position
+        thumb_size = max(1, height * view_height // total)
+        max_offset = total - view_height
+        thumb_pos = (height - thumb_size) * offset // max_offset if max_offset > 0 else 0
 
-            # Build scrollbar
-            result.extend(
-                ("class:scrollbar.thumb", self.SCROLLBAR_CHAR + "\n")
-                if thumb_pos <= i < thumb_pos + thumb_size
-                else ("class:scrollbar.track", self.SCROLLBAR_CHAR + "\n")
-                for i in range(height)
-            )
+        result.extend(
+            self.SCROLLBAR_THUMB
+            if thumb_pos <= i < thumb_pos + thumb_size
+            else self.SCROLLBAR_TRACK
+            for i in range(height)
+        )
 
         return result

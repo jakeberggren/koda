@@ -8,7 +8,7 @@ from typing import ClassVar
 from prompt_toolkit.formatted_text import FormattedText, to_formatted_text
 from prompt_toolkit.formatted_text.ansi import ANSI
 from rich.console import Console, ConsoleOptions, RenderResult
-from rich.markdown import BlockQuote, CodeBlock, Markdown
+from rich.markdown import BlockQuote, CodeBlock, Heading, Markdown
 from rich.segment import Segment
 from rich.syntax import Syntax
 from rich.text import Text
@@ -34,10 +34,22 @@ class NoBackgroundCodeBlock(CodeBlock):
         )
 
 
+class LeftAlignedHeading(Heading):
+    """Markdown heading rendered with left alignment."""
+
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        self.text.justify = "left"
+        yield self.text
+
+
 class StyledMarkdown(Markdown):
     """Markdown with code blocks without background."""
 
-    elements: ClassVar = {**Markdown.elements, "fence": NoBackgroundCodeBlock}
+    elements: ClassVar = {
+        **Markdown.elements,
+        "fence": NoBackgroundCodeBlock,
+        "heading_open": LeftAlignedHeading,
+    }
 
 
 class BlueBlockQuote(BlockQuote):
@@ -67,6 +79,7 @@ class UserMarkdown(Markdown):
     elements: ClassVar = {
         **Markdown.elements,
         "fence": NoBackgroundCodeBlock,
+        "heading_open": LeftAlignedHeading,
         "blockquote_open": BlueBlockQuote,
     }
 
