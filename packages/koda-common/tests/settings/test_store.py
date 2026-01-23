@@ -101,10 +101,14 @@ def test_keychain_store_raises_keyring_not_installed_on_import_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # This actually tests the import-error branch of _get_keyring.
+    import builtins  # noqa: PLC0415
+
+    original_import = builtins.__import__
+
     def fake_import(name: str, *args, **kwargs):
         if name == "keyring":
             raise ImportError("nope")
-        return __import__(name, *args, **kwargs)
+        return original_import(name, *args, **kwargs)
 
     monkeypatch.setattr("builtins.__import__", fake_import)
 
