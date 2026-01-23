@@ -8,12 +8,15 @@ from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested
 from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda.tools import exceptions as tool_exceptions
 from koda.tools.executor import ToolExecutor
+from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from koda.providers import Provider
     from koda.tools.config import ToolConfig
+
+logger = get_logger(__name__)
 
 
 class Agent:
@@ -33,10 +36,14 @@ class Agent:
         if system_message:
             self._history.append(SystemMessage(content=system_message))
 
+        logger.info("agent_initialized", provider=type(provider).__name__)
+
     async def run(self, user_text: str) -> AsyncIterator[ProviderEvent]:
         if not user_text or not user_text.strip():
+            logger.warning("run_called_with_empty_message")
             raise provider_exceptions.EmptyMessageError
 
+        logger.info("agent_run_started", user_text_length=len(user_text.strip()))
         user_message = UserMessage(content=user_text.strip())
         self._history.append(user_message)
         tool_definitions = self.tools.registry.get_definitions() if self.tools else None
@@ -44,6 +51,7 @@ class Agent:
         iteration = 0
         while iteration < self.max_tool_iterations:
             iteration += 1
+            logger.info("agent_loop_iteration", iteration=iteration)
             messages: list[Message] = self._history.copy()
             stream: AsyncIterator[ProviderEvent] = self.provider.stream(messages, tool_definitions)
 
@@ -61,10 +69,13 @@ class Agent:
             self._history.append(assistant_message)
 
             if pending_tool_calls:
+                logger.info("tool_calls_pending", count=len(pending_tool_calls))
                 await self._handle_tool_calls(tool_calls=pending_tool_calls)
                 continue
+            logger.info("run_completed", iterations=iteration)
             return
 
+        logger.error("max_iterations_exceeded", max_iterations=self.max_tool_iterations)
         raise tool_exceptions.MaxIterationsExceededError(self.max_tool_iterations)
 
     def add_message(self, message_to_add: Message) -> None:
@@ -108,6 +119,7 @@ class Agent:
         if self.tools is None:
             # If provider requested tool calls but we don't have tools configured,
             # record errors for each tool call.
+            logger.warning("tool_calls_requested_but_no_tools_configured", count=len(tool_calls))
             for tool_call in tool_calls:
                 tool_result = ToolResult(
                     call_id=tool_call.call_id,

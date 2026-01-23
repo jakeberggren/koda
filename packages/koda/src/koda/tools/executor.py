@@ -7,6 +7,9 @@ from pydantic import ValidationError
 
 from koda.tools import exceptions as tool_exceptions
 from koda.tools.base import ToolCall, ToolOutput, ToolResult
+from koda_common.logging import get_logger
+
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from koda.tools.context import ToolContext
@@ -27,6 +30,7 @@ class ToolExecutor:
     async def execute_call(self, tool_call: ToolCall, ctx: ToolContext) -> ToolResult:
         tool = self.tool_registry.get(tool_call.tool_name)
         if not tool:
+            logger.warning("tool_not_found", tool_name=tool_call.tool_name)
             return ToolResult(
                 output=ToolOutput(
                     is_error=True,
@@ -34,9 +38,11 @@ class ToolExecutor:
                 ),
                 call_id=tool_call.call_id,
             )
+        logger.info("executing_tool", tool_name=tool_call.tool_name, arguments=tool_call.arguments)
         try:
             params = tool.parameters_model.model_validate(tool_call.arguments)
         except ValidationError as e:
+            logger.warning("tool_validation_error", tool_name=tool_call.tool_name, error=repr(e))
             return ToolResult(
                 output=ToolOutput(is_error=True, error_message=str(e)),
                 call_id=tool_call.call_id,
@@ -44,8 +50,10 @@ class ToolExecutor:
         try:
             output = await tool.execute(params, ctx)
         except tool_exceptions.ToolError as e:
+            logger.warning("tool_execution_error", tool_name=tool_call.tool_name, error=repr(e))
             return ToolResult(
                 output=ToolOutput(is_error=True, error_message=str(e)),
                 call_id=tool_call.call_id,
             )
+        logger.info("tool_executed", tool_name=tool_call.tool_name, is_error=output.is_error)
         return ToolResult(output=output, call_id=tool_call.call_id)

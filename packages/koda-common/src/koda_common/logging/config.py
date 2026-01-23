@@ -47,7 +47,10 @@ def _build_shared_processors() -> list[structlog.typing.Processor]:
         structlog.processors.add_log_level,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.CallsiteParameterAdder(
-            [structlog.processors.CallsiteParameter.MODULE]
+            [
+                structlog.processors.CallsiteParameter.MODULE,
+                structlog.processors.CallsiteParameter.QUAL_NAME,
+            ]
         ),
     ]
 
