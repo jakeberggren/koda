@@ -23,3 +23,6 @@ wheels/
 
 # Claude local settings
 settings.local.json
+
+# Logging
+logs/

@@ -2,6 +2,10 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
+from koda_common.logging import get_logger
+
+log = get_logger(__name__)
+
 
 class SettingsStore(Protocol):
     def load(self) -> dict[str, Any]:
@@ -19,12 +23,16 @@ class JsonFileSettingsStore(SettingsStore):
 
     def load(self) -> dict[str, Any]:
         if not self.path.exists():
+            log.debug("settings_file_not_found", path=str(self.path))
             return {}
-        return json.loads(self.path.read_text())
+        data = json.loads(self.path.read_text())
+        log.debug("settings_file_loaded", path=str(self.path))
+        return data
 
     def save(self, data: dict[str, Any]) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(data, indent=2))
+        log.debug("settings_file_saved", path=str(self.path))
 
 
 class SecretsStore(Protocol):
@@ -55,14 +63,19 @@ class KeyChainSecretsStore(SecretsStore):
         try:
             import keyring  # noqa: PLC0415 - optional dependency
         except ImportError as e:
+            log.warning("keyring_not_installed")
             raise KeyringNotInstalledError from e
         return keyring
 
     def get_key(self, key: str) -> str | None:
-        return self._get_keyring().get_password(self.SERVICE_NAME, key)
+        result = self._get_keyring().get_password(self.SERVICE_NAME, key)
+        log.debug("keychain_key_retrieved", key=key, found=result is not None)
+        return result
 
     def set_key(self, key: str, value: str) -> None:
         self._get_keyring().set_password(self.SERVICE_NAME, key, value)
+        log.debug("keychain_key_set", key=key)
 
     def delete_key(self, key: str) -> None:
         self._get_keyring().delete_password(self.SERVICE_NAME, key)
+        log.debug("keychain_key_deleted", key=key)

@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
+from koda_common.logging import get_logger
 from koda_common.settings.settings import EnvSettings, Settings
 from koda_common.settings.store import (
     JsonFileSettingsStore,
@@ -14,6 +15,8 @@ type SettingsChangeCallback = Callable[[str, Any, Any], None]
 # Prefix for env var to settings field mapping
 _ENV_PREFIX = "koda_"
 _API_KEY_SUFFIX = "_api_key"
+
+log = get_logger(__name__)
 
 
 class SettingsManager:
@@ -57,6 +60,7 @@ class SettingsManager:
             if value is not None and env_field.endswith(_API_KEY_SUFFIX):
                 provider = env_field.removesuffix(_API_KEY_SUFFIX)
                 self._api_key_cache[provider] = value.get_secret_value()
+                log.debug("api_key_loaded_from_env", provider=provider)
 
     def _apply_setting_override(
         self,
@@ -81,7 +85,9 @@ class SettingsManager:
         data: dict[str, Any] = Settings().model_dump()
         data.update(self._settings_store.load())
         self._apply_env_overrides(data)
-        return Settings.model_validate(data)
+        settings = Settings.model_validate(data)
+        log.info("settings_loaded", provider=settings.provider, model=settings.model)
+        return settings
 
     def _save_settings(self) -> None:
         """Persist non-secret settings to file storage."""
@@ -113,6 +119,7 @@ class SettingsManager:
             setattr(self._settings, name, value)
             self._save_settings()
             self._notify(name, old, value)
+            log.info("setting_changed", setting=name, old_value=old, new_value=value)
             return
         super().__setattr__(name, value)
 
@@ -122,6 +129,7 @@ class SettingsManager:
         """Get API key for a provider. Loads from secrets store lazily if not cached."""
         if provider not in self._api_key_cache and (key := self._secrets_store.get_key(provider)):
             self._api_key_cache[provider] = key
+            log.debug("api_key_loaded_from_keychain", provider=provider)
         return self._api_key_cache.get(provider)
 
     def set_api_key(self, provider: str, key: str) -> None:
@@ -130,6 +138,7 @@ class SettingsManager:
         self._secrets_store.set_key(provider, key)
         self._api_key_cache[provider] = key
         self._notify(f"api_keys.{provider}", old, key)
+        log.info("api_key_updated", provider=provider)
 
     # Flags
 

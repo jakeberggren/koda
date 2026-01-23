@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-LogFormat = Literal["json", "text"]
 
 
 class Settings(BaseModel):
@@ -40,8 +39,8 @@ class EnvSettings(BaseSettings):
     koda_use_mock_client: bool = Field(default=False, description="Use mock client for testing")
 
     # Logging
+    koda_log_enabled: bool = Field(default=True, description="Enable logging")
     koda_log_level: LogLevel = Field(default="INFO", description="Log level")
-    koda_log_format: LogFormat = Field(default="text", description="Log format (json or text)")
     koda_log_file: Path | None = Field(default=None, description="Log file path")
 
     model_config = SettingsConfigDict(
