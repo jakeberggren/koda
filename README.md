@@ -57,3 +57,28 @@ packages/
     │   └── settings/            # Settings management (store, manager)
     └── tests/
 ```
+
+## Development Setup
+
+KODA uses [Astral's](https://astral.sh/) Python toolchain:
+
+- **uv** — Package and workspace management
+- **ruff** — Linting and formatting
+- **ty** — Type checking
+
+### Prerequisites
+
+Install uv: https://docs.astral.sh/uv/getting-started/installation/
+
+### Getting Started
+
+```bash
+# Install dependencies and set up the workspace
+uv sync
+
+# Install pre-commit hooks
+pre-commit install
+```
+
+Pre-commit hooks run ruff formatting and linting, and ty type checking automatically on each commit.
+Pre-push hooks also runs tests for modified packages and additional security checks.
