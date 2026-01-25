@@ -59,4 +59,9 @@ class ListDirectoryTool:
             }
             for item in dir_items
         ]
-        return ToolOutput(content={"items": items})
+
+        dir_count = sum(1 for i in items if i["type"] == "directory")
+        file_count = len(items) - dir_count
+        display = f"Listed {params.path}: {file_count} files, {dir_count} directories"
+
+        return ToolOutput(content={"items": items}, display=display)

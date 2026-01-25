@@ -44,23 +44,26 @@ class GlobTool:
         if not resolved.is_dir():
             raise exceptions.NotADirectoryError(params.path)
 
-        # Collect matching files
         matches = sorted(
             path.relative_to(resolved) for path in resolved.glob(params.pattern) if path.is_file()
         )
 
-        total_count = len(matches)
-        truncated = total_count > params.limit
-        matches = matches[: params.limit]
+        total_count: int = len(matches)
+        truncated: bool = total_count > params.limit
+        matches: list[Path] = matches[: params.limit]
 
         # Format output
-        if total_count == 0:
-            text = f"No files found matching '{params.pattern}'"
-        elif truncated:
-            paths = "\n".join(str(p) for p in matches)
-            text = f"Found {total_count} files matching '{params.pattern}' (showing first {params.limit}):\n{paths}"  # noqa: E501
-        else:
-            paths = "\n".join(str(p) for p in matches)
-            text = f"Found {total_count} files matching '{params.pattern}':\n{paths}"
+        paths: list[str] = [str(p) for p in matches]
+        paths_text: str = "\n".join(paths)
 
-        return ToolOutput(content={"text": text})
+        if total_count == 0:
+            display = f"No files found matching '{params.pattern}'"
+            text = display
+        elif truncated:
+            display = f"Found {total_count} files matching '{params.pattern}' (showing first {params.limit})"  # noqa: E501
+            text = f"{display}:\n{paths_text}"
+        else:
+            display = f"Found {total_count} files matching '{params.pattern}'"
+            text = f"{display}:\n{paths_text}"
+
+        return ToolOutput(content={"text": text}, display=display)

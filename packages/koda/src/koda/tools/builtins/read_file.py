@@ -51,4 +51,9 @@ class ReadFileTool:
         except OSError as e:
             raise ReadError(params.path, cause=e) from e
 
-        return ToolOutput(content={"text": text_content})
+        line_count = text_content.count("\n") + (
+            1 if text_content and not text_content.endswith("\n") else 0
+        )
+        display = f"Read {line_count} lines from {params.path}"
+
+        return ToolOutput(content={"text": text_content}, display=display)

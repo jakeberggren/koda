@@ -91,7 +91,7 @@ class OpenAIProvider(Provider):
         if isinstance(e, AuthenticationError):
             logger.error("provider_authentication_error", provider="OpenAI")
             raise exceptions.ProviderAuthenticationError("OpenAI", e) from e
-        if isinstance(e, (APIConnectionError, APITimeoutError)):
+        if isinstance(e, APIConnectionError | APITimeoutError):
             logger.error("provider_connection_error", provider="OpenAI", error=repr(e))
             raise exceptions.ProviderConnectionError("OpenAI", e) from e
         if isinstance(e, APIError):

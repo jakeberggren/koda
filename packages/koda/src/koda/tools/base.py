@@ -49,6 +49,7 @@ class ToolOutput(BaseModel):
     """Pure execution result of a tool."""
 
     content: dict[str, Any] = Field(default_factory=dict)
+    display: str | None = None
     is_error: bool = False
     error_message: str | None = None
 
