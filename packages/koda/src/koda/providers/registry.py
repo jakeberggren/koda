@@ -24,7 +24,6 @@ class ProviderRegistry:
             logger.warning("provider_already_registered", name=key)
             raise exceptions.ProviderAlreadyRegisteredError(key)
         self._factories[key] = factory
-        logger.info("provider_registered", name=key)
 
     def create(self, name: str, settings: SettingsManager, model: str | None = None) -> Provider:
         key = name.strip().lower()
@@ -32,7 +31,7 @@ class ProviderRegistry:
         if factory is None:
             supported = ", ".join(self.supported()) or "(none)"
             logger.warning("provider_not_supported", name=key, supported=supported)
-            raise exceptions.ProviderNotSupportedError(key, supported)
+            raise exceptions.ProviderNotSupportedError(key)
         model = model.strip() if model and model.strip() else None
         logger.info("provider_created", name=key, model=model)
         return factory(settings, model)

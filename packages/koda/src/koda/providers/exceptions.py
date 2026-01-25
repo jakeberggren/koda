@@ -86,12 +86,9 @@ class ProviderAlreadyRegisteredError(ProviderConfigurationError):
 class ProviderNotSupportedError(ProviderConfigurationError):
     """Provider is not supported."""
 
-    def __init__(self, provider_name: str, supported: str) -> None:
-        super().__init__(
-            f"Provider '{provider_name}' is not supported. Supported providers: {supported}"
-        )
+    def __init__(self, provider_name: str) -> None:
+        super().__init__(f"Provider '{provider_name}' is not supported")
         self.provider_name = provider_name
-        self.supported = supported
 
 
 class ProviderNameEmptyError(ProviderConfigurationError):
