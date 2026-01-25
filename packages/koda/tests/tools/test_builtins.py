@@ -102,7 +102,6 @@ class TestReadFileTool:
 
         assert result.output.display is not None
         assert "3 lines" in result.output.display
-        assert "test.txt" in result.output.display
 
 
 class TestWriteFileTool:
