@@ -53,6 +53,7 @@ class WriteFileTool:
         line_count = params.content.count("\n") + (
             1 if params.content and not params.content.endswith("\n") else 0
         )
-        display = f"Wrote {line_count} lines to {params.path}"
+        noun = "line" if line_count == 1 else "lines"
+        display = f"Wrote {line_count} {noun} to {params.path}"
 
         return ToolOutput(content={"success": True, "path": params.path}, display=display)

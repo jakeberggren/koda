@@ -54,6 +54,7 @@ class ReadFileTool:
         line_count = text_content.count("\n") + (
             1 if text_content and not text_content.endswith("\n") else 0
         )
-        display = f"Read {line_count} lines from {params.path}"
+        noun = "line" if line_count == 1 else "lines"
+        display = f"Read {line_count} {noun} from {params.path}"
 
         return ToolOutput(content={"text": text_content}, display=display)

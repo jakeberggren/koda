@@ -59,11 +59,10 @@ class GlobTool:
         if total_count == 0:
             display = f"No files found matching '{params.pattern}'"
             text = display
-        elif truncated:
-            display = f"Found {total_count} files matching '{params.pattern}' (showing first {params.limit})"  # noqa: E501
-            text = f"{display}:\n{paths_text}"
         else:
-            display = f"Found {total_count} files matching '{params.pattern}'"
+            shown = f" showing first {params.limit}" if truncated else ""
+            noun = "file" if total_count == 1 else "files"
+            display = f"Found {total_count} {noun} matching '{params.pattern}'{shown}"
             text = f"{display}:\n{paths_text}"
 
         return ToolOutput(content={"text": text}, display=display)

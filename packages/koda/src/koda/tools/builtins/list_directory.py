@@ -62,6 +62,7 @@ class ListDirectoryTool:
 
         dir_count = sum(1 for i in items if i["type"] == "directory")
         file_count = len(items) - dir_count
-        display = f"Listed {params.path}: {file_count} files, {dir_count} directories"
+        noun = "file" if file_count == 1 else "files"
+        display = f"Listed {params.path}: {file_count} {noun}, {dir_count} directories"
 
         return ToolOutput(content={"items": items}, display=display)
