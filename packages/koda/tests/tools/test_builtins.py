@@ -528,3 +528,140 @@ class TestGlobTool:
         assert result.output.display is not None
         assert f"Found {total_files} files" in result.output.display
         assert f"showing first {limit}" in result.output.display
+
+
+class TestGrepTool:
+    """Integration tests for grep tool."""
+
+    @pytest.mark.asyncio
+    async def test_grep_finds_matches(self, sandbox_dir: Path) -> None:
+        """grep tool finds matching lines across files."""
+        (sandbox_dir / "file1.txt").write_text("hello\nworld\nhello again")
+        (sandbox_dir / "file2.txt").write_text("no match\nhello there")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="grep",
+            arguments={"pattern": "hello"},
+            call_id="call_grep",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        text = result.output.content["text"]
+        assert "file1.txt:1:hello" in text
+        assert "file1.txt:3:hello again" in text
+        assert "file2.txt:2:hello there" in text
+
+    @pytest.mark.asyncio
+    async def test_grep_respects_limit(self, sandbox_dir: Path) -> None:
+        """grep tool truncates results when exceeding limit."""
+        (sandbox_dir / "file.txt").write_text("match\nmatch\nmatch")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        limit = 2
+        call = ToolCall(
+            tool_name="grep",
+            arguments={"pattern": "match", "limit": limit},
+            call_id="call_grep_limit",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        text = result.output.content["text"]
+        line_count = sum(1 for line in text.split("\n") if line.startswith("file.txt:"))
+        assert line_count == limit
+        assert "showing first 2" in text
+
+    @pytest.mark.asyncio
+    async def test_grep_no_matches(self, sandbox_dir: Path) -> None:
+        """grep tool reports when no matches are found."""
+        (sandbox_dir / "file.txt").write_text("hello\nworld")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="grep",
+            arguments={"pattern": "absent"},
+            call_id="call_grep_nomatch",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert "No matches found" in result.output.content["text"]
+
+    @pytest.mark.asyncio
+    async def test_grep_path_not_found(self, sandbox_dir: Path) -> None:
+        """grep tool errors when path does not exist."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="grep",
+            arguments={"pattern": "hello", "path": "missing"},
+            call_id="call_grep_notfound",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "missing" in result.output.error_message
+
+    @pytest.mark.asyncio
+    async def test_grep_pattern_starting_with_dash(self, sandbox_dir: Path) -> None:
+        """grep tool treats patterns starting with '-' as literals."""
+        (sandbox_dir / "file.txt").write_text("-match\nother")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="grep",
+            arguments={"pattern": "-match"},
+            call_id="call_grep_dash",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert "file.txt:1:-match" in result.output.content["text"]
+
+    @pytest.mark.asyncio
+    async def test_grep_file_path_formats_relative_path(self, sandbox_dir: Path) -> None:
+        """grep tool uses the file name when searching a single file."""
+        (sandbox_dir / "file.txt").write_text("hello\nworld")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="grep",
+            arguments={"pattern": "hello", "path": "file.txt"},
+            call_id="call_grep_file",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert "file.txt:1:hello" in result.output.content["text"]
