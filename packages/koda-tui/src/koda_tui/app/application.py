@@ -69,6 +69,7 @@ class KodaTuiApp:
         self._app: Application | None = None
         self._streaming_task: asyncio.Task | None = None
         self._spinner_task: asyncio.Task | None = None
+        self._exit_reset_handle: asyncio.TimerHandle | None = None
 
         # Palette manager for command palettes and dialogs
         self._palette_manager = PaletteManager(self.layout)
@@ -124,6 +125,29 @@ class KodaTuiApp:
             elif isinstance(event, ToolCallRequested):
                 self.state.transition_to_tool(event.call)
                 self.invalidate()
+
+    def _cancel_exit_reset(self) -> None:
+        if self._exit_reset_handle:
+            self._exit_reset_handle.cancel()
+            self._exit_reset_handle = None
+
+    def _reset_exit_request(self) -> None:
+        self.state.reset_exit_request()
+        self._exit_reset_handle = None
+        self.invalidate()
+
+    def request_exit(self, timeout_seconds: float = 3.0) -> bool:
+        """Request application exit. Returns True if should exit immediately."""
+        if self.state.exit_requested:
+            self._cancel_exit_reset()
+            return True
+
+        self.state.request_exit()
+        self._cancel_exit_reset()
+        if self._app:
+            loop = asyncio.get_running_loop()
+            self._exit_reset_handle = loop.call_later(timeout_seconds, self._reset_exit_request)
+        return False
 
     def invalidate(self) -> None:
         """Trigger a UI refresh."""

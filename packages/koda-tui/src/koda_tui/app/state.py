@@ -54,6 +54,10 @@ class AppState:
                 message.tool_running = False
                 break
 
+    def reset_exit_request(self) -> None:
+        """Reset the exit request flag."""
+        self.exit_requested = False
+
     def request_exit(self) -> bool:
         """Request application exit. Returns True if should exit immediately."""
         if self.exit_requested:
@@ -63,7 +67,7 @@ class AppState:
 
     def begin_response(self, user_message: str) -> None:
         """Atomically begin a new response cycle."""
-        self.exit_requested = False
+        self.reset_exit_request()
         self.messages.append(Message(role=MessageRole.USER, content=user_message))
         self.is_streaming = True
         self.current_streaming_content = ""

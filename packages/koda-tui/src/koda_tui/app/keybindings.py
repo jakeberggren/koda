@@ -53,7 +53,7 @@ def _handle_cancel_or_exit(app: KodaTuiApp) -> None:
     """Cancel streaming, or request exit if idle."""
     if app.state.is_streaming:
         app.cancel_streaming()
-    elif app.state.request_exit():
+    elif app.request_exit():
         app.exit()
     else:
         app.invalidate()
