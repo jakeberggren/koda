@@ -23,6 +23,7 @@ class Message:
     content: str
     tool_call: ToolCall | None = None
     tool_running: bool = False
+    tool_result_display: str | None = None
 
 
 @dataclass
@@ -43,15 +44,16 @@ class AppState:
         """Append text to current streaming message."""
         self.current_streaming_content += text
 
-    def complete_tool_message(self, tool_call: ToolCall) -> None:
+    def complete_tool_message(self, call_id: str, display: str | None = None) -> None:
         """Mark the running tool message as complete."""
         for message in reversed(self.messages):
             if (
                 message.role == MessageRole.TOOL
                 and message.tool_call
-                and message.tool_call.call_id == tool_call.call_id
+                and message.tool_call.call_id == call_id
             ):
                 message.tool_running = False
+                message.tool_result_display = display
                 break
 
     def reset_exit_request(self) -> None:
@@ -86,7 +88,7 @@ class AppState:
 
         # Complete previous tool if any
         if self.active_tool:
-            self.complete_tool_message(self.active_tool)
+            self.complete_tool_message(self.active_tool.call_id)
 
         # Set new tool
         self.active_tool = tool_call
@@ -112,7 +114,7 @@ class AppState:
 
         # Complete active tool if any
         if self.active_tool:
-            self.complete_tool_message(self.active_tool)
+            self.complete_tool_message(self.active_tool.call_id)
 
         # Reset state
         self.is_streaming = False

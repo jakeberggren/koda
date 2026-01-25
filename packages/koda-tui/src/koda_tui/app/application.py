@@ -12,7 +12,7 @@ from prompt_toolkit import Application
 
 from koda.agents import Agent
 from koda.providers import get_provider_registry
-from koda.providers.events import TextDelta, ToolCallRequested
+from koda.providers.events import TextDelta, ToolCallRequested, ToolCallResult
 from koda.providers.exceptions import ProviderAuthenticationError
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_common import SettingsManager
@@ -124,6 +124,10 @@ class KodaTuiApp:
                 self.invalidate()
             elif isinstance(event, ToolCallRequested):
                 self.state.transition_to_tool(event.call)
+                self.invalidate()
+            elif isinstance(event, ToolCallResult):
+                display = event.result.output.display
+                self.state.complete_tool_message(event.result.call_id, display)
                 self.invalidate()
 
     def _cancel_exit_reset(self) -> None:
