@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from koda.tools import ToolCall
+from koda.tools import ToolCall, ToolResult
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,4 +13,10 @@ class ToolCallRequested:
     call: ToolCall
 
 
-ProviderEvent = TextDelta | ToolCallRequested
+@dataclass(frozen=True, slots=True)
+class ToolCallResult:
+    tool_name: str
+    result: ToolResult
+
+
+ProviderEvent = TextDelta | ToolCallRequested | ToolCallResult
