@@ -1,8 +1,7 @@
-"""Ripgrep-based grep tool using system rg binary."""
-
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import shutil
 from pathlib import Path
@@ -11,6 +10,8 @@ from pydantic import BaseModel, Field
 
 from koda.tools import ToolContext, ToolOutput, exceptions
 from koda.tools.decorators import tool
+
+RIPGREP_TIMEOUT_SECONDS = 30.0
 
 
 class RipgrepNotFoundError(exceptions.ToolError):
@@ -27,6 +28,13 @@ class RipgrepError(exceptions.ToolError):
         self.returncode = returncode
         self.error_output = error_output
         super().__init__(f"ripgrep failed (exit {returncode}): {error_output}")
+
+
+class RipgrepTimeoutError(exceptions.ToolError):
+    """Ripgrep execution timed out."""
+
+    def __init__(self, timeout: float) -> None:
+        super().__init__(f"ripgrep timed out after {timeout} seconds")
 
 
 class GrepParams(BaseModel):
@@ -55,8 +63,9 @@ class GrepParams(BaseModel):
     )
 
 
+@functools.lru_cache(maxsize=1)
 def _get_rg_path() -> str:
-    """Get path to ripgrep binary."""
+    """Get path to ripgrep binary. Result is cached to avoid repeated lookups."""
     rg = shutil.which("rg")
     if rg is None:
         raise RipgrepNotFoundError
@@ -95,7 +104,7 @@ def _parse_rg_match(data: dict, search_root: Path) -> str | None:
     try:
         rel_path = Path(path_text).relative_to(base_path)
     except ValueError:
-        rel_path = Path(path_text).name
+        rel_path = Path(path_text)
 
     return f"{rel_path}:{line_number}:{line_text}"
 
@@ -171,7 +180,15 @@ class GrepTool:
             stderr=asyncio.subprocess.PIPE,
             cwd=str(ctx.cwd),
         )
-        stdout, stderr = await proc.communicate()
+
+        try:
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(), timeout=RIPGREP_TIMEOUT_SECONDS
+            )
+        except TimeoutError:
+            proc.kill()
+            await proc.wait()
+            raise RipgrepTimeoutError(RIPGREP_TIMEOUT_SECONDS) from None
 
         # returncode 0 = matches found, 1 = no matches, other = error
         returncode = proc.returncode
