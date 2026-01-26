@@ -12,12 +12,21 @@ from rich.markdown import BlockQuote, CodeBlock, Heading, Markdown
 from rich.segment import Segment
 from rich.syntax import Syntax
 from rich.text import Text
+from rich.theme import Theme
 
 from koda.tools import ToolCall
 from koda_tui.app.state import Message, MessageRole
 
 CODE_THEME = "dracula"
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+MARKDOWN_THEME = Theme(
+    {
+        "markdown.hr": "white",
+        "markdown.list": "white",
+        "markdown.item.number": "white",
+        "markdown.item.bullet": "white",
+    }
+)
 
 
 class NoBackgroundCodeBlock(CodeBlock):
@@ -102,6 +111,7 @@ class RichToPromptToolkit:
             force_terminal=True,
             width=self._width,
             no_color=False,
+            theme=MARKDOWN_THEME,
         )
         console.print(renderable, end="")
         return buffer.getvalue().lstrip("\n")
