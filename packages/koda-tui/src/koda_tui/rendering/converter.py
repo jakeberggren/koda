@@ -111,11 +111,16 @@ class RichToPromptToolkit:
         ansi_str = self._render_to_ansi(renderable)
         return to_formatted_text(ANSI(ansi_str))
 
+    def _quote_user_content(self, content: str) -> str:
+        lines = content.split("\n")
+        quoted_lines = [f"> {line}" if line else ">" for line in lines]
+        return "\n".join(quoted_lines)
+
     def render_message(self, message: Message) -> FormattedText:
         """Render a single message to FormattedText."""
         match message.role:
             case MessageRole.USER:
-                return self.convert(UserMarkdown("> " + message.content))
+                return self.convert(UserMarkdown(self._quote_user_content(message.content)))
             case MessageRole.ASSISTANT:
                 return self.convert(StyledMarkdown(message.content))
             case MessageRole.TOOL:
@@ -127,18 +132,32 @@ class RichToPromptToolkit:
                     )
                 return FormattedText([])
 
-    def _format_tool_args(self, arguments: dict[str, object]) -> str:
+    def _summarize_string(self, value: str, max_inline_chars: int = 120) -> str:
+        if "\n" in value or len(value) > max_inline_chars:
+            line_count = value.count("\n") + (1 if value and not value.endswith("\n") else 0)
+            return f"<{len(value)} chars, {line_count} lines>"
+        return value
+
+    def _format_tool_value(self, value: object) -> str:
+        if isinstance(value, str):
+            return self._summarize_string(value)
+        return json.dumps(value, ensure_ascii=False)
+
+    def _format_write_file_args(self, arguments: dict[str, object]) -> str:
+        path = arguments.get("path", "")
+        content = arguments.get("content", "")
+        parts = [f"path={path}", f"content={self._format_tool_value(content)}"]
+        return " ".join(parts)
+
+    def _format_tool_args(self, tool_name: str, arguments: dict[str, object]) -> str:
         """Format tool arguments for display."""
         if not arguments:
             return ""
 
-        parts: list[str] = []
-        for key, value in arguments.items():
-            if isinstance(value, str):
-                formatted_value = value
-            else:
-                formatted_value = json.dumps(value, ensure_ascii=False)
-            parts.append(f"{key}={formatted_value}")
+        if tool_name == "write_file":
+            return self._format_write_file_args(arguments)
+
+        parts = [f"{key}={self._format_tool_value(value)}" for key, value in arguments.items()]
         return " ".join(parts)
 
     def render_tool_call(
@@ -153,7 +172,7 @@ class RichToPromptToolkit:
         text.append("\u25cf ", style="yellow" if running else "green")  # bullet
         text.append(tool_call.tool_name, style="italic")
 
-        arguments = self._format_tool_args(tool_call.arguments)
+        arguments = self._format_tool_args(tool_call.tool_name, tool_call.arguments)
         if arguments:
             text.append(f" {arguments}", style="dim")
 
