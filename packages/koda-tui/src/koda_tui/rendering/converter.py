@@ -145,7 +145,7 @@ class RichToPromptToolkit:
     def _summarize_string(self, value: str, max_inline_chars: int = 120) -> str:
         if "\n" in value or len(value) > max_inline_chars:
             line_count = value.count("\n") + (1 if value and not value.endswith("\n") else 0)
-            return f"<{len(value)} chars, {line_count} lines>"
+            return f"[{len(value)} chars, {line_count} lines]"
         return value
 
     def _format_tool_value(self, value: object) -> str:
