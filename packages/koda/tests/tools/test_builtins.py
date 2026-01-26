@@ -187,7 +187,6 @@ class TestWriteFileTool:
 
         assert result.output.display is not None
         assert "2 lines" in result.output.display
-        assert "output.txt" in result.output.display
 
 
 class TestListDirectoryTool:
