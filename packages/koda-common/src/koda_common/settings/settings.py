@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import AnyHttpUrl, BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -37,6 +37,14 @@ class EnvSettings(BaseSettings):
 
     # Flags
     koda_use_mock_client: bool = Field(default=False, description="Use mock client for testing")
+
+    # Database
+    koda_db_path: Path = Field(
+        default=Path.home() / ".config" / "koda" / "koda.db",
+        description="Database file path",
+    )
+    koda_db_sync_url: AnyHttpUrl | None = Field(default=None, description="Database sync URL")
+    koda_db_auth_token: SecretStr | None = Field(default=None, description="Database auth token")
 
     # Logging
     koda_log_enabled: bool = Field(default=True, description="Enable logging")
