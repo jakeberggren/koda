@@ -5,6 +5,32 @@ from koda.providers.events import ProviderEvent, TextDelta
 from koda_tui.clients import Client
 
 SAMPLE_RESPONSES = [
+    """Here's the diff for the changes I made:
+
+```diff
+--- a/src/config.py
++++ b/src/config.py
+@@ -12,8 +12,15 @@ class Config:
+     def __init__(self, path: str = None):
+         self.path = path or DEFAULT_CONFIG_PATH
+         self._data = {}
++        self._cache = {}
++        self._initialized = False
+
+     def load(self) -> dict:
+-        with open(self.path) as f:
+-            return json.load(f)
++        if self._initialized and self.path in self._cache:
++            return self._cache[self.path]
++
++        with open(self.path, encoding='utf-8') as f:
++            self._data = json.load(f)
++            self._cache[self.path] = self._data
++            self._initialized = True
++        return self._data
+```
+
+This adds caching to prevent repeated file reads.""",
     "I'd be happy to help you with that! Let me think about the best approach here.",
     "You are absolutely right! Based on what you've described, I would suggest starting by breaking down the problem into smaller pieces.",  # noqa: E501
     "Here's what I found:\n\n1. First, you'll want to check the configuration\n2. Then verify the dependencies are installed\n3. Finally, run the tests to confirm everything works\n\nLet me know if you need more details!",  # noqa: E501

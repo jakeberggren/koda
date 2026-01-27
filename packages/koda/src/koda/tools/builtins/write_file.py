@@ -32,7 +32,11 @@ class WriteFileTool:
     """Tool for writing file contents."""
 
     name: str = "write_file"
-    description: str = "Write content to a file on the filesystem"
+    description: str = (
+        "Write content to a file on the filesystem."
+        "Only use this tool to create new files."
+        "To edit existing files, use the edit_file tool."
+    )
     parameters_model: type[WriteFileParams] = WriteFileParams
 
     async def execute(self, params: WriteFileParams, ctx: ToolContext) -> ToolOutput:
