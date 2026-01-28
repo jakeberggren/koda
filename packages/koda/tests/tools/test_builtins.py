@@ -94,7 +94,7 @@ class TestReadFileTool:
 
         call = ToolCall(
             tool_name="read_file",
-            arguments={"path": "test.txt"},
+            arguments={"path": "test.txt", "offset": 0, "limit": 3},
             call_id="call_display",
         )
 
@@ -102,6 +102,30 @@ class TestReadFileTool:
 
         assert result.output.display is not None
         assert "3 lines" in result.output.display
+
+    async def test_read_file_offset_limit(self, sandbox_dir: Path) -> None:
+        """read_file tool can read file contents with offset and limit."""
+        test_file = sandbox_dir / "test.txt"
+        test_file.write_text("line1\nline2\nline3")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="read_file",
+            arguments={"path": "test.txt", "offset": 1, "limit": 2},
+            call_id="call_display",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.content == {"text": "line2\nline3"}
+        assert "line1" not in result.output.content
+
+        assert result.output.display is not None
+        assert result.output.display == "Read 2 lines"
 
 
 class TestWriteFileTool:
