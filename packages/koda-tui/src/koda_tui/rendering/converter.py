@@ -254,7 +254,7 @@ class RichToPromptToolkit:
 
         additions_str = f"{additions} addition" if additions == 1 else f"{additions} additions"
         deletions_str = f"{deletions} deletion" if deletions == 1 else f"{deletions} deletions"
-        comma = ", " if additions > 0 and deletions > 0 else ""
+        comma = ", " if additions > 0 else ""
 
         return f"{additions_str}{comma}{deletions_str}"
 
