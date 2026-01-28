@@ -109,12 +109,14 @@ class Agent:
         async for event in self._process_events(stream, response_chunks, pending_tool_calls):
             yield event
 
-        self._history.append(
-            AssistantMessage(
-                content="".join(response_chunks),
-                tool_calls=pending_tool_calls,
+        content = "".join(response_chunks)
+        if content or pending_tool_calls:
+            self._history.append(
+                AssistantMessage(
+                    content=content,
+                    tool_calls=pending_tool_calls,
+                )
             )
-        )
 
         if pending_tool_calls:
             logger.info("tool_calls_pending", count=len(pending_tool_calls))
