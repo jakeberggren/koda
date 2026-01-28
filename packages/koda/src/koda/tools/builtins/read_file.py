@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import islice
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
@@ -24,6 +25,8 @@ class ReadFileParams(BaseModel):
     """Parameters for reading a file."""
 
     path: str = Field(..., description="Path to the file to read")
+    offset: int = Field(0, ge=0, description="Offset to start reading from")
+    limit: int = Field(1, gt=0, description="Number of lines to read")
 
 
 @tool
@@ -31,7 +34,10 @@ class ReadFileTool:
     """Tool for reading file contents."""
 
     name: str = "read_file"
-    description: str = "Read the contents of a file from the filesystem"
+    description: str = (
+        "Read file contents (line-based). "
+        "Prefer small ranges via offset/limit and expand as needed."
+    )
     parameters_model: type[ReadFileParams] = ReadFileParams
 
     async def execute(self, params: ReadFileParams, ctx: ToolContext) -> ToolOutput:
@@ -45,15 +51,15 @@ class ReadFileTool:
             raise exceptions.NotAFileError(params.path)
 
         try:
-            text_content = resolved.read_text(encoding="utf-8")
+            with resolved.open("r", encoding="utf-8") as handle:
+                lines = list(islice(handle, params.offset, params.offset + params.limit))
         except PermissionError as e:
             raise exceptions.PermissionError(params.path) from e
         except OSError as e:
             raise ReadError(params.path, cause=e) from e
 
-        line_count = text_content.count("\n") + (
-            1 if text_content and not text_content.endswith("\n") else 0
-        )
+        text_content = "".join(lines)
+        line_count = len(lines)
         noun = "line" if line_count == 1 else "lines"
         display = f"Read {line_count} {noun}"
 
