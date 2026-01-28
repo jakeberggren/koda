@@ -213,6 +213,202 @@ class TestWriteFileTool:
         assert "2 lines" in result.output.display
 
 
+class TestEditFileTool:
+    """Integration tests for edit_file tool."""
+
+    @pytest.mark.asyncio
+    async def test_edit_file_success(self, sandbox_dir: Path) -> None:
+        """edit_file tool can edit file content."""
+        test_file = sandbox_dir / "test.txt"
+        test_file.write_text("line1\nline2")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="edit_file",
+            arguments={
+                "path": "test.txt",
+                "old_text": "line2",
+                "new_text": "line2\nline3",
+            },
+            call_id="call_edit",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.call_id == "call_edit"
+        assert result.output.is_error is False
+        assert result.output.content["replacements"] == 1
+        assert result.output.content["path"] == "test.txt"
+        assert "+line3" in result.output.content["diff"]
+        assert result.output.display is not None
+        assert (sandbox_dir / "test.txt").read_text() == "line1\nline2\nline3"
+
+    @pytest.mark.asyncio
+    async def test_edit_file_outside_sandbox_fails(self, sandbox_dir: Path) -> None:
+        """edit_file tool fails when editing outside sandbox."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="edit_file",
+            arguments={"path": "/etc/passwd", "old_text": "root", "new_text": "r"},
+            call_id="call_escape",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "/etc/passwd" in result.output.error_message
+
+    @pytest.mark.asyncio
+    async def test_edit_file_not_found(self, sandbox_dir: Path) -> None:
+        """edit_file tool returns error for missing file."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="edit_file",
+            arguments={"path": "missing.txt", "old_text": "a", "new_text": "b"},
+            call_id="call_missing",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "missing.txt" in result.output.error_message
+
+    @pytest.mark.asyncio
+    async def test_edit_file_not_a_file(self, sandbox_dir: Path) -> None:
+        """edit_file tool returns error for directory targets."""
+        (sandbox_dir / "subdir").mkdir()
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="edit_file",
+            arguments={"path": "subdir", "old_text": "a", "new_text": "b"},
+            call_id="call_dir",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "subdir" in result.output.error_message
+
+    @pytest.mark.asyncio
+    async def test_edit_file_text_not_found(self, sandbox_dir: Path) -> None:
+        """edit_file tool errors when text is missing."""
+        test_file = sandbox_dir / "test.txt"
+        test_file.write_text("line1\nline2")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="edit_file",
+            arguments={"path": "test.txt", "old_text": "line3", "new_text": "x"},
+            call_id="call_notfound",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "Text not found" in result.output.error_message
+
+    @pytest.mark.asyncio
+    async def test_edit_file_multiple_matches_fails(self, sandbox_dir: Path) -> None:
+        """edit_file tool errors on multiple matches without replace_all."""
+        test_file = sandbox_dir / "test.txt"
+        test_file.write_text("repeat\nrepeat\nrepeat")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="edit_file",
+            arguments={"path": "test.txt", "old_text": "repeat", "new_text": "once"},
+            call_id="call_multiple",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "Provide more context" in result.output.error_message
+
+    @pytest.mark.asyncio
+    async def test_edit_file_replace_all(self, sandbox_dir: Path) -> None:
+        """edit_file tool can replace all matches."""
+        test_file = sandbox_dir / "test.txt"
+        test_file.write_text("repeat\nrepeat\nrepeat")
+        expected_replacements = test_file.read_text().count("repeat")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="edit_file",
+            arguments={
+                "path": "test.txt",
+                "old_text": "repeat",
+                "new_text": "done",
+                "replace_all": True,
+            },
+            call_id="call_replace_all",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert result.output.content["replacements"] == expected_replacements
+        assert (sandbox_dir / "test.txt").read_text() == "\n".join(["done"] * expected_replacements)
+
+    @pytest.mark.asyncio
+    async def test_edit_file_no_changes(self, sandbox_dir: Path) -> None:
+        """edit_file tool returns no changes when replacement is identical."""
+        test_file = sandbox_dir / "test.txt"
+        test_file.write_text("same")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="edit_file",
+            arguments={"path": "test.txt", "old_text": "same", "new_text": "same"},
+            call_id="call_noop",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert result.output.content["replacements"] == 0
+        assert result.output.content["diff"] == ""
+        assert result.output.display == "No changes"
+
+
 class TestListDirectoryTool:
     """Integration tests for list_directory tool."""
 
