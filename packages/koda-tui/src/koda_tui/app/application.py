@@ -206,7 +206,7 @@ class KodaTuiApp:
         # Calculate palette dimensions
         term_width = shutil.get_terminal_size().columns
         term_height = shutil.get_terminal_size().lines
-        palette_width = max(40, min(80, term_width // 2))
+        palette_width = max(60, min(80, term_width // 2))
         palette_height = max(5, min(20, term_height // 2))
 
         if commands is None:
