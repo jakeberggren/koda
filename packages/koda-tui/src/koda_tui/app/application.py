@@ -10,11 +10,8 @@ from typing import Any
 
 from prompt_toolkit import Application
 
-from koda.agents import Agent
-from koda.providers import get_provider_registry
 from koda.providers.events import TextDelta, ToolCallRequested, ToolCallResult
 from koda.providers.exceptions import ProviderAuthenticationError
-from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_common import SettingsManager
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.layout import TUILayout
@@ -24,21 +21,11 @@ from koda_tui.components.palette import Command, CommandPalette, PaletteManager,
 from koda_tui.rendering import TUI_STYLE
 
 
-def _create_tool_config(sandbox_dir: Path) -> ToolConfig:
-    """Create and configure tools with registry and context."""
-    registry = ToolRegistry()
-    registry.register_all(get_builtin_tools())
-    context = ToolContext.default(sandbox_dir=sandbox_dir)
-    return ToolConfig(registry=registry, context=context)
-
-
 def _create_client(settings: SettingsManager, sandbox_dir: Path) -> Client:
-    """Create and configure the client with agent."""
+    """Create and configure the client."""
     if settings.use_mock_client:
         return MockClient()
-    provider = get_provider_registry().create(settings.provider, settings, model=settings.model)
-    agent = Agent(provider=provider, tools=_create_tool_config(sandbox_dir))
-    return LocalClient(agent)
+    return LocalClient(settings, sandbox_dir)
 
 
 class KodaTuiApp:
@@ -219,6 +206,7 @@ class KodaTuiApp:
 
         if commands is None:
             commands = get_main_commands(
+                client=self._client,
                 settings=self._settings,
                 palette_manager=self._palette_manager,
                 on_close=self._on_palette_close,

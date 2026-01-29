@@ -6,7 +6,6 @@ import shutil
 from functools import partial
 from typing import TYPE_CHECKING
 
-from koda.providers import get_provider_registry
 from koda_tui.components.dialogs import ApiKeyDialog
 from koda_tui.components.palette.commands.base import Command
 
@@ -14,6 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from koda_common import SettingsManager
+    from koda_tui.clients import Client
     from koda_tui.components.palette.manager import PaletteManager
 
 
@@ -51,6 +51,7 @@ def _open_api_key_dialog(
 
 
 def get_provider_commands(
+    client: Client,
     settings: SettingsManager,
     palette_manager: PaletteManager,
     on_close: Callable[[], None],
@@ -62,7 +63,7 @@ def get_provider_commands(
         palette_manager: Palette manager for pushing dialogs
         on_close: Callback when dialog is closed/cancelled
     """
-    providers = get_provider_registry().supported()
+    providers = client.list_providers()
 
     return [
         Command(

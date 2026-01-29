@@ -11,10 +11,12 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from koda_common import SettingsManager
+    from koda_tui.clients import Client
     from koda_tui.components.palette.manager import PaletteManager
 
 
 def get_main_commands(
+    client: Client,
     settings: SettingsManager,
     palette_manager: PaletteManager,
     on_close: Callable[[], None],
@@ -31,6 +33,7 @@ def get_main_commands(
 
     def cmd_connect_provider() -> None:
         commands = provider.get_provider_commands(
+            client=client,
             settings=settings,
             palette_manager=palette_manager,
             on_close=on_close,
