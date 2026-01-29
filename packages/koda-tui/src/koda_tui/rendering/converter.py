@@ -210,6 +210,7 @@ class RichToPromptToolkit:
                     return self.render_tool_call(
                         message.tool_call,
                         running=message.tool_running,
+                        error=message.tool_error,
                         result_display=message.tool_result_display,
                     )
                 return FormattedText([])
@@ -260,16 +261,27 @@ class RichToPromptToolkit:
         parts = [f"{key}={self._format_tool_value(value)}" for key, value in arguments.items()]
         return " ".join(parts)
 
+    @staticmethod
+    def _tool_status_indicator(*, running: bool, error: bool) -> tuple[str, str]:
+        """Return (symbol, style) for the tool call status."""
+        if running:
+            return ("\u25cf ", "yellow")
+        if error:
+            return ("\u2715 ", "red")
+        return ("\u2713 ", "green")
+
     def render_tool_call(
         self,
         tool_call: ToolCall,
         *,
         running: bool = False,
+        error: bool = False,
         result_display: str | None = None,
     ) -> FormattedText:
         """Render a tool call indicator with optional result display."""
+        symbol, style = self._tool_status_indicator(running=running, error=error)
         text = Text()
-        text.append("\u25cf ", style="yellow" if running else "green")  # bullet
+        text.append(symbol, style=style)
         text.append(tool_call.tool_name, style="italic")
 
         arguments = self._format_tool_args(tool_call.tool_name, tool_call.arguments)

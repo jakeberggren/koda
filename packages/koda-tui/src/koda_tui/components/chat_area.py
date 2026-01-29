@@ -107,6 +107,7 @@ class ChatAreaControl(UIControl):
             message.content,
             message.tool_call.call_id if message.tool_call else None,
             message.tool_running,
+            message.tool_error,
         )
 
     def _render_message_cached(self, message: Message) -> FormattedText:

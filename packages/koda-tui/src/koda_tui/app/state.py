@@ -23,6 +23,7 @@ class Message:
     content: str
     tool_call: ToolCall | None = None
     tool_running: bool = False
+    tool_error: bool = False
     tool_result_display: str | None = None
 
 
@@ -44,7 +45,13 @@ class AppState:
         """Append text to current streaming message."""
         self.current_streaming_content += text
 
-    def complete_tool_message(self, call_id: str, display: str | None = None) -> None:
+    def complete_tool_message(
+        self,
+        call_id: str,
+        display: str | None = None,
+        *,
+        is_error: bool = False,
+    ) -> None:
         """Mark the running tool message as complete."""
         for message in reversed(self.messages):
             if (
@@ -53,6 +60,7 @@ class AppState:
                 and message.tool_call.call_id == call_id
             ):
                 message.tool_running = False
+                message.tool_error = is_error
                 message.tool_result_display = display
                 break
 

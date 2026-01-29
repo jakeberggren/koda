@@ -112,9 +112,14 @@ class KodaTuiApp:
             elif isinstance(event, ToolCallRequested):
                 self.state.transition_to_tool(event.call)
                 self.invalidate()
+                await asyncio.sleep(0)
             elif isinstance(event, ToolCallResult):
                 display = event.result.output.display
-                self.state.complete_tool_message(event.result.call_id, display)
+                self.state.complete_tool_message(
+                    event.result.call_id,
+                    display,
+                    is_error=event.result.output.is_error,
+                )
                 self.invalidate()
 
     def _cancel_exit_reset(self) -> None:
