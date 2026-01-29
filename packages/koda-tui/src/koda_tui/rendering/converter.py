@@ -12,9 +12,9 @@ from prompt_toolkit.formatted_text.ansi import ANSI
 from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.markdown import BlockQuote, CodeBlock, Heading, Markdown
 from rich.segment import Segment
+from rich.style import Style
 from rich.syntax import Syntax
 from rich.text import Text
-from rich.theme import Theme
 
 from koda.tools import ToolCall
 from koda_tui.app.state import Message, MessageRole
@@ -28,15 +28,6 @@ DIFF_HEADER_FILENAME_RE = re.compile(r"^---\s+\S+?([^/\s]+)$", re.MULTILINE)
 DIFF_HUNK_RE = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 DIFF_ADDITION_RE = re.compile(r"^\+(?!\+\+)", re.MULTILINE)
 DIFF_DELETION_RE = re.compile(r"^-(?!--)", re.MULTILINE)
-
-MARKDOWN_THEME = Theme(
-    {
-        "markdown.hr": "white",
-        "markdown.list": "white",
-        "markdown.item.number": "white",
-        "markdown.item.bullet": "white",
-    }
-)
 
 
 @dataclass
@@ -113,21 +104,19 @@ class StyledMarkdown(Markdown):
 class BlueBlockQuote(BlockQuote):
     """Block quote with blue styling."""
 
+    QUOTE_STYLE = Style(color="magenta")
+
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         # Render children and apply blue color via ANSI escape directly
         render_options = options.update(width=options.max_width - 4)
         lines = console.render_lines(self.elements, render_options)
         new_line = Segment("\n")
-        # Use ANSI 34 directly for blue (matches prompt_toolkit's ansiblue)
-        blue = Segment("\x1b[34m")
-        reset = Segment("\x1b[0m")
+
         for line in lines:
-            yield blue
-            yield Segment("▌ ")
+            yield Segment("▌ ", self.QUOTE_STYLE)
             for seg in line:
-                # Strip existing styles from segment text
-                yield Segment(seg.text)
-            yield reset
+                if seg.text:
+                    yield Segment(seg.text, self.QUOTE_STYLE)
             yield new_line
 
 
@@ -160,7 +149,6 @@ class RichToPromptToolkit:
             force_terminal=True,
             width=self._width,
             no_color=False,
-            theme=MARKDOWN_THEME,
         )
         console.print(renderable, end="")
         return buffer.getvalue().lstrip("\n")

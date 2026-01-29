@@ -39,16 +39,6 @@ def _handle_newline(event: KeyPressEvent) -> None:
     event.current_buffer.insert_text("\n")
 
 
-def _handle_scroll_up(app: KodaTuiApp) -> None:
-    """Scroll chat area up."""
-    app.layout.chat_area.scroll_up(scroll_amount=5)
-
-
-def _handle_scroll_down(app: KodaTuiApp) -> None:
-    """Scroll chat area down."""
-    app.layout.chat_area.scroll_down(scroll_amount=5)
-
-
 def _handle_cancel_or_exit(app: KodaTuiApp) -> None:
     """Cancel streaming, or request exit if idle."""
     if app.state.is_streaming:
@@ -78,8 +68,6 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:
     kb.add(Keys.Enter)(lambda event: _handle_enter(app, event))
     kb.add(Keys.ControlJ)(_handle_newline)
     kb.add(Keys.Escape, Keys.Enter)(_handle_newline)
-    kb.add(Keys.Up)(lambda _: _handle_scroll_up(app))
-    kb.add(Keys.Down)(lambda _: _handle_scroll_down(app))
     kb.add(Keys.ControlC)(lambda _: _handle_cancel_or_exit(app))
     kb.add(Keys.Escape)(lambda _: _handle_escape(app))
     kb.add(Keys.ControlP)(lambda _: _handle_palette_toggle(app))

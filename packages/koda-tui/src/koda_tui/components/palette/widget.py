@@ -16,7 +16,7 @@ from prompt_toolkit.layout import (
     Window,
     WindowAlign,
 )
-from prompt_toolkit.widgets import Box
+from prompt_toolkit.widgets import Box, Frame
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -132,7 +132,7 @@ class CommandPalette:
 
         return result
 
-    def _build_container(self) -> Box:
+    def _build_container(self) -> Frame:
         """Build the palette UI container."""
         # Title
         title_text = Window(
@@ -182,7 +182,7 @@ class CommandPalette:
 
         # Combine with padding and background style
         body = HSplit([title_row, separator, search_row, separator, command_list])
-        return Box(
+        box = Box(
             body,
             padding_left=2,
             padding_right=2,
@@ -190,8 +190,9 @@ class CommandPalette:
             padding_bottom=1,
             style="class:palette.box",
         )
+        return Frame(body=box, style="class:palette.frame")
 
-    def __pt_container__(self) -> Box:
+    def __pt_container__(self) -> Frame:
         """Return the container for prompt_toolkit."""
         return self._container
 

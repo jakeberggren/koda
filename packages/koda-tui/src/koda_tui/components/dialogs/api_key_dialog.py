@@ -16,7 +16,7 @@ from prompt_toolkit.layout import (
     WindowAlign,
 )
 from prompt_toolkit.layout.processors import PasswordProcessor
-from prompt_toolkit.widgets import Box
+from prompt_toolkit.widgets import Box, Frame
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -62,7 +62,7 @@ class ApiKeyDialog:
 
         return kb
 
-    def _build_container(self) -> Box:
+    def _build_container(self) -> Frame:
         """Build the dialog UI container."""
         title_text = Window(
             content=FormattedTextControl(
@@ -102,7 +102,7 @@ class ApiKeyDialog:
 
         body = HSplit([title_row, separator, input_row])
 
-        return Box(
+        box = Box(
             body,
             padding_left=2,
             padding_right=2,
@@ -110,7 +110,8 @@ class ApiKeyDialog:
             padding_bottom=2,
             style="class:dialog.box",
         )
+        return Frame(body=box, style="class:dialog.frame")
 
-    def __pt_container__(self) -> Box:
+    def __pt_container__(self) -> Frame:
         """Return the container for prompt_toolkit."""
         return self._container
