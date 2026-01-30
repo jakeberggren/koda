@@ -41,12 +41,12 @@ class TUILayout:
 
         separator = Window(
             height=SEPARATOR_HEIGHT,
-            char="\u2500",  # Horizontal line character
+            char="",
             style="class:separator",
         )
 
         input_prompt = Window(
-            content=FormattedTextControl(text=[("class:prompt", "❯")]),  # noqa: RUF001 - allow confusable
+            content=FormattedTextControl(text=[("class:prompt", "▌")]),
             width=2,
             dont_extend_width=True,
         )

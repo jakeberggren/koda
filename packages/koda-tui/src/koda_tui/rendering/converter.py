@@ -9,8 +9,9 @@ from typing import ClassVar
 
 from prompt_toolkit.formatted_text import FormattedText, to_formatted_text
 from prompt_toolkit.formatted_text.ansi import ANSI
+from rich.cells import cell_len
 from rich.console import Console, ConsoleOptions, Group, RenderResult
-from rich.markdown import BlockQuote, CodeBlock, Heading, Markdown
+from rich.markdown import CodeBlock, Heading, Markdown
 from rich.segment import Segment
 from rich.style import Style
 from rich.syntax import Syntax
@@ -20,8 +21,13 @@ from koda.tools import ToolCall
 from koda_tui.app.state import Message, MessageRole
 
 CODE_THEME = "ansi_dark"
-DIFF_ADD_BG = "dark_green"
-DIFF_DEL_BG = "dark_red"
+
+WHITE = "#ffffff"
+GREY30 = "#4e4e4e"
+MAGENTA = "magenta"
+DARK_GREEN = "#005f00"
+DARK_RED = "#870000"
+
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 DIFF_HEADER_FILENAME_RE = re.compile(r"^---\s+\S+?([^/\s]+)$", re.MULTILINE)
@@ -45,7 +51,7 @@ class DiffBlockAccumulator:
         if not self.lines:
             return
 
-        bg = {"add": DIFF_ADD_BG, "del": DIFF_DEL_BG}.get(self.block_type, "default")
+        bg = {"add": DARK_GREEN, "del": DARK_RED}.get(self.block_type, "default")
         self.renderables.append(
             Syntax(
                 "\n".join(self.lines),
@@ -79,7 +85,6 @@ class NoBackgroundCodeBlock(CodeBlock):
             self.lexer_name,
             theme=CODE_THEME,
             background_color="default",
-            line_numbers=True,
         )
 
 
@@ -101,34 +106,32 @@ class StyledMarkdown(Markdown):
     }
 
 
-class BlueBlockQuote(BlockQuote):
-    """Block quote with blue styling."""
+class QuotedContent:
+    """Wraps a renderable with a magenta quote prefix and full-width background."""
 
-    QUOTE_STYLE = Style(color="magenta")
+    PREFIX_STYLE = Style(color=MAGENTA)
+    BG_STYLE = Style(bgcolor=GREY30)
+
+    def __init__(self, renderable) -> None:
+        self.renderable = renderable
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        # Render children and apply blue color via ANSI escape directly
-        render_options = options.update(width=options.max_width - 4)
-        lines = console.render_lines(self.elements, render_options)
+        render_options = options.update(width=options.max_width - 2)
+        lines = console.render_lines(self.renderable, render_options)
         new_line = Segment("\n")
 
         for line in lines:
-            yield Segment("▌ ", self.QUOTE_STYLE)
+            yield Segment("▌ ", self.PREFIX_STYLE)
+            line_width = 2
             for seg in line:
                 if seg.text:
-                    yield Segment(seg.text, self.QUOTE_STYLE)
+                    style = seg.style + self.BG_STYLE if seg.style else self.BG_STYLE
+                    yield Segment(seg.text, style)
+                    line_width += cell_len(seg.text)
+            padding = options.max_width - line_width
+            if padding > 0:
+                yield Segment(" " * padding, self.BG_STYLE)
             yield new_line
-
-
-class UserMarkdown(Markdown):
-    """Markdown for user messages with blue blockquotes."""
-
-    elements: ClassVar = {
-        **Markdown.elements,
-        "fence": NoBackgroundCodeBlock,
-        "heading_open": LeftAlignedHeading,
-        "blockquote_open": BlueBlockQuote,
-    }
 
 
 class RichToPromptToolkit:
@@ -202,7 +205,11 @@ class RichToPromptToolkit:
         """Render a single message to FormattedText."""
         match message.role:
             case MessageRole.USER:
-                return self.convert(UserMarkdown(self._quote_user_content(message.content)))
+                return self.convert(
+                    QuotedContent(
+                        StyledMarkdown(message.content, style=Style(color=WHITE, bgcolor=GREY30))
+                    )
+                )
             case MessageRole.ASSISTANT:
                 return self.convert(StyledMarkdown(message.content))
             case MessageRole.TOOL:
