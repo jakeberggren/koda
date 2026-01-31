@@ -11,6 +11,7 @@ from koda.providers.events import TextDelta, ToolCallRequested, ToolCallResult
 from koda.providers.exceptions import ProviderAuthenticationError
 from koda_common import SettingsManager
 from koda_tui.app.keybindings import create_keybindings
+from koda_tui.app.output import SynchronizedOutput
 from koda_tui.clients import Client, LocalClient, MockClient
 from koda_tui.state import AppState
 from koda_tui.ui.layout import TUILayout
@@ -83,6 +84,14 @@ class KodaTuiApp:
             mouse_support=True,
         )
         app.ttimeoutlen = 0.01  # Reduce escape key delay (default 0.5s)
+
+        # Wrap output in synchronized update sequences (DEC mode 2026).
+        # The terminal buffers all writes between begin/end markers and
+        # displays them atomically, eliminating tearing on scroll/redraw.
+        synced = SynchronizedOutput(app.output)
+        app.output = synced
+        app.renderer.output = synced
+
         return app
 
     async def _run_spinner(self) -> None:

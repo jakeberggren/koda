@@ -2,12 +2,11 @@ import json
 import re
 import time
 from dataclasses import dataclass, field
-from io import StringIO
 from typing import ClassVar
 
-from prompt_toolkit.formatted_text import FormattedText, to_formatted_text
-from prompt_toolkit.formatted_text.ansi import ANSI
+from prompt_toolkit.formatted_text import FormattedText
 from rich.cells import cell_len
+from rich.color import Color, ColorType
 from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.markdown import CodeBlock, Heading, Markdown
 from rich.segment import Segment
@@ -27,6 +26,81 @@ DARK_GREEN = "#005f00"
 DARK_RED = "#870000"
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+# Rich standard color number → prompt_toolkit color name.
+# Note: Rich "white" (7) maps to PT "ansigray", Rich "bright_white" (15) to PT "ansiwhite".
+_STANDARD_COLOR_TO_PT = {
+    0: "ansiblack",
+    1: "ansired",
+    2: "ansigreen",
+    3: "ansiyellow",
+    4: "ansiblue",
+    5: "ansimagenta",
+    6: "ansicyan",
+    7: "ansigray",
+    8: "ansibrightblack",
+    9: "ansibrightred",
+    10: "ansibrightgreen",
+    11: "ansibrightyellow",
+    12: "ansibrightblue",
+    13: "ansibrightmagenta",
+    14: "ansibrightcyan",
+    15: "ansiwhite",
+}
+
+
+def _rich_color_to_pt(color: Color | None) -> str:
+    """Convert a Rich Color to a prompt_toolkit color string."""
+    if color is None or color.is_default:
+        return ""
+    if color.type == ColorType.STANDARD and color.number is not None:
+        return _STANDARD_COLOR_TO_PT.get(color.number, "")
+    if color.triplet is not None:
+        r, g, b = color.triplet
+        return f"#{r:02x}{g:02x}{b:02x}"
+    if color.type == ColorType.EIGHT_BIT:
+        triplet = color.get_truecolor()
+        return f"#{triplet.red:02x}{triplet.green:02x}{triplet.blue:02x}"
+    return ""
+
+
+_RICH_ATTR_TO_PT = (
+    ("bold", "bold"),
+    ("dim", "dim"),
+    ("italic", "italic"),
+    ("underline", "underline"),
+    ("blink", "blink"),
+    ("blink2", "blink"),
+    ("reverse", "reverse"),
+    ("conceal", "hidden"),
+    ("strike", "strike"),
+)
+
+
+def _rich_attrs_to_pt(style: Style) -> list[str]:
+    """Extract active boolean attributes from a Rich Style as PT keywords."""
+    return [pt for attr, pt in _RICH_ATTR_TO_PT if getattr(style, attr)]
+
+
+def _rich_style_to_pt(style: Style | None) -> str:
+    """Convert a Rich Style to a prompt_toolkit style string."""
+    if style is None or not str(style):
+        return ""
+
+    parts: list[str] = []
+
+    fg = _rich_color_to_pt(style.color)
+    if fg:
+        parts.append(fg)
+
+    bg = _rich_color_to_pt(style.bgcolor)
+    if bg:
+        parts.append(f"bg:{bg}")
+
+    parts.extend(_rich_attrs_to_pt(style))
+
+    return " ".join(parts)
+
 
 DIFF_HEADER_FILENAME_RE = re.compile(r"^---\s+\S+?([^/\s]+)$", re.MULTILINE)
 DIFF_HUNK_RE = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
@@ -147,22 +221,25 @@ class MessageRenderer:
         """Update the rendering width."""
         self._width = width
 
-    def _render_to_ansi(self, renderable) -> str:
-        """Render a Rich object to ANSI string."""
-        buffer = StringIO()
-        console = Console(
-            file=buffer,
-            force_terminal=True,
-            width=self._width,
-            no_color=False,
-        )
-        console.print(renderable, end="")
-        return buffer.getvalue().lstrip("\n")
-
     def convert(self, renderable) -> FormattedText:
-        """Convert Rich renderable to prompt_toolkit FormattedText."""
-        ansi_str = self._render_to_ansi(renderable)
-        return to_formatted_text(ANSI(ansi_str))
+        """Convert Rich renderable directly to prompt_toolkit FormattedText."""
+        console = Console(width=self._width, force_terminal=True, no_color=False)
+        segments = console.render(renderable)
+        cropped = Segment.split_and_crop_lines(segments, self._width, pad=False)
+
+        result: list[tuple[str, str]] = []
+        for line in cropped:
+            result.extend(
+                (_rich_style_to_pt(seg.style), seg.text)
+                for seg in line
+                if not seg.control and seg.text
+            )
+
+        # Strip leading newlines (Rich Markdown may emit them)
+        while result and result[0][1] == "\n":
+            result.pop(0)
+
+        return FormattedText(result)
 
     def _get_lexer_from_diff(self, diff: str) -> str:
         """Extract lexer from diff header filename."""

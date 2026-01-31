@@ -34,7 +34,6 @@ class TUILayout:
         """Create the full-screen layout."""
         chat_area = Window(
             content=self.chat_area,
-            wrap_lines=True,
             style="class:chat-area",
             right_margins=[ChatScrollbarMargin(self.chat_area)],
         )

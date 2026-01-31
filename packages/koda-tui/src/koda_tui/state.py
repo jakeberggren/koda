@@ -58,8 +58,10 @@ class AppState:
                 and message.tool_call.call_id == call_id
             ):
                 message.tool_running = False
-                message.tool_error = is_error
-                message.tool_result_display = display
+                if message.tool_running or is_error:
+                    message.tool_error = is_error
+                if display is not None:
+                    message.tool_result_display = display
                 break
 
     def reset_exit_request(self) -> None:

@@ -8,8 +8,6 @@ from prompt_toolkit.data_structures import Point
 from prompt_toolkit.formatted_text import (
     FormattedText,
     StyleAndTextTuples,
-    merge_formatted_text,
-    to_formatted_text,
 )
 from prompt_toolkit.layout import UIContent, UIControl
 from prompt_toolkit.layout.margins import Margin
@@ -71,11 +69,15 @@ class ChatAreaControl(UIControl):
         self._scroll_offset = 0
         self._total_lines = 0
         self._view_height = 0
+        # Pending scroll delta — accumulated between render frames, applied in create_content()
+        self._pending_scroll = 0
         # Line-level cache invalidation tracking
         self._cached_width = 0
         self._cached_content_key: tuple[int, int, bool] | None = None
         # Per-message rendering cache: message_id -> (cache_key, FormattedText)
         self._message_cache: dict[int, tuple[tuple, FormattedText]] = {}
+        # Per-message wrapped lines cache: message_id -> (cache_key, lines)
+        self._lines_cache: dict[int, tuple[tuple, list[FormattedText]]] = {}
 
     @property
     def total_lines(self) -> int:
@@ -124,30 +126,13 @@ class ChatAreaControl(UIControl):
         self._message_cache[msg_id] = (cache_key, fragment)
         return fragment
 
-    def _cleanup_message_cache(self) -> None:
+    def _cleanup_caches(self) -> None:
         """Remove cache entries for messages no longer in state."""
         current_ids = {id(m) for m in self._state.messages}
-        stale_ids = [mid for mid in self._message_cache if mid not in current_ids]
-        for mid in stale_ids:
-            del self._message_cache[mid]
-
-    def _render_fragments(self) -> list[FormattedText]:
-        """Render all messages and streaming content into fragments."""
-        self._cleanup_message_cache()
-        fragments: list[FormattedText] = []
-
-        for message in self._state.messages:
-            fragments.append(self._render_message_cached(message))
-            fragments.append(FormattedText([("", "\n")]))
-
-        if self._state.is_streaming and self._state.current_streaming_content:
-            fragments.append(
-                self._renderer.render_streaming_content(self._state.current_streaming_content)
-            )
-        elif self._state.is_streaming:
-            fragments.append(self._renderer.render_thinking_spinner())
-
-        return fragments
+        for cache in (self._message_cache, self._lines_cache):
+            stale = [k for k in cache if k not in current_ids]
+            for k in stale:
+                del cache[k]
 
     def _split_into_lines(self, text: FormattedText, width: int) -> list[FormattedText]:
         """Split formatted text into lines respecting width."""
@@ -161,12 +146,43 @@ class ChatAreaControl(UIControl):
                     builder.add_char(style, char)
         return builder.build()
 
-    def _merge_and_split(self, fragments: list[FormattedText], width: int) -> list[FormattedText]:
-        """Merge fragments and split into wrapped lines."""
-        if not fragments:
-            return [FormattedText([])]
-        merged = to_formatted_text(merge_formatted_text(fragments))
-        return self._split_into_lines(merged, width)
+    def _get_message_lines(self, message: Message, width: int) -> list[FormattedText]:
+        """Get wrapped lines for a message, using per-message line cache."""
+        msg_id = id(message)
+        cache_key = (*self._message_cache_key(message), width)
+
+        cached = self._lines_cache.get(msg_id)
+        if cached and cached[0] == cache_key:
+            return cached[1]
+
+        fragment = self._render_message_cached(message)
+        lines = self._split_into_lines(fragment, width)
+        self._lines_cache[msg_id] = (cache_key, lines)
+        return lines
+
+    def _rebuild_lines(self, width: int) -> list[FormattedText]:
+        """Build all wrapped lines, reusing cached lines for stable messages."""
+        self._cleanup_caches()
+        all_lines: list[FormattedText] = []
+
+        for message in self._state.messages:
+            all_lines.extend(self._get_message_lines(message, width))
+            all_lines.append(FormattedText([]))  # blank separator
+
+        if self._state.is_streaming and self._state.current_streaming_content:
+            fragment = self._renderer.render_streaming_content(
+                self._state.current_streaming_content
+            )
+            all_lines.extend(self._split_into_lines(fragment, width))
+        elif self._state.is_streaming:
+            all_lines.extend(
+                self._split_into_lines(
+                    self._renderer.render_thinking_spinner(),
+                    width,
+                )
+            )
+
+        return all_lines or [FormattedText([])]
 
     def _is_at_bottom(self, height: int) -> bool:
         """Check if scroll is at or near the bottom."""
@@ -184,7 +200,7 @@ class ChatAreaControl(UIControl):
 
     def _build_ui_content(self, height: int) -> UIContent:
         """Build the final UIContent with line getter and cursor."""
-        cursor_y = min(self._scroll_offset + height - 1, self._total_lines - 1)
+        cursor_y = min(height - 1, self._total_lines - self._scroll_offset - 1)
 
         def get_line(i: int) -> FormattedText:
             actual_line = i + self._scroll_offset
@@ -200,12 +216,19 @@ class ChatAreaControl(UIControl):
 
     def scroll_up(self, scroll_amount: int = 1) -> None:
         """Scroll up by given amount."""
-        self._scroll_offset = max(0, self._scroll_offset - scroll_amount)
+        self._pending_scroll -= scroll_amount
 
     def scroll_down(self, scroll_amount: int = 1) -> None:
         """Scroll down by given amount."""
+        self._pending_scroll += scroll_amount
+
+    def _apply_pending_scroll(self) -> None:
+        """Apply accumulated scroll delta and reset it."""
+        if self._pending_scroll == 0:
+            return
         max_offset = max(0, self._total_lines - self._view_height)
-        self._scroll_offset = min(self._scroll_offset + scroll_amount, max_offset)
+        self._scroll_offset = max(0, min(self._scroll_offset + self._pending_scroll, max_offset))
+        self._pending_scroll = 0
 
     def mouse_handler(self, mouse_event: MouseEvent) -> None:
         """Handle mouse scroll events."""
@@ -232,14 +255,16 @@ class ChatAreaControl(UIControl):
             # Check if at bottom BEFORE content changes
             at_bottom = self._is_at_bottom(height)
 
-            fragments = self._render_fragments()
-            self._lines = self._merge_and_split(fragments, width)
+            self._lines = self._rebuild_lines(width)
             self._total_lines = len(self._lines)
             self._update_scroll(height, is_at_bottom=at_bottom)
 
             # Update cache
             self._cached_width = width
             self._cached_content_key = content_key
+
+        # Apply batched scroll events accumulated since last frame
+        self._apply_pending_scroll()
 
         return self._build_ui_content(height)
 
