@@ -1,16 +1,14 @@
-"""Tests for the rendering converter module."""
-
 from rich.text import Text
 
 from koda.tools import ToolCall
-from koda_tui.app import AppState, Message, MessageRole
-from koda_tui.rendering import RichToPromptToolkit
+from koda_tui.rendering import MessageRenderer
+from koda_tui.state import AppState, Message, MessageRole
 
 
-class TestRichToPromptToolkitConvert:
+class TestMessageRendererConvert:
     """Tests for basic conversion methods."""
 
-    def test_convert_text(self, converter: RichToPromptToolkit) -> None:
+    def test_convert_text(self, converter: MessageRenderer) -> None:
         """convert() should convert Rich Text to FormattedText."""
         text = Text("Hello world")
         result = converter.convert(text)
@@ -18,7 +16,7 @@ class TestRichToPromptToolkitConvert:
         content = "".join(t[1] for t in result)
         assert "Hello world" in content
 
-    def test_convert_styled_text(self, converter: RichToPromptToolkit) -> None:
+    def test_convert_styled_text(self, converter: MessageRenderer) -> None:
         """convert() should preserve styling information."""
         text = Text()
         text.append("Bold", style="bold")
@@ -27,24 +25,24 @@ class TestRichToPromptToolkitConvert:
         assert "Bold" in content
 
 
-class TestRichToPromptToolkitMessages:
+class TestMessageRendererMessages:
     """Tests for message rendering."""
 
-    def test_render_user_message(self, converter: RichToPromptToolkit) -> None:
+    def test_render_user_message(self, converter: MessageRenderer) -> None:
         """render_message() should render user messages as markdown."""
         message = Message(role=MessageRole.USER, content="Hello")
         result = converter.render_message(message)
         content = "".join(t[1] for t in result)
         assert "Hello" in content
 
-    def test_render_assistant_message(self, converter: RichToPromptToolkit) -> None:
+    def test_render_assistant_message(self, converter: MessageRenderer) -> None:
         """render_message() should render assistant messages as markdown."""
         message = Message(role=MessageRole.ASSISTANT, content="I can help")
         result = converter.render_message(message)
         content = "".join(t[1] for t in result)
         assert "I can help" in content
 
-    def test_render_tool_message(self, converter: RichToPromptToolkit) -> None:
+    def test_render_tool_message(self, converter: MessageRenderer) -> None:
         """render_message() should render tool messages."""
         tool_call = ToolCall(
             tool_name="search",
@@ -61,10 +59,10 @@ class TestRichToPromptToolkitMessages:
         assert "search" in content
 
 
-class TestRichToPromptToolkitToolCalls:
+class TestMessageRendererToolCalls:
     """Tests for tool call rendering."""
 
-    def test_render_tool_call(self, converter: RichToPromptToolkit) -> None:
+    def test_render_tool_call(self, converter: MessageRenderer) -> None:
         """render_tool_call() should display the tool name."""
         tool_call = ToolCall(
             tool_name="read_file",
@@ -75,7 +73,7 @@ class TestRichToPromptToolkitToolCalls:
         content = "".join(t[1] for t in result)
         assert "read_file" in content
 
-    def test_render_tool_call_running(self, converter: RichToPromptToolkit) -> None:
+    def test_render_tool_call_running(self, converter: MessageRenderer) -> None:
         """render_tool_call() with running=True should display the tool name."""
         tool_call = ToolCall(
             tool_name="search",
@@ -87,10 +85,10 @@ class TestRichToPromptToolkitToolCalls:
         assert "search" in content
 
 
-class TestRichToPromptToolkitStreaming:
+class TestMessageRendererStreaming:
     """Tests for streaming content rendering."""
 
-    def test_render_streaming_content(self, converter: RichToPromptToolkit) -> None:
+    def test_render_streaming_content(self, converter: MessageRenderer) -> None:
         """render_streaming_content() should show content with cursor."""
         result = converter.render_streaming_content("Hello wor")
         content = "".join(t[1] for t in result)

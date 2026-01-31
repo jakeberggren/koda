@@ -5,11 +5,11 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from koda_tui.components.palette.commands.base import Command
+from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
     from koda_common import SettingsManager
-    from koda_tui.components.palette.manager import PaletteManager
+    from koda_tui.ui.palette.palette_manager import PaletteManager
 
 MODELS_BY_PROVIDER: dict[str, list[str]] = {
     "openai": [
@@ -43,20 +43,14 @@ def _select_model(
 ) -> None:
     """Select a model and close the palette."""
     settings.model = model
-    palette_manager.clear()
+    palette_manager.close_all()
 
 
-def get_model_commands(
+def get_commands(
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> list[Command]:
-    """Get commands for the model selection palette.
-
-    Args:
-        settings: Settings manager for model access
-        palette_manager: Palette manager for closing dialogs
-        on_close: Callback when dialog is closed/cancelled (unused but kept for consistency)
-    """
+    """Get commands for the model selection palette."""
     provider = settings.provider
     models = MODELS_BY_PROVIDER.get(provider, [])
 

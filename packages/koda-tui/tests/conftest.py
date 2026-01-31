@@ -1,15 +1,13 @@
-"""Pytest configuration and shared fixtures."""
-
 import pytest
 
-from koda_tui.app import AppState
-from koda_tui.rendering import RichToPromptToolkit
+from koda_tui import AppState
+from koda_tui.rendering import MessageRenderer
 
 
 @pytest.fixture
-def converter() -> RichToPromptToolkit:
-    """A RichToPromptToolkit converter for testing."""
-    return RichToPromptToolkit(width=80)
+def converter() -> MessageRenderer:
+    """A MessageRenderer converter for testing."""
+    return MessageRenderer(width=80)
 
 
 @pytest.fixture

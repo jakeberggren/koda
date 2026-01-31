@@ -3,8 +3,9 @@ import sys
 
 from koda_common.logging import LoggingConfig, configure_logging, get_logger
 from koda_tui.app import KodaTuiApp
+from koda_tui.state import AppState
 
-__all__ = ["KodaTuiApp", "main"]
+__all__ = ["AppState", "KodaTuiApp", "main"]
 
 
 def main() -> None:

@@ -34,6 +34,6 @@ TUI_STYLE = Style.from_dict(
         "dialog.frame": "fg:ansibrightblack bg:ansiblack",
         "dialog.box": "bg:ansiblack",
         "dialog.title": "fg:ansiwhite bold bg:ansiblack",
-        "dialog.hint": "fg:ansiyellow",
+        "dialog.hint": "fg:ansibrightblack bg:ansiblack",
     }
 )

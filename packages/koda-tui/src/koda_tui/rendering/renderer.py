@@ -1,5 +1,3 @@
-"""Rich to prompt_toolkit conversion utilities."""
-
 import json
 import re
 import time
@@ -18,7 +16,7 @@ from rich.syntax import Syntax
 from rich.text import Text
 
 from koda.tools import ToolCall
-from koda_tui.app.state import Message, MessageRole
+from koda_tui.state import Message, MessageRole
 
 CODE_THEME = "ansi_dark"
 
@@ -134,8 +132,13 @@ class QuotedContent:
             yield new_line
 
 
-class RichToPromptToolkit:
-    """Converts Rich renderable objects to prompt_toolkit FormattedText."""
+class MessageRenderer:
+    """
+    Renders messages, tool calls, and streaming content as FormattedText.
+
+    Uses Rich as the rendering engine and converts the output to
+    prompt_toolkit FormattedText for display in TUI components.
+    """
 
     def __init__(self, width: int = 80) -> None:
         self._width = width
@@ -160,11 +163,6 @@ class RichToPromptToolkit:
         """Convert Rich renderable to prompt_toolkit FormattedText."""
         ansi_str = self._render_to_ansi(renderable)
         return to_formatted_text(ANSI(ansi_str))
-
-    def _quote_user_content(self, content: str) -> str:
-        lines = content.split("\n")
-        quoted_lines = [f"> {line}" if line else ">" for line in lines]
-        return "\n".join(quoted_lines)
 
     def _get_lexer_from_diff(self, diff: str) -> str:
         """Extract lexer from diff header filename."""

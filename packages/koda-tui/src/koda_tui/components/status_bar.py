@@ -5,7 +5,7 @@ from pathlib import Path
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.layout import UIContent, UIControl
 
-from koda_tui.app.state import AppState
+from koda_tui.state import AppState
 
 
 class StatusBarControl(UIControl):

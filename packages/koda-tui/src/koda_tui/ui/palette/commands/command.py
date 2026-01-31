@@ -1,5 +1,3 @@
-"""Base command definitions."""
-
 from collections.abc import Callable
 from dataclasses import dataclass
 

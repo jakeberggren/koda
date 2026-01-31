@@ -1,5 +1,3 @@
-"""Key binding definitions for Koda TUI."""
-
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -57,7 +55,7 @@ def _handle_escape(app: KodaTuiApp) -> None:
 
 def _handle_palette_toggle(app: KodaTuiApp) -> None:
     """Toggle command palette visibility."""
-    app.toggle_palette()
+    app.palette_manager.toggle()
 
 
 def create_keybindings(app: KodaTuiApp) -> KeyBindings:

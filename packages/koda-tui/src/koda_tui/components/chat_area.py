@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 
     from prompt_toolkit.layout import WindowRenderInfo
 
-    from koda_tui.app.state import AppState, Message
-    from koda_tui.rendering import RichToPromptToolkit
+    from koda_tui.rendering import MessageRenderer
+    from koda_tui.state import AppState, Message
 
 
 class _LineBuilder:
@@ -64,7 +64,7 @@ class _LineBuilder:
 class ChatAreaControl(UIControl):
     """Scrollable chat history control."""
 
-    def __init__(self, state: AppState, renderer: RichToPromptToolkit) -> None:
+    def __init__(self, state: AppState, renderer: MessageRenderer) -> None:
         self._state = state
         self._renderer = renderer
         self._lines: list[FormattedText] = []

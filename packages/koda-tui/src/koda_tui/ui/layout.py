@@ -10,9 +10,9 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.widgets import Box
 
-from koda_tui.app.state import AppState
 from koda_tui.components import ChatAreaControl, ChatScrollbarMargin, InputArea, StatusBarControl
-from koda_tui.rendering import RichToPromptToolkit
+from koda_tui.rendering import MessageRenderer
+from koda_tui.state import AppState
 
 SEPARATOR_HEIGHT = 1
 STATUS_BAR_HEIGHT = 1
@@ -23,7 +23,7 @@ class TUILayout:
 
     def __init__(self, state: AppState) -> None:
         self._state = state
-        self._renderer = RichToPromptToolkit()
+        self._renderer = MessageRenderer()
 
         # Initialize components
         self.chat_area = ChatAreaControl(state, self._renderer)

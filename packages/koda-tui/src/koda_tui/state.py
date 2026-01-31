@@ -1,5 +1,3 @@
-"""Application state management for Koda TUI."""
-
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
@@ -29,7 +27,7 @@ class Message:
 
 @dataclass
 class AppState:
-    """Central application state."""
+    """Shared application state as single source of truth for the UI."""
 
     messages: list[Message] = field(default_factory=list)
     cwd: Path = field(default_factory=lambda: Path.cwd())
