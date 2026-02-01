@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterator
 from typing import Protocol
 
-from koda.providers.events import ProviderEvent
+from koda.providers import ModelDefinition, ProviderEvent
 
 
 class Client(Protocol):
@@ -15,6 +15,6 @@ class Client(Protocol):
         """List available providers."""
         ...
 
-    def list_models(self, provider: str) -> list[str]:
-        """List available models for a provider."""
+    def list_models(self, provider: str | None = None) -> list[ModelDefinition]:
+        """List available models, optionally filtered by provider."""
         ...

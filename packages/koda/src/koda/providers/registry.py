@@ -1,4 +1,7 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from enum import StrEnum, auto
+
+from pydantic import BaseModel, Field
 
 from koda.providers import Provider, exceptions
 from koda_common import SettingsManager
@@ -40,8 +43,72 @@ class ProviderRegistry:
         return sorted(self._factories.keys())
 
 
-_registry = ProviderRegistry()
+class ThinkingLevel(StrEnum):
+    LOW = auto()
+    MEDIUM = auto()
+    HIGH = auto()
+    EXTRA_HIGH = auto()
+
+
+class ModelDefinition(BaseModel):
+    id: str
+    name: str
+    provider: str
+    thinking: set[ThinkingLevel] = Field(default_factory=set)
+
+
+class ModelRegistry:
+    """Registry for provider models keyed by model id."""
+
+    def __init__(self) -> None:
+        self._models: dict[str, ModelDefinition] = {}
+
+    @staticmethod
+    def _normalize_id(model_id: str) -> str:
+        return model_id.strip().lower()
+
+    def register(self, model_definition: ModelDefinition) -> None:
+        model_id = self._normalize_id(model_definition.id)
+        if not model_id:
+            logger.warning("model_registration_failed")
+            raise exceptions.ModelConfigurationError
+        if model_id in self._models:
+            logger.warning("model_already_registered", name=model_definition.name)
+            raise exceptions.ModelAlreadyRegisteredError(
+                model_definition.name,
+                model_definition.provider,
+            )
+        self._models[model_id] = model_definition
+
+    def register_all(self, model_definitions: Iterable[ModelDefinition]) -> None:
+        for model_definition in model_definitions:
+            self.register(model_definition)
+
+    def get(self, model_id: str) -> ModelDefinition:
+        key = self._normalize_id(model_id)
+        model = self._models.get(key)
+        if model is None:
+            supported = ", ".join(m.id for m in self.supported()) or "(none)"
+            logger.warning("model_not_supported", name=model_id, supported=supported)
+            raise exceptions.ModelNotSupportedError(model_id, "unknown")
+        return model
+
+    def supported(self, provider: str | None = None) -> list[ModelDefinition]:
+        """Supported models for given provider."""
+        models = list(self._models.values())
+        if provider:
+            key = provider.strip().lower()
+            models = [m for m in models if m.provider.lower() == key]
+        return sorted(models, key=lambda m: m.id, reverse=True)
+
+
+_provider_registry = ProviderRegistry()
+_model_registry = ModelRegistry()
 
 
 def get_provider_registry() -> ProviderRegistry:
-    return _registry
+    return _provider_registry
+
+
+def get_model_registry() -> ModelRegistry:
+    return _model_registry

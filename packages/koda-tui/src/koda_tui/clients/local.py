@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda.agents import Agent
-from koda.providers import get_provider_registry
+from koda.providers import get_model_registry, get_provider_registry
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_tui.clients import Client
 
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
     from koda.providers.events import ProviderEvent
     from koda_common import SettingsManager
+    from koda_tui.clients import ModelDefinition
 
 
 class LocalClient(Client):
@@ -42,6 +43,6 @@ class LocalClient(Client):
         """List available providers."""
         return get_provider_registry().supported()
 
-    def list_models(self, provider: str) -> list[str]:
-        """List available models for a provider."""
-        raise NotImplementedError
+    def list_models(self, provider: str | None = None) -> list[ModelDefinition]:
+        """List available models, optionally filtered by provider."""
+        return get_model_registry().supported(provider)

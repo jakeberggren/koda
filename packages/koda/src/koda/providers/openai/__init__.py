@@ -1,7 +1,8 @@
 from koda.providers import exceptions
 from koda.providers.openai.adapter import OpenAIAdapter
+from koda.providers.openai.definitions import MODELS
 from koda.providers.openai.provider import OpenAIProvider
-from koda.providers.registry import get_provider_registry
+from koda.providers.registry import get_model_registry, get_provider_registry
 from koda_common import SettingsManager
 
 
@@ -18,5 +19,6 @@ def _create_openai_provider(settings: SettingsManager, model: str | None) -> Ope
 
 # Self-register on import
 get_provider_registry().register("openai", _create_openai_provider)
+get_model_registry().register_all(MODELS)
 
 __all__ = ["OpenAIAdapter", "OpenAIProvider"]

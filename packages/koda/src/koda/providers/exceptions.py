@@ -104,3 +104,21 @@ class UnknownMessageTypeError(ProviderError):
     def __init__(self, message_type: type) -> None:
         super().__init__(f"Unknown message type: {message_type}")
         self.message_type = message_type
+
+
+class ModelConfigurationError(ProviderError):
+    """Provider model configuration or registry error."""
+
+
+class ModelAlreadyRegisteredError(ModelConfigurationError):
+    def __init__(self, model_name: str, provider_name: str) -> None:
+        super().__init__(f"Model '{model_name}' for provider {provider_name} is already registered")
+        self.model_name = model_name
+        self.provider_name = provider_name
+
+
+class ModelNotSupportedError(ModelConfigurationError):
+    def __init__(self, provider_model: str, provider_name: str) -> None:
+        super().__init__(f"Model '{provider_model}' for provider {provider_name} is not supported")
+        self.provider_model = provider_model
+        self.provider_name = provider_name

@@ -1,5 +1,3 @@
-"""Provider connection commands."""
-
 from __future__ import annotations
 
 from functools import partial
