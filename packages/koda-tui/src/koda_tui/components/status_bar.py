@@ -18,6 +18,19 @@ class StatusBarControl(UIControl):
         """Return the path relative to the repository root."""
         return self._state.cwd.relative_to(Path.home())
 
+    def _get_status(self) -> str:
+        if self._state.active_tools:
+            count = len(self._state.active_tools)
+            if count == 1:
+                name = next(iter(self._state.active_tools.values())).tool_name
+                return f"Running: {name}"
+            return f"Running {count} tools"
+        if self._state.is_streaming:
+            return "Streaming"
+        if self._state.exit_requested:
+            return "Press Ctrl+C again to exit"
+        return "Ready"
+
     def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002 - unused argument
         """Create the status bar content."""
         # Left side: provider/model info
@@ -26,14 +39,7 @@ class StatusBarControl(UIControl):
         left = f"{path} | {provider_and_model}"
 
         # Right side: status
-        if self._state.active_tool:
-            status = f"Running: {self._state.active_tool.tool_name}"
-        elif self._state.is_streaming:
-            status = "Streaming"
-        elif self._state.exit_requested:
-            status = "Press Ctrl+C again to exit"
-        else:
-            status = "Ready"
+        status = self._get_status()
 
         # Calculate padding
         padding = width - len(left) - len(status) - 2

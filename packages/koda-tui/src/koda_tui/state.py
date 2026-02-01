@@ -33,7 +33,7 @@ class AppState:
     cwd: Path = field(default_factory=lambda: Path.cwd())
     current_streaming_content: str = ""
     is_streaming: bool = False
-    active_tool: ToolCall | None = None
+    active_tools: dict[str, ToolCall] = field(default_factory=dict)
     model_name: str = ""
     provider_name: str = ""
     exit_requested: bool = False
@@ -48,7 +48,7 @@ class AppState:
         call_id: str,
         display: str | None = None,
         *,
-        is_error: bool = False,
+        is_error: bool | None = None,
     ) -> None:
         """Mark the running tool message as complete."""
         for message in reversed(self.messages):
@@ -58,7 +58,7 @@ class AppState:
                 and message.tool_call.call_id == call_id
             ):
                 message.tool_running = False
-                if message.tool_running or is_error:
+                if is_error is not None:
                     message.tool_error = is_error
                 if display is not None:
                     message.tool_result_display = display
@@ -94,12 +94,7 @@ class AppState:
             )
             self.current_streaming_content = ""
 
-        # Complete previous tool if any
-        if self.active_tool:
-            self.complete_tool_message(self.active_tool.call_id)
-
-        # Set new tool
-        self.active_tool = tool_call
+        self.active_tools[tool_call.call_id] = tool_call
         self.messages.append(
             Message(
                 role=MessageRole.TOOL,
@@ -120,11 +115,11 @@ class AppState:
                 )
             )
 
-        # Complete active tool if any
-        if self.active_tool:
-            self.complete_tool_message(self.active_tool.call_id)
+        # Complete any remaining active tools
+        for call_id in list(self.active_tools):
+            self.complete_tool_message(call_id)
+        self.active_tools.clear()
 
         # Reset state
         self.is_streaming = False
         self.current_streaming_content = ""
-        self.active_tool = None

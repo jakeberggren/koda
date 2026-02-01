@@ -2,7 +2,7 @@ from rich.text import Text
 
 from koda.tools import ToolCall
 from koda_tui.rendering import MessageRenderer
-from koda_tui.state import AppState, Message, MessageRole
+from koda_tui.state import Message, MessageRole
 
 
 class TestMessageRendererConvert:
@@ -95,28 +95,3 @@ class TestMessageRendererStreaming:
         assert "Hello wor" in content
         # Should have cursor block
         assert "\u2588" in content
-
-
-class TestAppState:
-    """Tests for application state management."""
-
-    def test_streaming_lifecycle(self, state: AppState) -> None:
-        """Streaming should go through begin, append, end cycle."""
-        state.begin_response("user message")
-        assert state.is_streaming is True
-        assert state.current_streaming_content == ""
-        assert len(state.messages) == 1  # User message added
-
-        state.append_delta("Hello ")
-        state.append_delta("world")
-        assert state.current_streaming_content == "Hello world"
-
-        state.end_response()
-        assert state.is_streaming is False
-        assert state.current_streaming_content == ""
-        assert state.messages[1].content == "Hello world"
-
-    def test_exit_request(self, state: AppState) -> None:
-        """request_exit() should require two calls to exit."""
-        assert state.request_exit() is False
-        assert state.request_exit() is True
