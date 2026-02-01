@@ -20,11 +20,8 @@ class StatusBarControl(UIControl):
 
     def _get_status(self) -> str:
         if self._state.active_tools:
-            count = len(self._state.active_tools)
-            if count == 1:
-                name = next(iter(self._state.active_tools.values())).tool_name
-                return f"Running: {name}"
-            return f"Running {count} tools"
+            last_tool = next(reversed(self._state.active_tools.values()))
+            return f"Running: {last_tool.tool_name}"
         if self._state.is_streaming:
             return "Streaming"
         if self._state.exit_requested:
