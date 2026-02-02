@@ -23,10 +23,10 @@ class TUILayout:
 
     def __init__(self, state: AppState) -> None:
         self._state = state
-        self._renderer = MessageRenderer()
+        self.renderer = MessageRenderer()
 
         # Initialize components
-        self.chat_area = ChatAreaControl(state, self._renderer)
+        self.chat_area = ChatAreaControl(state, self.renderer)
         self.input_area = InputArea()
         self.status_bar = StatusBarControl(state)
 
@@ -35,7 +35,7 @@ class TUILayout:
         chat_area = Window(
             content=self.chat_area,
             style="class:chat-area",
-            right_margins=[ChatScrollbarMargin(self.chat_area)],
+            right_margins=[ChatScrollbarMargin(self.chat_area, self._state)],
         )
 
         separator = Window(

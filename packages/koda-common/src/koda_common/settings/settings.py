@@ -12,6 +12,8 @@ class Settings(BaseModel):
 
     provider: str = Field(default="openai", description="LLM provider")
     model: str = Field(default="gpt-5.2", description="Model name")
+    theme: Literal["dark", "light"] = Field(default="dark", description="UI theme")
+    show_scrollbar: bool = Field(default=True, description="Show chat scrollbar")
 
 
 class EnvSettings(BaseSettings):
@@ -30,6 +32,8 @@ class EnvSettings(BaseSettings):
     # Setting overrides (KODA_<field> -> <field>, None = don't override)
     koda_provider: str | None = Field(default=None, description="LLM provider")
     koda_model: str | None = Field(default=None, description="Model name")
+    koda_theme: Literal["dark", "light"] | None = Field(default=None, description="UI theme")
+    koda_show_scrollbar: bool | None = Field(default=None, description="Show chat scrollbar")
 
     # API keys (override keychain, cached in manager)
     openai_api_key: SecretStr | None = Field(default=None, description="OpenAI API key")

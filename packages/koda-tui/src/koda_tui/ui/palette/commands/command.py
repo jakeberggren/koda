@@ -9,3 +9,4 @@ class Command:
     label: str
     handler: Callable[[], None]
     description: str = ""
+    group: str | None = None
