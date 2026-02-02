@@ -33,7 +33,33 @@ def get_commands(
         )
         palette_manager.open_palette(commands)
 
+    def cmd_toggle_theme() -> None:
+        new_theme = "light" if settings.theme == "dark" else "dark"
+        settings.theme = new_theme
+        palette_manager.close_all()
+
+    def cmd_toggle_scrollbar() -> None:
+        settings.show_scrollbar = not settings.show_scrollbar
+        palette_manager.close_all()
+
     return [
-        Command("Connect Provider", cmd_connect_provider, "Configure LLM provider API keys"),
-        Command("Switch Model", cmd_switch_model, "Select a different model"),
+        Command(
+            "Connect Provider",
+            cmd_connect_provider,
+            "Configure LLM provider API keys",
+            group="Agent",
+        ),
+        Command("Switch Model", cmd_switch_model, "Select a different model", group="Agent"),
+        Command(
+            "Toggle Theme",
+            cmd_toggle_theme,
+            "Switch between dark and light mode",
+            group="Appearance",
+        ),
+        Command(
+            "Toggle Scrollbar",
+            cmd_toggle_scrollbar,
+            "Show or hide the chat scrollbar",
+            group="Appearance",
+        ),
     ]

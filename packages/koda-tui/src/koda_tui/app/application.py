@@ -16,7 +16,7 @@ from koda_tui.clients import Client, LocalClient, MockClient
 from koda_tui.state import AppState
 from koda_tui.ui.layout import TUILayout
 from koda_tui.ui.palette import PaletteManager
-from koda_tui.ui.styles import TUI_STYLE
+from koda_tui.ui.styles import get_style
 
 
 def _create_client(settings: SettingsManager, sandbox_dir: Path) -> Client:
@@ -45,10 +45,13 @@ class KodaTuiApp:
         self.state = AppState(
             provider_name=self._settings.provider,
             model_name=self._settings.model,
+            show_scrollbar=self._settings.show_scrollbar,
         )
 
         # Initialize layout
         self.layout = TUILayout(self.state)
+        self.layout.renderer.set_theme(self._settings.theme)
+        self.layout.input_area.set_show_scrollbar(show_scrollbar=self._settings.show_scrollbar)
 
         # Application instance (created on run)
         self._app: Application | None = None
@@ -73,13 +76,25 @@ class KodaTuiApp:
             self._client = _create_client(self._settings, self._sandbox_dir)
             self.palette_manager.client = self._client
             self.invalidate()
+            return
+
+        if name == "show_scrollbar":
+            self.state.show_scrollbar = self._settings.show_scrollbar
+            self.layout.input_area.set_show_scrollbar(show_scrollbar=self._settings.show_scrollbar)
+            self.invalidate()
+            return
+
+        if name == "theme" and self._app:
+            self._app.style = get_style(self._settings.theme)
+            self.layout.renderer.set_theme(self._settings.theme)
+            self.invalidate()
 
     def _create_application(self) -> Application:
         """Create the prompt_toolkit Application."""
         app = Application(
             layout=self.layout.create_layout(),
             key_bindings=create_keybindings(self),
-            style=TUI_STYLE,
+            style=get_style(self._settings.theme),
             full_screen=True,
             mouse_support=True,
         )

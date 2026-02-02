@@ -72,7 +72,12 @@ def test_setting_attribute_persists_and_notifies(
 
     assert manager.provider == "anthropic"
     # persisted payload must be JSON-friendly
-    assert settings_store.save_calls[-1] == {"provider": "anthropic", "model": "gpt-5.2"}
+    assert settings_store.save_calls[-1] == {
+        "provider": "anthropic",
+        "model": "gpt-5.2",
+        "theme": "dark",
+        "show_scrollbar": True,
+    }
     assert changes == [("provider", "openai", "anthropic")]
 
 

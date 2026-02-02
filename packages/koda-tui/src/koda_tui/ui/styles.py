@@ -2,7 +2,7 @@
 
 from prompt_toolkit.styles import Style
 
-TUI_STYLE = Style.from_dict(
+TUI_DARK_STYLE = Style.from_dict(
     {
         # Chat area
         "chat-area": "",
@@ -30,6 +30,7 @@ TUI_STYLE = Style.from_dict(
         "palette.selected": "bg:ansimagenta fg:ansiwhite bold",
         "palette.empty": "fg:ansibrightblack italic",
         "palette.dim": "fg:ansibrightblack",
+        "palette.group": "fg:ansibrightblack bold",
         # Dialog
         "dialog.frame": "fg:ansibrightblack bg:ansiblack",
         "dialog.box": "bg:ansiblack",
@@ -37,3 +38,47 @@ TUI_STYLE = Style.from_dict(
         "dialog.hint": "fg:ansibrightblack bg:ansiblack",
     }
 )
+
+TUI_LIGHT_STYLE = Style.from_dict(
+    {
+        # Chat area
+        "chat-area": "",  # explicit is better
+        # Separators
+        "separator": "fg:ansibrightblack",
+        # Input prompt
+        "prompt": "bold ansimagenta",
+        # Status bar
+        "status-bar": "fg:ansiblack",
+        "status-bar.left": "fg:ansiblack",
+        "status-bar.right": "fg:ansimagenta",
+        # Scrollbar
+        "scrollbar.track": "fg:ansigray",
+        "scrollbar.thumb": "fg:ansibrightblack",
+        # Error display
+        "error": "fg:ansired bold",
+        # Command palette
+        "palette.frame": "fg:ansibrightblack bg:ansiwhite",
+        "palette.box": "bg:ansiwhite",
+        "palette.title": "fg:ansiblack bold",
+        "palette.prompt": "bold ansimagenta",
+        "palette.hint": "fg:ansibrightblack",
+        "palette.separator": "fg:ansibrightblack",
+        "palette.item": "fg:ansiblack",
+        "palette.selected": "bg:ansimagenta fg:ansiwhite bold",
+        "palette.empty": "fg:ansibrightblack italic",
+        "palette.dim": "fg:ansibrightblack",
+        "palette.group": "fg:ansimagenta bold",
+        # Dialog
+        "dialog.frame": "fg:ansibrightblack bg:ansiwhite",
+        "dialog.box": "bg:ansiwhite",
+        "dialog.title": "fg:ansiblack bold bg:ansiwhite",
+        "dialog.hint": "fg:ansibrightblack bg:ansiwhite",
+    }
+)
+
+
+def get_style(theme: str) -> Style:
+    """Return the style for the requested theme."""
+    if theme == "light":
+        return TUI_LIGHT_STYLE
+    return TUI_DARK_STYLE

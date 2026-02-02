@@ -277,8 +277,9 @@ class ChatScrollbarMargin(Margin):
     SCROLLBAR_TRACK = ("class:scrollbar.track", SCROLLBAR_LEFT_PADDING + SCROLLBAR_CHAR + "\n")
     SCROLLBAR_THUMB = ("class:scrollbar.thumb", SCROLLBAR_LEFT_PADDING + SCROLLBAR_CHAR + "\n")
 
-    def __init__(self, chat_control: ChatAreaControl) -> None:
+    def __init__(self, chat_control: ChatAreaControl, state: AppState) -> None:
         self._chat = chat_control
+        self._state = state
 
     def get_width(self, get_ui_content: Callable[[], UIContent]) -> int:  # noqa: ARG002
         return 2
@@ -289,6 +290,9 @@ class ChatScrollbarMargin(Margin):
         width: int,  # noqa: ARG002
         height: int,
     ) -> StyleAndTextTuples:
+        if not self._state.show_scrollbar:
+            return []
+
         total = self._chat.total_lines
         offset = self._chat.scroll_offset
         view_height = self._chat.view_height

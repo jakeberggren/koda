@@ -104,29 +104,79 @@ class CommandPalette:
 
         return kb
 
+    def _group_commands(self) -> list[tuple[str | None, list[Command]]]:
+        """Group filtered commands by their group label."""
+        grouped: list[tuple[str | None, list[Command]]] = []
+        group_map: dict[str, list[Command]] = {}
+        ungrouped: list[Command] = []
+
+        for cmd in self._filtered_commands:
+            if cmd.group:
+                if cmd.group not in group_map:
+                    group_map[cmd.group] = []
+                    grouped.append((cmd.group, group_map[cmd.group]))
+                group_map[cmd.group].append(cmd)
+            else:
+                ungrouped.append(cmd)
+
+        if ungrouped:
+            return [(None, ungrouped), *grouped]
+        return grouped
+
+    def _get_empty_command_list_text(self) -> list[tuple[str, str]]:
+        """Return placeholder text when no commands match."""
+        return [("class:palette.empty", "  No matching commands\n")]
+
+    def _get_max_label_width(self) -> int:
+        """Calculate max label width for alignment."""
+        return max((len(cmd.label) for cmd in self._filtered_commands), default=0)
+
+    def _append_group_header(self, result: list[tuple[str, str]], group: str | None) -> None:
+        """Append a group header to the formatted result."""
+        if not group:
+            return
+        if result:
+            result.append(("class:palette.dim", "\n"))
+        result.append(("class:palette.group", f"{group}\n"))
+
+    def _append_command_line(
+        self,
+        result: list[tuple[str, str]],
+        cmd: Command,
+        *,
+        max_label_width: int,
+        is_selected: bool,
+    ) -> None:
+        """Append a formatted command line to the result."""
+        style = "class:palette.selected" if is_selected else "class:palette.item"
+        dim_style = "class:palette.selected" if is_selected else "class:palette.dim"
+        prefix = "- " if is_selected else "  "
+        padded_label = cmd.label.ljust(max_label_width)
+        result.append((style, f"{prefix}{padded_label}"))
+        if cmd.description:
+            result.append((dim_style, f"  {cmd.description}"))
+        result.append((style, "\n"))
+
     def _get_command_list_text(self) -> list[tuple[str, str]]:
         """Generate formatted text for the command list."""
-        result: list[tuple[str, str]] = []
-
-        # Calculate max label width for alignment
-        max_label_width = max(
-            (len(cmd.label) for cmd in self._filtered_commands),
-            default=0,
-        )
-
-        for i, cmd in enumerate(self._filtered_commands):
-            is_selected = i == self.selected_index
-            style = "class:palette.selected" if is_selected else "class:palette.item"
-            dim_style = "class:palette.selected" if is_selected else "class:palette.dim"
-            prefix = "- " if is_selected else "  "
-            padded_label = cmd.label.ljust(max_label_width)
-            result.append((style, f"{prefix}{padded_label}"))
-            if cmd.description:
-                result.append((dim_style, f"  {cmd.description}"))
-            result.append((style, "\n"))
-
         if not self._filtered_commands:
-            result.append(("class:palette.empty", "  No matching commands\n"))
+            return self._get_empty_command_list_text()
+
+        result: list[tuple[str, str]] = []
+        max_label_width = self._get_max_label_width()
+        command_index = 0
+
+        for group, commands in self._group_commands():
+            self._append_group_header(result, group)
+            for cmd in commands:
+                is_selected = command_index == self.selected_index
+                self._append_command_line(
+                    result,
+                    cmd,
+                    max_label_width=max_label_width,
+                    is_selected=is_selected,
+                )
+                command_index += 1
 
         return result
 

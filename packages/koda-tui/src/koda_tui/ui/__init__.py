@@ -1,4 +1,4 @@
 from koda_tui.ui.layout import TUILayout
-from koda_tui.ui.styles import TUI_STYLE
+from koda_tui.ui.styles import get_style
 
-__all__ = ["TUI_STYLE", "TUILayout"]
+__all__ = ["TUILayout", "get_style"]

@@ -36,6 +36,7 @@ class AppState:
     active_tools: dict[str, ToolCall] = field(default_factory=dict)
     model_name: str = ""
     provider_name: str = ""
+    show_scrollbar: bool = True
     exit_requested: bool = False
     palette_open: bool = False
 
