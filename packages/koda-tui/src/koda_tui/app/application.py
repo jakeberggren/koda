@@ -51,7 +51,6 @@ class KodaTuiApp:
         # Initialize layout
         self.layout = TUILayout(self.state)
         self.layout.renderer.set_theme(self._settings.theme)
-        self.layout.input_area.set_show_scrollbar(show_scrollbar=self._settings.show_scrollbar)
 
         # Application instance (created on run)
         self._app: Application | None = None
@@ -77,13 +76,10 @@ class KodaTuiApp:
             self.palette_manager.client = self._client
             self.invalidate()
             return
-
         if name == "show_scrollbar":
             self.state.show_scrollbar = self._settings.show_scrollbar
-            self.layout.input_area.set_show_scrollbar(show_scrollbar=self._settings.show_scrollbar)
             self.invalidate()
             return
-
         if name == "theme" and self._app:
             self._app.style = get_style(self._settings.theme)
             self.layout.renderer.set_theme(self._settings.theme)

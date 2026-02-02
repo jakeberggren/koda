@@ -2,7 +2,7 @@ import json
 import re
 import time
 from dataclasses import dataclass, field
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from prompt_toolkit.formatted_text import FormattedText
 from rich.cells import cell_len
@@ -17,21 +17,25 @@ from rich.text import Text
 from koda.tools import ToolCall
 from koda_tui.state import Message, MessageRole
 
+Theme = Literal["dark", "light"]
+
 # Per-theme rendering constants
 _THEME_COLORS = {
     "dark": {
         "code_theme": "ansi_dark",
         "user_fg": "#ffffff",
-        "user_bg": "#4e4e4e",
-        "diff_add_bg": "#005f00",
-        "diff_del_bg": "#870000",
+        "user_bg": "gray30",
+        "diff_add_bg": "dark_green",
+        "diff_del_bg": "dark_red",
+        "quote_prefix": "magenta",
     },
     "light": {
         "code_theme": "ansi_light",
-        "user_fg": "#000000",
-        "user_bg": "#e0e0e0",
+        "user_fg": "grey0",
+        "user_bg": "grey89",
         "diff_add_bg": "#d4edda",
         "diff_del_bg": "#f8d7da",
+        "quote_prefix": "magenta",
     },
 }
 
@@ -160,27 +164,24 @@ class DiffBlockAccumulator:
         self.lines.append(line)
 
 
-class LeftAlignedHeading(Heading):
-    """Markdown heading rendered with left alignment."""
-
-    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        self.text.justify = "left"
-        yield self.text
-
-
-def _make_markdown_cls(code_theme: str) -> type:
-    """Create a Markdown subclass whose code blocks use *code_theme*."""
+def _create_themed_markdown(code_theme: str) -> type:
+    """Create a Markdown subclass with themed elements."""
 
     class _CodeBlock(CodeBlock):
         def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
             code = str(self.text).rstrip()
             yield Syntax(code, self.lexer_name, theme=code_theme, background_color="default")
 
+    class _Heading(Heading):
+        def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+            self.text.justify = "left"
+            yield self.text
+
     class _Markdown(Markdown):
         elements: ClassVar = {
             **Markdown.elements,
             "fence": _CodeBlock,
-            "heading_open": LeftAlignedHeading,
+            "heading_open": _Heading,
         }
 
     return _Markdown
@@ -189,11 +190,10 @@ def _make_markdown_cls(code_theme: str) -> type:
 class QuotedContent:
     """Wraps a renderable with quoted prefix and full-width background."""
 
-    PREFIX_STYLE = Style(color="magenta")
-
-    def __init__(self, renderable, *, background: str) -> None:
+    def __init__(self, renderable, *, bg_color: str, prefix_color: str) -> None:
         self.renderable = renderable
-        self._background_style = Style(bgcolor=background)
+        self._bg_style = Style(bgcolor=bg_color)
+        self._prefix_style = Style(color=prefix_color)
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         render_options = options.update(width=options.max_width - 2)
@@ -201,18 +201,16 @@ class QuotedContent:
         new_line = Segment("\n")
 
         for line in lines:
-            yield Segment("▌ ", self.PREFIX_STYLE)
+            yield Segment("▌ ", self._prefix_style)
             line_width = 2
             for seg in line:
                 if seg.text:
-                    style = (
-                        seg.style + self._background_style if seg.style else self._background_style
-                    )
+                    style = seg.style + self._bg_style if seg.style else self._bg_style
                     yield Segment(seg.text, style)
                     line_width += cell_len(seg.text)
             padding = options.max_width - line_width
             if padding > 0:
-                yield Segment(" " * padding, self._background_style)
+                yield Segment(" " * padding, self._bg_style)
             yield new_line
 
 
@@ -224,19 +222,19 @@ class MessageRenderer:
     prompt_toolkit FormattedText for display in TUI components.
     """
 
-    def __init__(self, width: int = 80, theme: str = "dark") -> None:
+    def __init__(self, width: int = 80, theme: Theme = "dark") -> None:
         self._width = width
         self._colors = _THEME_COLORS[theme]
-        self._markdown_cls = _make_markdown_cls(self._colors["code_theme"])
+        self._markdown_cls = _create_themed_markdown(self._colors["code_theme"])
 
     def set_width(self, width: int) -> None:
         """Update the rendering width."""
         self._width = width
 
-    def set_theme(self, theme: str) -> None:
+    def set_theme(self, theme: Theme) -> None:
         """Switch the rendering theme."""
         self._colors = _THEME_COLORS.get(theme, _THEME_COLORS["dark"])
-        self._markdown_cls = _make_markdown_cls(self._colors["code_theme"])
+        self._markdown_cls = _create_themed_markdown(self._colors["code_theme"])
 
     def convert(self, renderable) -> FormattedText:
         """Convert Rich renderable directly to prompt_toolkit FormattedText."""
@@ -302,17 +300,19 @@ class MessageRenderer:
         """Render a single message to FormattedText."""
         match message.role:
             case MessageRole.USER:
-                return self.convert(
-                    QuotedContent(
-                        self._markdown_cls(
-                            message.content,
-                            style=Style(
-                                color=self._colors["user_fg"], bgcolor=self._colors["user_bg"]
-                            ),
-                        ),
-                        background=self._colors["user_bg"],
-                    )
+                user_content = self._markdown_cls(
+                    message.content,
+                    style=Style(
+                        color=self._colors["user_fg"],
+                        bgcolor=self._colors["user_bg"],
+                    ),
                 )
+                quoted_content = QuotedContent(
+                    user_content,
+                    bg_color=self._colors["user_bg"],
+                    prefix_color=self._colors["quote_prefix"],
+                )
+                return self.convert(quoted_content)
             case MessageRole.ASSISTANT:
                 return self.convert(self._markdown_cls(message.content))
             case MessageRole.TOOL:

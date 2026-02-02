@@ -49,7 +49,12 @@ def get_commands(
             "Configure LLM provider API keys",
             group="Agent",
         ),
-        Command("Switch Model", cmd_switch_model, "Select a different model", group="Agent"),
+        Command(
+            "Switch Model",
+            cmd_switch_model,
+            "Select a different model",
+            group="Agent",
+        ),
         Command(
             "Toggle Theme",
             cmd_toggle_theme,
