@@ -27,7 +27,7 @@ class TUILayout:
 
         # Initialize components
         self.chat_area = ChatAreaControl(state, self.renderer)
-        self.input_area = InputArea()
+        self.input_area = InputArea(state)
         self.status_bar = StatusBarControl(state)
 
     def create_layout(self) -> Layout:

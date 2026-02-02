@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import shutil
+from typing import TYPE_CHECKING
 
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.layout import BufferControl, Window
 from prompt_toolkit.layout.dimension import Dimension
 from wcwidth import wcswidth
+
+if TYPE_CHECKING:
+    from koda_tui.state import AppState
 
 
 class InputArea:
@@ -18,13 +22,13 @@ class InputArea:
     MIN_HEIGHT = 1
     MAX_HEIGHT = 10
 
-    def __init__(self) -> None:
+    def __init__(self, state: AppState) -> None:
+        self._state = state
         self.buffer = Buffer(
             multiline=True,
             name="input_buffer",
         )
         self._control = BufferControl(buffer=self.buffer)
-        self._width_offset = self.DEFAULT_WIDTH_OFFSET
 
     def _count_wrapped_lines(self, text: str, width: int) -> int:
         """Count visual lines after wrapping."""
@@ -48,7 +52,8 @@ class InputArea:
 
     def get_height(self) -> Dimension:
         """Calculate height based on wrapped line count."""
-        terminal_width = shutil.get_terminal_size().columns - self._width_offset
+        width_offset = self.DEFAULT_WIDTH_OFFSET if self._state.show_scrollbar else 2
+        terminal_width = shutil.get_terminal_size().columns - width_offset
         line_count = self._count_wrapped_lines(self.buffer.text, terminal_width)
         height = max(self.MIN_HEIGHT, min(line_count, self.MAX_HEIGHT))
         return Dimension(min=self.MIN_HEIGHT, max=self.MAX_HEIGHT, preferred=height)
@@ -69,10 +74,6 @@ class InputArea:
     def clear(self) -> None:
         """Clear the input buffer."""
         self.buffer.reset()
-
-    def set_show_scrollbar(self, *, show_scrollbar: bool) -> None:
-        """Update width offset based on scrollbar visibility."""
-        self._width_offset = self.DEFAULT_WIDTH_OFFSET if show_scrollbar else 2
 
     @property
     def control(self) -> BufferControl:

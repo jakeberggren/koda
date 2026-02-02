@@ -111,13 +111,16 @@ class CommandPalette:
         ungrouped: list[Command] = []
 
         for cmd in self._filtered_commands:
-            if cmd.group:
-                if cmd.group not in group_map:
-                    group_map[cmd.group] = []
-                    grouped.append((cmd.group, group_map[cmd.group]))
-                group_map[cmd.group].append(cmd)
-            else:
+            if not cmd.group:
                 ungrouped.append(cmd)
+                continue
+
+            group_commands = group_map.get(cmd.group)
+            if group_commands is None:
+                group_commands = []
+                group_map[cmd.group] = group_commands
+                grouped.append((cmd.group, group_map[cmd.group]))
+            group_commands.append(cmd)
 
         if ungrouped:
             return [(None, ungrouped), *grouped]

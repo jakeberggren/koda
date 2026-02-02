@@ -20,8 +20,8 @@ TUI_DARK_STYLE = Style.from_dict(
         # Error display
         "error": "fg:ansired bold",
         # Command palette
-        "palette.frame": "fg:ansibrightblack bg:ansiblack",
-        "palette.box": "bg:ansiblack",
+        "palette.frame": "fg:ansibrightblack bg:default",
+        "palette.box": "bg:default",
         "palette.title": "fg:ansiwhite bold",
         "palette.prompt": "bold ansimagenta",
         "palette.hint": "fg:ansibrightblack",
@@ -32,10 +32,10 @@ TUI_DARK_STYLE = Style.from_dict(
         "palette.dim": "fg:ansibrightblack",
         "palette.group": "fg:ansibrightblack bold",
         # Dialog
-        "dialog.frame": "fg:ansibrightblack bg:ansiblack",
-        "dialog.box": "bg:ansiblack",
-        "dialog.title": "fg:ansiwhite bold bg:ansiblack",
-        "dialog.hint": "fg:ansibrightblack bg:ansiblack",
+        "dialog.frame": "fg:ansibrightblack bg:default",
+        "dialog.box": "bg:default",
+        "dialog.title": "fg:ansiwhite bold bg:default",
+        "dialog.hint": "fg:ansibrightblack bg:default",
     }
 )
 
@@ -57,8 +57,8 @@ TUI_LIGHT_STYLE = Style.from_dict(
         # Error display
         "error": "fg:ansired bold",
         # Command palette
-        "palette.frame": "fg:ansibrightblack bg:ansiwhite",
-        "palette.box": "bg:ansiwhite",
+        "palette.frame": "fg:ansibrightblack bg:default",
+        "palette.box": "bg:default",
         "palette.title": "fg:ansiblack bold",
         "palette.prompt": "bold ansimagenta",
         "palette.hint": "fg:ansibrightblack",
@@ -69,10 +69,10 @@ TUI_LIGHT_STYLE = Style.from_dict(
         "palette.dim": "fg:ansibrightblack",
         "palette.group": "fg:ansimagenta bold",
         # Dialog
-        "dialog.frame": "fg:ansibrightblack bg:ansiwhite",
-        "dialog.box": "bg:ansiwhite",
-        "dialog.title": "fg:ansiblack bold bg:ansiwhite",
-        "dialog.hint": "fg:ansibrightblack bg:ansiwhite",
+        "dialog.frame": "fg:ansibrightblack bg:default",
+        "dialog.box": "bg:default",
+        "dialog.title": "fg:ansiblack bold bg:default",
+        "dialog.hint": "fg:ansibrightblack bg:default",
     }
 )
 
