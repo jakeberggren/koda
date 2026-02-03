@@ -1,4 +1,4 @@
-from koda.providers.registry import ModelDefinition, ThinkingLevel
+from koda.providers.registry import ModelCapacity, ModelDefinition, ThinkingLevel
 
 MODELS: list[ModelDefinition] = [
     ModelDefinition(
@@ -11,6 +11,7 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.HIGH,
             ThinkingLevel.EXTRA_HIGH,
         },
+        capabilities={ModelCapacity.WEB_SEARCH},
     ),
     ModelDefinition(
         id="gpt-5.2",
@@ -22,6 +23,7 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.HIGH,
             ThinkingLevel.EXTRA_HIGH,
         },
+        capabilities={ModelCapacity.WEB_SEARCH},
     ),
     ModelDefinition(
         id="gpt-5.1-codex",
@@ -32,6 +34,7 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
         },
+        capabilities={ModelCapacity.WEB_SEARCH},
     ),
     ModelDefinition(
         id="gpt-5.1",
@@ -42,6 +45,7 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
         },
+        capabilities={ModelCapacity.WEB_SEARCH},
     ),
     ModelDefinition(
         id="gpt-5-mini",
@@ -52,6 +56,7 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
         },
+        capabilities={ModelCapacity.WEB_SEARCH},
     ),
     ModelDefinition(
         id="gpt-5-nano",
@@ -62,5 +67,6 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
         },
+        capabilities={ModelCapacity.WEB_SEARCH},
     ),
 ]

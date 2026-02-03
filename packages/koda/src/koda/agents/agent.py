@@ -4,7 +4,14 @@ from typing import TYPE_CHECKING
 
 from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
 from koda.providers import exceptions as provider_exceptions
-from koda.providers.events import ProviderEvent, TextDelta, ToolCallRequested, ToolCallResult
+from koda.providers.events import (
+    ProviderEvent,
+    ProviderToolCompleted,
+    ProviderToolStarted,
+    TextDelta,
+    ToolCallRequested,
+    ToolCallResult,
+)
 from koda.tools import ToolCall, ToolDefinition, ToolOutput, ToolResult
 from koda.tools import exceptions as tool_exceptions
 from koda.tools.executor import ToolExecutor
@@ -58,6 +65,8 @@ class Agent:
                 yield event
             elif isinstance(event, ToolCallRequested):
                 pending_tool_calls.append(event.call)
+                yield event
+            elif isinstance(event, (ProviderToolStarted, ProviderToolCompleted)):
                 yield event
 
     async def _handle_tool_calls(self, tool_calls: list[ToolCall]) -> AsyncIterator[ToolCallResult]:

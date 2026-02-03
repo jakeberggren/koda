@@ -7,8 +7,15 @@ from typing import Any
 
 from prompt_toolkit import Application
 
-from koda.providers.events import TextDelta, ToolCallRequested, ToolCallResult
+from koda.providers.events import (
+    ProviderToolCompleted,
+    ProviderToolStarted,
+    TextDelta,
+    ToolCallRequested,
+    ToolCallResult,
+)
 from koda.providers.exceptions import ProviderAuthenticationError
+from koda.tools import ToolCall
 from koda_common import SettingsManager
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.output import SynchronizedOutput
@@ -124,7 +131,7 @@ class KodaTuiApp:
                 await self._spinner_task
             self._spinner_task = None
 
-    async def _process_stream(self, message: str) -> None:
+    async def _process_stream(self, message: str) -> None:  # noqa: C901 - allow complex
         """Process the response stream from backend."""
         stream = self._client.chat(message)
 
@@ -136,13 +143,23 @@ class KodaTuiApp:
             elif isinstance(event, ToolCallRequested):
                 self.state.transition_to_tool(event.call)
                 self.invalidate()
-                await asyncio.sleep(0)
+            elif isinstance(event, ProviderToolStarted):
+                call = ToolCall(tool_name=event.tool_name, call_id=event.call_id, arguments={})
+                self.state.transition_to_tool(call)
+                self.invalidate()
             elif isinstance(event, ToolCallResult):
                 display = event.result.output.display
                 self.state.complete_tool_message(
                     event.result.call_id,
                     display,
                     is_error=event.result.output.is_error,
+                )
+                self.invalidate()
+            elif isinstance(event, ProviderToolCompleted):
+                self.state.complete_tool_message(
+                    event.call_id,
+                    event.display,
+                    is_error=event.is_error,
                 )
                 self.invalidate()
 
