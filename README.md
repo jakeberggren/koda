@@ -11,9 +11,7 @@
 </pre>
 </div>
 
-KODA is a lightweight agentic coding assistant designed for the terminal. KODA is built to be a complete coding companion capable of navigating, understanding, and modifying codebases and completing coding tasks for end-to-end software creation.
-
-The current state of KODA is a lightweight, provider-agnostic agent framework combined with a Terminal UI (TUI). Future improvements include persistent sessions, enhanced TUI features, and more advanced tooling for improved codebase navigation and safe editing capabilities.
+Lightweight terminal coding assistant that can navigate, understand, and modify codebases.
 
 ## Usage
 
@@ -31,7 +29,7 @@ Koda is a monorepo workspace managed by uv, containing three main packages:
 
 - **koda**: Provider-agnostic core library that handles agent logic, tool execution, and LLM provider integration
 - **koda-tui**: Interactive terminal interface
-- **koda-common**: Shared utilities including settings management and logging configuration
+- **koda-common**: Shared utilities including settings, logging, and database configuration
 
 ```
 packages/
@@ -53,6 +51,7 @@ packages/
 │
 └── koda-common/                 # Shared utilities
     ├── src/koda_common/
+    │   ├── db/                  # Database configuration + engine helpers
     │   ├── logging/             # Logging configuration
     │   └── settings/            # Settings management (store, manager)
     └── tests/
