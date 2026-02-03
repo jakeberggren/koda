@@ -6,14 +6,16 @@ from koda.providers.registry import get_model_registry, get_provider_registry
 from koda_common import SettingsManager
 
 
-def _create_openai_provider(settings: SettingsManager, model: str | None) -> OpenAIProvider:
+def _create_openai_provider(settings: SettingsManager, model: str) -> OpenAIProvider:
     """Factory function for creating OpenAI provider instances."""
     api_key = settings.get_api_key("openai")
     if not api_key:
         raise exceptions.ApiKeyNotConfiguredError("OpenAI")
+    model_def = get_model_registry().get(model)
     return OpenAIProvider(
         api_key=api_key,
-        model=model or settings.model,
+        model=model,
+        capabilities=model_def.capabilities,
     )
 
 

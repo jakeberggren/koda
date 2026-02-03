@@ -19,4 +19,20 @@ class ToolCallResult:
     result: ToolResult
 
 
-ProviderEvent = TextDelta | ToolCallRequested | ToolCallResult
+@dataclass(frozen=True, slots=True)
+class ProviderToolStarted:
+    tool_name: str
+    call_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderToolCompleted:
+    tool_name: str
+    call_id: str
+    display: str | None = None
+    is_error: bool = False
+
+
+ProviderEvent = (
+    TextDelta | ToolCallRequested | ToolCallResult | ProviderToolStarted | ProviderToolCompleted
+)

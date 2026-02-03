@@ -9,7 +9,7 @@ from koda_common.logging import get_logger
 
 logger = get_logger(__name__)
 
-type ProviderFactory = Callable[[SettingsManager, str | None], Provider]
+type ProviderFactory = Callable[[SettingsManager, str], Provider]
 
 
 class ProviderRegistry:
@@ -35,9 +35,9 @@ class ProviderRegistry:
             supported = ", ".join(self.supported()) or "(none)"
             logger.warning("provider_not_supported", name=key, supported=supported)
             raise exceptions.ProviderNotSupportedError(key)
-        model = model.strip() if model and model.strip() else None
-        logger.info("provider_created", name=key, model=model)
-        return factory(settings, model)
+        resolved_model = (model.strip() if model and model.strip() else None) or settings.model
+        logger.info("provider_created", name=key, model=resolved_model)
+        return factory(settings, resolved_model)
 
     def supported(self) -> list[str]:
         return sorted(self._factories.keys())
@@ -50,11 +50,16 @@ class ThinkingLevel(StrEnum):
     EXTRA_HIGH = auto()
 
 
+class ModelCapacity(StrEnum):
+    WEB_SEARCH = "web_search"
+
+
 class ModelDefinition(BaseModel):
     id: str
     name: str
     provider: str
     thinking: set[ThinkingLevel] = Field(default_factory=set)
+    capabilities: set[ModelCapacity] = Field(default_factory=set)
 
 
 class ModelRegistry:
