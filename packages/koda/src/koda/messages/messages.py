@@ -1,11 +1,11 @@
-from enum import Enum, auto
+from enum import StrEnum, auto
 
 from pydantic import BaseModel, Field
 
 from koda.tools import ToolCall, ToolResult
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     USER = auto()
     ASSISTANT = auto()
     SYSTEM = auto()

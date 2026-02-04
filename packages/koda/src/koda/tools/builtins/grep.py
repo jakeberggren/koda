@@ -6,6 +6,7 @@ import json
 import shutil
 from pathlib import Path
 
+from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
 from koda.tools import ToolContext, ToolOutput, exceptions
@@ -168,8 +169,9 @@ class GrepTool:
 
     async def execute(self, params: GrepParams, ctx: ToolContext) -> ToolOutput:
         resolved: Path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+        async_path = AnyioPath(resolved)
 
-        if not resolved.exists():
+        if not await async_path.exists():
             raise exceptions.FileNotFoundError(params.path)
 
         cmd = _build_rg_command(_get_rg_path(), params, resolved)

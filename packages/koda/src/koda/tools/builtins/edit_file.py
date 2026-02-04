@@ -3,6 +3,7 @@ from __future__ import annotations
 from difflib import unified_diff
 from typing import TYPE_CHECKING
 
+from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
 from koda.tools import ToolOutput, exceptions
@@ -62,19 +63,19 @@ class EditFileTool:
     )
     parameters_model: type[EditFileParams] = EditFileParams
 
-    def _read_file(self, resolved: Path, path: str) -> str:
+    async def _read_file(self, resolved: AnyioPath, path: str) -> str:
         """Read file content with error handling."""
         try:
-            return resolved.read_text(encoding="utf-8")
+            return await resolved.read_text(encoding="utf-8")
         except PermissionError as e:
             raise exceptions.PermissionError(path) from e
         except OSError as e:
             raise EditError(path, cause=e) from e
 
-    def _write_file(self, resolved: Path, path: str, content: str) -> None:
+    async def _write_file(self, resolved: AnyioPath, path: str, content: str) -> None:
         """Write file content with error handling."""
         try:
-            resolved.write_text(content, encoding="utf-8")
+            await resolved.write_text(content, encoding="utf-8")
         except PermissionError as e:
             raise exceptions.PermissionError(path) from e
         except OSError as e:
@@ -106,17 +107,18 @@ class EditFileTool:
         resolved: Path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
         # Validate we are within the sandbox
         ctx.policy.resolve_path(str(resolved.parent), cwd=ctx.cwd)
+        async_path = AnyioPath(resolved)
 
-        if not resolved.exists():
+        if not await async_path.exists():
             raise exceptions.FileNotFoundError(params.path)
-        if not resolved.is_file():
+        if not await async_path.is_file():
             raise exceptions.NotAFileError(params.path)
 
-        original = self._read_file(resolved, params.path)
+        original = await self._read_file(async_path, params.path)
         updated, replacements_made = self._apply_replacement(original, params)
 
         if updated != original:
-            self._write_file(resolved, params.path, updated)
+            await self._write_file(async_path, params.path, updated)
 
         diff_text = self._build_diff(original, updated, params.path)
 

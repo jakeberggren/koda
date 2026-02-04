@@ -30,7 +30,7 @@ class AppState:
     """Shared application state as single source of truth for the UI."""
 
     messages: list[Message] = field(default_factory=list)
-    cwd: Path = field(default_factory=lambda: Path.cwd())
+    cwd: Path = field(default_factory=Path.cwd)
     current_streaming_content: str = ""
     is_streaming: bool = False
     active_tools: dict[str, ToolCall] = field(default_factory=dict)

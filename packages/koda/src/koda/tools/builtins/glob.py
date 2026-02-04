@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
 from koda.tools import ToolContext, ToolOutput, exceptions
 from koda.tools.decorators import tool
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class GlobParams(BaseModel):
@@ -37,22 +33,30 @@ class GlobTool:
     )
     parameters_model: type[GlobParams] = GlobParams
 
-    async def execute(self, params: GlobParams, ctx: ToolContext) -> ToolOutput:
-        resolved: Path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+    async def _collect_matches(self, resolved: AnyioPath, pattern: str) -> list[str]:
+        return sorted(
+            [
+                str(path.relative_to(resolved))
+                async for path in resolved.glob(pattern)
+                if await path.is_file()
+            ]
+        )
 
-        if not resolved.exists():
+    async def execute(self, params: GlobParams, ctx: ToolContext) -> ToolOutput:
+        resolved_path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+        resolved = AnyioPath(resolved_path)
+
+        if not await resolved.exists():
             raise exceptions.FileNotFoundError(params.path)
 
-        if not resolved.is_dir():
+        if not await resolved.is_dir():
             raise exceptions.NotADirectoryError(params.path)
 
-        matches = sorted(
-            path.relative_to(resolved) for path in resolved.glob(params.pattern) if path.is_file()
-        )
+        matches = await self._collect_matches(resolved, params.pattern)
 
         total_count: int = len(matches)
         truncated: bool = total_count > params.limit
-        matches: list[Path] = matches[: params.limit]
+        matches = matches[: params.limit]
 
         # Format output
         paths: list[str] = [str(p) for p in matches]
