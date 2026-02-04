@@ -19,6 +19,9 @@ TUI_DARK_STYLE = Style.from_dict(
         "scrollbar.thumb": "fg:ansiwhite",
         # Error display
         "error": "fg:ansired bold",
+        # Queued inputs
+        "queued-inputs": "fg:ansibrightblack bg:#4e4e4e italic",
+        "queued-inputs.title": "bold noitalic",
         # Command palette
         "palette.frame": "fg:ansibrightblack bg:default",
         "palette.box": "bg:default",
@@ -56,6 +59,9 @@ TUI_LIGHT_STYLE = Style.from_dict(
         "scrollbar.thumb": "fg:ansibrightblack",
         # Error display
         "error": "fg:ansired bold",
+        # Queued inputs
+        "queued-inputs": "fg:ansibrightblack bg:#e4e4e4 italic",
+        "queued-inputs.title": "bold noitalic",
         # Command palette
         "palette.frame": "fg:ansibrightblack bg:default",
         "palette.box": "bg:default",

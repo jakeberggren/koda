@@ -71,6 +71,9 @@ class ChatAreaControl(UIControl):
         self._view_height = 0
         # Pending scroll delta — accumulated between render frames, applied in create_content()
         self._pending_scroll = 0
+        # Tracked auto-scroll flag — persists across frames so layout height changes
+        # (e.g. queued inputs appearing) don't break auto-scroll.
+        self._at_bottom = True
         # Line-level cache invalidation tracking
         self._cached_width = 0
         self._cached_content_key: tuple[int, int, bool] | None = None
@@ -198,6 +201,8 @@ class ChatAreaControl(UIControl):
         else:
             self._scroll_offset = min(self._scroll_offset, max_offset)
 
+        self._at_bottom = self._scroll_offset >= max_offset
+
     def _build_ui_content(self, height: int) -> UIContent:
         """Build the final UIContent with line getter and cursor."""
         cursor_y = min(height - 1, self._total_lines - self._scroll_offset - 1)
@@ -229,6 +234,7 @@ class ChatAreaControl(UIControl):
         max_offset = max(0, self._total_lines - self._view_height)
         self._scroll_offset = max(0, min(self._scroll_offset + self._pending_scroll, max_offset))
         self._pending_scroll = 0
+        self._at_bottom = self._scroll_offset >= max_offset
 
     def mouse_handler(self, mouse_event: MouseEvent) -> None:
         """Handle mouse scroll events."""
@@ -252,12 +258,10 @@ class ChatAreaControl(UIControl):
 
         if needs_rebuild:
             self._renderer.set_width(width)
-            # Check if at bottom BEFORE content changes
-            at_bottom = self._is_at_bottom(height)
 
             self._lines = self._rebuild_lines(width)
             self._total_lines = len(self._lines)
-            self._update_scroll(height, is_at_bottom=at_bottom)
+            self._update_scroll(height, is_at_bottom=self._at_bottom)
 
             # Update cache
             self._cached_width = width

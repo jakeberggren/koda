@@ -18,18 +18,24 @@ def _register_terminal_sequences() -> None:
     ANSI_SEQUENCES["\x1b[27;2;13~"] = Keys.ControlJ
     # Shift+Enter - kitty protocol
     ANSI_SEQUENCES["\x1b[13;2u"] = Keys.ControlJ
+    # Shift+Enter - ESC+CR (terminals that send literal escape + enter)
+    ANSI_SEQUENCES["\x1b\r"] = Keys.ControlJ
 
 
 async def _handle_enter(app: KodaTuiApp, event: KeyPressEvent) -> None:
-    """Submit message on Enter, or cancel if streaming."""
-    if app.state.is_streaming:
-        app.cancel_streaming()
+    """Submit message on Enter, or queue if streaming."""
+    text = event.current_buffer.text.strip()
+    if not text:
         return
 
-    text = event.current_buffer.text.strip()
-    if text:
-        event.current_buffer.reset()
-        await app.send_message(text)
+    event.current_buffer.reset()  # clear input buffer
+
+    if app.state.is_streaming:
+        cancel_current = False  # interrupt or queue
+        app.enqueue_message(text, cancel_current=cancel_current)
+        return
+
+    await app.send_message(text)
 
 
 def _handle_newline(event: KeyPressEvent) -> None:
@@ -48,7 +54,10 @@ def _handle_cancel_or_exit(app: KodaTuiApp) -> None:
 
 
 def _handle_escape(app: KodaTuiApp) -> None:
-    """Cancel streaming on Escape."""
+    """Clear queue on Escape, or cancel streaming if queue is empty."""
+    if app.state.pending_inputs:
+        app.dequeue_all()
+        return
     if app.state.is_streaming:
         app.cancel_streaming()
 
@@ -65,9 +74,8 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:
 
     kb.add(Keys.Enter)(lambda event: _handle_enter(app, event))
     kb.add(Keys.ControlJ)(_handle_newline)
-    kb.add(Keys.Escape, Keys.Enter)(_handle_newline)
     kb.add(Keys.ControlC)(lambda _: _handle_cancel_or_exit(app))
-    kb.add(Keys.Escape)(lambda _: _handle_escape(app))
+    kb.add(Keys.Escape, eager=True)(lambda _: _handle_escape(app))
     kb.add(Keys.ControlP)(lambda _: _handle_palette_toggle(app))
 
     return kb
