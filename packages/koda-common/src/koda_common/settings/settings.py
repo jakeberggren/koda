@@ -14,6 +14,7 @@ class Settings(BaseModel):
     model: str = Field(default="gpt-5.2", description="Model name")
     theme: Literal["dark", "light"] = Field(default="dark", description="UI theme")
     show_scrollbar: bool = Field(default=True, description="Show chat scrollbar")
+    queue_inputs: bool = Field(default=True, description="Queue inputs during streaming")
 
 
 class EnvSettings(BaseSettings):

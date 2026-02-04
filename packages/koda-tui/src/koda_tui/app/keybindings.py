@@ -31,7 +31,7 @@ async def _handle_enter(app: KodaTuiApp, event: KeyPressEvent) -> None:
     event.current_buffer.reset()  # clear input buffer
 
     if app.state.is_streaming:
-        cancel_current = False  # interrupt or queue
+        cancel_current = not app.state.queue_inputs
         app.enqueue_message(text, cancel_current=cancel_current)
         return
 

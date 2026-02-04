@@ -38,6 +38,7 @@ class AppState:
     model_name: str = ""
     provider_name: str = ""
     show_scrollbar: bool = True
+    queue_inputs: bool = True
     exit_requested: bool = False
     palette_open: bool = False
 
