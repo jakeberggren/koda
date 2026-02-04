@@ -77,6 +77,7 @@ def test_setting_attribute_persists_and_notifies(
         "model": "gpt-5.2",
         "theme": "dark",
         "show_scrollbar": True,
+        "queue_inputs": True,
     }
     assert changes == [("provider", "openai", "anthropic")]
 

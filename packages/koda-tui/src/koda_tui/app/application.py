@@ -54,6 +54,7 @@ class KodaTuiApp:
             provider_name=self._settings.provider,
             model_name=self._settings.model,
             show_scrollbar=self._settings.show_scrollbar,
+            queue_inputs=self._settings.queue_inputs,
         )
 
         # Initialize layout
@@ -88,6 +89,10 @@ class KodaTuiApp:
             return
         if name == "show_scrollbar":
             self.state.show_scrollbar = self._settings.show_scrollbar
+            self.invalidate()
+            return
+        if name == "queue_inputs":
+            self.state.queue_inputs = self._settings.queue_inputs
             self.invalidate()
             return
         if name == "theme" and self._app:

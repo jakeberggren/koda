@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 
-def get_commands(
+def get_commands(  # noqa: C901 - allow complex
     client: Client,
     settings: SettingsManager,
     palette_manager: PaletteManager,
@@ -42,6 +42,10 @@ def get_commands(
         settings.show_scrollbar = not settings.show_scrollbar
         palette_manager.close_all()
 
+    def cmd_toggle_queue_inputs() -> None:
+        settings.queue_inputs = not settings.queue_inputs
+        palette_manager.close_all()
+
     return [
         Command(
             "Connect Provider",
@@ -66,5 +70,11 @@ def get_commands(
             cmd_toggle_scrollbar,
             "Show or hide the chat scrollbar",
             group="Appearance",
+        ),
+        Command(
+            "Toggle Queue Inputs",
+            cmd_toggle_queue_inputs,
+            "Queue or cancel on input during streaming",
+            group="System",
         ),
     ]
