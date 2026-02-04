@@ -34,6 +34,7 @@ class AppState:
     current_streaming_content: str = ""
     is_streaming: bool = False
     active_tools: dict[str, ToolCall] = field(default_factory=dict)
+    pending_inputs: list[str] = field(default_factory=list)
     model_name: str = ""
     provider_name: str = ""
     show_scrollbar: bool = True

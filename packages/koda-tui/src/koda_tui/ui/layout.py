@@ -8,7 +8,13 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.widgets import Box
 
-from koda_tui.components import ChatAreaControl, ChatScrollbarMargin, InputArea, StatusBarControl
+from koda_tui.components import (
+    ChatAreaControl,
+    ChatScrollbarMargin,
+    InputArea,
+    QueuedInputs,
+    StatusBarControl,
+)
 from koda_tui.rendering import MessageRenderer
 from koda_tui.state import AppState
 
@@ -25,6 +31,7 @@ class TUILayout:
 
         # Initialize components
         self.chat_area = ChatAreaControl(state, self.renderer)
+        self.queued_inputs = QueuedInputs(state)
         self.input_area = InputArea(state)
         self.status_bar = StatusBarControl(state)
 
@@ -42,6 +49,8 @@ class TUILayout:
             style="class:separator",
         )
 
+        queued_inputs = self.queued_inputs.create_window()
+
         input = self.input_area.create_window()
 
         status_bar = Window(
@@ -56,6 +65,7 @@ class TUILayout:
                 [
                     Box(chat_area, padding=0, padding_left=1, padding_top=1),
                     separator,
+                    queued_inputs,
                     input,  # Dynamic height 1-10 lines
                     separator,
                     status_bar,  # Fixed 1 line

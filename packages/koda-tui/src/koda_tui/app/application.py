@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +65,8 @@ class KodaTuiApp:
         self._streaming_task: asyncio.Task | None = None
         self._spinner_task: asyncio.Task | None = None
         self._exit_reset_handle: asyncio.TimerHandle | None = None
+        self._pending_messages: deque[str] = deque()
+        self._send_queue_task: asyncio.Task | None = None
 
         # Palette manager for command palettes and dialogs
         self.palette_manager = PaletteManager(
@@ -191,6 +194,40 @@ class KodaTuiApp:
         if self._app:
             self._app.invalidate()
 
+    def _kick_send_queue(self) -> None:
+        if self._send_queue_task and not self._send_queue_task.done():
+            return
+        self._send_queue_task = asyncio.create_task(self._drain_send_queue())
+
+    async def _drain_send_queue(self) -> None:
+        while self._pending_messages and not self.state.is_streaming:
+            next_message = self._pending_messages.popleft()
+            if self.state.pending_inputs:
+                self.state.pending_inputs.pop(0)
+            self.invalidate()
+            await self.send_message(next_message)
+
+    def enqueue_message(self, text: str, *, cancel_current: bool = False) -> None:
+        """Queue a message to be sent after the current stream completes."""
+        if not text or not text.strip():
+            return
+        cleaned = text.strip()
+        self._pending_messages.append(cleaned)
+        self.state.pending_inputs.append(cleaned)
+        self.invalidate()
+        if cancel_current and self.state.is_streaming:
+            self.cancel_streaming()
+        if not self.state.is_streaming:
+            self._kick_send_queue()
+
+    def dequeue_all(self) -> None:
+        """Remove all queued messages."""
+        if not self._pending_messages:
+            return
+        self._pending_messages.clear()
+        self.state.pending_inputs.clear()
+        self.invalidate()
+
     async def send_message(self, text: str) -> None:
         """Send a message and process the response stream."""
         self.state.begin_response(text)
@@ -217,6 +254,7 @@ class KodaTuiApp:
             self.state.end_response()
             self._streaming_task = None
             self.invalidate()
+            self._kick_send_queue()
 
     def cancel_streaming(self) -> None:
         """Cancel the current streaming operation."""
