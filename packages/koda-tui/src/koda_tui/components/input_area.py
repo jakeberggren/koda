@@ -6,12 +6,33 @@ import shutil
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.buffer import Buffer
-from prompt_toolkit.layout import BufferControl, Window
+from prompt_toolkit.layout import BufferControl, UIContent, Window
 from prompt_toolkit.layout.dimension import Dimension
+from prompt_toolkit.layout.margins import Margin
 from wcwidth import wcswidth
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from prompt_toolkit.formatted_text import StyleAndTextTuples
+    from prompt_toolkit.layout.containers import WindowRenderInfo
+
     from koda_tui.state import AppState
+
+
+class _PromptMargin(Margin):
+    """Renders the prompt character on every visible line."""
+
+    def get_width(self, get_ui_content: Callable[[], UIContent]) -> int:  # noqa: ARG002
+        return 2
+
+    def create_margin(
+        self,
+        window_render_info: WindowRenderInfo,
+        width: int,  # noqa: ARG002
+        height: int,  # noqa: ARG002
+    ) -> StyleAndTextTuples:
+        return [("class:prompt", "▌\n")] * window_render_info.window_height
 
 
 class InputArea:
@@ -65,6 +86,7 @@ class InputArea:
             height=self.get_height,
             wrap_lines=True,
             dont_extend_height=True,
+            left_margins=[_PromptMargin()],
         )
 
     def get_text(self) -> str:

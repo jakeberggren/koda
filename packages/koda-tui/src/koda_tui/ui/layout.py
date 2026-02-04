@@ -2,10 +2,8 @@
 
 from prompt_toolkit.layout import (
     FloatContainer,
-    FormattedTextControl,
     HSplit,
     Layout,
-    VSplit,
     Window,
 )
 from prompt_toolkit.widgets import Box
@@ -44,13 +42,7 @@ class TUILayout:
             style="class:separator",
         )
 
-        input_prompt = Window(
-            content=FormattedTextControl(text=[("class:prompt", "▌")]),
-            width=2,
-            dont_extend_width=True,
-        )
-
-        input = VSplit([input_prompt, self.input_area.create_window()])
+        input = self.input_area.create_window()
 
         status_bar = Window(
             content=self.status_bar,
