@@ -12,7 +12,6 @@ from koda.providers.events import (
     ToolCallResult,
 )
 from koda.providers.exceptions import ProviderAuthenticationError
-from koda.tools import ToolCall
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -51,27 +50,18 @@ class StreamProcessor:
                 await self._spinner_task
             self._spinner_task = None
 
-    async def _process_stream(self, message: str, client: Client) -> None:  # noqa: C901 - allow complex
+    async def _process_stream(self, message: str, client: Client) -> None:
         async for event in client.chat(message):
             if isinstance(event, TextDelta):
                 await self._stop_spinner()
                 self._state.append_delta(event.text)
-            elif isinstance(event, ToolCallRequested):
+            elif isinstance(event, ToolCallRequested | ProviderToolStarted):
                 self._state.transition_to_tool(event.call)
-            elif isinstance(event, ProviderToolStarted):
-                call = ToolCall(tool_name=event.tool_name, call_id=event.call_id, arguments={})
-                self._state.transition_to_tool(call)
-            elif isinstance(event, ToolCallResult):
+            elif isinstance(event, ToolCallResult | ProviderToolCompleted):
                 self._state.complete_tool_message(
                     event.result.call_id,
                     event.result.output.display,
                     is_error=event.result.output.is_error,
-                )
-            elif isinstance(event, ProviderToolCompleted):
-                self._state.complete_tool_message(
-                    event.call_id,
-                    event.display,
-                    is_error=event.is_error,
                 )
             self._invalidate()
 

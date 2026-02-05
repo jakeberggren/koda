@@ -21,16 +21,13 @@ class ToolCallResult:
 
 @dataclass(frozen=True, slots=True)
 class ProviderToolStarted:
-    tool_name: str
-    call_id: str
+    call: ToolCall
 
 
 @dataclass(frozen=True, slots=True)
 class ProviderToolCompleted:
     tool_name: str
-    call_id: str
-    display: str | None = None
-    is_error: bool = False
+    result: ToolResult
 
 
 ProviderEvent = (

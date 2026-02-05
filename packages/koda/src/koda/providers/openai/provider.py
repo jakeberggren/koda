@@ -31,7 +31,7 @@ from koda.providers.events import (
 )
 from koda.providers.openai import OpenAIAdapter
 from koda.providers.registry import ModelCapacity
-from koda.tools import ToolDefinition
+from koda.tools import ToolCall, ToolDefinition, ToolOutput, ToolResult
 from koda_common.logging import get_logger
 
 logger = get_logger(__name__)
@@ -79,16 +79,17 @@ class OpenAIProvider(Provider):
         if isinstance(event, ResponseTextDeltaEvent):
             yield TextDelta(text=event.delta)
         elif isinstance(event, ResponseWebSearchCallInProgressEvent):
-            yield ProviderToolStarted(tool_name="web_search", call_id=event.item_id)
+            call = ToolCall(tool_name="web_search", call_id=event.item_id, arguments={})
+            yield ProviderToolStarted(call=call)
         elif isinstance(event, ResponseOutputItemDoneEvent) and isinstance(
             event.item, ResponseFunctionWebSearch
         ):
-            yield ProviderToolCompleted(
-                tool_name="web_search",
-                call_id=event.item.id,
+            output = ToolOutput(
                 display=self._format_web_search(event.item),
                 is_error=event.item.status == "failed",
             )
+            result = ToolResult(output=output, call_id=event.item.id)
+            yield ProviderToolCompleted(tool_name="web_search", result=result)
         elif isinstance(event, ResponseCompletedEvent):
             self._last_response_id = event.response.id
             tool_calls = self.adapter.parse_tool_calls(event.response)
