@@ -64,7 +64,7 @@ def _handle_escape(app: KodaTuiApp) -> None:
 
 def _handle_palette_toggle(app: KodaTuiApp) -> None:
     """Toggle command palette visibility."""
-    app.palette_manager.toggle()
+    app.toggle_palette()
 
 
 def create_keybindings(app: KodaTuiApp) -> KeyBindings:

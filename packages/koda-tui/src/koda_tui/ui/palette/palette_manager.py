@@ -30,26 +30,15 @@ class PaletteManager:
         self,
         layout: TUILayout,
         state: AppState,
-        client: Client,
         settings: SettingsManager,
         invalidate: Callable[[], None],
     ) -> None:
         self._app: Application[Any] | None = None
         self._layout = layout
         self._state = state
-        self._client = client
         self._settings = settings
         self._invalidate = invalidate
         self._stack: list[tuple[Any, Float]] = []
-
-    @property
-    def client(self) -> Client:
-        """Current client instance."""
-        return self._client
-
-    @client.setter
-    def client(self, value: Client) -> None:
-        self._client = value
 
     def set_app(self, app: Application[Any]) -> None:
         """Set the application reference for focus management."""
@@ -61,7 +50,7 @@ class PaletteManager:
         return self._layout.root_container.floats
 
     @property
-    def is_open(self) -> bool:
+    def _is_open(self) -> bool:
         """Check if any overlay is open."""
         return len(self._stack) > 0
 
@@ -87,33 +76,41 @@ class PaletteManager:
         self._stack.append((content, float_item))
         self._focus_content(content)
 
-    def _get_default_commands(self) -> list[Command]:
+    def _get_default_commands(self, client: Client) -> list[Command]:
         """Build the default root command list."""
         return get_commands(
-            client=self._client,
+            client=client,
             settings=self._settings,
             palette_manager=self,
         )
 
-    def toggle(self) -> None:
+    @staticmethod
+    def _get_terminal_size() -> tuple[int, int]:
+        """Return terminal width and height using a safe fallback."""
+        size = shutil.get_terminal_size(fallback=(80, 24))
+        return size.columns, size.lines
+
+    @staticmethod
+    def _calculate_palette_size(term_width: int, term_height: int) -> tuple[int, int]:
+        width = max(60, min(80, term_width // 2))
+        height = max(5, min(20, term_height // 2))
+        return width, height
+
+    def toggle(self, client: Client) -> None:
         """Toggle command palette visibility."""
-        if self.is_open:
+        if self._is_open:
             self.close_all()
         else:
-            self.open_palette()
+            commands = self._get_default_commands(client)
+            self.open_palette(commands)
 
-    def open_palette(self, commands: list[Command] | None = None) -> None:
-        """Open a command palette with the given commands (or defaults)."""
+    def open_palette(self, commands: list[Command]) -> None:
+        """Open a command palette with the given commands."""
         if not self._app:
             return
 
-        term_width = shutil.get_terminal_size().columns
-        term_height = shutil.get_terminal_size().lines
-        width = max(60, min(80, term_width // 2))
-        height = max(5, min(20, term_height // 2))
-
-        if commands is None:
-            commands = self._get_default_commands()
+        term_width, term_height = self._get_terminal_size()
+        width, height = self._calculate_palette_size(term_width, term_height)
 
         palette = CommandPalette(
             commands=commands,
@@ -155,7 +152,7 @@ class PaletteManager:
         elif self._app:
             self._app.layout.focus(self._layout.input_area.buffer)
 
-        self._state.palette_open = self.is_open
+        self._state.palette_open = self._is_open
         self._invalidate()
 
     def close_all(self) -> None:

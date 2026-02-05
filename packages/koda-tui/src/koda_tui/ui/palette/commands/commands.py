@@ -28,6 +28,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_switch_model() -> None:
         commands = model_commands.get_commands(
+            client=client,
             settings=settings,
             palette_manager=palette_manager,
         )
