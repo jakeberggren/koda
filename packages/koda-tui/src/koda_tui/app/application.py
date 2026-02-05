@@ -115,19 +115,20 @@ class KodaTuiApp:
             self.invalidate()
 
     def _on_exit_timeout(self) -> None:
-        self.state.reset_exit_request()
+        self.state.exit_requested = False
         self._exit_reset_handle = None
         self.invalidate()
 
     def request_exit(self, timeout_seconds: float = 3.0) -> bool:
-        """Request application exit. Returns True if should exit immediately."""
+        """Request application exit. Returns True if should exit immediately (on double-press)."""
         if self._exit_reset_handle:
             self._exit_reset_handle.cancel()
             self._exit_reset_handle = None
 
-        if self.state.request_exit():
+        if self.state.exit_requested:
             return True
 
+        self.state.exit_requested = True
         if self._app:
             loop = asyncio.get_running_loop()
             self._exit_reset_handle = loop.call_later(timeout_seconds, self._on_exit_timeout)
