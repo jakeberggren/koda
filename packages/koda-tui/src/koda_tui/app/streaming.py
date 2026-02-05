@@ -59,9 +59,10 @@ class StreamProcessor:
                 self._state.transition_to_tool(event.call)
             elif isinstance(event, ToolCallResult | ProviderToolCompleted):
                 self._state.complete_tool_message(
-                    event.result.call_id,
-                    event.result.output.display,
+                    call_id=event.result.call_id,
+                    display=event.result.output.display,
                     is_error=event.result.output.is_error,
+                    error_message=event.result.output.error_message,
                 )
             self._invalidate()
 

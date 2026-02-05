@@ -23,6 +23,7 @@ class Message:
     tool_running: bool = False
     tool_error: bool = False
     tool_result_display: str | None = None
+    tool_error_message: str | None = None
 
 
 @dataclass
@@ -48,10 +49,11 @@ class AppState:
 
     def complete_tool_message(
         self,
+        *,
         call_id: str,
         display: str | None = None,
-        *,
-        is_error: bool | None = None,
+        is_error: bool = False,
+        error_message: str | None = None,
     ) -> None:
         """Mark the running tool message as complete."""
         for message in reversed(self.messages):
@@ -59,12 +61,12 @@ class AppState:
                 message.role == MessageRole.TOOL
                 and message.tool_call
                 and message.tool_call.call_id == call_id
+                and message.tool_running
             ):
                 message.tool_running = False
-                if is_error is not None:
-                    message.tool_error = is_error
-                if display is not None:
-                    message.tool_result_display = display
+                message.tool_error = is_error
+                message.tool_error_message = error_message
+                message.tool_result_display = display or (error_message if is_error else None)
                 break
 
     def reset_exit_request(self) -> None:
@@ -120,7 +122,7 @@ class AppState:
 
         # Complete any remaining active tools
         for call_id in list(self.active_tools):
-            self.complete_tool_message(call_id)
+            self.complete_tool_message(call_id=call_id)
         self.active_tools.clear()
 
         # Reset state

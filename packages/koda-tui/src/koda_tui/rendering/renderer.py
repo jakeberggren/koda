@@ -296,6 +296,12 @@ class MessageRenderer:
         accumulator.flush()
         return Group(*accumulator.renderables)
 
+    def _get_tool_result_display(self, message: Message) -> str | None:
+        result_display = message.tool_result_display
+        if not result_display and message.tool_error and message.tool_error_message:
+            return message.tool_error_message
+        return result_display
+
     def render_message(self, message: Message) -> FormattedText:
         """Render a single message to FormattedText."""
         match message.role:
@@ -315,14 +321,14 @@ class MessageRenderer:
                 return self.convert(quoted_content)
             case MessageRole.ASSISTANT:
                 return self.convert(self._markdown_cls(message.content))
+            case MessageRole.TOOL if message.tool_call:
+                return self.render_tool_call(
+                    message.tool_call,
+                    running=message.tool_running,
+                    error=message.tool_error,
+                    result_display=self._get_tool_result_display(message),
+                )
             case MessageRole.TOOL:
-                if message.tool_call:
-                    return self.render_tool_call(
-                        message.tool_call,
-                        running=message.tool_running,
-                        error=message.tool_error,
-                        result_display=message.tool_result_display,
-                    )
                 return FormattedText([])
 
     def _summarize_string(self, value: str, max_inline_chars: int = 120) -> str:
