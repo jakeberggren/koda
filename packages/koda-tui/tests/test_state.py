@@ -33,13 +33,14 @@ class TestAppState:
         assert len(state.messages) == expected_messages
         assert state.messages[1].tool_running is True
 
-        state.complete_tool_message("c1", "ok", is_error=False)
+        state.complete_tool_message(call_id="c1", display="ok")
 
         # active_tools persists until end_response (for status bar)
         assert state.active_tools == {"c1": tool}
         assert state.messages[1].tool_running is False
         assert state.messages[1].tool_error is False
         assert state.messages[1].tool_result_display == "ok"
+        assert state.messages[1].tool_error_message is None
 
         state.end_response()
         assert state.active_tools == {}
@@ -58,12 +59,12 @@ class TestAppState:
         assert state.messages[2].tool_running is True
 
         # Complete first tool
-        state.complete_tool_message("a", "found", is_error=False)
+        state.complete_tool_message(call_id="a", display="found")
         assert state.active_tools == {"a": tool_a, "b": tool_b}
         assert state.messages[1].tool_running is False
 
         # Complete second tool
-        state.complete_tool_message("b", "matched", is_error=False)
+        state.complete_tool_message(call_id="b", display="matched")
         assert state.active_tools == {"a": tool_a, "b": tool_b}
         assert state.messages[2].tool_running is False
 
@@ -94,20 +95,26 @@ class TestAppState:
 
         state.begin_response("msg")
         state.transition_to_tool(tool)
-        state.complete_tool_message("c1", "not found", is_error=True)
+        state.complete_tool_message(
+            call_id="c1",
+            display="not found",
+            is_error=True,
+            error_message="missing file",
+        )
 
         assert state.messages[1].tool_error is True
         assert state.messages[1].tool_result_display == "not found"
+        assert state.messages[1].tool_error_message == "missing file"
 
-    def test_complete_tool_message_none_error_preserves_default(self, state: AppState) -> None:
-        """complete_tool_message() with is_error=None should not change tool_error."""
+    def test_complete_tool_message_defaults_to_no_error(self, state: AppState) -> None:
+        """complete_tool_message() without is_error should default to False."""
         tool = ToolCall(tool_name="read_file", arguments={}, call_id="c1")
 
         state.begin_response("msg")
         state.transition_to_tool(tool)
-        state.complete_tool_message("c1", is_error=None)
+        state.complete_tool_message(call_id="c1")
 
-        assert state.messages[1].tool_error is False  # default preserved
+        assert state.messages[1].tool_error is False
 
     def test_transition_to_tool_finalizes_streaming_content(self, state: AppState) -> None:
         """transition_to_tool() should save pending streaming content as a message."""
