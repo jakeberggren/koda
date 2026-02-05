@@ -7,7 +7,7 @@ from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
     from koda_common import SettingsManager
-    from koda_tui.clients import ModelDefinition
+    from koda_tui.clients import Client, ModelDefinition
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 
@@ -30,12 +30,13 @@ def _select_model(
 
 
 def get_commands(
+    client: Client,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> list[Command]:
     """Get commands for the model selection palette."""
     provider = settings.provider
-    models = palette_manager.client.list_models(provider)
+    models = client.list_models(provider)
 
     return [
         Command(
