@@ -1,6 +1,7 @@
 import pytest
 
 from koda_tui import AppState
+from koda_tui.app.response import ResponseLifecycle
 from koda_tui.rendering import MessageRenderer
 
 
@@ -14,3 +15,9 @@ def converter() -> MessageRenderer:
 def state() -> AppState:
     """An AppState for testing."""
     return AppState(provider_name="test", model_name="test-model")
+
+
+@pytest.fixture
+def lifecycle(state: AppState) -> ResponseLifecycle:
+    """A ResponseLifecycle for testing."""
+    return ResponseLifecycle(state)

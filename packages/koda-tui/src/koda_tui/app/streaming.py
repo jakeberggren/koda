@@ -12,6 +12,7 @@ from koda.providers.events import (
     ToolCallResult,
 )
 from koda.providers.exceptions import ProviderAuthenticationError
+from koda_tui.app.response import ResponseLifecycle
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
 
 
 class StreamProcessor:
-    """Process provider streams and manage UI spinner updates."""
+    """Process provider streams with spinner and error handling."""
 
     def __init__(
         self,
@@ -31,6 +32,7 @@ class StreamProcessor:
     ) -> None:
         self._state = state
         self._invalidate = invalidate
+        self._lifecycle = ResponseLifecycle(state)
         self._spinner_task: asyncio.Task | None = None
         self._streaming_task: asyncio.Task | None = None
 
@@ -54,11 +56,11 @@ class StreamProcessor:
         async for event in client.chat(message):
             if isinstance(event, TextDelta):
                 await self._stop_spinner()
-                self._state.append_delta(event.text)
+                self._lifecycle.append_content(event.text)
             elif isinstance(event, ToolCallRequested | ProviderToolStarted):
-                self._state.transition_to_tool(event.call)
+                self._lifecycle.transition_to_tool(event.call)
             elif isinstance(event, ToolCallResult | ProviderToolCompleted):
-                self._state.complete_tool_message(
+                self._lifecycle.complete_tool(
                     call_id=event.result.call_id,
                     display=event.result.output.display,
                     is_error=event.result.output.is_error,
@@ -68,7 +70,7 @@ class StreamProcessor:
 
     async def stream(self, text: str, client: Client) -> None:
         """Stream a message and process the full response lifecycle."""
-        self._state.begin_response(text)
+        self._lifecycle.begin(text)
         self._invalidate()
 
         try:
@@ -83,13 +85,13 @@ class StreamProcessor:
                 f"\n\n**Authentication failed for {provider.title()}.**\n\n"
                 f"Please check your API key. Press `Ctrl+P` → `Connect Provider` to update it."
             )
-            self._state.append_delta(error_msg)
+            self._lifecycle.append_content(error_msg)
         except Exception as e:
             error_msg = f"\n\n**Error:** {type(e).__name__}: {e}"
-            self._state.append_delta(error_msg)
+            self._lifecycle.append_content(error_msg)
         finally:
             await self._stop_spinner()
-            self._state.end_response()
+            self._lifecycle.end()
             self._streaming_task = None
             self._invalidate()
 
