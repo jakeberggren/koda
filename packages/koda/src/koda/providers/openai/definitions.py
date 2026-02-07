@@ -2,6 +2,18 @@ from koda.providers.registry import ModelCapabilities, ModelDefinition, Thinking
 
 MODELS: list[ModelDefinition] = [
     ModelDefinition(
+        id="gpt-5.3-codex",
+        name="gpt-5.3-codex",
+        provider="openai",
+        thinking={
+            ThinkingLevel.LOW,
+            ThinkingLevel.MEDIUM,
+            ThinkingLevel.HIGH,
+            ThinkingLevel.EXTRA_HIGH,
+        },
+        capabilities={ModelCapacity.WEB_SEARCH},
+    ),
+    ModelDefinition(
         id="gpt-5.2-codex",
         name="gpt-5.2-codex",
         provider="openai",
