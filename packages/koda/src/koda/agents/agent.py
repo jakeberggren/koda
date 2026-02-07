@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
+from koda.messages import AssistantMessage, Message, ToolMessage, UserMessage
 from koda.providers import exceptions as provider_exceptions
 from koda.providers.events import (
     ProviderEvent,
@@ -19,9 +19,11 @@ from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
+    from uuid import UUID
 
     from koda.providers import Provider
-    from koda.tools.config import ToolConfig
+    from koda.sessions import Session, SessionManager
+    from koda.tools import ToolConfig
 
 logger = get_logger(__name__)
 
@@ -30,28 +32,26 @@ class Agent:
     def __init__(
         self,
         provider: Provider,
+        session_manager: SessionManager,
         system_message: str | None = None,
         tools: ToolConfig | None = None,
         max_tool_iterations: int = 30,
     ) -> None:
         self.provider: Provider = provider
-        self.system_message: str | None = system_message
+        self._session_manager: SessionManager = session_manager
+        self._session_manager.create_session()
+        self._system_message: str | None = system_message
         self.tools: ToolConfig | None = tools
         self.max_tool_iterations: int = max_tool_iterations
-        self._history: list[Message] = []
-
-        if system_message:
-            self._history.append(SystemMessage(content=system_message))
 
         logger.info("agent_initialized", provider=type(provider).__name__)
 
-    def _validate_and_add_user_message(self, user_text: str) -> None:
-        """Validate user input and add to history."""
-        if not user_text or not user_text.strip():
-            logger.warning("run_called_with_empty_message")
-            raise provider_exceptions.EmptyMessageError
-        logger.info("agent_run_started", user_text_length=len(user_text.strip()))
-        self._history.append(UserMessage(content=user_text.strip()))
+    def _append_message_to_session(self, message: Message) -> None:
+        """Append a message to the current session."""
+        self._session_manager.append_message(
+            self._session_manager.active_session.session_id,
+            message,
+        )
 
     async def _process_events(
         self,
@@ -79,7 +79,7 @@ class Agent:
                     call_id=tool_call.call_id,
                     output=ToolOutput(is_error=True, error_message="No tools configured"),
                 )
-                self._history.append(
+                self._append_message_to_session(
                     ToolMessage(
                         tool_name=tool_call.tool_name,
                         tool_result=tool_result,
@@ -95,7 +95,7 @@ class Agent:
         tool_results = await executor.execute_calls(tool_calls, self.tools.context)
 
         for tool_call, tool_result in zip(tool_calls, tool_results, strict=True):
-            self._history.append(
+            self._append_message_to_session(
                 ToolMessage(
                     tool_name=tool_call.tool_name,
                     tool_result=tool_result,
@@ -112,7 +112,8 @@ class Agent:
         pending_tool_calls: list[ToolCall],
     ) -> AsyncIterator[ProviderEvent]:
         """Run a single iteration, streaming events as they occur."""
-        stream = self.provider.stream(self._history.copy(), tool_definitions)
+        session = self._session_manager.active_session
+        stream = self.provider.stream(session.messages, self._system_message, tool_definitions)
         response_chunks: list[str] = []
 
         async for event in self._process_events(stream, response_chunks, pending_tool_calls):
@@ -120,7 +121,7 @@ class Agent:
 
         content = "".join(response_chunks)
         if content or pending_tool_calls:
-            self._history.append(
+            self._append_message_to_session(
                 AssistantMessage(
                     content=content,
                     tool_calls=pending_tool_calls,
@@ -133,7 +134,15 @@ class Agent:
                 yield event
 
     async def run(self, user_text: str) -> AsyncIterator[ProviderEvent]:
-        self._validate_and_add_user_message(user_text)
+        logger.info("agent_run_started")
+
+        # validate user input
+        if not user_text or not user_text.strip():
+            logger.warning("run_called_with_empty_message")
+            raise provider_exceptions.EmptyMessageError
+
+        self._append_message_to_session(UserMessage(content=user_text.strip()))
+
         tool_definitions = self.tools.registry.get_definitions() if self.tools else None
 
         for iteration in range(1, self.max_tool_iterations + 1):
@@ -150,25 +159,19 @@ class Agent:
         logger.error("max_iterations_exceeded", max_iterations=self.max_tool_iterations)
         raise tool_exceptions.MaxIterationsExceededError(self.max_tool_iterations)
 
-    def add_message(self, message_to_add: Message) -> None:
-        self._history.append(message_to_add)
-
-    def get_history(self) -> list[Message]:
-        return self._history.copy()
-
-    def clear_history(self) -> None:
-        system_msg = None
-        if self._history and self._history[0].role.value == "system":
-            system_msg = self._history[0]
-
-        self._history.clear()
-
-        if system_msg:
-            self._history.append(system_msg)
-
-    def reset(self) -> None:
-        self.clear_history()
-
+    def new_session(self, name: str | None = None) -> Session:
+        session = self._session_manager.create_session(name)
+        # Reset provider-specific state (e.g., conversation threading) if supported.
         reset_state = getattr(self.provider, "reset_state", None)
         if reset_state is not None and callable(reset_state):
             reset_state()
+        return session
+
+    def list_sessions(self) -> list[Session]:
+        return self._session_manager.list_sessions()
+
+    def switch_session(self, session_id: UUID) -> Session:
+        return self._session_manager.switch_session(session_id)
+
+    def delete_session(self, session_id: UUID) -> None:
+        self._session_manager.delete_session(session_id)

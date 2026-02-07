@@ -15,7 +15,6 @@ from openai.types.responses.response_input_param import FunctionCallOutput
 from koda.messages import (
     AssistantMessage,
     Message,
-    SystemMessage,
     ToolMessage,
     UserMessage,
 )
@@ -46,8 +45,6 @@ class OpenAIAdapter(ProviderAdapter):
             return EasyInputMessageParam(role="user", content=message.content, type="message")
         if isinstance(message, AssistantMessage):
             return EasyInputMessageParam(role="assistant", content=message.content, type="message")
-        if isinstance(message, SystemMessage):
-            return EasyInputMessageParam(role="system", content=message.content, type="message")
         raise UnknownMessageTypeError(type(message))
 
     def adapt_messages(self, messages: list[Message]) -> ResponseInputParam:

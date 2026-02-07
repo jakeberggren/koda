@@ -7,7 +7,7 @@ Any new provider implementation should pass all these tests.
 
 from pydantic import BaseModel
 
-from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
+from koda.messages import AssistantMessage, Message, ToolMessage, UserMessage
 from koda.providers import ProviderAdapter
 from koda.tools import base as tools_base
 
@@ -30,15 +30,6 @@ class TestAdaptMessages:
         result = adapter.adapt_messages([msg])
         assert result
 
-    def test_system_message_produces_output(
-        self,
-        adapter: ProviderAdapter,
-    ) -> None:
-        """System messages must produce non-empty output."""
-        msg = SystemMessage(content="You are helpful")
-        result = adapter.adapt_messages([msg])
-        assert result
-
     def test_empty_message_list_returns_empty(
         self,
         adapter: ProviderAdapter,
@@ -53,7 +44,6 @@ class TestAdaptMessages:
     ) -> None:
         """Multiple messages must all be included in output."""
         messages: list[Message] = [
-            SystemMessage(content="System"),
             UserMessage(content="User"),
             AssistantMessage(content="Assistant"),
         ]

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from koda.agents import Agent
 from koda.providers import get_model_registry, get_provider_registry
+from koda.sessions import InMemorySessionStore, SessionManager
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_tui.clients import Client
 
@@ -33,7 +34,11 @@ class LocalClient(Client):
         registry.register_all(get_builtin_tools())
         context = ToolContext.default(sandbox_dir=self._sandbox_dir)
         tools = ToolConfig(registry=registry, context=context)
-        return Agent(provider=provider, tools=tools)
+        return Agent(
+            provider=provider,
+            session_manager=SessionManager(InMemorySessionStore()),
+            tools=tools,
+        )
 
     def chat(self, message: str) -> AsyncIterator[ProviderEvent]:
         """Send a message and stream response events."""

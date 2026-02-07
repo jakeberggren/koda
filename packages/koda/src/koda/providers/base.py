@@ -38,5 +38,6 @@ class Provider(Protocol):
     def stream(
         self,
         messages: list[Message],
+        system_message: str | None = None,
         tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[ProviderEvent]: ...

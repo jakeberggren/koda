@@ -118,6 +118,7 @@ class OpenAIProvider(Provider):
     async def stream(
         self,
         messages: list[Message],
+        system_message: str | None = None,
         tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[ProviderEvent]:
         if not messages:
@@ -133,6 +134,7 @@ class OpenAIProvider(Provider):
             stream = await self.client.responses.create(
                 model=self.model,
                 previous_response_id=self._last_response_id,
+                instructions=system_message,
                 stream=True,
                 tools=openai_tools,
                 input=openai_input,
