@@ -10,11 +10,13 @@ from prompt_toolkit.layout import Float
 from koda_tui.ui.palette.api_key_dialog import ApiKeyDialog
 from koda_tui.ui.palette.command_palette import CommandPalette
 from koda_tui.ui.palette.commands.commands import get_commands
+from koda_tui.ui.palette.confirm_dialog import ConfirmDialog
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from prompt_toolkit import Application
+    from prompt_toolkit.formatted_text import StyleAndTextTuples
 
     from koda_common import SettingsManager
     from koda_tui.clients import Client
@@ -32,12 +34,14 @@ class PaletteManager:
         state: AppState,
         settings: SettingsManager,
         invalidate: Callable[[], None],
+        cancel_streaming: Callable[[], None],
     ) -> None:
         self._app: Application[Any] | None = None
         self._layout = layout
         self._state = state
         self._settings = settings
         self._invalidate = invalidate
+        self._cancel_streaming = cancel_streaming
         self._stack: list[tuple[Any, Float]] = []
 
     def set_app(self, app: Application[Any]) -> None:
@@ -81,7 +85,9 @@ class PaletteManager:
         return get_commands(
             client=client,
             settings=self._settings,
+            state=self._state,
             palette_manager=self,
+            cancel_streaming=self._cancel_streaming,
         )
 
     @staticmethod
@@ -104,7 +110,13 @@ class PaletteManager:
             commands = self._get_default_commands(client)
             self.open_palette(commands)
 
-    def open_palette(self, commands: list[Command]) -> None:
+    def open_palette(
+        self,
+        commands: list[Command],
+        *,
+        footer: StyleAndTextTuples | None = None,
+        shortcuts: dict[str, Callable[[Command | None], None]] | None = None,
+    ) -> None:
         """Open a command palette with the given commands."""
         if not self._app:
             return
@@ -116,6 +128,8 @@ class PaletteManager:
             commands=commands,
             on_close=self.close,
             height=height,
+            footer=footer,
+            shortcuts=shortcuts,
         )
         self._push(palette, width=width)
         self._state.palette_open = True
@@ -133,6 +147,22 @@ class PaletteManager:
         dialog = ApiKeyDialog(
             provider=provider,
             on_submit=on_submit,
+            on_cancel=self.close,
+        )
+        self._push(dialog, width=width)
+
+    def open_confirm(
+        self,
+        message: str,
+        on_confirm: Callable[[], None],
+    ) -> None:
+        """Open a yes/no confirmation dialog."""
+        term_width = shutil.get_terminal_size().columns
+        width = max(40, min(60, term_width // 2))
+
+        dialog = ConfirmDialog(
+            message=message,
+            on_confirm=on_confirm,
             on_cancel=self.close,
         )
         self._push(dialog, width=width)

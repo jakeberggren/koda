@@ -19,6 +19,7 @@ from prompt_toolkit.widgets import Box, Frame
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from prompt_toolkit.formatted_text import StyleAndTextTuples
     from prompt_toolkit.key_binding import KeyPressEvent
 
     from koda_tui.ui.palette.commands import Command
@@ -32,12 +33,16 @@ class CommandPalette:
         commands: list[Command],
         on_close: Callable[[], None],
         height: int = 10,
+        footer: StyleAndTextTuples | None = None,
+        shortcuts: dict[str, Callable[[Command | None], None]] | None = None,
     ) -> None:
         self.commands = commands
         self.on_close = on_close
         self.selected_index = 0
         self._filtered_commands: list[Command] = list(commands)
         self._height = height
+        self._footer = footer
+        self._shortcuts = shortcuts or {}
 
         # Create fuzzy completer from command labels
         command_labels = [cmd.label for cmd in commands]
@@ -82,7 +87,14 @@ class CommandPalette:
             cmd = self._filtered_commands[self.selected_index]
             cmd.handler()
 
-    def _create_keybindings(self) -> KeyBindings:
+    @property
+    def selected_command(self) -> Command | None:
+        """Return the currently selected command, or None if list is empty."""
+        if self._filtered_commands:
+            return self._filtered_commands[self.selected_index]
+        return None
+
+    def _create_keybindings(self) -> KeyBindings:  # noqa: C901 - allow complex
         """Create key bindings for palette navigation."""
         kb = KeyBindings()
 
@@ -101,6 +113,14 @@ class CommandPalette:
         @kb.add(Keys.Down)
         def _move_down(_event: KeyPressEvent) -> None:
             self._move_selection(1)
+
+        for key, handler in self._shortcuts.items():
+
+            @kb.add(key)
+            def _shortcut(
+                _event: KeyPressEvent, _handler: Callable[[Command | None], None] = handler
+            ) -> None:
+                _handler(self.selected_command)
 
         return kb
 
@@ -232,7 +252,16 @@ class CommandPalette:
         )
 
         # Combine with padding and background style
-        body = HSplit([title_row, separator, search_row, separator, command_list])
+        children = [title_row, separator, search_row, separator, command_list]
+        if self._footer:
+            footer_row = Window(
+                content=FormattedTextControl(text=self._footer),
+                height=1,
+                dont_extend_height=True,
+                align=WindowAlign.LEFT,
+            )
+            children.extend([separator, footer_row])
+        body = HSplit(children)
         box = Box(
             body,
             padding_left=2,

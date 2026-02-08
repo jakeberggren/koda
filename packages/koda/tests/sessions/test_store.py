@@ -16,15 +16,6 @@ class TestInMemorySessionStore:
     def test_create_session(self) -> None:
         store = InMemorySessionStore()
 
-        session = store.create_session(name="test")
-
-        assert isinstance(session.session_id, uuid.UUID)
-        assert session.name == "test"
-        assert session.messages == []
-
-    def test_create_session_without_name(self) -> None:
-        store = InMemorySessionStore()
-
         session = store.create_session()
 
         assert isinstance(session.session_id, uuid.UUID)
@@ -41,7 +32,7 @@ class TestInMemorySessionStore:
 
     def test_get_session(self) -> None:
         store = InMemorySessionStore()
-        created = store.create_session(name="test")
+        created = store.create_session()
 
         session = store.get_session(created.session_id)
 
@@ -55,13 +46,12 @@ class TestInMemorySessionStore:
 
     def test_list_sessions(self) -> None:
         store = InMemorySessionStore()
-        store.create_session(name="first")
-        store.create_session(name="second")
+        store.create_session()
+        store.create_session()
 
         sessions = store.list_sessions()
 
-        names = {s.name for s in sessions}
-        assert names == {"first", "second"}
+        assert len(sessions) == 2  # noqa: PLR2004
 
     def test_list_sessions_empty(self) -> None:
         store = InMemorySessionStore()
@@ -70,25 +60,24 @@ class TestInMemorySessionStore:
 
     def test_update_session(self) -> None:
         store = InMemorySessionStore()
-        created = store.create_session(name="test")
+        created = store.create_session()
 
-        msg = UserMessage(content="hello")
-        updated = Session(session_id=created.session_id, name="test", messages=[msg])
+        updated = Session(session_id=created.session_id, name="renamed")
         result = store.update_session(updated)
 
-        assert result.messages == [msg]
-        assert store.get_session(created.session_id).messages == [msg]
+        assert result.name == "renamed"
+        assert store.get_session(created.session_id).name == "renamed"
 
     def test_update_session_not_found(self) -> None:
         store = InMemorySessionStore()
-        session = Session(session_id=uuid.uuid4(), name="ghost", messages=[])
+        session = Session(session_id=uuid.uuid4(), name="ghost")
 
         with pytest.raises(SessionNotFoundError):
             store.update_session(session)
 
     def test_delete_session(self) -> None:
         store = InMemorySessionStore()
-        session = store.create_session(name="test")
+        session = store.create_session()
 
         store.delete_session(session.session_id)
 
@@ -103,7 +92,7 @@ class TestInMemorySessionStore:
 
     def test_append_message(self) -> None:
         store = InMemorySessionStore()
-        created = store.create_session(name="test")
+        created = store.create_session()
         msg = UserMessage(content="hello")
 
         result = store.append_message(created.session_id, msg)

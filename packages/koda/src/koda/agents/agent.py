@@ -46,12 +46,9 @@ class Agent:
 
         logger.info("agent_initialized", provider=type(provider).__name__)
 
-    def _append_message_to_session(self, message: Message) -> None:
-        """Append a message to the current session."""
-        self._session_manager.append_message(
-            self._session_manager.active_session.session_id,
-            message,
-        )
+    def _append_message(self, session_id: UUID, message: Message) -> None:
+        """Append a message to the session."""
+        self._session_manager.append_message(session_id, message)
 
     async def _process_events(
         self,
@@ -69,7 +66,9 @@ class Agent:
             elif isinstance(event, (ProviderToolStarted, ProviderToolCompleted)):
                 yield event
 
-    async def _handle_tool_calls(self, tool_calls: list[ToolCall]) -> AsyncIterator[ToolCallResult]:
+    async def _handle_tool_calls(
+        self, session_id: UUID, tool_calls: list[ToolCall]
+    ) -> AsyncIterator[ToolCallResult]:
         if self.tools is None:
             # If provider requested tool calls but we don't have tools configured,
             # record errors for each tool call.
@@ -79,7 +78,8 @@ class Agent:
                     call_id=tool_call.call_id,
                     output=ToolOutput(is_error=True, error_message="No tools configured"),
                 )
-                self._append_message_to_session(
+                self._append_message(
+                    session_id,
                     ToolMessage(
                         tool_name=tool_call.tool_name,
                         tool_result=tool_result,
@@ -95,11 +95,12 @@ class Agent:
         tool_results = await executor.execute_calls(tool_calls, self.tools.context)
 
         for tool_call, tool_result in zip(tool_calls, tool_results, strict=True):
-            self._append_message_to_session(
+            self._append_message(
+                session_id,
                 ToolMessage(
                     tool_name=tool_call.tool_name,
                     tool_result=tool_result,
-                )
+                ),
             )
             yield ToolCallResult(
                 tool_name=tool_call.tool_name,
@@ -108,11 +109,12 @@ class Agent:
 
     async def _run_iteration(
         self,
+        session_id: UUID,
         tool_definitions: list[ToolDefinition] | None,
         pending_tool_calls: list[ToolCall],
     ) -> AsyncIterator[ProviderEvent]:
         """Run a single iteration, streaming events as they occur."""
-        session = self._session_manager.active_session
+        session = self._session_manager.get_session(session_id)
         stream = self.provider.stream(session.messages, self._system_message, tool_definitions)
         response_chunks: list[str] = []
 
@@ -121,16 +123,17 @@ class Agent:
 
         content = "".join(response_chunks)
         if content or pending_tool_calls:
-            self._append_message_to_session(
+            self._append_message(
+                session_id,
                 AssistantMessage(
                     content=content,
                     tool_calls=pending_tool_calls,
-                )
+                ),
             )
 
         if pending_tool_calls:
             logger.info("tool_calls_pending", count=len(pending_tool_calls))
-            async for event in self._handle_tool_calls(tool_calls=pending_tool_calls):
+            async for event in self._handle_tool_calls(session_id, tool_calls=pending_tool_calls):
                 yield event
 
     async def run(self, user_text: str) -> AsyncIterator[ProviderEvent]:
@@ -141,7 +144,8 @@ class Agent:
             logger.warning("run_called_with_empty_message")
             raise provider_exceptions.EmptyMessageError
 
-        self._append_message_to_session(UserMessage(content=user_text.strip()))
+        session_id = self._session_manager.active_session.session_id
+        self._append_message(session_id, UserMessage(content=user_text.strip()))
 
         tool_definitions = self.tools.registry.get_definitions() if self.tools else None
 
@@ -149,7 +153,11 @@ class Agent:
             logger.info("agent_loop_iteration", iteration=iteration)
             pending_tool_calls: list[ToolCall] = []
 
-            async for event in self._run_iteration(tool_definitions, pending_tool_calls):
+            async for event in self._run_iteration(
+                session_id,
+                tool_definitions,
+                pending_tool_calls,
+            ):
                 yield event
 
             if not pending_tool_calls:
@@ -159,19 +167,31 @@ class Agent:
         logger.error("max_iterations_exceeded", max_iterations=self.max_tool_iterations)
         raise tool_exceptions.MaxIterationsExceededError(self.max_tool_iterations)
 
-    def new_session(self, name: str | None = None) -> Session:
-        session = self._session_manager.create_session(name)
-        # Reset provider-specific state (e.g., conversation threading) if supported.
+    @property
+    def active_session(self) -> Session:
+        return self._session_manager.active_session
+
+    def _reset_provider_state(self) -> None:
+        """Reset provider-specific state (e.g., conversation threading) if supported."""
         reset_state = getattr(self.provider, "reset_state", None)
         if reset_state is not None and callable(reset_state):
             reset_state()
+
+    def new_session(self) -> Session:
+        session = self._session_manager.create_session()
+        self._reset_provider_state()
         return session
 
     def list_sessions(self) -> list[Session]:
         return self._session_manager.list_sessions()
 
     def switch_session(self, session_id: UUID) -> Session:
-        return self._session_manager.switch_session(session_id)
+        session = self._session_manager.switch_session(session_id)
+        self._reset_provider_state()
+        return session
+
+    def get_session_messages(self, session_id: UUID) -> list[Message]:
+        return self._session_manager.get_session_messages(session_id)
 
     def delete_session(self, session_id: UUID) -> None:
         self._session_manager.delete_session(session_id)

@@ -42,3 +42,10 @@ class AppState:
     queue_inputs: bool = True
     exit_requested: bool = False
     palette_open: bool = False
+
+    def reset_conversation(self) -> None:
+        """Clear all conversation and streaming state."""
+        self.messages.clear()
+        self.current_streaming_content = ""
+        self.is_streaming = False
+        self.active_tools.clear()

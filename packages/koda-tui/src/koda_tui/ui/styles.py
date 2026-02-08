@@ -39,6 +39,8 @@ TUI_DARK_STYLE = Style.from_dict(
         "dialog.box": "bg:default",
         "dialog.title": "fg:ansiwhite bold bg:default",
         "dialog.hint": "fg:ansibrightblack bg:default",
+        "dialog.button": "fg:ansibrightblack bg:default",
+        "dialog.selected": "bg:ansimagenta fg:ansiwhite bold",
     }
 )
 
@@ -79,6 +81,8 @@ TUI_LIGHT_STYLE = Style.from_dict(
         "dialog.box": "bg:default",
         "dialog.title": "fg:ansiblack bold bg:default",
         "dialog.hint": "fg:ansibrightblack bg:default",
+        "dialog.button": "fg:ansibrightblack bg:default",
+        "dialog.selected": "bg:ansimagenta fg:ansiwhite bold",
     }
 )
 
