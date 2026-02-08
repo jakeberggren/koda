@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from koda.sessions.session import Session
     from koda.sessions.store import SessionStore
 
-from koda.sessions.exceptions import ActiveSessionError, NoActiveSessionError
+from koda.sessions.exceptions import NoActiveSessionError
 
 
 class SessionManager:
@@ -26,11 +26,24 @@ class SessionManager:
             raise NoActiveSessionError
         return self._store.get_session(self._active_session_id)
 
-    def create_session(self, name: str | None = None) -> Session:
+    def _cleanup_empty_active(self) -> None:
+        """Delete the active session if it has no messages."""
+        if self._active_session_id is None:
+            return
+        session = self._store.get_session(self._active_session_id)
+        if not session.messages:
+            self._store.delete_session(self._active_session_id)
+
+    def create_session(self) -> Session:
         """Create a new session and set it as active."""
-        session = self._store.create_session(name)
+        self._cleanup_empty_active()
+        session = self._store.create_session()
         self._active_session_id = session.session_id
         return session
+
+    def get_session(self, session_id: UUID) -> Session:
+        """Get a session by id."""
+        return self._store.get_session(session_id)
 
     def list_sessions(self) -> list[Session]:
         """List all sessions."""
@@ -42,16 +55,23 @@ class SessionManager:
 
     def switch_session(self, session_id: UUID) -> Session:
         """Switch the active session."""
+        self._cleanup_empty_active()
         session = self._store.get_session(session_id)
         self._active_session_id = session.session_id
         return session
+
+    def get_session_messages(self, session_id: UUID) -> list[Message]:
+        """Get messages for a session."""
+        return self._store.get_session(session_id).messages
 
     def append_message(self, session_id: UUID, message: Message) -> Session:
         """Append a message to a session."""
         return self._store.append_message(session_id, message)
 
     def delete_session(self, session_id: UUID) -> None:
-        """Delete a session. Raises ActiveSessionError if it is the active session."""
-        if session_id == self._active_session_id:
-            raise ActiveSessionError(session_id)
+        """Delete a session. If it is the active session, a new one is created."""
+        is_active = session_id == self._active_session_id
         self._store.delete_session(session_id)
+        if is_active:
+            self._active_session_id = None
+            self.create_session()

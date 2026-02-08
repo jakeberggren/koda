@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class SessionStore(Protocol):
     """Protocol for session persistence with CRUD operations."""
 
-    def create_session(self, name: str | None = None) -> Session:
+    def create_session(self) -> Session:
         """Create and store a new session."""
         ...
 
@@ -23,7 +23,7 @@ class SessionStore(Protocol):
         ...
 
     def list_sessions(self) -> list[Session]:
-        """List all sessions."""
+        """List all sessions, newest first."""
         ...
 
     def update_session(self, session: Session) -> Session:
@@ -45,9 +45,9 @@ class InMemorySessionStore(SessionStore):
     def __init__(self) -> None:
         self._sessions: dict[UUID, Session] = {}
 
-    def create_session(self, name: str | None = None) -> Session:
+    def create_session(self) -> Session:
         """Create and store a new session."""
-        session = Session(name=name)
+        session = Session()
         self._sessions[session.session_id] = session
         return session
 
@@ -58,8 +58,8 @@ class InMemorySessionStore(SessionStore):
         return self._sessions[session_id]
 
     def list_sessions(self) -> list[Session]:
-        """List all sessions."""
-        return list(self._sessions.values())
+        """List all sessions, newest first."""
+        return list(reversed(self._sessions.values()))
 
     def update_session(self, session: Session) -> Session:
         """Update an existing session."""

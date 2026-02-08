@@ -71,6 +71,7 @@ class KodaTuiApp:
             state=self.state,
             settings=self._settings,
             invalidate=self.invalidate,
+            cancel_streaming=self.cancel_streaming,
         )
 
     def _create_application(self) -> Application:
