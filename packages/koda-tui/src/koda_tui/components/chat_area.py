@@ -76,7 +76,7 @@ class ChatAreaControl(UIControl):
         self._at_bottom = True
         # Line-level cache invalidation tracking
         self._cached_width = 0
-        self._cached_content_key: tuple[int, int, bool] | None = None
+        self._cached_content_key: tuple[int, int, int, bool] | None = None
         # Per-message rendering cache: message_id -> (cache_key, FormattedText)
         self._message_cache: dict[int, tuple[tuple, FormattedText]] = {}
         # Per-message wrapped lines cache: message_id -> (cache_key, lines)
@@ -97,13 +97,18 @@ class ChatAreaControl(UIControl):
         """Height of the visible viewport."""
         return self._view_height
 
-    def _content_key(self) -> tuple[int, int, bool] | None:
+    def _content_key(self) -> tuple[int, int, int, bool] | None:
         """Return a key representing current content state for cache invalidation."""
         # Always rebuild lines while spinner is showing (no streaming content yet)
         if self._state.is_streaming and not self._state.current_streaming_content:
             return None
         streaming_len = len(self._state.current_streaming_content or "")
-        return (len(self._state.messages), streaming_len, self._state.is_streaming)
+        return (
+            id(self._state.messages),
+            len(self._state.messages),
+            streaming_len,
+            self._state.is_streaming,
+        )
 
     def _message_cache_key(self, message: Message) -> tuple:
         """Return cache key for a single message."""

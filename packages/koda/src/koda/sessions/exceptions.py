@@ -15,11 +15,3 @@ class SessionNotFoundError(SessionError):
 
 class NoActiveSessionError(SessionError):
     """No active session set."""
-
-
-class ActiveSessionError(SessionError):
-    """Cannot delete the active session."""
-
-    def __init__(self, session_id: UUID) -> None:
-        self.session_id = session_id
-        super().__init__(f"Cannot delete active session: '{session_id}'")
