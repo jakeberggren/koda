@@ -76,7 +76,6 @@ class ChatAreaControl(UIControl):
         self._at_bottom = True
         # Line-level cache invalidation tracking
         self._cached_width = 0
-        self._cached_content_key: tuple[int, int, int, bool] | None = None
         # Per-message rendering cache: message_id -> (cache_key, FormattedText)
         self._message_cache: dict[int, tuple[tuple, FormattedText]] = {}
         # Per-message wrapped lines cache: message_id -> (cache_key, lines)
@@ -96,19 +95,6 @@ class ChatAreaControl(UIControl):
     def view_height(self) -> int:
         """Height of the visible viewport."""
         return self._view_height
-
-    def _content_key(self) -> tuple[int, int, int, bool] | None:
-        """Return a key representing current content state for cache invalidation."""
-        # Always rebuild lines while spinner is showing (no streaming content yet)
-        if self._state.is_streaming and not self._state.current_streaming_content:
-            return None
-        streaming_len = len(self._state.current_streaming_content or "")
-        return (
-            id(self._state.messages),
-            len(self._state.messages),
-            streaming_len,
-            self._state.is_streaming,
-        )
 
     def _message_cache_key(self, message: Message) -> tuple:
         """Return cache key for a single message."""
@@ -254,25 +240,15 @@ class ChatAreaControl(UIControl):
         """Create the content for the chat area."""
         self._view_height = height
 
-        # Check if we need to rebuild lines (content or width changed)
-        # None content_key means always rebuild (e.g., spinner animation)
-        content_key = self._content_key()
-        needs_rebuild = (
-            content_key is None
-            or width != self._cached_width
-            or content_key != self._cached_content_key
-        )
-
-        if needs_rebuild:
+        # Always rebuild lines — per-message caches handle the expensive
+        # rendering/wrapping work, so this iteration is cheap.
+        if width != self._cached_width:
             self._renderer.set_width(width)
-
-            self._lines = self._rebuild_lines(width)
-            self._total_lines = len(self._lines)
-            self._update_scroll(height, is_at_bottom=self._at_bottom)
-
-            # Update cache
             self._cached_width = width
-            self._cached_content_key = content_key
+
+        self._lines = self._rebuild_lines(width)
+        self._total_lines = len(self._lines)
+        self._update_scroll(height, is_at_bottom=self._at_bottom)
 
         # Apply batched scroll events accumulated since last frame
         self._apply_pending_scroll()

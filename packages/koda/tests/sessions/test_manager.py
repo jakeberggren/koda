@@ -61,9 +61,11 @@ class TestSessionManager:
         session = manager.create_session()
         _add_message(manager, session.session_id)
 
-        manager.delete_session(session.session_id)
+        new_session = manager.delete_session(session.session_id)
 
-        assert manager.active_session.session_id != session.session_id
+        assert new_session is not None
+        assert new_session.session_id != session.session_id
+        assert manager.active_session.session_id == new_session.session_id
 
     def test_delete_inactive_session(self, manager: SessionManager) -> None:
         first = manager.create_session()
@@ -71,8 +73,9 @@ class TestSessionManager:
         second = manager.create_session()
         _add_message(manager, second.session_id)
 
-        manager.delete_session(first.session_id)
+        result = manager.delete_session(first.session_id)
 
+        assert result is None
         session_ids = {s.session_id for s in manager.list_sessions()}
         assert first.session_id not in session_ids
 
@@ -103,6 +106,13 @@ class TestSessionManager:
 
         session_ids = {s.session_id for s in manager.list_sessions()}
         assert empty.session_id not in session_ids
+
+    def test_switch_to_active_empty_session(self, manager: SessionManager) -> None:
+        session = manager.create_session()
+
+        result = manager.switch_session(session.session_id)
+
+        assert result.session_id == session.session_id
 
     def test_create_session_keeps_non_empty_active(self, manager: SessionManager) -> None:
         first = manager.create_session()

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import TYPE_CHECKING
 
 from koda.agents import Agent
@@ -28,6 +27,8 @@ class LocalClient(Client):
     def __init__(self, settings: SettingsManager, sandbox_dir: Path) -> None:
         self._settings = settings
         self._sandbox_dir = sandbox_dir
+        self._session_manager = SessionManager(InMemorySessionStore())
+        self._session_manager.create_session()
         self._agent = self._create_agent()
 
     def _create_agent(self) -> Agent:
@@ -41,9 +42,13 @@ class LocalClient(Client):
         tools = ToolConfig(registry=registry, context=context)
         return Agent(
             provider=provider,
-            session_manager=SessionManager(InMemorySessionStore()),
+            session_manager=self._session_manager,
             tools=tools,
         )
+
+    def reconfigure(self) -> None:
+        """Rebuild the agent for the current settings, preserving sessions."""
+        self._agent = self._create_agent()
 
     def chat(self, message: str) -> AsyncIterator[ProviderEvent]:
         """Send a message and stream response events."""
@@ -57,47 +62,42 @@ class LocalClient(Client):
         """List available models, optionally filtered by provider."""
         return get_model_registry().supported(provider)
 
-    @staticmethod
-    def _timestamp():
-        return datetime.now().strftime("%Y-%m-%d")
-
-    @staticmethod
-    def _to_session_info(session: Session) -> SessionInfo:
+    def _to_session_info(self, session: Session) -> SessionInfo:
         if session.name:
             name = session.name
         elif session.messages:
-            name = f"{session.messages[0].content[:30]}... [{LocalClient._timestamp()}]"
+            name = f"{session.messages[0].content[:30]}..."
         else:
-            name = f"New session [{LocalClient._timestamp()}]"
+            name = "New session"
 
         return SessionInfo(
             session_id=session.session_id,
             name=name,
             message_count=len(session.messages),
+            created_at=session.created_at,
         )
 
     def active_session(self) -> SessionInfo:
         """Get the currently active session."""
-        return LocalClient._to_session_info(self._agent.active_session)
+        return self._to_session_info(self._agent.active_session)
 
     def list_sessions(self) -> list[SessionInfo]:
-        """List available sessions."""
-        return [LocalClient._to_session_info(s) for s in self._agent.list_sessions()]
+        """List non-empty sessions."""
+        return [self._to_session_info(s) for s in self._agent.list_sessions() if s.messages]
 
     def new_session(self) -> SessionInfo:
         """Create a new session."""
         session = self._agent.new_session()
-        return LocalClient._to_session_info(session)
+        return self._to_session_info(session)
 
-    def switch_session(self, session_id: UUID) -> SessionInfo:
-        """Switch to a different session."""
+    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, list[Message]]:
+        """Switch to a different session. Returns session info and messages."""
         session = self._agent.switch_session(session_id)
-        return LocalClient._to_session_info(session)
+        return self._to_session_info(session), session.messages
 
-    def get_session_messages(self, session_id: UUID) -> list[Message]:
-        """Get messages for a session."""
-        return self._agent.get_session_messages(session_id)
-
-    def delete_session(self, session_id: UUID) -> None:
-        """Delete a session."""
-        self._agent.delete_session(session_id)
+    def delete_session(self, session_id: UUID) -> SessionInfo | None:
+        """Delete a session. Returns the new active session if the deleted one was active."""
+        new_session = self._agent.delete_session(session_id)
+        if new_session is not None:
+            return self._to_session_info(new_session)
+        return None
