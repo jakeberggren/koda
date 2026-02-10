@@ -39,6 +39,9 @@ class Agent:
     ) -> None:
         self.provider: Provider = provider
         self._session_manager: SessionManager = session_manager
+        # Ensure there is always an active session on startup.
+        # NOTE: This is a side-effect — do not share a single SessionManager
+        # across multiple Agent instances, as this call switches the active session.
         self._session_manager.create_session()
         self._system_message: str | None = system_message
         self.tools: ToolConfig | None = tools
@@ -189,9 +192,6 @@ class Agent:
         session = self._session_manager.switch_session(session_id)
         self._reset_provider_state()
         return session
-
-    def get_session_messages(self, session_id: UUID) -> list[Message]:
-        return self._session_manager.get_session_messages(session_id)
 
     def delete_session(self, session_id: UUID) -> None:
         self._session_manager.delete_session(session_id)

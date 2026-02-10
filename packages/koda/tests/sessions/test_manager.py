@@ -104,6 +104,13 @@ class TestSessionManager:
         session_ids = {s.session_id for s in manager.list_sessions()}
         assert empty.session_id not in session_ids
 
+    def test_switch_to_active_empty_session(self, manager: SessionManager) -> None:
+        session = manager.create_session()
+
+        result = manager.switch_session(session.session_id)
+
+        assert result.session_id == session.session_id
+
     def test_create_session_keeps_non_empty_active(self, manager: SessionManager) -> None:
         first = manager.create_session()
         _add_message(manager, first.session_id)

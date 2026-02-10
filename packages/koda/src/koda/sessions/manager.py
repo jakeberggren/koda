@@ -55,14 +55,11 @@ class SessionManager:
 
     def switch_session(self, session_id: UUID) -> Session:
         """Switch the active session."""
-        self._cleanup_empty_active()
+        if session_id != self._active_session_id:
+            self._cleanup_empty_active()
         session = self._store.get_session(session_id)
         self._active_session_id = session.session_id
         return session
-
-    def get_session_messages(self, session_id: UUID) -> list[Message]:
-        """Get messages for a session."""
-        return self._store.get_session(session_id).messages
 
     def append_message(self, session_id: UUID, message: Message) -> Session:
         """Append a message to a session."""

@@ -148,7 +148,7 @@ class CommandPalette:
 
     def _get_empty_command_list_text(self) -> list[tuple[str, str]]:
         """Return placeholder text when no commands match."""
-        return [("class:palette.empty", "  No matching commands\n")]
+        return [("class:palette.empty", "  No results found\n")]
 
     def _get_max_label_width(self) -> int:
         """Calculate max label width for alignment."""

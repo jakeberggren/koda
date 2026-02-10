@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
@@ -12,6 +13,7 @@ class SessionInfo(BaseModel):
     session_id: UUID
     name: str
     message_count: int
+    created_at: datetime
 
 
 class Client(Protocol):
@@ -41,14 +43,10 @@ class Client(Protocol):
         """Create a new session."""
         ...
 
-    def switch_session(self, session_id: UUID) -> SessionInfo:
-        """Switch to a different session."""
+    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, list[Message]]:
+        """Switch to a different session. Returns session info and messages."""
         ...
 
     def delete_session(self, session_id: UUID) -> None:
         """Delete a session."""
-        ...
-
-    def get_session_messages(self, session_id: UUID) -> list[Message]:
-        """Get messages for a session."""
         ...

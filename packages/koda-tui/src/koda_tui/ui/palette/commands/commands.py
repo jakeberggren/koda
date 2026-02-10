@@ -59,23 +59,7 @@ def get_commands(  # noqa: C901 - allow complex
         palette_manager.close_all()
 
     def cmd_list_sessions() -> None:
-        commands, shortcuts = session_commands.get_commands(
-            client=client,
-            state=state,
-            palette_manager=palette_manager,
-            cancel_streaming=cancel_streaming,
-        )
-        footer = [
-            ("class:palette.item", "ctrl-n"),
-            ("class:palette.hint", " new · "),
-            ("class:palette.item", "ctrl-d"),
-            ("class:palette.hint", " delete"),
-        ]
-        palette_manager.open_palette(
-            commands,
-            footer=footer,
-            shortcuts=shortcuts,
-        )
+        session_commands.open_session_list(client, state, palette_manager, cancel_streaming)
 
     return [
         Command(

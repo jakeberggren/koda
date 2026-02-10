@@ -59,7 +59,7 @@ class InMemorySessionStore(SessionStore):
 
     def list_sessions(self) -> list[Session]:
         """List all sessions, newest first."""
-        return list(reversed(self._sessions.values()))
+        return sorted(self._sessions.values(), key=lambda s: s.created_at, reverse=True)
 
     def update_session(self, session: Session) -> Session:
         """Update an existing session."""

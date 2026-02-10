@@ -16,9 +16,29 @@ if TYPE_CHECKING:
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 
+_SESSION_FOOTER = [
+    ("class:palette.item", "ctrl-n"),
+    ("class:palette.hint", " new · "),
+    ("class:palette.item", "ctrl-d"),
+    ("class:palette.hint", " delete"),
+]
+
+
+def open_session_list(
+    client: Client,
+    state: AppState,
+    palette_manager: PaletteManager,
+    cancel_streaming: Callable[[], None],
+) -> None:
+    """Open the session list palette."""
+    commands, shortcuts = get_commands(client, state, palette_manager, cancel_streaming)
+    palette_manager.open_palette(commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
+
+
 def _format_session_label(session: SessionInfo, active_session: SessionInfo) -> str:
-    """Format session label with active status and message count."""
-    label = f"{session.name}  ({session.message_count} messages)"
+    """Format session label with timestamp, message count, and active status."""
+    timestamp = session.created_at.strftime("%Y-%m-%d")
+    label = f"{session.name}  [{timestamp}] ({session.message_count} messages)"
     if session.session_id == active_session.session_id:
         label += " [active]"
     return label
@@ -34,8 +54,7 @@ def _switch_session(
     """Switch to a session and update TUI state."""
     cancel_streaming()
     state.reset_conversation()
-    client.switch_session(session.session_id)
-    core_messages = client.get_session_messages(session.session_id)
+    _, core_messages = client.switch_session(session.session_id)
     state.messages = convert_messages(core_messages)
     palette_manager.close_all()
 
@@ -43,13 +62,17 @@ def _switch_session(
 def _confirm_delete_session(
     session: SessionInfo,
     client: Client,
+    state: AppState,
     palette_manager: PaletteManager,
+    cancel_streaming: Callable[[], None],
 ) -> None:
     """Open a confirmation dialog to delete a session."""
 
     def on_confirm() -> None:
         client.delete_session(session.session_id)
-        palette_manager.close_all()
+        # Replace confirm dialog + stale session list with a fresh session list.
+        commands, shortcuts = get_commands(client, state, palette_manager, cancel_streaming)
+        palette_manager.replace_top(2, commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
 
     palette_manager.open_confirm(
         message="Delete session?",
@@ -57,38 +80,7 @@ def _confirm_delete_session(
     )
 
 
-def _get_shortcuts(  # noqa: C901
-    client: Client,
-    state: AppState,
-    palette_manager: PaletteManager,
-    cancel_streaming: Callable[[], None],
-) -> dict[str, Callable[[Command | None], None]]:
-    """Build keyboard shortcuts for the session palette."""
-
-    def on_new(_cmd: Command | None) -> None:
-        cancel_streaming()
-        client.new_session()
-        state.reset_conversation()
-        palette_manager.close_all()
-
-    def on_delete(cmd: Command | None) -> None:
-        if cmd is None:
-            return
-        # Find matching session by label
-        sessions = client.list_sessions()
-        active = client.active_session()
-        for session in sessions:
-            if _format_session_label(session, active) == cmd.label:
-                _confirm_delete_session(session, client, palette_manager)
-                return
-
-    return {
-        Keys.ControlN: on_new,
-        Keys.ControlD: on_delete,
-    }
-
-
-def get_commands(
+def get_commands(  # noqa: C901
     client: Client,
     state: AppState,
     palette_manager: PaletteManager,
@@ -98,8 +90,9 @@ def get_commands(
     sessions = client.list_sessions()
     active = client.active_session()
 
-    commands = [
-        Command(
+    command_sessions: list[tuple[Command, SessionInfo]] = []
+    for session in sessions:
+        cmd = Command(
             label=_format_session_label(session, active),
             handler=partial(
                 _switch_session,
@@ -110,9 +103,33 @@ def get_commands(
                 cancel_streaming,
             ),
         )
-        for session in sessions
-    ]
+        command_sessions.append((cmd, session))
 
-    shortcuts = _get_shortcuts(client, state, palette_manager, cancel_streaming)
+    commands = [cmd for cmd, _ in command_sessions]
+
+    def on_new(_cmd: Command | None) -> None:
+        cancel_streaming()
+        client.new_session()
+        state.reset_conversation()
+        palette_manager.close_all()
+
+    def on_delete(cmd: Command | None) -> None:
+        if cmd is None:
+            return
+        for command, session in command_sessions:
+            if command is cmd:
+                _confirm_delete_session(
+                    session,
+                    client,
+                    state,
+                    palette_manager,
+                    cancel_streaming,
+                )
+                return
+
+    shortcuts: dict[str, Callable[[Command | None], None]] = {
+        Keys.ControlN: on_new,
+        Keys.ControlD: on_delete,
+    }
 
     return commands, shortcuts
