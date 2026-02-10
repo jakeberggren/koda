@@ -39,7 +39,6 @@ class Agent:
     ) -> None:
         self.provider: Provider = provider
         self._session_manager: SessionManager = session_manager
-        self._session_manager.create_session()
         self._system_message: str | None = system_message
         self.tools: ToolConfig | None = tools
         self.max_tool_iterations: int = max_tool_iterations
@@ -172,10 +171,8 @@ class Agent:
         return self._session_manager.active_session
 
     def _reset_provider_state(self) -> None:
-        """Reset provider-specific state (e.g., conversation threading) if supported."""
-        reset_state = getattr(self.provider, "reset_state", None)
-        if reset_state is not None and callable(reset_state):
-            reset_state()
+        """Reset provider-specific state (e.g., conversation threading)."""
+        self.provider.reset_state()
 
     def new_session(self) -> Session:
         session = self._session_manager.create_session()
@@ -190,8 +187,6 @@ class Agent:
         self._reset_provider_state()
         return session
 
-    def get_session_messages(self, session_id: UUID) -> list[Message]:
-        return self._session_manager.get_session_messages(session_id)
-
-    def delete_session(self, session_id: UUID) -> None:
-        self._session_manager.delete_session(session_id)
+    def delete_session(self, session_id: UUID) -> Session | None:
+        """Delete a session. Returns the new active session if the deleted one was active."""
+        return self._session_manager.delete_session(session_id)

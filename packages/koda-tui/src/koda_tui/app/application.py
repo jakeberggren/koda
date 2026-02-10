@@ -99,7 +99,7 @@ class KodaTuiApp:
         if name in ("provider", "model") or name.startswith("api_keys."):
             self.state.provider_name = self._settings.provider
             self.state.model_name = self._settings.model
-            self._client = _create_client(self._settings, self._sandbox_dir)
+            self._client.reconfigure()
             self.invalidate()
             return
         if name == "show_scrollbar":

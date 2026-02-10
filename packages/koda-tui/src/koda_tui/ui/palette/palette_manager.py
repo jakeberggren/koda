@@ -167,6 +167,20 @@ class PaletteManager:
         )
         self._push(dialog, width=width)
 
+    def replace_top(
+        self,
+        n: int,
+        commands: list[Command],
+        *,
+        footer: StyleAndTextTuples | None = None,
+        shortcuts: dict[str, Callable[[Command | None], None]] | None = None,
+    ) -> None:
+        """Pop *n* overlays and push a new palette in one operation."""
+        for _ in range(min(n, len(self._stack))):
+            self._stack.pop()
+        self._floats.clear()
+        self.open_palette(commands, footer=footer, shortcuts=shortcuts)
+
     def close(self) -> None:
         """Close the top overlay (Escape handler)."""
         if not self._stack:
