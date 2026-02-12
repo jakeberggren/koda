@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from koda.messages import AssistantMessage, Message, SystemMessage, ToolMessage, UserMessage
 from koda_tui.state import Message as TUIMessage
 from koda_tui.state import MessageRole
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
-def convert_messages(messages: list[Message]) -> list[TUIMessage]:  # noqa: C901 - allow for now
+
+def convert_messages(messages: Sequence[Message]) -> list[TUIMessage]:  # noqa: C901 - allow for now
     """Convert koda core messages to TUI messages.
 
     Walks the message list in order, properly linking tool results

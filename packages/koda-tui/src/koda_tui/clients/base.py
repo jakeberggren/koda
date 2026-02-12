@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import datetime
 from typing import Protocol
 from uuid import UUID
@@ -47,7 +47,7 @@ class Client(Protocol):
         """Create a new session."""
         ...
 
-    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, list[Message]]:
+    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, Sequence[Message]]:
         """Switch to a different session. Returns session info and messages."""
         ...
 

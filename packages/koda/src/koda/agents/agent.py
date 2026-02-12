@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda.messages import AssistantMessage, Message, ToolMessage, UserMessage
+from koda.messages import AssistantMessage, ToolMessage, UserMessage
 from koda.providers import exceptions as provider_exceptions
 from koda.providers.events import (
     ProviderEvent,
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from koda.providers import Provider
     from koda.sessions import Session, SessionManager
+    from koda.sessions.session import SessionMessage
     from koda.tools import ToolConfig
 
 logger = get_logger(__name__)
@@ -45,7 +46,7 @@ class Agent:
 
         logger.info("agent_initialized", provider=type(provider).__name__)
 
-    def _append_message(self, session_id: UUID, message: Message) -> None:
+    def _append_message(self, session_id: UUID, message: SessionMessage) -> None:
         """Append a message to the session."""
         self._session_manager.append_message(session_id, message)
 

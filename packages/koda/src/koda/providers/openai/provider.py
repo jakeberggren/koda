@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Sequence
 
 from openai import (
     APIConnectionError,
@@ -117,7 +117,7 @@ class OpenAIProvider(Provider):
 
     async def stream(
         self,
-        messages: list[Message],
+        messages: Sequence[Message],
         system_message: str | None = None,
         tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[ProviderEvent]:

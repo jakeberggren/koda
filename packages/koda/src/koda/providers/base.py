@@ -6,7 +6,7 @@ from koda.messages import Message
 from koda.tools import ToolDefinition
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Sequence
 
     from koda.messages import Message
     from koda.providers.events import ProviderEvent
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class ProviderAdapter(Protocol):
     """Protocol for converting between internal and provider-specific formats."""
 
-    def adapt_messages(self, messages: list[Message]) -> Any:
+    def adapt_messages(self, messages: Sequence[Message]) -> Any:
         """Convert internal messages to provider-specific format."""
         ...
 
@@ -45,7 +45,7 @@ class Provider(Protocol):
 
     def stream(
         self,
-        messages: list[Message],
+        messages: Sequence[Message],
         system_message: str | None = None,
         tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[ProviderEvent]: ...

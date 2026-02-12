@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING
 
 from koda.agents import Agent
 from koda.providers import get_model_registry, get_provider_registry
-from koda.sessions import InMemorySessionStore, SessionManager
+from koda.sessions import JsonSessionStore, SessionManager
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_tui.clients import Client
 from koda_tui.clients.base import SessionInfo
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncIterator, Sequence
     from pathlib import Path
     from uuid import UUID
 
@@ -27,7 +27,7 @@ class LocalClient(Client):
     def __init__(self, settings: SettingsManager, sandbox_dir: Path) -> None:
         self._settings = settings
         self._sandbox_dir = sandbox_dir
-        self._session_manager = SessionManager(InMemorySessionStore())
+        self._session_manager = SessionManager(JsonSessionStore())
         self._session_manager.create_session()
         self._agent = self._create_agent()
 
@@ -90,7 +90,7 @@ class LocalClient(Client):
         session = self._agent.new_session()
         return self._to_session_info(session)
 
-    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, list[Message]]:
+    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, Sequence[Message]]:
         """Switch to a different session. Returns session info and messages."""
         session = self._agent.switch_session(session_id)
         return self._to_session_info(session), session.messages

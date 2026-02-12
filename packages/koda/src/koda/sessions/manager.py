@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda.sessions.exceptions import NoActiveSessionError
+
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from koda.messages import Message
-    from koda.sessions.session import Session
+    from koda.sessions.session import Session, SessionMessage
     from koda.sessions.store import SessionStore
-
-from koda.sessions.exceptions import NoActiveSessionError
 
 
 class SessionManager:
@@ -61,7 +60,7 @@ class SessionManager:
         self._active_session_id = session.session_id
         return session
 
-    def append_message(self, session_id: UUID, message: Message) -> Session:
+    def append_message(self, session_id: UUID, message: SessionMessage) -> Session:
         """Append a message to a session."""
         return self._store.append_message(session_id, message)
 

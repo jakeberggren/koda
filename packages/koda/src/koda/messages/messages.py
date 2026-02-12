@@ -1,4 +1,5 @@
 from enum import StrEnum, auto
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -18,19 +19,19 @@ class Message(BaseModel):
 
 
 class UserMessage(Message):
-    role: MessageRole = Field(default=MessageRole.USER, frozen=True)
+    role: Literal[MessageRole.USER] = Field(default=MessageRole.USER, frozen=True)
 
 
 class AssistantMessage(Message):
-    role: MessageRole = Field(default=MessageRole.ASSISTANT, frozen=True)
+    role: Literal[MessageRole.ASSISTANT] = Field(default=MessageRole.ASSISTANT, frozen=True)
     tool_calls: list[ToolCall] = Field(default_factory=list)
 
 
 class SystemMessage(Message):
-    role: MessageRole = Field(default=MessageRole.SYSTEM, frozen=True)
+    role: Literal[MessageRole.SYSTEM] = Field(default=MessageRole.SYSTEM, frozen=True)
 
 
 class ToolMessage(Message):
-    role: MessageRole = Field(default=MessageRole.TOOL, frozen=True)
+    role: Literal[MessageRole.TOOL] = Field(default=MessageRole.TOOL, frozen=True)
     tool_name: str = Field()
     tool_result: ToolResult = Field()

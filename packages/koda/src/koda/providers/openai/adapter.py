@@ -1,4 +1,5 @@
 import json
+from collections.abc import Sequence
 from typing import Any
 
 import openai
@@ -47,7 +48,7 @@ class OpenAIAdapter(ProviderAdapter):
             return EasyInputMessageParam(role="assistant", content=message.content, type="message")
         raise UnknownMessageTypeError(type(message))
 
-    def adapt_messages(self, messages: list[Message]) -> ResponseInputParam:
+    def adapt_messages(self, messages: Sequence[Message]) -> ResponseInputParam:
         """Convert messages to OpenAI format."""
         result: ResponseInputParam = []
         for msg in messages:
