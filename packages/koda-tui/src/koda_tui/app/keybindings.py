@@ -75,7 +75,7 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:
     kb.add(Keys.Enter)(lambda event: _handle_enter(app, event))
     kb.add(Keys.ControlJ)(_handle_newline)
     kb.add(Keys.ControlC)(lambda _: _handle_cancel_or_exit(app))
-    kb.add(Keys.Escape, eager=True)(lambda _: _handle_escape(app))
+    kb.add(Keys.Escape)(lambda _: _handle_escape(app))
     kb.add(Keys.ControlP)(lambda _: _handle_palette_toggle(app))
 
     return kb
