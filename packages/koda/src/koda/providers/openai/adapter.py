@@ -24,7 +24,7 @@ from koda.providers.exceptions import UnknownMessageTypeError
 from koda.tools import ToolCall, ToolDefinition
 
 
-class OpenAIAdapter(ProviderAdapter):
+class OpenAIAdapter(ProviderAdapter[ResponseInputParam, list[FunctionToolParam] | Omit, Response]):
     """Adapter for converting to/from OpenAI's API format."""
 
     def _adapt_tool_message(self, message: ToolMessage) -> FunctionCallOutput:
