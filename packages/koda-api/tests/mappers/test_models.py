@@ -1,4 +1,4 @@
-from koda.providers.registry import ModelCapacity, ThinkingLevel
+from koda.providers.registry import ModelCapabilities, ThinkingLevel
 from koda.providers.registry import ModelDefinition as CoreModelDefinition
 from koda_api.mappers import map_model_definition_to_contract_model_definition
 
@@ -9,7 +9,7 @@ def test_map_model_definition_to_contract_model_definition() -> None:
         name="GPT 5.2",
         provider="openai",
         thinking={ThinkingLevel.HIGH},
-        capabilities={ModelCapacity.WEB_SEARCH},
+        capabilities={ModelCapabilities.WEB_SEARCH},
     )
 
     mapped = map_model_definition_to_contract_model_definition(core_model)

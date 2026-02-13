@@ -13,26 +13,26 @@ if TYPE_CHECKING:
     from koda.tools import ToolCall, ToolDefinition
 
 
-class ProviderAdapter(Protocol):
+class ProviderAdapter[MessagesT, ToolsT, ResponseT](Protocol):
     """Protocol for converting between internal and provider-specific formats."""
 
-    def adapt_messages(self, messages: Sequence[Message]) -> Any:
+    def adapt_messages(self, messages: Sequence[Message]) -> MessagesT:
         """Convert internal messages to provider-specific format."""
         ...
 
-    def adapt_tools(self, tools: list[ToolDefinition] | None) -> Any:
+    def adapt_tools(self, tools: list[ToolDefinition] | None) -> ToolsT:
         """Convert tool definitions to provider-specific format."""
         ...
 
-    def parse_tool_calls(self, response: Any) -> list[ToolCall]:
+    def parse_tool_calls(self, response: ResponseT) -> list[ToolCall]:
         """Parse tool calls from provider-specific response format."""
         ...
 
 
-class Provider(Protocol):
+class Provider[AdapterT: ProviderAdapter[Any, Any, Any]](Protocol):
     """Protocol for AI providers."""
 
-    adapter: ProviderAdapter
+    adapter: AdapterT
     """Adapter for converting to/from provider-specific formats."""
 
     def reset_state(self) -> None:

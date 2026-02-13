@@ -37,6 +37,7 @@ class EnvSettings(BaseSettings):
     # API keys (override keychain, cached in manager)
     openai_api_key: SecretStr | None = Field(default=None, description="OpenAI API key")
     anthropic_api_key: SecretStr | None = Field(default=None, description="Anthropic API key")
+    bergetai_api_key: SecretStr | None = Field(default=None, description="BergetAI API key")
 
     # Flags
     koda_backend: Literal["in_process", "http"] = Field(

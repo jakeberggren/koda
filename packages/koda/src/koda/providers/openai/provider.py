@@ -1,13 +1,6 @@
 from collections.abc import AsyncIterator, Iterator, Sequence
 
-from openai import (
-    APIConnectionError,
-    APIError,
-    APITimeoutError,
-    AsyncOpenAI,
-    AuthenticationError,
-    RateLimitError,
-)
+from openai import AsyncOpenAI, Omit
 from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseFunctionWebSearch,
@@ -21,7 +14,7 @@ from openai.types.responses import (
 from openai.types.responses.response_function_web_search import ActionSearch
 
 from koda.messages import Message
-from koda.providers import Provider, exceptions
+from koda.providers import Provider, exceptions, utils
 from koda.providers.events import (
     ProviderEvent,
     ProviderToolCompleted,
@@ -30,20 +23,20 @@ from koda.providers.events import (
     ToolCallRequested,
 )
 from koda.providers.openai import OpenAIAdapter
-from koda.providers.registry import ModelCapacity
+from koda.providers.registry import ModelCapabilities
 from koda.tools import ToolCall, ToolDefinition, ToolOutput, ToolResult
 from koda_common.logging import get_logger
 
 logger = get_logger(__name__)
 
 
-class OpenAIProvider(Provider):
+class OpenAIProvider(Provider[OpenAIAdapter]):
     def __init__(
         self,
         api_key: str,
-        model: str = "gpt-5.2",
+        model: str,
         base_url: str | None = None,
-        capabilities: set[ModelCapacity] | None = None,
+        capabilities: set[ModelCapabilities] | None = None,
     ) -> None:
         if not api_key or not api_key.strip():
             logger.error("empty_api_key", provider="OpenAI")
@@ -53,14 +46,17 @@ class OpenAIProvider(Provider):
         self.model: str = model
         self.adapter: OpenAIAdapter = OpenAIAdapter()
         self._last_response_id: str | None = None
-        self.capabilities: set[ModelCapacity] = capabilities or set()
+        self.capabilities: set[ModelCapabilities] = capabilities or set()
 
-        logger.info("openai_provider_initialized", model=model, has_base_url=base_url is not None)
+        logger.info("openai_provider_initialized", model=model)
 
     def _build_tools(self, tools: list[ToolDefinition] | None) -> list[ToolParam]:
         """Combine agent tools with capability-based provider tools."""
-        result: list[ToolParam] = self.adapter.adapt_tools(tools) if tools else []
-        if ModelCapacity.WEB_SEARCH in self.capabilities:
+        result: list[ToolParam] = []
+        adapted_tools = self.adapter.adapt_tools(tools)
+        if not isinstance(adapted_tools, Omit):
+            result.extend(adapted_tools)
+        if ModelCapabilities.WEB_SEARCH in self.capabilities:
             result.append(WebSearchToolParam(type="web_search"))
         return result
 
@@ -96,22 +92,6 @@ class OpenAIProvider(Provider):
             for call in tool_calls:
                 yield ToolCallRequested(call=call)
 
-    def _handle_provider_exceptions(self, e: Exception) -> None:
-        if isinstance(e, RateLimitError):
-            logger.error("provider_rate_limit_error", provider="OpenAI")
-            raise exceptions.ProviderRateLimitError("OpenAI", e) from e
-        if isinstance(e, AuthenticationError):
-            logger.error("provider_authentication_error", provider="OpenAI")
-            raise exceptions.ProviderAuthenticationError("OpenAI", e) from e
-        if isinstance(e, APIConnectionError | APITimeoutError):
-            logger.error("provider_connection_error", provider="OpenAI", error=repr(e))
-            raise exceptions.ProviderConnectionError("OpenAI", e) from e
-        if isinstance(e, APIError):
-            logger.error("provider_api_error", provider="OpenAI", error=repr(e))
-            raise exceptions.ProviderAPIError("OpenAI", e) from e
-        logger.error("provider_unknown_error", provider="OpenAI", error=repr(e))
-        raise exceptions.ProviderAPIError("OpenAI", e) from e
-
     def reset_state(self) -> None:
         self._last_response_id = None
 
@@ -138,10 +118,12 @@ class OpenAIProvider(Provider):
                 stream=True,
                 tools=openai_tools,
                 input=openai_input,
+                parallel_tool_calls=True,
+                prompt_cache_retention="24h",
             )
             async for event in stream:
                 for processed_event in self._process_event(event):
                     yield processed_event
             logger.info("stream_completed")
         except Exception as e:
-            self._handle_provider_exceptions(e)
+            utils.handle_provider_exceptions(e, provider="OpenAI")

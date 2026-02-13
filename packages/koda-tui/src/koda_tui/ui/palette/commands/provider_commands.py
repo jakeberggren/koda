@@ -10,10 +10,19 @@ if TYPE_CHECKING:
     from koda_common.contracts import KodaBackend
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
+PROVIDER_DISPLAY_NAMES: dict[str, str] = {
+    "openai": "OpenAI",
+    "bergetai": "BergetAI",
+}
+
+
+def _display_name(provider: str) -> str:
+    return PROVIDER_DISPLAY_NAMES.get(provider, provider.title())
+
 
 def _format_provider_label(provider: str, settings: SettingsManager) -> str:
     """Format provider label with connected status."""
-    label = provider.title()
+    label = _display_name(provider)
     if settings.get_api_key(provider):
         label += " [connected]"
     return label
@@ -31,7 +40,7 @@ def _open_api_key_dialog(
         palette_manager.close_all()
 
     palette_manager.open_dialog(
-        provider=provider.title(),
+        provider=_display_name(provider),
         on_submit=on_submit,
     )
 
@@ -48,7 +57,7 @@ def get_commands(
         Command(
             label=_format_provider_label(provider, settings),
             handler=partial(_open_api_key_dialog, provider, settings, palette_manager),
-            description=f"Configure {provider} API key",
+            description=f"Configure {_display_name(provider)} API key",
         )
         for provider in providers
     ]

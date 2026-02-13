@@ -43,6 +43,7 @@ def get_commands(
             label=_format_model_label(model, settings),
             handler=partial(_select_model, model, settings, palette_manager),
             description="",
+            group=settings.provider,
         )
         for model in models
     ]

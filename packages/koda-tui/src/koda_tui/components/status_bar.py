@@ -32,8 +32,8 @@ class StatusBarControl(UIControl):
         """Create the status bar content."""
         # Left side: provider/model info
         path = f" ~/{self._path_relative_to_home()}"
-        provider_and_model = f"{self._state.provider_name}/{self._state.model_name}"
-        left = f"{path} | {provider_and_model}"
+        provider_and_model = f"{self._state.provider_name} · {self._state.model_name}"
+        left = f"{path} · {provider_and_model}"
 
         # Right side: status
         status = self._get_status()

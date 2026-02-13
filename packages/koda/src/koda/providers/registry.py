@@ -50,7 +50,7 @@ class ThinkingLevel(StrEnum):
     EXTRA_HIGH = auto()
 
 
-class ModelCapacity(StrEnum):
+class ModelCapabilities(StrEnum):
     WEB_SEARCH = "web_search"
 
 
@@ -59,7 +59,7 @@ class ModelDefinition(BaseModel):
     name: str
     provider: str
     thinking: set[ThinkingLevel] = Field(default_factory=set)
-    capabilities: set[ModelCapacity] = Field(default_factory=set)
+    capabilities: set[ModelCapabilities] = Field(default_factory=set)
 
 
 class ModelRegistry:

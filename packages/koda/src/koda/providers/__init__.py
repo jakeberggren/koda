@@ -1,4 +1,5 @@
 from koda.providers.base import Provider, ProviderAdapter
+from koda.providers.berget import BergetAIProvider
 from koda.providers.events import ProviderEvent
 from koda.providers.openai import OpenAIProvider
 from koda.providers.registry import (
@@ -10,6 +11,7 @@ from koda.providers.registry import (
 )
 
 __all__ = [
+    "BergetAIProvider",
     "ModelDefinition",
     "ModelRegistry",
     "OpenAIProvider",
