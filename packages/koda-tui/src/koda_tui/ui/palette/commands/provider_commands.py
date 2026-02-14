@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
-    from koda_common import SettingsManager
-    from koda_tui.clients import Client
+    from koda_common import KodaBackend, SettingsManager
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 
@@ -37,12 +36,12 @@ def _open_api_key_dialog(
 
 
 def get_commands(
-    client: Client,
+    backend: KodaBackend,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> list[Command]:
     """Get commands for the provider selection palette."""
-    providers = client.list_providers()
+    providers = backend.list_providers()
 
     return [
         Command(

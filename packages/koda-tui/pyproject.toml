@@ -6,7 +6,7 @@ readme = "README.md"
 
 requires-python = ">=3.13"
 dependencies = [
-    "koda",
+    "koda-api",
     "koda-common[keychain]",
     "prompt-toolkit~=3.0.52",
     "rich~=14.2.0",
@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-koda = { workspace = true }
+koda-api = { workspace = true }
 koda-common = { workspace = true }
 
 [project.scripts]

@@ -4,20 +4,20 @@ import asyncio
 import contextlib
 from typing import TYPE_CHECKING
 
-from koda.providers.events import (
+from koda_common.contracts import (
+    BackendAuthenticationError,
     ProviderToolCompleted,
     ProviderToolStarted,
     TextDelta,
     ToolCallRequested,
     ToolCallResult,
 )
-from koda.providers.exceptions import ProviderAuthenticationError
 from koda_tui.app.response import ResponseLifecycle
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_tui.clients import Client
+    from koda_common import KodaBackend
     from koda_tui.state import AppState
 
 
@@ -52,8 +52,8 @@ class StreamProcessor:
                 await self._spinner_task
             self._spinner_task = None
 
-    async def _process_stream(self, message: str, client: Client) -> None:
-        async for event in client.chat(message):
+    async def _process_stream(self, message: str, backend: KodaBackend) -> None:
+        async for event in backend.chat(message):
             if isinstance(event, TextDelta):
                 await self._stop_spinner()
                 self._lifecycle.append_content(event.text)
@@ -68,18 +68,18 @@ class StreamProcessor:
                 )
             self._invalidate()
 
-    async def stream(self, text: str, client: Client) -> None:
+    async def stream(self, text: str, backend: KodaBackend) -> None:
         """Stream a message and process the full response lifecycle."""
         self._lifecycle.begin(text)
         self._invalidate()
 
         try:
             self._start_spinner()
-            self._streaming_task = asyncio.create_task(self._process_stream(text, client))
+            self._streaming_task = asyncio.create_task(self._process_stream(text, backend))
             await self._streaming_task
         except asyncio.CancelledError:
             pass
-        except ProviderAuthenticationError:
+        except BackendAuthenticationError:
             provider = self._state.provider_name
             error_msg = (
                 f"\n\n**Authentication failed for {provider.title()}.**\n\n"

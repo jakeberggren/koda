@@ -11,7 +11,7 @@ from koda_tui.ui.palette.commands.command import Command
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_tui.clients import Client, SessionInfo
+    from koda_common import KodaBackend, SessionInfo
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
@@ -25,13 +25,13 @@ _SESSION_FOOTER = [
 
 
 def open_session_list(
-    client: Client,
+    backend: KodaBackend,
     state: AppState,
     palette_manager: PaletteManager,
     cancel_streaming: Callable[[], None],
 ) -> None:
     """Open the session list palette."""
-    commands, shortcuts = get_commands(client, state, palette_manager, cancel_streaming)
+    commands, shortcuts = get_commands(backend, state, palette_manager, cancel_streaming)
     palette_manager.open_palette(commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
 
 
@@ -46,7 +46,7 @@ def _format_session_label(session: SessionInfo, active_session: SessionInfo) -> 
 
 def _switch_session(
     session: SessionInfo,
-    client: Client,
+    backend: KodaBackend,
     state: AppState,
     palette_manager: PaletteManager,
     cancel_streaming: Callable[[], None],
@@ -54,14 +54,14 @@ def _switch_session(
     """Switch to a session and update TUI state."""
     cancel_streaming()
     state.reset_conversation()
-    _, core_messages = client.switch_session(session.session_id)
-    state.messages = convert_messages(core_messages)
+    _, messages = backend.switch_session(session.session_id)
+    state.messages = convert_messages(messages)
     palette_manager.close_all()
 
 
 def _confirm_delete_session(
     session: SessionInfo,
-    client: Client,
+    backend: KodaBackend,
     state: AppState,
     palette_manager: PaletteManager,
     cancel_streaming: Callable[[], None],
@@ -69,13 +69,13 @@ def _confirm_delete_session(
     """Open a confirmation dialog to delete a session."""
 
     def on_confirm() -> None:
-        new_active = client.delete_session(session.session_id)
+        new_active = backend.delete_session(session.session_id)
         if new_active is not None:
             # On deletion of the active session, clear stale messages from the screen.
             cancel_streaming()
             state.reset_conversation()
         # Replace confirm dialog + stale session list with a fresh session list.
-        commands, shortcuts = get_commands(client, state, palette_manager, cancel_streaming)
+        commands, shortcuts = get_commands(backend, state, palette_manager, cancel_streaming)
         palette_manager.replace_top(2, commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
 
     palette_manager.open_confirm(
@@ -85,14 +85,14 @@ def _confirm_delete_session(
 
 
 def get_commands(  # noqa: C901
-    client: Client,
+    backend: KodaBackend,
     state: AppState,
     palette_manager: PaletteManager,
     cancel_streaming: Callable[[], None],
 ) -> tuple[list[Command], dict[str, Callable[[Command | None], None]]]:
     """Get commands and shortcuts for the session list palette."""
-    sessions = client.list_sessions()
-    active = client.active_session()
+    sessions = backend.list_sessions()
+    active = backend.active_session()
 
     command_sessions: list[tuple[Command, SessionInfo]] = []
     for session in sessions:
@@ -101,7 +101,7 @@ def get_commands(  # noqa: C901
             handler=partial(
                 _switch_session,
                 session,
-                client,
+                backend,
                 state,
                 palette_manager,
                 cancel_streaming,
@@ -113,7 +113,7 @@ def get_commands(  # noqa: C901
 
     def on_new(_cmd: Command | None) -> None:
         cancel_streaming()
-        client.new_session()
+        backend.new_session()
         state.reset_conversation()
         palette_manager.close_all()
 
@@ -124,7 +124,7 @@ def get_commands(  # noqa: C901
             if command is cmd:
                 _confirm_delete_session(
                     session,
-                    client,
+                    backend,
                     state,
                     palette_manager,
                     cancel_streaming,

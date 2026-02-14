@@ -18,8 +18,7 @@ if TYPE_CHECKING:
     from prompt_toolkit import Application
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-    from koda_common import SettingsManager
-    from koda_tui.clients import Client
+    from koda_common import KodaBackend, SettingsManager
     from koda_tui.state import AppState
     from koda_tui.ui.layout import TUILayout
     from koda_tui.ui.palette.commands.command import Command
@@ -80,10 +79,10 @@ class PaletteManager:
         self._stack.append((content, float_item))
         self._focus_content(content)
 
-    def _get_default_commands(self, client: Client) -> list[Command]:
+    def _get_default_commands(self, backend: KodaBackend) -> list[Command]:
         """Build the default root command list."""
         return get_commands(
-            client=client,
+            backend=backend,
             settings=self._settings,
             state=self._state,
             palette_manager=self,
@@ -102,12 +101,12 @@ class PaletteManager:
         height = max(5, min(20, term_height // 2))
         return width, height
 
-    def toggle(self, client: Client) -> None:
+    def toggle(self, backend: KodaBackend) -> None:
         """Toggle command palette visibility."""
         if self._is_open:
             self.close_all()
         else:
-            commands = self._get_default_commands(client)
+            commands = self._get_default_commands(backend)
             self.open_palette(commands)
 
     def open_palette(

@@ -39,7 +39,10 @@ class EnvSettings(BaseSettings):
     anthropic_api_key: SecretStr | None = Field(default=None, description="Anthropic API key")
 
     # Flags
-    koda_use_mock_client: bool = Field(default=False, description="Use mock client for testing")
+    koda_backend: Literal["in_process", "http"] = Field(
+        default="in_process",
+        description="Backend selection for Koda clients",
+    )
 
     # Database
     koda_db_path: Path = Field(
