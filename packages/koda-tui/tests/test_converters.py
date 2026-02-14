@@ -1,7 +1,14 @@
 """Tests for koda_tui.converters.convert_messages."""
 
-from koda.messages import AssistantMessage, SystemMessage, ToolMessage, UserMessage
-from koda.tools import ToolCall, ToolOutput, ToolResult
+from koda_common.contracts import (
+    AssistantMessage,
+    SystemMessage,
+    ToolCall,
+    ToolMessage,
+    ToolOutput,
+    ToolResult,
+    UserMessage,
+)
 from koda_tui.converters import convert_messages
 from koda_tui.state import MessageRole
 

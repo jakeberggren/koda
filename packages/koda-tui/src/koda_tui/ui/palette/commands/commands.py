@@ -8,14 +8,13 @@ from koda_tui.ui.palette.commands.command import Command
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_common import SettingsManager
-    from koda_tui.clients import Client
+    from koda_common import KodaBackend, SettingsManager
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 
 def get_commands(  # noqa: C901 - allow complex
-    client: Client,
+    backend: KodaBackend,
     settings: SettingsManager,
     state: AppState,
     palette_manager: PaletteManager,
@@ -25,7 +24,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_connect_provider() -> None:
         commands = provider_commands.get_commands(
-            client=client,
+            backend=backend,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -33,7 +32,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_switch_model() -> None:
         commands = model_commands.get_commands(
-            client=client,
+            backend=backend,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -54,12 +53,12 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_new_session() -> None:
         cancel_streaming()
-        client.new_session()
+        backend.new_session()
         state.reset_conversation()
         palette_manager.close_all()
 
     def cmd_list_sessions() -> None:
-        session_commands.open_session_list(client, state, palette_manager, cancel_streaming)
+        session_commands.open_session_list(backend, state, palette_manager, cancel_streaming)
 
     return [
         Command(

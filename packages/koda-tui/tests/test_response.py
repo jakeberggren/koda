@@ -1,4 +1,4 @@
-from koda.tools import ToolCall
+from koda_common.contracts import ToolCall
 from koda_tui.app.response import ResponseLifecycle
 from koda_tui.state import AppState, MessageRole
 

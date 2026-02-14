@@ -150,34 +150,6 @@ def test_set_api_key_writes_secrets_store_and_notifies(
     assert changes == [("api_keys.openai", None, "sk-new")]
 
 
-def test_use_mock_client_flag_defaults_false(manager: SettingsManager) -> None:
-    assert manager.use_mock_client is False
-
-
-@pytest.mark.parametrize(
-    ("env_value", "expected"),
-    [
-        ("true", True),
-        ("True", True),
-        ("1", True),
-        ("false", False),
-        ("False", False),
-        ("0", False),
-    ],
-)
-def test_use_mock_client_flag_from_env(
-    monkeypatch: pytest.MonkeyPatch,
-    settings_store: SpySettingsStore,
-    secrets_store: SpySecretsStore,
-    env_value: str,
-    *,
-    expected: bool,
-) -> None:
-    monkeypatch.setenv("KODA_USE_MOCK_CLIENT", env_value)
-    manager = SettingsManager(settings_store=settings_store, secrets_store=secrets_store)
-    assert manager.use_mock_client is expected
-
-
 def test_singleton_get_instance_creates_when_missing() -> None:
     # We just assert it returns an instance and caches it.
     SettingsManager.reset_instance()

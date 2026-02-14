@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
+from koda_api.backends import KodaBackend, create_backend
 from prompt_toolkit import Application
 
 from koda_common import SettingsManager
@@ -11,18 +12,10 @@ from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.output import SynchronizedOutput
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
-from koda_tui.clients import Client, LocalClient, MockClient
 from koda_tui.state import AppState
 from koda_tui.ui.layout import TUILayout
 from koda_tui.ui.palette import PaletteManager
 from koda_tui.ui.styles import get_style
-
-
-def _create_client(settings: SettingsManager, sandbox_dir: Path) -> Client:
-    """Create and configure the client."""
-    if settings.use_mock_client:
-        return MockClient()
-    return LocalClient(settings, sandbox_dir)
 
 
 class KodaTuiApp:
@@ -31,11 +24,11 @@ class KodaTuiApp:
     def __init__(
         self,
         sandbox_dir: Path | None = None,
-        client: Client | None = None,
+        backend: KodaBackend | None = None,
     ) -> None:
         self._sandbox_dir = sandbox_dir or Path.cwd().resolve()
         self._settings = SettingsManager.get_instance()
-        self._client = client or _create_client(self._settings, self._sandbox_dir)
+        self._backend = backend or create_backend(self._settings, self._sandbox_dir)
 
         # Subscribe to settings changes
         self._unsubscribe = self._settings.subscribe(self._on_settings_changed)
@@ -99,7 +92,7 @@ class KodaTuiApp:
         if name in ("provider", "model") or name.startswith("api_keys."):
             self.state.provider_name = self._settings.provider
             self.state.model_name = self._settings.model
-            self._client.reconfigure()
+            self._backend.reconfigure()
             self.invalidate()
             return
         if name == "show_scrollbar":
@@ -150,7 +143,7 @@ class KodaTuiApp:
 
     async def send_message(self, text: str) -> None:
         """Send a message and process the response stream."""
-        await self._stream_processor.stream(text, self._client)
+        await self._stream_processor.stream(text, self._backend)
         self._message_queue.kick()
 
     def cancel_streaming(self) -> None:
@@ -159,7 +152,7 @@ class KodaTuiApp:
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""
-        self._palette_manager.toggle(self._client)
+        self._palette_manager.toggle(self._backend)
 
     def exit(self) -> None:
         """Exit the application."""

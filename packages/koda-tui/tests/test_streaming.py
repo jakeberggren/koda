@@ -4,8 +4,14 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from koda.providers.events import TextDelta, ToolCallRequested, ToolCallResult
-from koda.tools import ToolCall, ToolOutput, ToolResult
+from koda_common.contracts import (
+    TextDelta,
+    ToolCall,
+    ToolCallRequested,
+    ToolCallResult,
+    ToolOutput,
+    ToolResult,
+)
 from koda_tui.app.streaming import StreamProcessor
 from koda_tui.state import AppState, MessageRole
 

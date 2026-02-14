@@ -143,6 +143,6 @@ class SettingsManager:
     # Flags
 
     @property
-    def use_mock_client(self) -> bool:
-        """Whether to use mock client (env flag, not persisted)."""
-        return self._env.koda_use_mock_client
+    def koda_backend(self) -> str:
+        """Backend kind selected via environment (not persisted)."""
+        return self._env.koda_backend

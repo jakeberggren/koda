@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 
-from koda.tools import ToolCall
+from koda_common.contracts import ToolCall
 
 
 class MessageRole(Enum):

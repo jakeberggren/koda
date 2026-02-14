@@ -5,9 +5,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from koda.messages import Message
-from koda.providers import ModelDefinition, ProviderEvent
-
 
 class SessionInfo(BaseModel):
     session_id: UUID
@@ -16,14 +13,14 @@ class SessionInfo(BaseModel):
     created_at: datetime
 
 
-class Client(Protocol):
-    """Protocol for TUI clients."""
+class KodaBackend[EventT, ModelT, MessageT](Protocol):
+    """Protocol shared by all Koda client backends."""
 
     def reconfigure(self) -> None:
         """Rebuild internal state for the current settings, preserving sessions."""
         ...
 
-    def chat(self, message: str) -> AsyncIterator[ProviderEvent]:
+    def chat(self, message: str) -> AsyncIterator[EventT]:
         """Send a message and stream response events."""
         ...
 
@@ -31,7 +28,7 @@ class Client(Protocol):
         """List available providers."""
         ...
 
-    def list_models(self, provider: str | None = None) -> list[ModelDefinition]:
+    def list_models(self, provider: str | None = None) -> list[ModelT]:
         """List available models, optionally filtered by provider."""
         ...
 
@@ -47,7 +44,7 @@ class Client(Protocol):
         """Create a new session."""
         ...
 
-    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, Sequence[Message]]:
+    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, Sequence[MessageT]]:
         """Switch to a different session. Returns session info and messages."""
         ...
 
