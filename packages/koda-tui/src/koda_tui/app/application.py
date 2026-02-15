@@ -4,9 +4,9 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-from koda_api.backends import KodaBackend, create_backend
 from prompt_toolkit import Application
 
+from koda_api.backends import KodaBackend, create_backend
 from koda_common import SettingsManager
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.output import SynchronizedOutput
