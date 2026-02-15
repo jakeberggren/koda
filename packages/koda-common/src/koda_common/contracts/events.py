@@ -1,31 +1,31 @@
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
 
 from koda_common.contracts.tools import ToolCall, ToolResult
 
 
-@dataclass(frozen=True, slots=True)
-class TextDelta:
+class EventBase(BaseModel):
+    # Contract models are immutable and strict at the boundary.
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TextDelta(EventBase):
     text: str
 
 
-@dataclass(frozen=True, slots=True)
-class ToolCallRequested:
+class ToolCallRequested(EventBase):
     call: ToolCall
 
 
-@dataclass(frozen=True, slots=True)
-class ToolCallResult:
+class ToolCallResult(EventBase):
     tool_name: str
     result: ToolResult
 
 
-@dataclass(frozen=True, slots=True)
-class ProviderToolStarted:
+class ProviderToolStarted(EventBase):
     call: ToolCall
 
 
-@dataclass(frozen=True, slots=True)
-class ProviderToolCompleted:
+class ProviderToolCompleted(EventBase):
     tool_name: str
     result: ToolResult
 

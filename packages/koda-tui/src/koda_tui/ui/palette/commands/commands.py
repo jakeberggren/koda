@@ -8,7 +8,8 @@ from koda_tui.ui.palette.commands.command import Command
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_common import KodaBackend, SettingsManager
+    from koda_common import SettingsManager
+    from koda_common.contracts import KodaBackend
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
 

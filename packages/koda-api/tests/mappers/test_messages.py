@@ -60,4 +60,4 @@ def test_map_messages_to_contract_messages() -> None:
 
 def test_map_message_to_contract_message_unsupported_type() -> None:
     with pytest.raises(UnsupportedCoreMessageTypeError):
-        map_message_to_contract_message(object())  # type: ignore[arg-type]
+        map_message_to_contract_message(object())

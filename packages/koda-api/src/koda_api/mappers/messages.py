@@ -1,3 +1,5 @@
+from functools import singledispatch
+
 from koda.messages import AssistantMessage as CoreAssistantMessage
 from koda.messages import Message as CoreMessage
 from koda.messages import SystemMessage as CoreSystemMessage
@@ -21,26 +23,38 @@ class UnsupportedCoreMessageTypeError(TypeError):
         super().__init__(f"Unsupported message type: {type(core_message).__name__}")
 
 
+@singledispatch
 def map_message_to_contract_message(core_message: CoreMessage) -> Message:
     """Map core message to contract message."""
-    if isinstance(core_message, CoreUserMessage):
-        return UserMessage(content=core_message.content)
-    if isinstance(core_message, CoreSystemMessage):
-        return SystemMessage(content=core_message.content)
-    if isinstance(core_message, CoreAssistantMessage):
-        return AssistantMessage(
-            content=core_message.content,
-            tool_calls=[
-                map_tool_call_to_contract_tool_call(call) for call in core_message.tool_calls
-            ],
-        )
-    if isinstance(core_message, CoreToolMessage):
-        return ToolMessage(
-            content=core_message.content,
-            tool_name=core_message.tool_name,
-            tool_result=map_tool_result_to_contract_tool_result(core_message.tool_result),
-        )
     raise UnsupportedCoreMessageTypeError(core_message)
+
+
+# Core text messages
+@map_message_to_contract_message.register
+def _(core_message: CoreUserMessage) -> Message:
+    return UserMessage(content=core_message.content)
+
+
+@map_message_to_contract_message.register
+def _(core_message: CoreSystemMessage) -> Message:
+    return SystemMessage(content=core_message.content)
+
+
+# Core assistant/tool messages
+@map_message_to_contract_message.register
+def _(core_message: CoreAssistantMessage) -> Message:
+    tool_calls = [map_tool_call_to_contract_tool_call(call) for call in core_message.tool_calls]
+    return AssistantMessage(content=core_message.content, tool_calls=tool_calls)
+
+
+@map_message_to_contract_message.register
+def _(core_message: CoreToolMessage) -> Message:
+    tool_result = map_tool_result_to_contract_tool_result(core_message.tool_result)
+    return ToolMessage(
+        content=core_message.content,
+        tool_name=core_message.tool_name,
+        tool_result=tool_result,
+    )
 
 
 def map_messages_to_contract_messages(core_messages: list[CoreMessage]) -> list[Message]:

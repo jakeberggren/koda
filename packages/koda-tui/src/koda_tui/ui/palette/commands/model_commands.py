@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
-    from koda_common import KodaBackend, ModelDefinition, SettingsManager
+    from koda_common import SettingsManager
+    from koda_common.contracts import KodaBackend, ModelDefinition
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 

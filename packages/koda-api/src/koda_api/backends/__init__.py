@@ -2,8 +2,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from koda_api.backends.in_process import InProcessBackend
-from koda_common import KodaBackend, ModelDefinition, SettingsManager
-from koda_common.contracts import Message, StreamEvent
+from koda_common import SettingsManager
+from koda_common.contracts import KodaBackend, Message, ModelDefinition, StreamEvent
 
 type Backend = KodaBackend[StreamEvent, ModelDefinition, Message]
 type BackendFactory = Callable[[SettingsManager, Path], Backend]
