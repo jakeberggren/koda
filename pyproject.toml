@@ -74,7 +74,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.isort]
-known-first-party = ["koda", "koda_tui", "koda_common"]
+known-first-party = ["koda", "koda_api", "koda_tui", "koda_common"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 5
@@ -86,5 +86,10 @@ required-environments = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["packages/koda/tests", "packages/koda-tui/tests", "packages/koda-common/tests"]
-addopts = "--import-mode=importlib --cov=koda --cov=koda_tui --cov=koda_common --cov-report=term"
+testpaths = [
+    "packages/koda/tests",
+    "packages/koda-api/tests",
+    "packages/koda-tui/tests",
+    "packages/koda-common/tests",
+]
+addopts = "--import-mode=importlib --cov=koda --cov=koda_api --cov=koda_tui --cov=koda_common --cov-report=term"
