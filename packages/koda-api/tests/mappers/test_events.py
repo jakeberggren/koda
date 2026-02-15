@@ -65,4 +65,4 @@ def test_map_provider_tool_completed_event() -> None:
 
 def test_map_provider_event_to_stream_event_unsupported_type() -> None:
     with pytest.raises(UnsupportedProviderEventTypeError):
-        map_provider_event_to_stream_event(object())  # type: ignore[arg-type]
+        map_provider_event_to_stream_event(object())

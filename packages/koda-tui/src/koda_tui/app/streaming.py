@@ -17,7 +17,7 @@ from koda_tui.app.response import ResponseLifecycle
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_common import KodaBackend
+    from koda_common.contracts import KodaBackend
     from koda_tui.state import AppState
 
 

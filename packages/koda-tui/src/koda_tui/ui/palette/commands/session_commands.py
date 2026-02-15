@@ -11,7 +11,7 @@ from koda_tui.ui.palette.commands.command import Command
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_common import KodaBackend, SessionInfo
+    from koda_common.contracts import KodaBackend, SessionInfo
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
 

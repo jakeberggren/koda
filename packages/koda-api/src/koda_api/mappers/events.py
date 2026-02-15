@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from functools import singledispatch
+
 from koda.providers.events import ProviderEvent
 from koda.providers.events import ProviderToolCompleted as CoreProviderToolCompleted
 from koda.providers.events import ProviderToolStarted as CoreProviderToolStarted
@@ -23,22 +27,40 @@ class UnsupportedProviderEventTypeError(TypeError):
         super().__init__(f"Unsupported provider event type: {type(provider_event).__name__}")
 
 
-def map_provider_event_to_stream_event(provider_event: ProviderEvent) -> StreamEvent:  # noqa: C901 - allow complex
+@singledispatch
+def map_provider_event_to_stream_event(provider_event: ProviderEvent) -> StreamEvent:
     """Map provider event to contract stream event."""
-    if isinstance(provider_event, CoreTextDelta):
-        return TextDelta(text=provider_event.text)
-    if isinstance(provider_event, CoreToolCallRequested):
-        return ToolCallRequested(call=map_tool_call_to_contract_tool_call(provider_event.call))
-    if isinstance(provider_event, CoreToolCallResult):
-        return ToolCallResult(
-            tool_name=provider_event.tool_name,
-            result=map_tool_result_to_contract_tool_result(provider_event.result),
-        )
-    if isinstance(provider_event, CoreProviderToolStarted):
-        return ProviderToolStarted(call=map_tool_call_to_contract_tool_call(provider_event.call))
-    if isinstance(provider_event, CoreProviderToolCompleted):
-        return ProviderToolCompleted(
-            tool_name=provider_event.tool_name,
-            result=map_tool_result_to_contract_tool_result(provider_event.result),
-        )
     raise UnsupportedProviderEventTypeError(provider_event)
+
+
+# Core text streaming events
+@map_provider_event_to_stream_event.register
+def _(event: CoreTextDelta) -> StreamEvent:
+    return TextDelta(text=event.text)
+
+
+# Core tool lifecycle events
+@map_provider_event_to_stream_event.register
+def _(event: CoreToolCallRequested) -> StreamEvent:
+    return ToolCallRequested(call=map_tool_call_to_contract_tool_call(event.call))
+
+
+@map_provider_event_to_stream_event.register
+def _(event: CoreToolCallResult) -> StreamEvent:
+    return ToolCallResult(
+        tool_name=event.tool_name,
+        result=map_tool_result_to_contract_tool_result(event.result),
+    )
+
+
+@map_provider_event_to_stream_event.register
+def _(event: CoreProviderToolStarted) -> StreamEvent:
+    return ProviderToolStarted(call=map_tool_call_to_contract_tool_call(event.call))
+
+
+@map_provider_event_to_stream_event.register
+def _(event: CoreProviderToolCompleted) -> StreamEvent:
+    return ProviderToolCompleted(
+        tool_name=event.tool_name,
+        result=map_tool_result_to_contract_tool_result(event.result),
+    )
