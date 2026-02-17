@@ -38,6 +38,7 @@ class PartialToolCallState:
     argument_chunks: list[str] = field(default_factory=list)
 
     def add_delta(self, tool_call: ChoiceDeltaToolCall) -> None:
+        """Accumulate streamed tool-call fields into this partial state."""
         if tool_call.id:
             self.call_id = tool_call.id
 
@@ -51,6 +52,7 @@ class PartialToolCallState:
             self.argument_chunks.append(function.arguments)
 
     def parse_arguments(self) -> dict[str, object]:
+        """Parse buffered argument chunks into a JSON object."""
         raw_arguments = "".join(self.argument_chunks) or "{}"
         try:
             parsed = json.loads(raw_arguments)
@@ -59,6 +61,7 @@ class PartialToolCallState:
         return parsed if isinstance(parsed, dict) else {}
 
     def to_tool_call_requested(self) -> ToolCallRequested | None:
+        """Build a tool-call event when required fields are present."""
         if not self.call_id or not self.tool_name:
             return None
         arguments: dict[str, Any] = self.parse_arguments()
@@ -80,6 +83,7 @@ class BergetAIProvider(Provider[BergetAIAdapter]):
         base_url: str | None = "https://api.berget.ai/v1",
         capabilities: set[ModelCapabilities] | None = None,
     ) -> None:
+        """Initialize the Berget provider client and runtime configuration."""
         if not api_key or not api_key.strip():
             logger.error("empty_api_key", provider="BergetAI")
             raise exceptions.EmptyApiKeyError("BergetAI")
@@ -96,6 +100,7 @@ class BergetAIProvider(Provider[BergetAIAdapter]):
         partial_tool_calls: dict[int, PartialToolCallState],
         tool_call: ChoiceDeltaToolCall,
     ) -> None:
+        """Collect one streamed tool-call delta by its index."""
         index = tool_call.index
         if index is None:
             return
@@ -107,6 +112,7 @@ class BergetAIProvider(Provider[BergetAIAdapter]):
         self,
         partial_tool_calls: dict[int, PartialToolCallState],
     ) -> list[ToolCallRequested]:
+        """Emit completed tool-call events in stable index order."""
         events: list[ToolCallRequested] = []
         for idx in sorted(partial_tool_calls):
             event = partial_tool_calls[idx].to_tool_call_requested()
@@ -120,6 +126,7 @@ class BergetAIProvider(Provider[BergetAIAdapter]):
         choice: Choice,
         partial_tool_calls: dict[int, PartialToolCallState],
     ) -> list[ProviderEvent]:
+        """Translate one streamed choice into provider events."""
         events: list[ProviderEvent] = []
         delta = choice.delta
         if delta is not None:
@@ -140,6 +147,7 @@ class BergetAIProvider(Provider[BergetAIAdapter]):
         stream: AsyncStream[ChatCompletionChunk],
         partial_tool_calls: dict[int, PartialToolCallState],
     ) -> AsyncIterator[ProviderEvent]:
+        """Yield provider events from streamed chat completion chunks."""
         async for chunk in stream:
             for choice in chunk.choices:
                 for event in self._process_choice(choice, partial_tool_calls):
@@ -151,6 +159,7 @@ class BergetAIProvider(Provider[BergetAIAdapter]):
         system_message: str | None = None,
         tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[ProviderEvent]:
+        """Run a streaming completion and emit text/tool-call events."""
         if not messages:
             logger.warning("stream_called_with_empty_messages")
             raise exceptions.EmptyMessagesListError

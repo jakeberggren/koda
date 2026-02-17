@@ -41,15 +41,18 @@ class BergetAIAdapter(
 
     @staticmethod
     def _adapt_user_message(message: UserMessage) -> ChatCompletionUserMessageParam:
+        """Convert an internal user message to chat completion format."""
         return ChatCompletionUserMessageParam(role="user", content=message.content)
 
     @staticmethod
     def _adapt_assistant_message(message: AssistantMessage) -> ChatCompletionAssistantMessageParam:
+        """Convert an internal assistant message to chat completion format."""
         # Tool calls are represented by provider events and routed back as ToolMessage.
         return ChatCompletionAssistantMessageParam(role="assistant", content=message.content)
 
     @staticmethod
     def _serialize_tool_output(message: ToolMessage) -> str:
+        """Serialize tool output payload as JSON for tool-role messages."""
         tool_output = message.tool_result.output
         payload: dict[str, Any] = {
             "content": tool_output.content,
@@ -60,6 +63,7 @@ class BergetAIAdapter(
         return json.dumps(payload)
 
     def _adapt_tool_message(self, message: ToolMessage) -> ChatCompletionToolMessageParam:
+        """Convert an internal tool message to chat completion format."""
         return ChatCompletionToolMessageParam(
             role="tool",
             tool_call_id=message.tool_result.call_id,
@@ -67,6 +71,7 @@ class BergetAIAdapter(
         )
 
     def adapt_messages(self, messages: Sequence[Message]) -> list[ChatCompletionMessageParam]:
+        """Convert internal messages to provider chat completion messages."""
         result: list[ChatCompletionMessageParam] = []
         for message in messages:
             if isinstance(message, ToolMessage):
@@ -81,20 +86,9 @@ class BergetAIAdapter(
             raise UnknownMessageTypeError(type(message))
         return result
 
-    def _adapt_tool(self, tool: ToolDefinition) -> ChatCompletionToolUnionParam:
-        schema = self._simplify_schema(tool.parameters_model.model_json_schema())
-        return {
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "strict": True,
-                "parameters": schema,
-            },
-        }
-
     @staticmethod
     def _remove_null_type_from_anyof(options: list[Any]) -> list[Any]:
+        """Drop explicit `null` branches from an `anyOf` options list."""
         return [
             option
             for option in options
@@ -106,6 +100,7 @@ class BergetAIAdapter(
         result: dict[str, Any],
         options: list[Any],
     ) -> bool:
+        """Flatten a single-object `anyOf` branch into the current schema node."""
         if len(options) != 1 or not isinstance(options[0], dict):
             return False
         inner = self._simplify_schema(options[0])
@@ -117,6 +112,7 @@ class BergetAIAdapter(
         return True
 
     def _simplify_schema_dict(self, value: dict[str, Any]) -> dict[str, Any]:
+        """Simplify a schema object recursively for provider compatibility."""
         result: dict[str, Any] = {}
         for key, raw in value.items():
             # Relax strict Pydantic/OpenAI schema features that some providers reject.
@@ -139,32 +135,43 @@ class BergetAIAdapter(
             return self._simplify_schema_dict(value)
         return value
 
+    def _adapt_tool(self, tool: ToolDefinition) -> ChatCompletionToolUnionParam:
+        """Convert a tool definition into the provider tool schema."""
+        schema = self._simplify_schema(tool.parameters_model.model_json_schema())
+        return {
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "strict": True,
+                "parameters": schema,
+            },
+        }
+
     def adapt_tools(
         self,
         tools: list[ToolDefinition] | None,
     ) -> list[ChatCompletionToolUnionParam] | Omit:
+        """Convert tool definitions or omit the field when none are provided."""
         if not tools:
             return omit
         return [self._adapt_tool(tool) for tool in tools]
 
-    @staticmethod
-    def _parse_function_tool_call(
-        tool_call: ChatCompletionMessageFunctionToolCall,
-    ) -> ToolCall:
-        parsed_arguments = json.loads(tool_call.function.arguments)
-        if not isinstance(parsed_arguments, dict):
-            raise InvalidToolCallArgumentsError
-        return ToolCall(
-            tool_name=tool_call.function.name,
-            arguments=parsed_arguments,
-            call_id=tool_call.id,
-        )
-
     def parse_tool_calls(self, response: ChatCompletion) -> list[ToolCall]:
+        """Extract function-style tool calls from a completion response."""
         calls: list[ToolCall] = []
         for choice in response.choices:
             for tool_call in choice.message.tool_calls or ():
                 if not isinstance(tool_call, ChatCompletionMessageFunctionToolCall):
                     continue
-                calls.append(self._parse_function_tool_call(tool_call))
+                parsed_arguments = json.loads(tool_call.function.arguments)
+                if not isinstance(parsed_arguments, dict):
+                    raise InvalidToolCallArgumentsError
+                calls.append(
+                    ToolCall(
+                        tool_name=tool_call.function.name,
+                        arguments=parsed_arguments,
+                        call_id=tool_call.id,
+                    ),
+                )
         return calls
