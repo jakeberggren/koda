@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Callable
 from typing import Any
 
@@ -26,7 +28,7 @@ class SettingsManager:
     to Settings automatically makes it available here - no manager changes needed.
     """
 
-    _instance: "SettingsManager | None" = None
+    _instance: SettingsManager | None = None
 
     def __init__(
         self,
@@ -42,7 +44,7 @@ class SettingsManager:
         self._callbacks: list[SettingsChangeCallback] = []
 
     @classmethod
-    def get_instance(cls) -> "SettingsManager":
+    def get_instance(cls) -> SettingsManager:
         """Get a singleton instance of the settings manager."""
         if cls._instance is None:
             cls._instance = cls()
