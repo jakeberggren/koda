@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from koda.messages import Message as CoreMessage
-    from koda_common import SettingsManager
+    from koda_common.settings import SettingsManager
 
 
 class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):

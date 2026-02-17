@@ -7,7 +7,7 @@ import pytest
 from koda_api.backends import UnsupportedKodaBackendError, create_backend
 
 if TYPE_CHECKING:
-    from koda_common import SettingsManager
+    from koda_common.settings import SettingsManager
 
 
 def test_create_backend_uses_in_process_factory(monkeypatch: pytest.MonkeyPatch) -> None:

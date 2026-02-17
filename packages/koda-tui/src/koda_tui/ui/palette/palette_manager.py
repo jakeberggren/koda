@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from prompt_toolkit import Application
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-    from koda_common import SettingsManager
     from koda_common.contracts import KodaBackend
+    from koda_common.settings import SettingsManager
     from koda_tui.state import AppState
     from koda_tui.ui.layout import TUILayout
     from koda_tui.ui.palette.commands.command import Command

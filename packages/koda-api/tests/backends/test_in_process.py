@@ -19,7 +19,7 @@ from koda_api.backends.in_process import InProcessBackend
 from koda_common.contracts import BackendAuthenticationError, TextDelta, UserMessage
 
 if TYPE_CHECKING:
-    from koda_common import SettingsManager
+    from koda_common.settings import SettingsManager
 
 
 class _FakeAgent:

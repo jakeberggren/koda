@@ -4,8 +4,8 @@ from enum import StrEnum, auto
 from pydantic import BaseModel, Field
 
 from koda.providers import Provider, exceptions
-from koda_common import SettingsManager
 from koda_common.logging import get_logger
+from koda_common.settings import SettingsManager
 
 logger = get_logger(__name__)
 

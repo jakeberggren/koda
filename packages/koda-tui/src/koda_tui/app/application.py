@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from prompt_toolkit import Application
 
-from koda_api.backends import KodaBackend, create_backend
-from koda_common import SettingsManager
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.output import SynchronizedOutput
 from koda_tui.app.queue import MessageQueue
@@ -17,18 +14,21 @@ from koda_tui.ui.layout import TUILayout
 from koda_tui.ui.palette import PaletteManager
 from koda_tui.ui.styles import get_style
 
+if TYPE_CHECKING:
+    from koda_api.backends import KodaBackend
+    from koda_common.settings import SettingsManager
+
 
 class KodaTuiApp:
     """Main TUI application."""
 
     def __init__(
         self,
-        sandbox_dir: Path | None = None,
-        backend: KodaBackend | None = None,
+        settings: SettingsManager,
+        backend: KodaBackend,
     ) -> None:
-        self._sandbox_dir = sandbox_dir or Path.cwd().resolve()
-        self._settings = SettingsManager.get_instance()
-        self._backend = backend or create_backend(self._settings, self._sandbox_dir)
+        self._settings = settings
+        self._backend = backend
 
         # Subscribe to settings changes
         self._unsubscribe = self._settings.subscribe(self._on_settings_changed)

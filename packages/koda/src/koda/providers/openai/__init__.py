@@ -3,7 +3,7 @@ from koda.providers.openai.adapter import OpenAIAdapter
 from koda.providers.openai.definitions import MODELS
 from koda.providers.openai.provider import OpenAIProvider
 from koda.providers.registry import get_model_registry, get_provider_registry
-from koda_common import SettingsManager
+from koda_common.settings import SettingsManager
 
 
 def _create_openai_provider(settings: SettingsManager, model: str) -> OpenAIProvider:

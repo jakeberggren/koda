@@ -3,7 +3,7 @@ from koda.providers.berget.adapter import BergetAIAdapter
 from koda.providers.berget.definitions import MODELS
 from koda.providers.berget.provider import BergetAIProvider
 from koda.providers.registry import get_model_registry, get_provider_registry
-from koda_common import SettingsManager
+from koda_common.settings import SettingsManager
 
 
 def _create_bergetai_provider(settings: SettingsManager, model: str) -> BergetAIProvider:

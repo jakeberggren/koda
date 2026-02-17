@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
-    from koda_common import SettingsManager
     from koda_common.contracts import KodaBackend
+    from koda_common.settings import SettingsManager
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 PROVIDER_DISPLAY_NAMES: dict[str, str] = {

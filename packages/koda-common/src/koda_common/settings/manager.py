@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from koda_common.logging import get_logger
 from koda_common.settings.settings import EnvSettings, Settings
-from koda_common.settings.store import (
-    JsonFileSettingsStore,
-    KeyChainSecretsStore,
-    SecretsStore,
-    SettingsStore,
-)
+
+if TYPE_CHECKING:
+    from koda_common.settings.store import (
+        SecretsStore,
+        SettingsStore,
+    )
 
 type SettingsChangeCallback = Callable[[str, Any, Any], None]
 
@@ -28,32 +28,18 @@ class SettingsManager:
     to Settings automatically makes it available here - no manager changes needed.
     """
 
-    _instance: SettingsManager | None = None
-
     def __init__(
         self,
-        settings_store: SettingsStore | None = None,
-        secrets_store: SecretsStore | None = None,
+        settings_store: SettingsStore,
+        secrets_store: SecretsStore,
     ) -> None:
-        self._settings_store = settings_store or JsonFileSettingsStore()
-        self._secrets_store = secrets_store or KeyChainSecretsStore()
+        self._settings_store = settings_store
+        self._secrets_store = secrets_store
         self._env = EnvSettings()
         self._api_key_cache: dict[str, str] = {}
         self._load_api_keys_from_env()
         self._settings = self._load_layered()
         self._callbacks: list[SettingsChangeCallback] = []
-
-    @classmethod
-    def get_instance(cls) -> SettingsManager:
-        """Get a singleton instance of the settings manager."""
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
-
-    @classmethod
-    def reset_instance(cls) -> None:
-        """Reset the singleton instance (for testing)."""
-        cls._instance = None
 
     def _load_api_keys_from_env(self) -> None:
         """Load API key overrides from environment into cache."""

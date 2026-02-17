@@ -148,11 +148,3 @@ def test_set_api_key_writes_secrets_store_and_notifies(
     assert secrets_store.set_calls == [("openai", "sk-new")]
     assert manager.get_api_key("openai") == "sk-new"
     assert changes == [("api_keys.openai", None, "sk-new")]
-
-
-def test_singleton_get_instance_creates_when_missing() -> None:
-    # We just assert it returns an instance and caches it.
-    SettingsManager.reset_instance()
-    m1 = SettingsManager.get_instance()
-    m2 = SettingsManager.get_instance()
-    assert m1 is m2

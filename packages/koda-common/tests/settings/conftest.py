@@ -10,12 +10,13 @@ from typing import Any
 
 import pytest
 
+from koda_common.settings import SettingsStore
 from koda_common.settings.manager import SettingsManager
 from koda_common.settings.settings import EnvSettings
 
 
 @dataclass
-class SpySettingsStore:
+class SpySettingsStore(SettingsStore):
     """In-memory settings store that tracks calls and can simulate bad returns."""
 
     initial_data: dict[str, Any] | None = None
@@ -37,7 +38,7 @@ class SpySettingsStore:
 
 
 @dataclass
-class SpySecretsStore:
+class SpySecretsStore(SettingsStore):
     """In-memory secrets store that tracks calls."""
 
     initial_keys: dict[str, str] | None = None
@@ -62,13 +63,10 @@ class SpySecretsStore:
 
 @pytest.fixture(autouse=True)
 def clean_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Reset singleton and ensure tests never read a .env file."""
+    """Ensure tests never read a .env file and start with clean env vars."""
 
     # Prevent surprise .env reads in CI/dev machines.
     monkeypatch.setattr(EnvSettings, "model_config", {"env_file": None})
-
-    # Reset singleton between tests.
-    SettingsManager.reset_instance()
 
     # Clear env vars used by EnvSettings.
     for key in (
