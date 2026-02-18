@@ -32,6 +32,7 @@ class KodaTuiApp:
 
         # Subscribe to settings changes
         self._unsubscribe = self._settings.subscribe(self._on_settings_changed)
+        self._closed = False
 
         # Initialize state
         self.state = AppState(
@@ -159,8 +160,18 @@ class KodaTuiApp:
         if self._app:
             self._app.exit()
 
+    def close(self) -> None:
+        """Release app resources and subscriptions."""
+        if self._closed:
+            return
+        self._closed = True
+        self._unsubscribe()
+
     async def run(self) -> None:
         """Start the TUI application."""
         self._app = self._create_application()
         self._palette_manager.set_app(self._app)
-        await self._app.run_async()
+        try:
+            await self._app.run_async()
+        finally:
+            self.close()

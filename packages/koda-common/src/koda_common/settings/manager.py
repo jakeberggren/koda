@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any
 
 from koda_common.logging import get_logger
@@ -90,7 +91,17 @@ class SettingsManager:
     def subscribe(self, callback: SettingsChangeCallback) -> Callable[[], None]:
         """Subscribe to setting changes. Returns unsubscribe function."""
         self._callbacks.append(callback)
-        return lambda: self._callbacks.remove(callback)
+        unsubscribed = False
+
+        def unsubscribe() -> None:
+            nonlocal unsubscribed
+            if unsubscribed:
+                return
+            unsubscribed = True
+            with suppress(ValueError):
+                self._callbacks.remove(callback)
+
+        return unsubscribe
 
     # Dynamic attribute access - forwards to Settings model
 

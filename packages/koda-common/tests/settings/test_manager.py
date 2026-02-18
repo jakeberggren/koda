@@ -101,6 +101,12 @@ def test_unsubscribe_stops_notifications(manager: SettingsManager) -> None:
     assert changes == []
 
 
+def test_unsubscribe_is_idempotent(manager: SettingsManager) -> None:
+    unsubscribe = manager.subscribe(lambda _n, _o, _v: None)
+    unsubscribe()
+    unsubscribe()
+
+
 def test_multiple_subscribers_all_called(manager: SettingsManager) -> None:
     c1: list[tuple[str, str, str]] = []
     c2: list[tuple[str, str, str]] = []
