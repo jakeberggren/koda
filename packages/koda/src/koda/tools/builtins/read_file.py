@@ -26,7 +26,7 @@ class ReadFileParams(BaseModel):
 
     path: str = Field(..., description="Path to the file to read")
     offset: int = Field(0, ge=0, description="Offset to start reading from")
-    limit: int = Field(1, gt=0, description="Number of lines to read")
+    limit: int = Field(100, gt=0, description="Number of lines to read")
 
 
 @tool
