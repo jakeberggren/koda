@@ -58,7 +58,6 @@ class StreamProcessor:
     async def _process_stream(self, message: str, backend: KodaBackend) -> None:
         async for event in backend.chat(message):
             if isinstance(event, TextDelta):
-                await self._stop_spinner()
                 self._lifecycle.append_content(event.text)
             elif isinstance(event, ToolCallRequested | ProviderToolStarted):
                 self._lifecycle.transition_to_tool(event.call)
