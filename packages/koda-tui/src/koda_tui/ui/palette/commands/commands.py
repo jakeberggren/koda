@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda_common.logging import get_logger
+from koda_tui import actions
 from koda_tui.ui.palette.commands import model_commands, provider_commands, session_commands
 from koda_tui.ui.palette.commands.command import Command
 
@@ -12,6 +14,8 @@ if TYPE_CHECKING:
     from koda_common.settings import SettingsManager
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
+
+log = get_logger(__name__)
 
 
 def get_commands(  # noqa: C901 - allow complex
@@ -54,8 +58,11 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_new_session() -> None:
         cancel_streaming()
-        backend.new_session()
-        state.reset_conversation()
+        result = actions.new_session(backend, state)
+        if not result.ok:
+            log.warning("cmd_new_session_failed", error=result.error)
+            # TODO: surface action errors in the palette/status UI.
+            return
         palette_manager.close_all()
 
     def cmd_list_sessions() -> None:

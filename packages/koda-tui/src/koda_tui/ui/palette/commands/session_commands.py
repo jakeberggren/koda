@@ -5,15 +5,19 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit.keys import Keys
 
-from koda_tui.converters import convert_messages
+from koda_common.logging import get_logger
+from koda_tui import actions
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from koda_common.contracts import KodaBackend, SessionInfo
+    from koda_tui.actions import ActionResult, DeleteSessionPayload
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
+
+log = get_logger(__name__)
 
 
 _SESSION_FOOTER = [
@@ -53,9 +57,15 @@ def _switch_session(
 ) -> None:
     """Switch to a session and update TUI state."""
     cancel_streaming()
-    state.reset_conversation()
-    _, messages = backend.switch_session(session.session_id)
-    state.messages = convert_messages(messages)
+    result = actions.switch_session(session.session_id, backend, state)
+    if not result.ok:
+        log.warning(
+            "cmd_switch_session_failed",
+            session_id=str(session.session_id),
+            error=result.error,
+        )
+        # TODO: surface action errors in the palette/status UI.
+        return
     palette_manager.close_all()
 
 
@@ -69,11 +79,20 @@ def _confirm_delete_session(
     """Open a confirmation dialog to delete a session."""
 
     def on_confirm() -> None:
-        new_active = backend.delete_session(session.session_id)
-        if new_active is not None:
+        result: ActionResult[DeleteSessionPayload] = actions.delete_session(
+            session.session_id, backend, state
+        )
+        if not result.ok:
+            log.warning(
+                "cmd_delete_session_failed",
+                session_id=str(session.session_id),
+                error=result.error,
+            )
+            # TODO: surface action errors in the palette/status UI.
+            return
+        if result.ok and result.payload and result.payload.removed_active_session:
             # On deletion of the active session, clear stale messages from the screen.
             cancel_streaming()
-            state.reset_conversation()
         # Replace confirm dialog + stale session list with a fresh session list.
         commands, shortcuts = get_commands(backend, state, palette_manager, cancel_streaming)
         palette_manager.replace_top(2, commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
@@ -113,8 +132,11 @@ def get_commands(  # noqa: C901
 
     def on_new(_cmd: Command | None) -> None:
         cancel_streaming()
-        backend.new_session()
-        state.reset_conversation()
+        result = actions.new_session(backend, state)
+        if not result.ok:
+            log.warning("cmd_new_session_shortcut_failed", error=result.error)
+            # TODO: surface action errors in the palette/status UI.
+            return
         palette_manager.close_all()
 
     def on_delete(cmd: Command | None) -> None:

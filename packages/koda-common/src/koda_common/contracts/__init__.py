@@ -18,7 +18,11 @@ from koda_common.contracts.events import (
     ToolCallRequested,
     ToolCallResult,
 )
-from koda_common.contracts.exceptions import BackendAuthenticationError
+from koda_common.contracts.exceptions import (
+    BackendAuthenticationError,
+    BackendNoActiveSessionError,
+    BackendSessionNotFoundError,
+)
 from koda_common.contracts.messages import (
     AssistantMessage,
     Message,
@@ -33,6 +37,8 @@ from koda_common.contracts.tools import ToolCall, ToolOutput, ToolResult
 __all__ = [
     "AssistantMessage",
     "BackendAuthenticationError",
+    "BackendNoActiveSessionError",
+    "BackendSessionNotFoundError",
     "KodaBackend",
     "Message",
     "MessageRole",

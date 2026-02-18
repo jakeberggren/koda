@@ -6,6 +6,7 @@ from koda.agents import Agent
 from koda.providers import get_model_registry, get_provider_registry
 from koda.providers.exceptions import ProviderAuthenticationError
 from koda.sessions import JsonSessionStore, SessionManager
+from koda.sessions.exceptions import NoActiveSessionError, SessionNotFoundError
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_api.mappers import (
     map_messages_to_contract_messages,
@@ -15,6 +16,8 @@ from koda_api.mappers import (
 )
 from koda_common.contracts import (
     BackendAuthenticationError,
+    BackendNoActiveSessionError,
+    BackendSessionNotFoundError,
     KodaBackend,
     Message,
     ModelDefinition,
@@ -79,7 +82,10 @@ class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
 
     def active_session(self) -> SessionInfo:
         """Get the currently active session."""
-        return map_session_to_session_info(self._agent.active_session)
+        try:
+            return map_session_to_session_info(self._agent.active_session)
+        except NoActiveSessionError as e:
+            raise BackendNoActiveSessionError from e
 
     def list_sessions(self) -> list[SessionInfo]:
         """List non-empty sessions."""
@@ -92,13 +98,19 @@ class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
 
     def switch_session(self, session_id: UUID) -> tuple[SessionInfo, Sequence[Message]]:
         """Switch to a different session. Returns session info and messages."""
-        session = self._agent.switch_session(session_id)
+        try:
+            session = self._agent.switch_session(session_id)
+        except SessionNotFoundError as e:
+            raise BackendSessionNotFoundError from e
         messages: list[CoreMessage] = list(session.messages)
         return map_session_to_session_info(session), map_messages_to_contract_messages(messages)
 
     def delete_session(self, session_id: UUID) -> SessionInfo | None:
         """Delete a session. Returns the new active session if the deleted one was active."""
-        new_session = self._agent.delete_session(session_id)
+        try:
+            new_session = self._agent.delete_session(session_id)
+        except SessionNotFoundError as e:
+            raise BackendSessionNotFoundError from e
         if new_session is not None:
             return map_session_to_session_info(new_session)
         return None
