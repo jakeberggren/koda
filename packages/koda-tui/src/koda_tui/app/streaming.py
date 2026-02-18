@@ -12,6 +12,7 @@ from koda_common.contracts import (
     ToolCallRequested,
     ToolCallResult,
 )
+from koda_common.logging import get_logger
 from koda_tui.app.response import ResponseLifecycle
 
 if TYPE_CHECKING:
@@ -19,6 +20,8 @@ if TYPE_CHECKING:
 
     from koda_common.contracts import KodaBackend
     from koda_tui.state import AppState
+
+log = get_logger(__name__)
 
 
 class StreamProcessor:
@@ -86,8 +89,13 @@ class StreamProcessor:
                 f"Please check your API key. Press `Ctrl+P` → `Connect Provider` to update it."
             )
             self._lifecycle.append_content(error_msg)
-        except Exception as e:
-            error_msg = f"\n\n**Error:** {type(e).__name__}: {e}"
+        except Exception:
+            log.exception(
+                "stream_processing_failed",
+                provider=self._state.provider_name,
+                model=self._state.model_name,
+            )
+            error_msg = "An unexpected error occurred while processing the response."
             self._lifecycle.append_content(error_msg)
         finally:
             await self._stop_spinner()

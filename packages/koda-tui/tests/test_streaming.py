@@ -111,7 +111,7 @@ class TestStreamProcessor:
     async def test_stream_handles_exception(
         self, state: AppState, processor: StreamProcessor
     ) -> None:
-        """Exceptions during streaming should be appended as error message."""
+        """Unknown exceptions should show a generic user-safe error message."""
         client = AsyncMock()
 
         async def mock_chat(_msg: str) -> AsyncIterator:
@@ -125,8 +125,10 @@ class TestStreamProcessor:
 
         assert state.is_streaming is False
         _user_msg, assistant_msg = state.messages
-        assert "ValueError" in assistant_msg.content
-        assert "Something went wrong" in assistant_msg.content
+        assert "Starting..." in assistant_msg.content
+        assert (
+            "An unexpected error occurred while processing the response." in assistant_msg.content
+        )
 
     @pytest.mark.asyncio
     async def test_cancel_stream(self, state: AppState, processor: StreamProcessor) -> None:
