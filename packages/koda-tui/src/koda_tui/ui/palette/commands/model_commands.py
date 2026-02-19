@@ -3,12 +3,16 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
+from koda_common.logging import get_logger
+from koda_tui import actions
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
     from koda_common.contracts import KodaBackend, ModelDefinition
     from koda_common.settings import SettingsManager
     from koda_tui.ui.palette.palette_manager import PaletteManager
+
+log = get_logger(__name__)
 
 PROVIDER_DISPLAY_NAMES: dict[str, str] = {
     "openai": "OpenAI",
@@ -35,8 +39,11 @@ def _select_model(
     palette_manager: PaletteManager,
 ) -> None:
     """Select a model and close the palette."""
-    settings.provider = model.provider
-    settings.model = model.id
+    result = actions.select_model(model, settings)
+    if not result.ok:
+        log.warning("cmd_select_model_failed", model_id=model.id, provider=model.provider)
+        # TODO: surface action errors in the palette/status UI.
+        return
     palette_manager.close_all()
 
 

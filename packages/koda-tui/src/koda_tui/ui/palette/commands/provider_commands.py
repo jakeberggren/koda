@@ -3,12 +3,16 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
+from koda_common.logging import get_logger
+from koda_tui import actions
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
     from koda_common.contracts import KodaBackend
     from koda_common.settings import SettingsManager
     from koda_tui.ui.palette.palette_manager import PaletteManager
+
+log = get_logger(__name__)
 
 PROVIDER_DISPLAY_NAMES: dict[str, str] = {
     "openai": "OpenAI",
@@ -36,7 +40,11 @@ def _open_api_key_dialog(
     """Open dialog to enter API key for a provider."""
 
     def on_submit(key: str) -> None:
-        settings.set_api_key(provider, key)
+        result = actions.set_provider_api_key(provider, key, settings)
+        if not result.ok:
+            log.warning("cmd_set_provider_api_key_failed", provider=provider, error=result.error)
+            # TODO: surface action errors in the palette/status UI.
+            return
         palette_manager.close_all()
 
     palette_manager.open_dialog(

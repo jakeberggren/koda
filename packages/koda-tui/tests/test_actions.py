@@ -7,10 +7,20 @@ from uuid import uuid4
 from koda_common.contracts import (
     BackendNoActiveSessionError,
     BackendSessionNotFoundError,
+    ModelDefinition,
     SessionInfo,
     UserMessage,
 )
-from koda_tui.actions import delete_session, new_session, switch_session
+from koda_tui.actions import (
+    delete_session,
+    new_session,
+    select_model,
+    set_provider_api_key,
+    switch_session,
+    toggle_queue_inputs,
+    toggle_scrollbar,
+    toggle_theme,
+)
 from koda_tui.state import AppState, Message, MessageRole
 
 
@@ -125,3 +135,102 @@ def test_delete_session_not_found_returns_error() -> None:
     assert result.ok is False
     assert result.error == "Session not found"
     assert state.messages[0].content == "old"
+
+
+class _ModelSettings:
+    def __init__(self, provider: str, model: str, fail_model_id: str | None = None) -> None:
+        self._provider = provider
+        self._model = model
+        self._fail_model_id = fail_model_id
+
+    @property
+    def provider(self) -> str:
+        return self._provider
+
+    @provider.setter
+    def provider(self, value: str) -> None:
+        self._provider = value
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    @model.setter
+    def model(self, value: str) -> None:
+        if self._fail_model_id is not None and value == self._fail_model_id:
+            raise ValueError("invalid model")
+        self._model = value
+
+
+def test_select_model_success_updates_settings() -> None:
+    settings = _ModelSettings(provider="openai", model="gpt-5")
+    model = ModelDefinition(id="gpt-5.2", name="GPT 5.2", provider="openai")
+
+    result = select_model(model, settings)
+
+    assert result.ok is True
+    assert settings.provider == "openai"
+    assert settings.model == "gpt-5.2"
+
+
+def test_select_model_invalid_rolls_back_settings() -> None:
+    settings = _ModelSettings(provider="openai", model="gpt-5", fail_model_id="invalid-model")
+    model = ModelDefinition(id="invalid-model", name="Broken", provider="bergetai")
+
+    result = select_model(model, settings)
+
+    assert result.ok is False
+    assert result.error == "Invalid model selection"
+    assert settings.provider == "openai"
+    assert settings.model == "gpt-5"
+
+
+class _AppearanceSettings:
+    def __init__(self, *, theme: str, show_scrollbar: bool, queue_inputs: bool) -> None:
+        self.theme = theme
+        self.show_scrollbar = show_scrollbar
+        self.queue_inputs = queue_inputs
+
+
+def test_toggle_theme_switches_dark_to_light() -> None:
+    settings = _AppearanceSettings(theme="dark", show_scrollbar=True, queue_inputs=True)
+
+    result = toggle_theme(settings)
+
+    assert result.ok is True
+    assert settings.theme == "light"
+
+
+def test_toggle_scrollbar_flips_value() -> None:
+    settings = _AppearanceSettings(theme="dark", show_scrollbar=True, queue_inputs=True)
+
+    result = toggle_scrollbar(settings)
+
+    assert result.ok is True
+    assert settings.show_scrollbar is False
+
+
+def test_toggle_queue_inputs_flips_value() -> None:
+    settings = _AppearanceSettings(theme="dark", show_scrollbar=True, queue_inputs=False)
+
+    result = toggle_queue_inputs(settings)
+
+    assert result.ok is True
+    assert settings.queue_inputs is True
+
+
+class _ProviderSettings:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+
+    def set_api_key(self, provider: str, key: str) -> None:
+        self.calls.append((provider, key))
+
+
+def test_set_provider_api_key_delegates_to_settings() -> None:
+    settings = _ProviderSettings()
+
+    result = set_provider_api_key("openai", "secret", settings)
+
+    assert result.ok is True
+    assert settings.calls == [("openai", "secret")]

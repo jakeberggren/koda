@@ -44,16 +44,27 @@ def get_commands(  # noqa: C901 - allow complex
         palette_manager.open_palette(commands)
 
     def cmd_toggle_theme() -> None:
-        new_theme = "light" if settings.theme == "dark" else "dark"
-        settings.theme = new_theme
+        result = actions.toggle_theme(settings)
+        if not result.ok:
+            log.warning("cmd_toggle_theme_failed", error=result.error)
+            # TODO: surface action errors in the palette/status UI.
+            return
         palette_manager.close_all()
 
     def cmd_toggle_scrollbar() -> None:
-        settings.show_scrollbar = not settings.show_scrollbar
+        result = actions.toggle_scrollbar(settings)
+        if not result.ok:
+            log.warning("cmd_toggle_scrollbar_failed", error=result.error)
+            # TODO: surface action errors in the palette/status UI.
+            return
         palette_manager.close_all()
 
     def cmd_toggle_queue_inputs() -> None:
-        settings.queue_inputs = not settings.queue_inputs
+        result = actions.toggle_queue_inputs(settings)
+        if not result.ok:
+            log.warning("cmd_toggle_queue_inputs_failed", error=result.error)
+            # TODO: surface action errors in the palette/status UI.
+            return
         palette_manager.close_all()
 
     def cmd_new_session() -> None:
