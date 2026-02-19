@@ -11,7 +11,8 @@ from openai.types.responses import (
     ResponseFunctionToolCall,
     ResponseInputParam,
 )
-from openai.types.responses.response_input_param import FunctionCallOutput
+from openai.types.responses.response_function_tool_call_param import ResponseFunctionToolCallParam
+from openai.types.responses.response_input_param import FunctionCallOutput, ResponseInputItemParam
 
 from koda.messages import (
     AssistantMessage,
@@ -41,11 +42,29 @@ class OpenAIAdapter(ProviderAdapter[ResponseInputParam, list[FunctionToolParam] 
             type="function_call_output",
         )
 
-    def _adapt_message(self, message: Message) -> EasyInputMessageParam | FunctionCallOutput:
+    def _adapt_message(self, message: Message) -> list[ResponseInputItemParam]:
         if isinstance(message, UserMessage):
-            return EasyInputMessageParam(role="user", content=message.content, type="message")
+            return [EasyInputMessageParam(role="user", content=message.content, type="message")]
         if isinstance(message, AssistantMessage):
-            return EasyInputMessageParam(role="assistant", content=message.content, type="message")
+            result: list[ResponseInputItemParam] = []
+            if message.content or not message.tool_calls:
+                result.append(
+                    EasyInputMessageParam(
+                        role="assistant",
+                        content=message.content,
+                        type="message",
+                    ),
+                )
+            result.extend(
+                ResponseFunctionToolCallParam(
+                    type="function_call",
+                    name=tool_call.tool_name,
+                    arguments=json.dumps(tool_call.arguments),
+                    call_id=tool_call.call_id,
+                )
+                for tool_call in message.tool_calls
+            )
+            return result
         raise UnknownMessageTypeError(type(message))
 
     def adapt_messages(self, messages: Sequence[Message]) -> ResponseInputParam:
@@ -55,7 +74,7 @@ class OpenAIAdapter(ProviderAdapter[ResponseInputParam, list[FunctionToolParam] 
             if isinstance(msg, ToolMessage):
                 result.append(self._adapt_tool_message(msg))
             else:
-                result.append(self._adapt_message(msg))
+                result.extend(self._adapt_message(msg))
         return result
 
     def _adapt_tool(self, tool: ToolDefinition) -> FunctionToolParam:

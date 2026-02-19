@@ -11,6 +11,9 @@ from openai.types.chat.chat_completion_assistant_message_param import (
 from openai.types.chat.chat_completion_message_function_tool_call import (
     ChatCompletionMessageFunctionToolCall,
 )
+from openai.types.chat.chat_completion_message_function_tool_call_param import (
+    ChatCompletionMessageFunctionToolCallParam,
+)
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 from openai.types.chat.chat_completion_tool_message_param import ChatCompletionToolMessageParam
 from openai.types.chat.chat_completion_tool_union_param import ChatCompletionToolUnionParam
@@ -40,17 +43,6 @@ class BergetAIAdapter(
     """Adapter for converting to/from Berget's chat completions API format."""
 
     @staticmethod
-    def _adapt_user_message(message: UserMessage) -> ChatCompletionUserMessageParam:
-        """Convert an internal user message to chat completion format."""
-        return ChatCompletionUserMessageParam(role="user", content=message.content)
-
-    @staticmethod
-    def _adapt_assistant_message(message: AssistantMessage) -> ChatCompletionAssistantMessageParam:
-        """Convert an internal assistant message to chat completion format."""
-        # Tool calls are represented by provider events and routed back as ToolMessage.
-        return ChatCompletionAssistantMessageParam(role="assistant", content=message.content)
-
-    @staticmethod
     def _serialize_tool_output(message: ToolMessage) -> str:
         """Serialize tool output payload as JSON for tool-role messages."""
         tool_output = message.tool_result.output
@@ -69,6 +61,33 @@ class BergetAIAdapter(
             tool_call_id=message.tool_result.call_id,
             content=self._serialize_tool_output(message),
         )
+
+    @staticmethod
+    def _adapt_user_message(message: UserMessage) -> ChatCompletionUserMessageParam:
+        """Convert an internal user message to chat completion format."""
+        return ChatCompletionUserMessageParam(role="user", content=message.content)
+
+    @staticmethod
+    def _adapt_assistant_message(message: AssistantMessage) -> ChatCompletionAssistantMessageParam:
+        """Convert an internal assistant message to chat completion format."""
+        if message.tool_calls:
+            tool_calls = [
+                ChatCompletionMessageFunctionToolCallParam(
+                    id=tool_call.call_id,
+                    type="function",
+                    function={
+                        "name": tool_call.tool_name,
+                        "arguments": json.dumps(tool_call.arguments),
+                    },
+                )
+                for tool_call in message.tool_calls
+            ]
+            return ChatCompletionAssistantMessageParam(
+                role="assistant",
+                content=message.content,
+                tool_calls=tool_calls,
+            )
+        return ChatCompletionAssistantMessageParam(role="assistant", content=message.content)
 
     def adapt_messages(self, messages: Sequence[Message]) -> list[ChatCompletionMessageParam]:
         """Convert internal messages to provider chat completion messages."""
