@@ -42,39 +42,46 @@ class OpenAIAdapter(ProviderAdapter[ResponseInputParam, list[FunctionToolParam] 
             type="function_call_output",
         )
 
-    def _adapt_message(self, message: Message) -> list[ResponseInputItemParam]:
-        if isinstance(message, UserMessage):
-            return [EasyInputMessageParam(role="user", content=message.content, type="message")]
-        if isinstance(message, AssistantMessage):
-            result: list[ResponseInputItemParam] = []
-            if message.content or not message.tool_calls:
-                result.append(
-                    EasyInputMessageParam(
-                        role="assistant",
-                        content=message.content,
-                        type="message",
-                    ),
-                )
-            result.extend(
-                ResponseFunctionToolCallParam(
-                    type="function_call",
-                    name=tool_call.tool_name,
-                    arguments=json.dumps(tool_call.arguments),
-                    call_id=tool_call.call_id,
-                )
-                for tool_call in message.tool_calls
+    @staticmethod
+    def _adapt_user_message(message: UserMessage) -> EasyInputMessageParam:
+        return EasyInputMessageParam(role="user", content=message.content, type="message")
+
+    @staticmethod
+    def _adapt_assistant_message(message: AssistantMessage) -> list[ResponseInputItemParam]:
+        result: list[ResponseInputItemParam] = []
+        if message.content or not message.tool_calls:
+            result.append(
+                EasyInputMessageParam(
+                    role="assistant",
+                    content=message.content,
+                    type="message",
+                ),
             )
-            return result
-        raise UnknownMessageTypeError(type(message))
+        result.extend(
+            ResponseFunctionToolCallParam(
+                type="function_call",
+                name=tool_call.tool_name,
+                arguments=json.dumps(tool_call.arguments),
+                call_id=tool_call.call_id,
+            )
+            for tool_call in message.tool_calls
+        )
+        return result
 
     def adapt_messages(self, messages: Sequence[Message]) -> ResponseInputParam:
         """Convert messages to OpenAI format."""
         result: ResponseInputParam = []
-        for msg in messages:
-            if isinstance(msg, ToolMessage):
-                result.append(self._adapt_tool_message(msg))
-            else:
-                result.extend(self._adapt_message(msg))
+        for message in messages:
+            if isinstance(message, ToolMessage):
+                result.append(self._adapt_tool_message(message))
+                continue
+            if isinstance(message, UserMessage):
+                result.append(self._adapt_user_message(message))
+                continue
+            if isinstance(message, AssistantMessage):
+                result.extend(self._adapt_assistant_message(message))
+                continue
+            raise UnknownMessageTypeError(type(message))
         return result
 
     def _adapt_tool(self, tool: ToolDefinition) -> FunctionToolParam:

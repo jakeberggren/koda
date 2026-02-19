@@ -43,8 +43,8 @@ class BergetAIAdapter(
     """Adapter for converting to/from Berget's chat completions API format."""
 
     @staticmethod
-    def _serialize_tool_output(message: ToolMessage) -> str:
-        """Serialize tool output payload as JSON for tool-role messages."""
+    def _adapt_tool_message(message: ToolMessage) -> ChatCompletionToolMessageParam:
+        """Convert an internal tool message to chat completion format."""
         tool_output = message.tool_result.output
         payload: dict[str, Any] = {
             "content": tool_output.content,
@@ -52,14 +52,11 @@ class BergetAIAdapter(
         }
         if tool_output.error_message:
             payload["error_message"] = tool_output.error_message
-        return json.dumps(payload)
 
-    def _adapt_tool_message(self, message: ToolMessage) -> ChatCompletionToolMessageParam:
-        """Convert an internal tool message to chat completion format."""
         return ChatCompletionToolMessageParam(
             role="tool",
             tool_call_id=message.tool_result.call_id,
-            content=self._serialize_tool_output(message),
+            content=json.dumps(payload),
         )
 
     @staticmethod
