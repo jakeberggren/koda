@@ -21,7 +21,7 @@ from koda.messages import (
     UserMessage,
 )
 from koda.providers.base import ProviderAdapter
-from koda.providers.exceptions import UnknownMessageTypeError
+from koda.providers.exceptions import InvalidToolCallArgumentsError, UnknownMessageTypeError
 from koda.tools import ToolCall, ToolDefinition
 
 
@@ -113,13 +113,15 @@ class OpenAIAdapter(ProviderAdapter[ResponseInputParam, list[FunctionToolParam] 
         for output in response.output:
             if isinstance(output, ResponseFunctionToolCall):
                 tool_name: str = output.name
-                arguments: dict[str, Any] = json.loads(output.arguments)
+                parsed_arguments = json.loads(output.arguments)
+                if not isinstance(parsed_arguments, dict):
+                    raise InvalidToolCallArgumentsError
                 call_id: str = output.call_id
 
                 calls.append(
                     ToolCall(
                         tool_name=tool_name,
-                        arguments=arguments,
+                        arguments=parsed_arguments,
                         call_id=call_id,
                     ),
                 )

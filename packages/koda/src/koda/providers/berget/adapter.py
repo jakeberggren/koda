@@ -21,16 +21,11 @@ from openai.types.chat.chat_completion_user_message_param import ChatCompletionU
 
 from koda.messages import AssistantMessage, Message, ToolMessage, UserMessage
 from koda.providers.base import ProviderAdapter
-from koda.providers.exceptions import UnknownMessageTypeError
+from koda.providers.exceptions import InvalidToolCallArgumentsError, UnknownMessageTypeError
 from koda.tools import ToolCall, ToolDefinition
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-
-class InvalidToolCallArgumentsError(TypeError):
-    def __init__(self) -> None:
-        super().__init__("Tool call arguments must decode to a JSON object")
 
 
 class BergetAIAdapter(

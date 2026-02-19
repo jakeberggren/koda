@@ -43,6 +43,13 @@ class ProviderValidationError(ProviderError):
     """Input validation error."""
 
 
+class InvalidToolCallArgumentsError(ProviderValidationError):
+    """Tool call arguments must decode to a JSON object."""
+
+    def __init__(self) -> None:
+        super().__init__("Tool call arguments must decode to a JSON object")
+
+
 class EmptyMessageError(ProviderValidationError):
     """Message cannot be empty."""
 
