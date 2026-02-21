@@ -33,6 +33,7 @@ def _create_openai_provider(settings: SettingsManager, model: str) -> OpenAIProv
         api_key=api_key,
         model=model,
         capabilities=model_def.capabilities,
+        allow_extended_prompt_retention=settings.allow_extended_prompt_retention,
         client_factory=openai_client,
     )
 

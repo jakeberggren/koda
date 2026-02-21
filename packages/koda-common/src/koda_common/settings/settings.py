@@ -15,6 +15,15 @@ class Settings(BaseModel):
     theme: Literal["dark", "light"] = Field(default="dark", description="UI theme")
     show_scrollbar: bool = Field(default=True, description="Show chat scrollbar")
     queue_inputs: bool = Field(default=True, description="Queue inputs during streaming")
+    allow_extended_prompt_retention: bool = Field(
+        default=False,
+        description=(
+            "Allow supported providers to use extended prompt retention to improve cache "
+            "hit rates, reduce token usage, and lower costs. Enabling this may store "
+            "prompt data beyond ephemeral processing and is not compatible with Zero "
+            "Data Retention (ZDR) requirements."
+        ),
+    )
 
 
 class EnvSettings(BaseSettings):
@@ -33,6 +42,15 @@ class EnvSettings(BaseSettings):
     # Setting overrides (KODA_<field> -> <field>, None = don't override)
     koda_provider: str | None = Field(default=None, description="LLM provider")
     koda_model: str | None = Field(default=None, description="Model name")
+    koda_allow_extended_prompt_retention: bool | None = Field(
+        default=None,
+        description=(
+            "Allow supported providers to use extended prompt retention to improve cache "
+            "hit rates, reduce token usage, and lower costs. Enabling this may store "
+            "prompt data beyond ephemeral processing and is not compatible with Zero "
+            "Data Retention (ZDR) requirements."
+        ),
+    )
 
     # API keys (override keychain, cached in manager)
     openai_api_key: SecretStr | None = Field(default=None, description="OpenAI API key")

@@ -11,7 +11,10 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.HIGH,
             ThinkingLevel.EXTRA_HIGH,
         },
-        capabilities={ModelCapabilities.WEB_SEARCH},
+        capabilities={
+            ModelCapabilities.WEB_SEARCH,
+            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
+        },
     ),
     ModelDefinition(
         id="gpt-5.2",
@@ -23,7 +26,10 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.HIGH,
             ThinkingLevel.EXTRA_HIGH,
         },
-        capabilities={ModelCapabilities.WEB_SEARCH},
+        capabilities={
+            ModelCapabilities.WEB_SEARCH,
+            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
+        },
     ),
     ModelDefinition(
         id="gpt-5.1-codex",
@@ -34,7 +40,10 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
         },
-        capabilities={ModelCapabilities.WEB_SEARCH},
+        capabilities={
+            ModelCapabilities.WEB_SEARCH,
+            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
+        },
     ),
     ModelDefinition(
         id="gpt-5.1",
@@ -45,7 +54,10 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
         },
-        capabilities={ModelCapabilities.WEB_SEARCH},
+        capabilities={
+            ModelCapabilities.WEB_SEARCH,
+            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
+        },
     ),
     ModelDefinition(
         id="gpt-5-mini",

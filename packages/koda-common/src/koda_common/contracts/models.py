@@ -1,17 +1,18 @@
-from enum import StrEnum
+from enum import StrEnum, auto
 
 from pydantic import BaseModel, Field
 
 
 class ThinkingLevel(StrEnum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-    EXTRA_HIGH = "extra_high"
+    LOW = auto()
+    MEDIUM = auto()
+    HIGH = auto()
+    EXTRA_HIGH = auto()
 
 
 class ModelCapability(StrEnum):
-    WEB_SEARCH = "web_search"
+    WEB_SEARCH = auto()
+    EXTENDED_PROMPT_RETENTION = auto()
 
 
 class ModelDefinition(BaseModel):

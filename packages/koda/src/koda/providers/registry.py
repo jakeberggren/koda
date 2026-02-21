@@ -51,7 +51,8 @@ class ThinkingLevel(StrEnum):
 
 
 class ModelCapabilities(StrEnum):
-    WEB_SEARCH = "web_search"
+    WEB_SEARCH = auto()
+    EXTENDED_PROMPT_RETENTION = auto()
 
 
 class ModelDefinition(BaseModel):

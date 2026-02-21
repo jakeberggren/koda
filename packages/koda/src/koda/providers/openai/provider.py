@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
+from typing import Literal
 
-from openai import AsyncOpenAI, Omit
+from openai import AsyncOpenAI, Omit, omit
 from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseFunctionWebSearch,
@@ -31,13 +32,15 @@ logger = get_logger(__name__)
 
 
 class OpenAIProvider(Provider[OpenAIAdapter]):
-    def __init__(
+    def __init__(  # noqa: PLR0913 - ignore for now...
         self,
         api_key: str,
         model: str,
         base_url: str | None = None,
         capabilities: set[ModelCapabilities] | None = None,
         client_factory: Callable[..., AsyncOpenAI] = AsyncOpenAI,
+        *,
+        allow_extended_prompt_retention: bool = False,
     ) -> None:
         if not api_key or not api_key.strip():
             logger.error("empty_api_key", provider="OpenAI")
@@ -47,6 +50,7 @@ class OpenAIProvider(Provider[OpenAIAdapter]):
         self.model: str = model
         self.adapter: OpenAIAdapter = OpenAIAdapter()
         self.capabilities: set[ModelCapabilities] = capabilities or set()
+        self.allow_extended_prompt_retention: bool = allow_extended_prompt_retention
 
         logger.info("openai_provider_initialized", model=model)
 
@@ -67,6 +71,14 @@ class OpenAIProvider(Provider[OpenAIAdapter]):
         if not isinstance(action, ActionSearch):
             return None
         return f'Searched for "{action.query}"'
+
+    def _resolve_prompt_cache_retention_strategy(self) -> Literal["24h"] | Omit:
+        if (
+            self.allow_extended_prompt_retention
+            and ModelCapabilities.EXTENDED_PROMPT_RETENTION in self.capabilities
+        ):
+            return "24h"
+        return omit
 
     def _process_event(  # noqa: C901
         self,
@@ -105,6 +117,7 @@ class OpenAIProvider(Provider[OpenAIAdapter]):
 
         openai_input = self.adapter.adapt_messages(messages)
         openai_tools = self._build_tools(tools)
+        prompt_cache_retention = self._resolve_prompt_cache_retention_strategy()
 
         try:
             stream = await self.client.responses.create(
@@ -114,6 +127,7 @@ class OpenAIProvider(Provider[OpenAIAdapter]):
                 tools=openai_tools,
                 input=openai_input,
                 parallel_tool_calls=True,
+                prompt_cache_retention=prompt_cache_retention,
             )
             async for event in stream:
                 for processed_event in self._process_event(event):
