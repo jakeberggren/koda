@@ -109,6 +109,8 @@ class SettingsManager:
         """Get a setting value by name."""
         if name in Settings.model_fields:
             return getattr(self._settings, name)
+        if name in EnvSettings.model_fields:
+            return getattr(self._env, name)
         raise AttributeError(name)
 
     def __setattr__(self, name: str, value: Any) -> None:
@@ -138,10 +140,3 @@ class SettingsManager:
         self._api_key_cache[provider] = key
         self._notify(f"api_keys.{provider}", old, key)
         log.info("api_key_updated", provider=provider)
-
-    # Flags
-
-    @property
-    def koda_backend(self) -> str:
-        """Backend kind selected via environment (not persisted)."""
-        return self._env.koda_backend

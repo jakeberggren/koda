@@ -1,4 +1,4 @@
-from collections.abc import AsyncIterator, Iterator, Sequence
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 
 from openai import AsyncOpenAI, Omit
 from openai.types.responses import (
@@ -37,12 +37,13 @@ class OpenAIProvider(Provider[OpenAIAdapter]):
         model: str,
         base_url: str | None = None,
         capabilities: set[ModelCapabilities] | None = None,
+        client_factory: Callable[..., AsyncOpenAI] = AsyncOpenAI,
     ) -> None:
         if not api_key or not api_key.strip():
             logger.error("empty_api_key", provider="OpenAI")
             raise exceptions.EmptyApiKeyError("OpenAI")
 
-        self.client: AsyncOpenAI = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self.client: AsyncOpenAI = client_factory(api_key=api_key, base_url=base_url)
         self.model: str = model
         self.adapter: OpenAIAdapter = OpenAIAdapter()
         self._last_response_id: str | None = None

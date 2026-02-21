@@ -40,7 +40,7 @@ class EnvSettings(BaseSettings):
     bergetai_api_key: SecretStr | None = Field(default=None, description="BergetAI API key")
 
     # Flags
-    koda_backend: Literal["in_process", "http"] = Field(
+    koda_backend: Literal["in_process"] = Field(
         default="in_process",
         description="Backend selection for Koda clients",
     )
@@ -57,6 +57,12 @@ class EnvSettings(BaseSettings):
     koda_log_enabled: bool = Field(default=True, description="Enable logging")
     koda_log_level: LogLevel = Field(default="INFO", description="Log level")
     koda_log_file: Path | None = Field(default=None, description="Log file path")
+
+    # Telemetry
+    langfuse_tracing_enabled: bool = Field(default=True, description="Enable telemetry")
+    langfuse_secret_key: SecretStr | None = Field(default=None, description="Langfuse secret key")
+    langfuse_public_key: str | None = Field(default=None, description="Langfuse public key")
+    langfuse_base_url: AnyHttpUrl | None = Field(default=None, description="Langfuse base URL")
 
     model_config = SettingsConfigDict(
         env_file=".env",
