@@ -16,7 +16,7 @@ from koda.tools import ToolCall, ToolDefinition
 from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Sequence
+    from collections.abc import AsyncIterator, Callable, Sequence
 
     from openai.types.chat.chat_completion_chunk import (
         ChatCompletionChunk,
@@ -75,20 +75,21 @@ class PartialToolCallState:
 
 
 class BergetAIProvider(Provider[BergetAIAdapter]):
-    def __init__(
+    def __init__(  # noqa: PLR0913 - ignore for now...
         self,
         api_key: str,
         model: str,
         adapter: BergetAIAdapter,
         base_url: str | None = "https://api.berget.ai/v1",
         capabilities: set[ModelCapabilities] | None = None,
+        client_factory: Callable[..., AsyncOpenAI] = AsyncOpenAI,
     ) -> None:
         """Initialize the Berget provider client and runtime configuration."""
         if not api_key or not api_key.strip():
             logger.error("empty_api_key", provider="BergetAI")
             raise exceptions.EmptyApiKeyError("BergetAI")
 
-        self.client: AsyncOpenAI = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self.client: AsyncOpenAI = client_factory(api_key=api_key, base_url=base_url)
         self.model: str = model
         self.adapter: BergetAIAdapter = adapter
         self.capabilities: set[ModelCapabilities] = capabilities or set()

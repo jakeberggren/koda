@@ -31,15 +31,24 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from koda.messages import Message as CoreMessage
+    from koda.telemetry import Telemetry
     from koda_common.settings import SettingsManager
 
 
 class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
     """Backend that uses koda core directly."""
 
-    def __init__(self, settings: SettingsManager, sandbox_dir: Path) -> None:
+    def __init__(
+        self,
+        settings: SettingsManager,
+        sandbox_dir: Path,
+        telemetry: Telemetry | None = None,
+    ) -> None:
         self._settings = settings
         self._sandbox_dir = sandbox_dir
+        self._telemetry = telemetry
+        if self._telemetry:
+            self._telemetry.initialize(self._settings)
         self._session_manager = SessionManager(JsonSessionStore())
         self._session_manager.create_session()
         self._agent = self._create_agent()
