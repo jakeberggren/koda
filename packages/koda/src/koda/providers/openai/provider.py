@@ -46,7 +46,6 @@ class OpenAIProvider(Provider[OpenAIAdapter]):
         self.client: AsyncOpenAI = client_factory(api_key=api_key, base_url=base_url)
         self.model: str = model
         self.adapter: OpenAIAdapter = OpenAIAdapter()
-        self._last_response_id: str | None = None
         self.capabilities: set[ModelCapabilities] = capabilities or set()
 
         logger.info("openai_provider_initialized", model=model)
@@ -88,13 +87,9 @@ class OpenAIProvider(Provider[OpenAIAdapter]):
             result = ToolResult(output=output, call_id=event.item.id)
             yield ProviderToolCompleted(tool_name="web_search", result=result)
         elif isinstance(event, ResponseCompletedEvent):
-            self._last_response_id = event.response.id
             tool_calls = self.adapter.parse_tool_calls(event.response)
             for call in tool_calls:
                 yield ToolCallRequested(call=call)
-
-    def reset_state(self) -> None:
-        self._last_response_id = None
 
     async def stream(
         self,
@@ -114,13 +109,11 @@ class OpenAIProvider(Provider[OpenAIAdapter]):
         try:
             stream = await self.client.responses.create(
                 model=self.model,
-                previous_response_id=self._last_response_id,
                 instructions=system_message,
                 stream=True,
                 tools=openai_tools,
                 input=openai_input,
                 parallel_tool_calls=True,
-                prompt_cache_retention="24h",
             )
             async for event in stream:
                 for processed_event in self._process_event(event):

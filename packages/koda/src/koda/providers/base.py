@@ -35,14 +35,6 @@ class Provider[AdapterT: ProviderAdapter[Any, Any, Any]](Protocol):
     adapter: AdapterT
     """Adapter for converting to/from provider-specific formats."""
 
-    def reset_state(self) -> None:
-        """Reset provider-specific conversational state (e.g., response threading).
-
-        Called when the active session changes. Providers that do not maintain
-        conversational state can leave this as a no-op.
-        """
-        ...
-
     def stream(
         self,
         messages: Sequence[Message],

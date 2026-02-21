@@ -171,22 +171,14 @@ class Agent:
     def active_session(self) -> Session:
         return self._session_manager.active_session
 
-    def _reset_provider_state(self) -> None:
-        """Reset provider-specific state (e.g., conversation threading)."""
-        self.provider.reset_state()
-
     def new_session(self) -> Session:
-        session = self._session_manager.create_session()
-        self._reset_provider_state()
-        return session
+        return self._session_manager.create_session()
 
     def list_sessions(self) -> list[Session]:
         return self._session_manager.list_sessions()
 
     def switch_session(self, session_id: UUID) -> Session:
-        session = self._session_manager.switch_session(session_id)
-        self._reset_provider_state()
-        return session
+        return self._session_manager.switch_session(session_id)
 
     def delete_session(self, session_id: UUID) -> Session | None:
         """Delete a session. Returns the new active session if the deleted one was active."""
