@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol
 
+from pydantic import BaseModel
+
 from koda.messages import Message
 from koda.tools import ToolDefinition
 
@@ -41,3 +43,10 @@ class Provider[AdapterT: ProviderAdapter[Any, Any, Any]](Protocol):
         system_message: str | None = None,
         tools: list[ToolDefinition] | None = None,
     ) -> AsyncIterator[ProviderEvent]: ...
+
+    async def generate_structured[T: BaseModel](
+        self,
+        messages: Sequence[Message],
+        schema: type[T],
+        system_message: str | None,
+    ) -> T: ...
