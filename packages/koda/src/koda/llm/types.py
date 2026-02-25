@@ -1,15 +1,39 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Literal
 
 from koda.messages import AssistantMessage, Message
 from koda.tools import ToolCall, ToolDefinition, ToolResult
+
+_MAX_TOP_LOGPROBS = 20
+
+
+@dataclass(frozen=True, slots=True)
+class LLMRequestOptions:
+    max_output_tokens: int | None = None
+    max_tool_calls: int | None = None
+    extended_prompt_retention: bool = False
+    parallel_tool_calls: bool = True
+    web_search: bool = False
+    temperature: float | None = None
+    top_logprobs: int | None = None
+    top_p: float | None = None
+    truncation: Literal["auto", "disabled"] = "disabled"
+
+    def __post_init__(self) -> None:
+        if self.top_logprobs is not None and not 0 <= self.top_logprobs <= _MAX_TOP_LOGPROBS:
+            raise ValueError
+        if self.top_p is not None and not 0 <= self.top_p <= 1:
+            raise ValueError
+        if self.temperature is not None and not 0 <= self.temperature <= 1:
+            raise ValueError
 
 
 @dataclass(frozen=True, slots=True)
 class LLMRequest:
     messages: Sequence[Message]
-    system_message: str | None = None
     tools: Sequence[ToolDefinition] | None = None
+    options: LLMRequestOptions = field(default_factory=LLMRequestOptions)
 
 
 @dataclass(frozen=True, slots=True)

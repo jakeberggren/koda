@@ -16,7 +16,7 @@ from koda_common.logging import get_logger
 logger = get_logger(__name__)
 
 
-def raise_openai_error(
+def raise_llm_error_from_openai(
     error: Exception,
     *,
     backend: str,
