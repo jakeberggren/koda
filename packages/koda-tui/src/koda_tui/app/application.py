@@ -19,6 +19,20 @@ if TYPE_CHECKING:
     from koda_common.settings import SettingsManager
 
 
+class _KodaApplication(Application):
+    """Prompt toolkit Application subclass with updated resize behavior for KODA-TUI."""
+
+    def _on_resize(self) -> None:
+        """Handle terminal resize events without flashing a blank frame."""
+        if self.full_screen:
+            # prompt_toolkit's default full-screen path calls renderer.erase(),
+            # which flushes a visible blank frame on every resize signal.
+            # This prevents screen flickering on resize.
+            self.invalidate()
+            return
+        super()._on_resize()
+
+
 class KodaTuiApp:
     """Main TUI application."""
 
@@ -70,7 +84,7 @@ class KodaTuiApp:
 
     def _create_application(self) -> Application:
         """Create the prompt_toolkit Application."""
-        app = Application(
+        app = _KodaApplication(
             layout=self.layout.create_layout(),
             key_bindings=create_keybindings(self),
             style=get_style(self._settings.theme),

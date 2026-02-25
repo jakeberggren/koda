@@ -50,6 +50,7 @@ class InputArea:
             name="input_buffer",
         )
         self._control = BufferControl(buffer=self.buffer)
+        self._window: Window | None = None
 
     def _count_wrapped_lines(self, text: str, width: int) -> int:
         """Count visual lines after wrapping."""
@@ -71,23 +72,30 @@ class InputArea:
 
         return max(1, line_count)
 
+    def _get_input_width(self) -> int:
+        """Return current input content width (without margins)."""
+        if self._window and self._window.render_info is not None:
+            return max(1, self._window.render_info.window_width)
+
+        width_offset = self.DEFAULT_WIDTH_OFFSET if self._state.show_scrollbar else 2
+        return max(1, shutil.get_terminal_size().columns - width_offset)
+
     def get_height(self) -> Dimension:
         """Calculate height based on wrapped line count."""
-        width_offset = self.DEFAULT_WIDTH_OFFSET if self._state.show_scrollbar else 2
-        terminal_width = shutil.get_terminal_size().columns - width_offset
-        line_count = self._count_wrapped_lines(self.buffer.text, terminal_width)
+        line_count = self._count_wrapped_lines(self.buffer.text, self._get_input_width())
         height = max(self.MIN_HEIGHT, min(line_count, self.MAX_HEIGHT))
         return Dimension(min=self.MIN_HEIGHT, max=self.MAX_HEIGHT, preferred=height)
 
     def create_window(self) -> Window:
         """Create the input window with buffer control."""
-        return Window(
+        self._window = Window(
             content=self._control,
             height=self.get_height,
             wrap_lines=True,
             dont_extend_height=True,
             left_margins=[_PromptMargin()],
         )
+        return self._window
 
     def get_text(self) -> str:
         """Get current input text."""
