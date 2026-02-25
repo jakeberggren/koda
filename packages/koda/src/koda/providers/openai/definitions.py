@@ -11,7 +11,7 @@ MODELS: list[ModelDefinition] = [
             ThinkingLevel.HIGH,
             ThinkingLevel.EXTRA_HIGH,
         },
-        capabilities={ModelCapacity.WEB_SEARCH},
+        capabilities={ModelCapabilities.WEB_SEARCH},
     ),
     ModelDefinition(
         id="gpt-5.2-codex",
