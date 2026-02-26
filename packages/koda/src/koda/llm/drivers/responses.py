@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Literal
 
 from openai import AsyncOpenAI, Omit, omit
 from openai.types.responses import (
-    FunctionToolParam,
     Response,
     ResponseCompletedEvent,
     ResponseFunctionWebSearch,
@@ -14,6 +13,8 @@ from openai.types.responses import (
     ResponseStreamEvent,
     ResponseTextDeltaEvent,
     ResponseWebSearchCallInProgressEvent,
+    ToolParam,
+    WebSearchToolParam,
 )
 from openai.types.responses.response_function_web_search import ActionSearch
 
@@ -39,12 +40,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-
-@dataclass(frozen=True, slots=True)
-class ResponsesDriverConfig:
-    api_key: str
-    model: str
-    base_url: str | None = None
+type ResponsesAdapter = LLMAdapter[ResponseInputParam, list[ToolParam] | Omit, Response]
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,10 +50,17 @@ class _CreateParams:
     parallel_tool_calls: bool
     prompt_cache_retention: Literal["24h"] | Omit
     temperature: float | Omit
-    tools: list[FunctionToolParam] | Omit
+    tools: list[ToolParam] | Omit
     top_logprobs: int | Omit
     top_p: float | Omit
     truncation: Literal["auto", "disabled"] | Omit
+
+
+@dataclass(frozen=True, slots=True)
+class ResponsesDriverConfig:
+    api_key: str
+    model: str
+    base_url: str | None = None
 
 
 class ResponsesDriver(LLM):
@@ -65,11 +68,11 @@ class ResponsesDriver(LLM):
         self,
         config: ResponsesDriverConfig,
         *,
-        adapter: ResponsesDriverAdapter | None = None,
+        adapter: ResponsesAdapter,
         client_factory: Callable[..., AsyncOpenAI] = AsyncOpenAI,
     ) -> None:
         self.config: ResponsesDriverConfig = config
-        self.adapter: ResponsesDriverAdapter = adapter or ResponsesDriverAdapter()
+        self.adapter: ResponsesAdapter = adapter
         self.client: AsyncOpenAI = client_factory(
             api_key=config.api_key,
             base_url=config.base_url,
@@ -86,18 +89,27 @@ class ResponsesDriver(LLM):
 
     def _resolve_create_params(self, request: LLMRequest) -> _CreateParams:
         return _CreateParams(
-            input=self.adapter.adapt_messages(request.messages),
+            input=self.adapter.to_provider_messages(request.messages),
             model=self.config.model,
             parallel_tool_calls=request.options.parallel_tool_calls,
             prompt_cache_retention=self._resolve_prompt_cache_retention(
                 extended_prompt_retention=request.options.extended_prompt_retention
             ),
             temperature=self._to_omit(request.options.temperature),
-            tools=self.adapter.adapt_tools(request.tools),
+            tools=self._resolve_tools(request),
             top_logprobs=self._to_omit(request.options.top_logprobs),
             top_p=self._to_omit(request.options.top_p),
             truncation=self._to_omit(request.options.truncation),
         )
+
+    def _resolve_tools(self, request: LLMRequest) -> list[ToolParam] | Omit:
+        adapted_tools = self.adapter.to_provider_tools(request.tools)
+        if not request.options.web_search:
+            return adapted_tools
+        web_search_tool = WebSearchToolParam(type="web_search")
+        if isinstance(adapted_tools, Omit):
+            return [web_search_tool]
+        return [*adapted_tools, web_search_tool]
 
     @staticmethod
     def _format_web_search(output: ResponseFunctionWebSearch) -> str | None:
@@ -122,7 +134,7 @@ class ResponsesDriver(LLM):
         return LLMResponse(
             output=AssistantMessage(
                 content=response.output_text or "",
-                tool_calls=self.adapter.parse_tool_calls(response),
+                tool_calls=self.adapter.extract_tool_calls(response),
             ),
             usage=self._adapt_usage(response),
         )
@@ -160,7 +172,7 @@ class ResponsesDriver(LLM):
     def _process_response_completed_event(
         self, event: ResponseCompletedEvent
     ) -> Iterator[LLMEvent]:
-        tool_calls = self.adapter.parse_tool_calls(event.response)
+        tool_calls = self.adapter.extract_tool_calls(event.response)
         for call in tool_calls:
             yield LLMToolCallRequested(call=call)
         yield LLMResponseCompleted(
@@ -207,8 +219,3 @@ class ResponsesDriver(LLM):
                     yield processed_event
         except Exception as e:
             raise_llm_error_from_openai(e, backend="responses")
-
-
-class ResponsesDriverAdapter(
-    LLMAdapter[ResponseInputParam, list[FunctionToolParam] | Omit, Response]
-): ...
