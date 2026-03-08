@@ -1,7 +1,8 @@
+from __future__ import annotations
+
 import json
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING, Any
 
 import openai
 from openai import AsyncOpenAI, Omit, omit
@@ -16,20 +17,36 @@ from openai.types.responses import (
 from openai.types.responses.response_function_tool_call_param import ResponseFunctionToolCallParam
 from openai.types.responses.response_input_param import FunctionCallOutput, ResponseInputItemParam
 
-from koda.llm.capabilities import (
-    CapabilityResolvedLLM,
-    CapabilityResolver,
-    StaticCapabilityResolver,
-)
 from koda.llm.drivers import ResponsesDriver, ResponsesDriverConfig
 from koda.llm.exceptions import InvalidToolCallArgumentsError, UnknownMessageTypeError
 from koda.llm.models import ModelCapabilities, ModelDefinition, ThinkingLevel
-from koda.llm.protocols import LLM, LLMAdapter
+from koda.llm.protocols import LLMAdapter
 from koda.llm.providers.base import LLMProviderBase
+from koda.llm.registry import ModelRegistry
 from koda.messages import AssistantMessage, Message, ToolMessage, UserMessage
 from koda.tools import ToolCall, ToolDefinition
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
+    from koda.llm.types import LLMRequest, LLMResponse
+
 OPENAI_MODELS: Sequence[ModelDefinition] = [
+    ModelDefinition(
+        id="gpt-5.4",
+        name="gpt-5.4",
+        provider="openai",
+        thinking={
+            ThinkingLevel.LOW,
+            ThinkingLevel.MEDIUM,
+            ThinkingLevel.HIGH,
+            ThinkingLevel.EXTRA_HIGH,
+        },
+        capabilities={
+            ModelCapabilities.WEB_SEARCH,
+            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
+        },
+    ),
     ModelDefinition(
         id="gpt-5.3-codex",
         name="gpt-5.3-codex",
@@ -40,7 +57,10 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
             ThinkingLevel.HIGH,
             ThinkingLevel.EXTRA_HIGH,
         },
-        capabilities={ModelCapabilities.WEB_SEARCH},
+        capabilities={
+            ModelCapabilities.WEB_SEARCH,
+            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
+        },
     ),
     ModelDefinition(
         id="gpt-5.2-codex",
@@ -229,8 +249,17 @@ class OpenAILLMProviderConfig:
 
 
 class OpenAILLMProvider(LLMProviderBase):
-    def __init__(self, driver: LLM) -> None:
+    provider_name: str = "openai"
+
+    def __init__(
+        self,
+        driver: ResponsesDriver,
+        *,
+        model_registry: ModelRegistry,
+    ) -> None:
         super().__init__(driver=driver)
+        self.model = driver.config.model
+        self.model_registry = model_registry
 
     @classmethod
     def from_config(
@@ -239,27 +268,56 @@ class OpenAILLMProvider(LLMProviderBase):
         *,
         adapter: OpenAIResponseAdapter | None = None,
         client_factory: Callable[..., AsyncOpenAI] = AsyncOpenAI,
-        capability_resolver: CapabilityResolver | None = None,
-    ) -> "OpenAILLMProvider":
+        model_registry: ModelRegistry | None = None,
+    ) -> OpenAILLMProvider:
         resolved_adapter = adapter or OpenAIResponseAdapter()
-        resolved_capability_resolver = capability_resolver or StaticCapabilityResolver(
-            list(OPENAI_MODELS)
+        resolved_model_registry = model_registry or ModelRegistry()
+        resolved_model_registry.register_all(OPENAI_MODELS)
+        driver_config = ResponsesDriverConfig(
+            api_key=config.api_key,
+            model=config.model,
+            base_url=config.base_url,
         )
         driver = ResponsesDriver(
-            config=ResponsesDriverConfig(
-                api_key=config.api_key,
-                model=config.model,
-                base_url=config.base_url,
-            ),
+            config=driver_config,
             adapter=resolved_adapter,
             client_factory=client_factory,
         )
-        resolved_driver = CapabilityResolvedLLM(
-            driver=driver,
-            resolver=resolved_capability_resolver,
-            provider="openai",
-            model=config.model,
-        )
         return cls(
-            driver=resolved_driver,
+            driver=driver,
+            model_registry=resolved_model_registry,
         )
+
+    @staticmethod
+    def _apply_capabilities(
+        request: LLMRequest,
+        *,
+        capabilities: set[ModelCapabilities],
+    ) -> LLMRequest:
+        resolved_options = replace(
+            request.options,
+            web_search=(
+                request.options.web_search and ModelCapabilities.WEB_SEARCH in capabilities
+            ),
+            extended_prompt_retention=(
+                request.options.extended_prompt_retention
+                and ModelCapabilities.EXTENDED_PROMPT_RETENTION in capabilities
+            ),
+        )
+        return replace(request, options=resolved_options)
+
+    async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
+        model_definition = self.model_registry.get(self.provider_name, self.model)
+        resolved_request = self._apply_capabilities(
+            request,
+            capabilities=set(model_definition.capabilities),
+        )
+        return await self.driver.generate(resolved_request)
+
+    def generate_stream(self, request: LLMRequest):
+        model_definition = self.model_registry.get(self.provider_name, self.model)
+        resolved_request = self._apply_capabilities(
+            request,
+            capabilities=set(model_definition.capabilities),
+        )
+        return self.driver.generate_stream(resolved_request)
