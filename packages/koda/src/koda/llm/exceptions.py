@@ -88,3 +88,21 @@ class UnknownMessageTypeError(LLMError):
 
 class StructuredOutputNotSupportedError(LLMError):
     """Structured outputs are not supported by this backend implementation."""
+
+
+class ModelConfigurationError(LLMError):
+    """LLM model configuration or registry error."""
+
+
+class ModelAlreadyRegisteredError(ModelConfigurationError):
+    def __init__(self, model_name: str, provider_name: str) -> None:
+        super().__init__(f"Model '{model_name}' for provider {provider_name} is already registered")
+        self.model_name = model_name
+        self.provider_name = provider_name
+
+
+class ModelNotSupportedError(ModelConfigurationError):
+    def __init__(self, model_id: str, provider_name: str) -> None:
+        super().__init__(f"Model '{model_id}' for provider {provider_name} is not supported")
+        self.model_id = model_id
+        self.provider_name = provider_name
