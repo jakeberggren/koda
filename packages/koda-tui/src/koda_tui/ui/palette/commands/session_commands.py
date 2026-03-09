@@ -12,6 +12,8 @@ from koda_tui.ui.palette.commands.command import Command
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from prompt_toolkit.formatted_text import StyleAndTextTuples
+
     from koda_common.contracts import KodaBackend, SessionInfo
     from koda_tui.actions import ActionResult, DeleteSessionPayload
     from koda_tui.state import AppState
@@ -20,7 +22,7 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 
-_SESSION_FOOTER = [
+_SESSION_FOOTER: StyleAndTextTuples = [
     ("class:palette.item", "ctrl-n"),
     ("class:palette.hint", " new · "),
     ("class:palette.item", "ctrl-d"),

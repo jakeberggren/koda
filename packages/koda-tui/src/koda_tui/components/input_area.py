@@ -32,7 +32,9 @@ class _PromptMargin(Margin):
         width: int,  # noqa: ARG002
         height: int,  # noqa: ARG002
     ) -> StyleAndTextTuples:
-        return [("class:prompt", "▌\n")] * window_render_info.window_height
+        fragments = []
+        fragments.extend(("class:prompt", "▌\n") for _ in range(window_render_info.window_height))
+        return fragments
 
 
 class InputArea:

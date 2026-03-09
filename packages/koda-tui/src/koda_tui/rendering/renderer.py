@@ -18,6 +18,7 @@ from koda_common.contracts import ToolCall
 from koda_tui.state import Message, MessageRole
 
 Theme = Literal["dark", "light"]
+type DiffBlockType = Literal["add", "del", "context"]
 
 # Per-theme rendering constants
 _THEME_COLORS = {
@@ -131,7 +132,7 @@ class DiffBlockAccumulator:
     diff_add_bg: str
     diff_del_bg: str
     renderables: list = field(default_factory=list)
-    block_type: str | None = None
+    block_type: DiffBlockType | None = None
     lines: list[str] = field(default_factory=list)
     start_line: int | None = None
 
@@ -140,7 +141,12 @@ class DiffBlockAccumulator:
         if not self.lines:
             return
 
-        bg = {"add": self.diff_add_bg, "del": self.diff_del_bg}.get(self.block_type, "default")
+        bg_by_type: dict[DiffBlockType, str] = {
+            "add": self.diff_add_bg,
+            "del": self.diff_del_bg,
+            "context": "default",
+        }
+        bg = "default" if self.block_type is None else bg_by_type[self.block_type]
         self.renderables.append(
             Syntax(
                 "\n".join(self.lines),
@@ -155,7 +161,7 @@ class DiffBlockAccumulator:
         self.block_type = None
         self.start_line = None
 
-    def add_line(self, line: str, line_type: str, start: int | None) -> None:
+    def add_line(self, line: str, line_type: DiffBlockType, start: int | None) -> None:
         """Add a line, flushing first if the type changes."""
         if self.block_type != line_type:
             self.flush()
