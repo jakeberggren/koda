@@ -2,7 +2,6 @@ from functools import singledispatch
 
 from koda.messages import AssistantMessage as CoreAssistantMessage
 from koda.messages import Message as CoreMessage
-from koda.messages import SystemMessage as CoreSystemMessage
 from koda.messages import ToolMessage as CoreToolMessage
 from koda.messages import UserMessage as CoreUserMessage
 from koda_api.mappers.tools import (
@@ -12,7 +11,6 @@ from koda_api.mappers.tools import (
 from koda_common.contracts import (
     AssistantMessage,
     Message,
-    SystemMessage,
     ToolMessage,
     UserMessage,
 )
@@ -33,11 +31,6 @@ def map_message_to_contract_message(core_message: CoreMessage) -> Message:
 @map_message_to_contract_message.register
 def _(core_message: CoreUserMessage) -> Message:
     return UserMessage(content=core_message.content)
-
-
-@map_message_to_contract_message.register
-def _(core_message: CoreSystemMessage) -> Message:
-    return SystemMessage(content=core_message.content)
 
 
 # Core assistant/tool messages

@@ -13,9 +13,9 @@ from openai.types.chat.chat_completion_message_function_tool_call import (
 )
 from pydantic import BaseModel
 
-from koda.messages import AssistantMessage, SystemMessage, ToolMessage
+from koda.messages import AssistantMessage, ToolMessage
 from koda.providers.berget.adapter import BergetAIAdapter
-from koda.providers.exceptions import InvalidToolCallArgumentsError, UnknownMessageTypeError
+from koda.providers.exceptions import InvalidToolCallArgumentsError
 from koda.tools.base import ToolCall, ToolDefinition, ToolOutput, ToolResult
 
 
@@ -79,13 +79,6 @@ def test_adapt_tool_message_omits_error_message_when_none() -> None:
     item = cast("dict[str, object]", items[0])
     payload = json.loads(cast("str", item["content"]))
     assert payload == {"content": {"ok": True}, "is_error": False}
-
-
-def test_adapt_messages_raises_for_unknown_message_type() -> None:
-    adapter = BergetAIAdapter()
-
-    with pytest.raises(UnknownMessageTypeError):
-        adapter.adapt_messages([SystemMessage(content="system prompt")])
 
 
 def test_parse_tool_calls_parses_function_and_skips_custom() -> None:
