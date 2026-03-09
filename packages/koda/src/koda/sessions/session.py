@@ -4,10 +4,10 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from koda.messages.messages import AssistantMessage, SystemMessage, ToolMessage, UserMessage
+from koda.messages.messages import AssistantMessage, ToolMessage, UserMessage
 
 SessionMessage = Annotated[
-    AssistantMessage | SystemMessage | ToolMessage | UserMessage,
+    AssistantMessage | ToolMessage | UserMessage,
     Field(discriminator="role"),
 ]
 

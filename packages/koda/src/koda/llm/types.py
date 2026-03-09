@@ -32,6 +32,7 @@ class LLMRequestOptions:
 @dataclass(frozen=True, slots=True)
 class LLMRequest:
     messages: Sequence[Message]
+    instructions: str | None = None
     tools: Sequence[ToolDefinition] | None = None
     options: LLMRequestOptions = field(default_factory=LLMRequestOptions)
 

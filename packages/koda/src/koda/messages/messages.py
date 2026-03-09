@@ -9,7 +9,6 @@ from koda.tools import ToolCall, ToolResult
 class MessageRole(StrEnum):
     USER = auto()
     ASSISTANT = auto()
-    SYSTEM = auto()
     TOOL = auto()
 
 
@@ -25,10 +24,6 @@ class UserMessage(Message):
 class AssistantMessage(Message):
     role: Literal[MessageRole.ASSISTANT] = Field(default=MessageRole.ASSISTANT, frozen=True)
     tool_calls: list[ToolCall] = Field(default_factory=list)
-
-
-class SystemMessage(Message):
-    role: Literal[MessageRole.SYSTEM] = Field(default=MessageRole.SYSTEM, frozen=True)
 
 
 class ToolMessage(Message):
