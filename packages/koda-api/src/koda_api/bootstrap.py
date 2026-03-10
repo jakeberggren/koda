@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from koda.agents import Agent
+from koda.agents import Agent, AgentConfig
+from koda.llm import LLMRequestOptions
 from koda.llm.providers.openai import OPENAI_MODELS, create_openai_llm
 from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
@@ -60,9 +61,17 @@ def create_agent(
         settings,
         registries.model_registry,
     )
+    request_options = LLMRequestOptions(
+        web_search=settings.allow_web_search,
+        extended_prompt_retention=settings.allow_extended_prompt_retention,
+    )
+    agent_config = AgentConfig(
+        system_message=system_message,
+        request_options=request_options,
+    )
     return Agent(
         llm=llm,
         session_manager=session_manager,
-        system_message=system_message,
+        config=agent_config,
         tools=create_tool_config(sandbox_dir),
     )

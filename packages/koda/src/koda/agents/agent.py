@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from koda.llm import LLM, LLMRequest
+from koda.llm import LLM, LLMRequest, LLMRequestOptions
 from koda.llm import exceptions as llm_exceptions
 from koda.llm.types import (
     LLMEvent,
@@ -30,20 +31,25 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+@dataclass(frozen=True, slots=True)
+class AgentConfig:
+    system_message: str | None = None
+    request_options: LLMRequestOptions = field(default_factory=LLMRequestOptions)
+    max_tool_iterations: int = 30
+
+
 class Agent:
     def __init__(
         self,
         llm: LLM,
+        config: AgentConfig,
         session_manager: SessionManager,
-        system_message: str | None = None,
         tools: ToolConfig | None = None,
-        max_tool_iterations: int = 30,
     ) -> None:
         self.llm: LLM = llm
+        self._config: AgentConfig = config
         self._session_manager: SessionManager = session_manager
-        self._system_message: str | None = system_message
         self.tools: ToolConfig | None = tools
-        self.max_tool_iterations: int = max_tool_iterations
 
         logger.info("agent_initialized", llm=type(llm).__name__)
 
@@ -143,8 +149,9 @@ class Agent:
         session = self._session_manager.get_session(session_id)
         request = LLMRequest(
             messages=session.messages,
-            instructions=self._system_message,
+            instructions=self._config.system_message,
             tools=tool_definitions,
+            options=self._config.request_options,
         )
         stream = self.llm.generate_stream(request)
         response_chunks: list[str] = []
@@ -180,7 +187,7 @@ class Agent:
 
         tool_definitions = self.tools.registry.get_definitions() if self.tools else None
 
-        for iteration in range(1, self.max_tool_iterations + 1):
+        for iteration in range(1, self._config.max_tool_iterations + 1):
             logger.info("agent_loop_iteration", iteration=iteration)
             pending_tool_calls: list[ToolCall] = []
 
@@ -195,8 +202,8 @@ class Agent:
                 logger.info("run_completed", iterations=iteration)
                 return
 
-        logger.error("max_iterations_exceeded", max_iterations=self.max_tool_iterations)
-        raise tool_exceptions.MaxIterationsExceededError(self.max_tool_iterations)
+        logger.error("max_iterations_exceeded", max_iterations=self._config.max_tool_iterations)
+        raise tool_exceptions.MaxIterationsExceededError(self._config.max_tool_iterations)
 
     @property
     def active_session(self) -> Session:

@@ -78,6 +78,7 @@ def test_setting_attribute_persists_and_notifies(
         "theme": "dark",
         "show_scrollbar": True,
         "queue_inputs": True,
+        "allow_web_search": False,
         "allow_extended_prompt_retention": False,
     }
     assert changes == [("provider", "openai", "anthropic")]

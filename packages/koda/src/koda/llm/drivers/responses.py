@@ -47,6 +47,8 @@ type ResponsesAdapter = LLMAdapter[ResponseInputParam, list[ToolParam] | Omit, R
 class _CreateParams:
     input: ResponseInputParam
     instructions: str | Omit
+    max_output_tokens: int | Omit
+    max_tool_calls: int | Omit
     model: str
     parallel_tool_calls: bool
     prompt_cache_retention: Literal["24h"] | Omit
@@ -92,6 +94,8 @@ class ResponsesDriver(LLM):
         return _CreateParams(
             input=self.adapter.to_provider_messages(request.messages),
             instructions=self._to_omit(request.instructions),
+            max_output_tokens=self._to_omit(request.options.max_output_tokens),
+            max_tool_calls=self._to_omit(request.options.max_tool_calls),
             model=self.config.model,
             parallel_tool_calls=request.options.parallel_tool_calls,
             prompt_cache_retention=self._resolve_prompt_cache_retention(
@@ -147,6 +151,8 @@ class ResponsesDriver(LLM):
             response: Response = await self.client.responses.create(
                 input=create_params.input,
                 instructions=create_params.instructions,
+                max_output_tokens=create_params.max_output_tokens,
+                max_tool_calls=create_params.max_tool_calls,
                 model=create_params.model,
                 parallel_tool_calls=create_params.parallel_tool_calls,
                 prompt_cache_retention=create_params.prompt_cache_retention,
@@ -208,6 +214,8 @@ class ResponsesDriver(LLM):
             stream = await self.client.responses.create(
                 input=create_params.input,
                 instructions=create_params.instructions,
+                max_output_tokens=create_params.max_output_tokens,
+                max_tool_calls=create_params.max_tool_calls,
                 model=create_params.model,
                 parallel_tool_calls=create_params.parallel_tool_calls,
                 prompt_cache_retention=create_params.prompt_cache_retention,
