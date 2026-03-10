@@ -1,4 +1,4 @@
-from koda.providers.registry import ModelDefinition as CoreModelDefinition
+from koda.llm.models import ModelDefinition as CoreModelDefinition
 from koda_common.contracts import ModelCapability, ModelDefinition, ThinkingLevel
 
 

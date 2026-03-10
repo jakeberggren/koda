@@ -94,6 +94,27 @@ class ModelConfigurationError(LLMError):
     """LLM model configuration or registry error."""
 
 
+class ProviderConfigurationError(LLMError):
+    """LLM provider configuration or registry error."""
+
+
+class ProviderNameEmptyError(ProviderConfigurationError):
+    def __init__(self) -> None:
+        super().__init__("Provider name cannot be empty")
+
+
+class ProviderAlreadyRegisteredError(ProviderConfigurationError):
+    def __init__(self, provider_name: str) -> None:
+        super().__init__(f"Provider '{provider_name}' is already registered")
+        self.provider_name = provider_name
+
+
+class ProviderNotSupportedError(ProviderConfigurationError):
+    def __init__(self, provider_name: str) -> None:
+        super().__init__(f"Provider '{provider_name}' is not supported")
+        self.provider_name = provider_name
+
+
 class ModelAlreadyRegisteredError(ModelConfigurationError):
     def __init__(self, model_name: str, provider_name: str) -> None:
         super().__init__(f"Model '{model_name}' for provider {provider_name} is already registered")

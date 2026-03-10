@@ -18,18 +18,24 @@ from openai.types.responses.response_function_tool_call_param import ResponseFun
 from openai.types.responses.response_input_param import FunctionCallOutput, ResponseInputItemParam
 
 from koda.llm.drivers import ResponsesDriver, ResponsesDriverConfig
-from koda.llm.exceptions import InvalidToolCallArgumentsError, UnknownMessageTypeError
+from koda.llm.exceptions import (
+    InvalidToolCallArgumentsError,
+    LLMAuthenticationError,
+    UnknownMessageTypeError,
+)
 from koda.llm.models import ModelCapabilities, ModelDefinition, ThinkingLevel
 from koda.llm.protocols import LLMAdapter
 from koda.llm.providers.base import LLMProviderBase
-from koda.llm.registry import ModelRegistry
 from koda.messages import AssistantMessage, Message, ToolMessage, UserMessage
 from koda.tools import ToolCall, ToolDefinition
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
+    from koda.llm.protocols import LLM
+    from koda.llm.registry import ModelRegistry
     from koda.llm.types import LLMRequest, LLMResponse
+    from koda_common.settings import SettingsManager
 
 OPENAI_MODELS: Sequence[ModelDefinition] = [
     ModelDefinition(
@@ -266,13 +272,9 @@ class OpenAILLMProvider(LLMProviderBase):
         cls,
         config: OpenAILLMProviderConfig,
         *,
-        adapter: OpenAIResponseAdapter | None = None,
         client_factory: Callable[..., AsyncOpenAI] = AsyncOpenAI,
-        model_registry: ModelRegistry | None = None,
+        model_registry: ModelRegistry,
     ) -> OpenAILLMProvider:
-        resolved_adapter = adapter or OpenAIResponseAdapter()
-        resolved_model_registry = model_registry or ModelRegistry()
-        resolved_model_registry.register_all(OPENAI_MODELS)
         driver_config = ResponsesDriverConfig(
             api_key=config.api_key,
             model=config.model,
@@ -280,12 +282,12 @@ class OpenAILLMProvider(LLMProviderBase):
         )
         driver = ResponsesDriver(
             config=driver_config,
-            adapter=resolved_adapter,
+            adapter=OpenAIResponseAdapter(),
             client_factory=client_factory,
         )
         return cls(
             driver=driver,
-            model_registry=resolved_model_registry,
+            model_registry=model_registry,
         )
 
     @staticmethod
@@ -321,3 +323,12 @@ class OpenAILLMProvider(LLMProviderBase):
             capabilities=set(model_definition.capabilities),
         )
         return self.driver.generate_stream(resolved_request)
+
+
+def create_openai_llm(settings: SettingsManager, model_registry: ModelRegistry) -> LLM:
+    provider = OpenAILLMProvider.provider_name
+    api_key = settings.get_api_key(provider)
+    if api_key is None:
+        raise LLMAuthenticationError(provider, Exception("API key not configured"))
+    config = OpenAILLMProviderConfig(api_key=api_key, model=settings.model)
+    return OpenAILLMProvider.from_config(config, model_registry=model_registry)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from koda.llm import exceptions
@@ -8,6 +9,39 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from koda.llm.models import ModelDefinition
+    from koda.llm.protocols import LLM
+    from koda_common.settings import SettingsManager
+
+type ProviderFactory = Callable[[SettingsManager, ModelRegistry], LLM]
+
+
+class ProviderRegistry:
+    """Registry for LLM provider factories keyed by provider name."""
+
+    def __init__(self) -> None:
+        self._factories: dict[str, ProviderFactory] = {}
+
+    @staticmethod
+    def _normalize(value: str) -> str:
+        return value.strip().lower()
+
+    def register(self, name: str, factory: ProviderFactory) -> None:
+        provider_name = self._normalize(name)
+        if not provider_name:
+            raise exceptions.ProviderNameEmptyError
+        if provider_name in self._factories:
+            raise exceptions.ProviderAlreadyRegisteredError(provider_name)
+        self._factories[provider_name] = factory
+
+    def create(self, name: str, settings: SettingsManager, model_registry: ModelRegistry) -> LLM:
+        provider_name = self._normalize(name)
+        factory = self._factories.get(provider_name)
+        if factory is None:
+            raise exceptions.ProviderNotSupportedError(provider_name)
+        return factory(settings, model_registry)
+
+    def supported(self) -> list[str]:
+        return sorted(self._factories.keys())
 
 
 class ModelRegistry:
