@@ -9,8 +9,14 @@ class LLMError(Exception):
 class LLMAPIError(LLMError):
     """API-related errors from LLM backends."""
 
-    def __init__(self, backend_name: str, error: Exception) -> None:
-        super().__init__(f"{backend_name} API error: {error}")
+    def __init__(
+        self,
+        backend_name: str,
+        error: Exception,
+        *,
+        message: str | None = None,
+    ) -> None:
+        super().__init__(message or f"{backend_name} API error: {error}")
         self.backend_name = backend_name
         self.error = error
 
@@ -19,24 +25,33 @@ class LLMConnectionError(LLMAPIError):
     """Connection errors from the LLM backend."""
 
     def __init__(self, backend_name: str, error: Exception) -> None:
-        super().__init__(backend_name, error)
-        self.message = f"{backend_name} connection error: {error}"
+        super().__init__(
+            backend_name,
+            error,
+            message=f"{backend_name} connection error: {error}",
+        )
 
 
 class LLMRateLimitError(LLMAPIError):
     """Rate limit exceeded for the LLM backend."""
 
     def __init__(self, backend_name: str, error: Exception) -> None:
-        super().__init__(backend_name, error)
-        self.message = f"{backend_name} rate limit exceeded: {error}"
+        super().__init__(
+            backend_name,
+            error,
+            message=f"{backend_name} rate limit exceeded: {error}",
+        )
 
 
 class LLMAuthenticationError(LLMAPIError):
     """Authentication error from the LLM backend."""
 
     def __init__(self, backend_name: str, error: Exception) -> None:
-        super().__init__(backend_name, error)
-        self.message = f"{backend_name} authentication failed: {error}"
+        super().__init__(
+            backend_name,
+            error,
+            message=f"{backend_name} authentication failed: {error}",
+        )
 
 
 class LLMValidationError(LLMError):

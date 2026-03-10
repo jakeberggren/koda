@@ -265,11 +265,11 @@ class OpenAILLMProvider(LLMProviderBase):
         self,
         driver: ResponsesDriver,
         *,
-        model_registry: ModelRegistry,
+        model_definition: ModelDefinition,
     ) -> None:
         super().__init__(driver=driver)
-        self.model = driver.config.model
-        self.model_registry = model_registry
+        self.model: str = model_definition.id
+        self.capabilities: set[ModelCapabilities] = set(model_definition.capabilities)
 
     @classmethod
     def from_config(
@@ -279,9 +279,14 @@ class OpenAILLMProvider(LLMProviderBase):
         client_factory: Callable[..., AsyncOpenAI] = AsyncOpenAI,
         model_registry: ModelRegistry,
     ) -> OpenAILLMProvider:
+        api_key = config.api_key.strip()
+        if not api_key:
+            raise LLMAuthenticationError(cls.provider_name, ValueError("API key cannot be empty"))
+
+        model_definition = model_registry.get(cls.provider_name, config.model)
         driver_config = ResponsesDriverConfig(
-            api_key=config.api_key,
-            model=config.model,
+            api_key=api_key,
+            model=model_definition.id,
             base_url=config.base_url,
         )
         driver = ResponsesDriver(
@@ -291,7 +296,7 @@ class OpenAILLMProvider(LLMProviderBase):
         )
         return cls(
             driver=driver,
-            model_registry=model_registry,
+            model_definition=model_definition,
         )
 
     @staticmethod
@@ -313,18 +318,16 @@ class OpenAILLMProvider(LLMProviderBase):
         return replace(request, options=resolved_options)
 
     async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
-        model_definition = self.model_registry.get(self.provider_name, self.model)
         resolved_request = self._apply_capabilities(
             request,
-            capabilities=set(model_definition.capabilities),
+            capabilities=self.capabilities,
         )
         return await self.driver.generate(resolved_request)
 
     def generate_stream(self, request: LLMRequest):
-        model_definition = self.model_registry.get(self.provider_name, self.model)
         resolved_request = self._apply_capabilities(
             request,
-            capabilities=set(model_definition.capabilities),
+            capabilities=self.capabilities,
         )
         return self.driver.generate_stream(resolved_request)
 
@@ -343,7 +346,7 @@ def create_openai_llm(settings: SettingsManager, model_registry: ModelRegistry) 
     provider = OpenAILLMProvider.provider_name
     api_key = settings.get_api_key(provider)
     if api_key is None:
-        raise LLMAuthenticationError(provider, Exception("API key not configured"))
+        raise LLMAuthenticationError(provider, ValueError("API key not configured"))
     config = OpenAILLMProviderConfig(api_key=api_key, model=settings.model)
     client_factory = _resolve_openai_client(settings)
     return OpenAILLMProvider.from_config(

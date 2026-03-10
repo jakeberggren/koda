@@ -17,8 +17,10 @@ from openai.types.responses import (
     WebSearchToolParam,
 )
 from openai.types.responses.response_function_web_search import ActionSearch
+from pydantic import BaseModel
 
 from koda.llm import LLMEvent, LLMResponse, LLMTokenUsage
+from koda.llm.exceptions import StructuredOutputNotSupportedError
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponseCompleted,
@@ -231,3 +233,11 @@ class ResponsesDriver(LLM):
                     yield processed_event
         except Exception as e:
             raise_llm_error_from_openai(e, backend="responses")
+
+    async def generate_structured[T: BaseModel](
+        self,
+        request: LLMRequest,
+        schema: type[T],
+    ) -> LLMResponse[T]:
+        _ = request, schema
+        raise StructuredOutputNotSupportedError
