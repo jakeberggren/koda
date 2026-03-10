@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID, uuid4
 
 import pytest
@@ -11,10 +11,12 @@ import pytest
 from koda.llm.exceptions import LLMAuthenticationError
 from koda.llm.models import ModelDefinition as CoreModelDefinition
 from koda.llm.models import ThinkingLevel
+from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.llm.types import LLMTextDelta as CoreTextDelta
 from koda.messages import AssistantMessage as CoreAssistantMessage
 from koda.messages import UserMessage as CoreUserMessage
 from koda.sessions import Session
+from koda_api import bootstrap
 from koda_api.backends.in_process import InProcessBackend
 from koda_common.contracts import BackendAuthenticationError, TextDelta, UserMessage
 
@@ -63,6 +65,13 @@ def _settings() -> SettingsManager:
     return cast("SettingsManager", SimpleNamespace(provider="openai", model="gpt-5.2"))
 
 
+def _registries() -> bootstrap.Registries:
+    return bootstrap.Registries(
+        model_registry=ModelRegistry(),
+        provider_registry=ProviderRegistry(),
+    )
+
+
 def _core_session(
     *,
     content: str = "hello",
@@ -78,11 +87,14 @@ def _core_session(
 
 
 @pytest.mark.asyncio
-async def test_chat_maps_core_events_to_stream_events(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_chat_maps_core_events_to_stream_events() -> None:
     fake_agent = _FakeAgent(events=[CoreTextDelta(text="hello")])
-    monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: fake_agent)
-
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=_registries(),
+        agent_factory=lambda **_kwargs: fake_agent,
+    )
     events = [event async for event in backend.chat("hi")]
 
     assert len(events) == 1
@@ -91,17 +103,19 @@ async def test_chat_maps_core_events_to_stream_events(monkeypatch: pytest.Monkey
 
 
 @pytest.mark.asyncio
-async def test_chat_maps_auth_error_to_backend_auth_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: _FailingAuthAgent())
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
+async def test_chat_maps_auth_error_to_backend_auth_error() -> None:
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=_registries(),
+        agent_factory=lambda **_kwargs: _FailingAuthAgent(),
+    )
 
     with pytest.raises(BackendAuthenticationError):
         _ = [event async for event in backend.chat("hi")]
 
 
-def test_switch_session_returns_contract_session_and_messages(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_switch_session_returns_contract_session_and_messages() -> None:
     session_id = uuid4()
     core_session = Session(
         session_id=session_id,
@@ -112,12 +126,12 @@ def test_switch_session_returns_contract_session_and_messages(
         ],
         name="Example Session",
     )
-    monkeypatch.setattr(
-        InProcessBackend,
-        "_create_agent",
-        lambda _self: _FakeAgent(session=core_session),
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=_registries(),
+        agent_factory=lambda **_kwargs: _FakeAgent(session=core_session),
     )
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
 
     mapped_session, mapped_messages = backend.switch_session(session_id)
 
@@ -128,35 +142,39 @@ def test_switch_session_returns_contract_session_and_messages(
     assert mapped_messages[0].content == "hello"
 
 
-def test_reconfigure_rebuilds_agent(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_reconfigure_rebuilds_agent() -> None:
     created_agents: list[object] = []
 
-    def _fake_create_agent(_self: InProcessBackend) -> object:
+    def _fake_create_agent(**_kwargs: object) -> object:
         agent = object()
         created_agents.append(agent)
         return agent
 
-    monkeypatch.setattr(InProcessBackend, "_create_agent", _fake_create_agent)
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=_registries(),
+        agent_factory=cast("Any", _fake_create_agent),
+    )
 
     backend.reconfigure()
 
     assert len(created_agents) == 2  # noqa: PLR2004
 
 
-def test_list_providers_delegates_to_registry(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake_registry = SimpleNamespace(supported=lambda: ["openai", "anthropic"])
-    monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: _FakeAgent())
-    monkeypatch.setattr(
-        InProcessBackend, "_create_provider_registry", staticmethod(lambda: fake_registry)
+def test_list_providers_delegates_to_registry() -> None:
+    fake_provider_registry = ProviderRegistry()
+    fake_provider_registry.supported = lambda: ["openai", "anthropic"]  # type: ignore[method-assign]
+    model_registry = ModelRegistry()
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=bootstrap.Registries(
+            model_registry=model_registry,
+            provider_registry=fake_provider_registry,
+        ),
+        agent_factory=lambda **_kwargs: _FakeAgent(),
     )
-    monkeypatch.setattr(
-        InProcessBackend,
-        "_create_model_registry",
-        staticmethod(lambda: SimpleNamespace(supported=lambda _provider=None: [])),
-    )
-
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
     assert backend.list_providers() == ["openai", "anthropic"]
 
 
@@ -167,15 +185,19 @@ def test_list_models_maps_contract_models(monkeypatch: pytest.MonkeyPatch) -> No
         provider="openai",
         thinking={ThinkingLevel.HIGH},
     )
-    fake_model_registry = SimpleNamespace(supported=lambda _provider=None: [core_model])
-    monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: _FakeAgent())
-    monkeypatch.setattr(
-        InProcessBackend,
-        "_create_model_registry",
-        staticmethod(lambda: fake_model_registry),
+    fake_model_registry = ModelRegistry()
+    monkeypatch.setattr(fake_model_registry, "supported", lambda _provider=None: [core_model])
+    provider_registry = ProviderRegistry()
+    monkeypatch.setattr(provider_registry, "supported", list)
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=bootstrap.Registries(
+            model_registry=fake_model_registry,
+            provider_registry=provider_registry,
+        ),
+        agent_factory=lambda **_kwargs: _FakeAgent(),
     )
-
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
     models = backend.list_models("openai")
 
     assert len(models) == 1
@@ -183,48 +205,58 @@ def test_list_models_maps_contract_models(monkeypatch: pytest.MonkeyPatch) -> No
     assert models[0].thinking
 
 
-def test_list_sessions_filters_empty_sessions(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_list_sessions_filters_empty_sessions() -> None:
     non_empty = _core_session(content="keep me")
     empty = Session()
     fake_agent = _FakeAgent(sessions=[empty, non_empty], session=non_empty)
-    monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: fake_agent)
-
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=_registries(),
+        agent_factory=lambda **_kwargs: fake_agent,
+    )
     sessions = backend.list_sessions()
 
     assert len(sessions) == 1
     assert sessions[0].name.startswith("keep me")
 
 
-def test_new_session_maps_session_info(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_new_session_maps_session_info() -> None:
     session = _core_session(content="new content")
     fake_agent = _FakeAgent(session=session)
-    monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: fake_agent)
-
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=_registries(),
+        agent_factory=lambda **_kwargs: fake_agent,
+    )
     mapped = backend.new_session()
 
     assert mapped.session_id == session.session_id
     assert mapped.message_count == 1
 
 
-def test_delete_session_returns_none_when_core_returns_none(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_delete_session_returns_none_when_core_returns_none() -> None:
     fake_agent = _FakeAgent(delete_return=None)
-    monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: fake_agent)
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=_registries(),
+        agent_factory=lambda **_kwargs: fake_agent,
+    )
 
     assert backend.delete_session(uuid4()) is None
 
 
-def test_delete_session_maps_session_when_core_returns_session(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_delete_session_maps_session_when_core_returns_session() -> None:
     returned = _core_session(content="after delete", name="Recovered")
     fake_agent = _FakeAgent(delete_return=returned)
-    monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: fake_agent)
-    backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
+    backend = InProcessBackend(
+        settings=_settings(),
+        sandbox_dir=Path.cwd(),
+        registries=_registries(),
+        agent_factory=lambda **_kwargs: fake_agent,
+    )
 
     mapped = backend.delete_session(uuid4())
 

@@ -1,14 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from koda.agents import Agent
 from koda.llm.exceptions import LLMAuthenticationError
-from koda.llm.providers.openai import OPENAI_MODELS, create_openai_llm
-from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.sessions import JsonSessionStore, SessionManager
 from koda.sessions.exceptions import NoActiveSessionError, SessionNotFoundError
-from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
+from koda_api import bootstrap
 from koda_api.mappers import (
     map_llm_event_to_stream_event,
     map_messages_to_contract_messages,
@@ -31,9 +29,12 @@ if TYPE_CHECKING:
     from pathlib import Path
     from uuid import UUID
 
+    from koda.agents import Agent
     from koda.messages import Message as CoreMessage
     from koda.telemetry import Telemetry
     from koda_common.settings import SettingsManager
+
+type AgentFactory = Callable[..., Agent]
 
 
 class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
@@ -43,49 +44,28 @@ class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
         self,
         settings: SettingsManager,
         sandbox_dir: Path,
+        registries: bootstrap.Registries,
         telemetry: Telemetry | None = None,
+        agent_factory: AgentFactory = bootstrap.create_agent,
     ) -> None:
         self._settings = settings
         self._sandbox_dir = sandbox_dir
         self._telemetry = telemetry
+        self._agent_factory = agent_factory
         if self._telemetry:
             self._telemetry.initialize(self._settings)
         self._session_manager = SessionManager(JsonSessionStore())
         self._session_manager.create_session()
-        self._model_registry = self._create_model_registry()
-        self._provider_registry = self._create_provider_registry()
+        self._registries = registries
         self._agent = self._create_agent()
 
-    @staticmethod
-    def _create_model_registry() -> ModelRegistry:
-        model_registry = ModelRegistry()
-        model_registry.register_all(OPENAI_MODELS)
-        return model_registry
-
-    @staticmethod
-    def _create_provider_registry() -> ProviderRegistry:
-        provider_registry = ProviderRegistry()
-        provider_registry.register("openai", create_openai_llm)
-        return provider_registry
-
-    def _create_llm(self):
-        return self._provider_registry.create(
-            self._settings.provider,
-            self._settings,
-            self._model_registry,
-        )
-
     def _create_agent(self) -> Agent:
-        """Create and configure the agent with llm and tools."""
-        llm = self._create_llm()
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=self._sandbox_dir)
-        tools = ToolConfig(registry=registry, context=context)
-        return Agent(
-            llm=llm,
+        """Create and configure the agent from application bootstrap wiring."""
+        return self._agent_factory(
+            settings=self._settings,
+            sandbox_dir=self._sandbox_dir,
             session_manager=self._session_manager,
-            tools=tools,
+            registries=self._registries,
         )
 
     def reconfigure(self) -> None:
@@ -102,11 +82,11 @@ class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
 
     def list_providers(self) -> list[str]:
         """List available providers."""
-        return self._provider_registry.supported()
+        return self._registries.provider_registry.supported()
 
     def list_models(self, provider: str | None = None) -> list[ModelDefinition]:
         """List available models, optionally filtered by provider."""
-        core_models = self._model_registry.supported(provider)
+        core_models = self._registries.model_registry.supported(provider)
         return [map_model_definition_to_contract_model_definition(model) for model in core_models]
 
     def active_session(self) -> SessionInfo:

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from koda.telemetry import LangfuseTelemetry
 from koda_api.backends.in_process import InProcessBackend
+from koda_api.bootstrap import create_registries
 from koda_common.contracts import KodaBackend, Message, ModelDefinition, StreamEvent
 from koda_common.settings import SettingsManager
 
@@ -20,6 +21,7 @@ def create_in_process_backend(settings: SettingsManager, sandbox_dir: Path) -> B
     return InProcessBackend(
         settings=settings,
         sandbox_dir=sandbox_dir,
+        registries=create_registries(),
         telemetry=LangfuseTelemetry(),
     )
 
