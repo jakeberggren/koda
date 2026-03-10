@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import json
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
@@ -28,6 +29,7 @@ from koda.llm.protocols import LLMAdapter
 from koda.llm.providers.base import LLMProviderBase
 from koda.messages import AssistantMessage, Message, ToolMessage, UserMessage
 from koda.tools import ToolCall, ToolDefinition
+from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -36,6 +38,8 @@ if TYPE_CHECKING:
     from koda.llm.registry import ModelRegistry
     from koda.llm.types import LLMRequest, LLMResponse
     from koda_common.settings import SettingsManager
+
+logger = get_logger(__name__)
 
 OPENAI_MODELS: Sequence[ModelDefinition] = [
     ModelDefinition(
@@ -325,10 +329,25 @@ class OpenAILLMProvider(LLMProviderBase):
         return self.driver.generate_stream(resolved_request)
 
 
+def _resolve_openai_client(settings: SettingsManager) -> Callable[..., AsyncOpenAI]:
+    if not settings.langfuse_tracing_enabled:
+        return importlib.import_module("openai").AsyncOpenAI
+    try:
+        return importlib.import_module("langfuse.openai").AsyncOpenAI
+    except ModuleNotFoundError:
+        logger.warning("langfuse_client_unavailable_falling_back_to_openai")
+        return importlib.import_module("openai").AsyncOpenAI
+
+
 def create_openai_llm(settings: SettingsManager, model_registry: ModelRegistry) -> LLM:
     provider = OpenAILLMProvider.provider_name
     api_key = settings.get_api_key(provider)
     if api_key is None:
         raise LLMAuthenticationError(provider, Exception("API key not configured"))
     config = OpenAILLMProviderConfig(api_key=api_key, model=settings.model)
-    return OpenAILLMProvider.from_config(config, model_registry=model_registry)
+    client_factory = _resolve_openai_client(settings)
+    return OpenAILLMProvider.from_config(
+        config,
+        client_factory=client_factory,
+        model_registry=model_registry,
+    )
