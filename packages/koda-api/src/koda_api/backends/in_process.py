@@ -3,15 +3,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda.agents import Agent
-from koda.providers import get_model_registry, get_provider_registry
-from koda.providers.exceptions import ProviderAuthenticationError
+from koda.llm.exceptions import LLMAuthenticationError
+from koda.llm.providers.openai import OPENAI_MODELS, create_openai_llm
+from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.sessions import JsonSessionStore, SessionManager
 from koda.sessions.exceptions import NoActiveSessionError, SessionNotFoundError
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
 from koda_api.mappers import (
+    map_llm_event_to_stream_event,
     map_messages_to_contract_messages,
     map_model_definition_to_contract_model_definition,
-    map_provider_event_to_stream_event,
     map_session_to_session_info,
 )
 from koda_common.contracts import (
@@ -51,19 +52,38 @@ class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
             self._telemetry.initialize(self._settings)
         self._session_manager = SessionManager(JsonSessionStore())
         self._session_manager.create_session()
+        self._model_registry = self._create_model_registry()
+        self._provider_registry = self._create_provider_registry()
         self._agent = self._create_agent()
 
-    def _create_agent(self) -> Agent:
-        """Create and configure the agent with provider and tools."""
-        provider = get_provider_registry().create(
-            self._settings.provider, self._settings, model=self._settings.model
+    @staticmethod
+    def _create_model_registry() -> ModelRegistry:
+        model_registry = ModelRegistry()
+        model_registry.register_all(OPENAI_MODELS)
+        return model_registry
+
+    @staticmethod
+    def _create_provider_registry() -> ProviderRegistry:
+        provider_registry = ProviderRegistry()
+        provider_registry.register("openai", create_openai_llm)
+        return provider_registry
+
+    def _create_llm(self):
+        return self._provider_registry.create(
+            self._settings.provider,
+            self._settings,
+            self._model_registry,
         )
+
+    def _create_agent(self) -> Agent:
+        """Create and configure the agent with llm and tools."""
+        llm = self._create_llm()
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
         context = ToolContext.default(sandbox_dir=self._sandbox_dir)
         tools = ToolConfig(registry=registry, context=context)
         return Agent(
-            provider=provider,
+            llm=llm,
             session_manager=self._session_manager,
             tools=tools,
         )
@@ -75,18 +95,18 @@ class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
     async def chat(self, message: str) -> AsyncIterator[StreamEvent]:
         """Send a message and stream response events."""
         try:
-            async for provider_event in self._agent.run(message):
-                yield map_provider_event_to_stream_event(provider_event)
-        except ProviderAuthenticationError as e:
+            async for llm_event in self._agent.run(message):
+                yield map_llm_event_to_stream_event(llm_event)
+        except LLMAuthenticationError as e:
             raise BackendAuthenticationError from e
 
     def list_providers(self) -> list[str]:
         """List available providers."""
-        return get_provider_registry().supported()
+        return self._provider_registry.supported()
 
     def list_models(self, provider: str | None = None) -> list[ModelDefinition]:
         """List available models, optionally filtered by provider."""
-        core_models = get_model_registry().supported(provider)
+        core_models = self._model_registry.supported(provider)
         return [map_model_definition_to_contract_model_definition(model) for model in core_models]
 
     def active_session(self) -> SessionInfo:

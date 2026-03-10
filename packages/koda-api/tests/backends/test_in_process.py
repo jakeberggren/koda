@@ -8,12 +8,12 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from koda.llm.exceptions import LLMAuthenticationError
+from koda.llm.models import ModelDefinition as CoreModelDefinition
+from koda.llm.models import ThinkingLevel
+from koda.llm.types import LLMTextDelta as CoreTextDelta
 from koda.messages import AssistantMessage as CoreAssistantMessage
 from koda.messages import UserMessage as CoreUserMessage
-from koda.providers.events import TextDelta as CoreTextDelta
-from koda.providers.exceptions import ProviderAuthenticationError
-from koda.providers.registry import ModelDefinition as CoreModelDefinition
-from koda.providers.registry import ThinkingLevel
 from koda.sessions import Session
 from koda_api.backends.in_process import InProcessBackend
 from koda_common.contracts import BackendAuthenticationError, TextDelta, UserMessage
@@ -55,7 +55,7 @@ class _FakeAgent:
 
 class _FailingAuthAgent:
     async def run(self, _message: str):
-        raise ProviderAuthenticationError("openai", Exception("bad key"))
+        raise LLMAuthenticationError("openai", Exception("bad key"))
         yield  # pragma: no cover
 
 
@@ -146,8 +146,15 @@ def test_reconfigure_rebuilds_agent(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_list_providers_delegates_to_registry(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_registry = SimpleNamespace(supported=lambda: ["openai", "anthropic"])
-    monkeypatch.setattr("koda_api.backends.in_process.get_provider_registry", lambda: fake_registry)
     monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: _FakeAgent())
+    monkeypatch.setattr(
+        InProcessBackend, "_create_provider_registry", staticmethod(lambda: fake_registry)
+    )
+    monkeypatch.setattr(
+        InProcessBackend,
+        "_create_model_registry",
+        staticmethod(lambda: SimpleNamespace(supported=lambda _provider=None: [])),
+    )
 
     backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
     assert backend.list_providers() == ["openai", "anthropic"]
@@ -161,10 +168,12 @@ def test_list_models_maps_contract_models(monkeypatch: pytest.MonkeyPatch) -> No
         thinking={ThinkingLevel.HIGH},
     )
     fake_model_registry = SimpleNamespace(supported=lambda _provider=None: [core_model])
-    monkeypatch.setattr(
-        "koda_api.backends.in_process.get_model_registry", lambda: fake_model_registry
-    )
     monkeypatch.setattr(InProcessBackend, "_create_agent", lambda _self: _FakeAgent())
+    monkeypatch.setattr(
+        InProcessBackend,
+        "_create_model_registry",
+        staticmethod(lambda: fake_model_registry),
+    )
 
     backend = InProcessBackend(settings=_settings(), sandbox_dir=Path.cwd())
     models = backend.list_models("openai")

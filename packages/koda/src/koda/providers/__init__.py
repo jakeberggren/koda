@@ -1,3 +1,5 @@
+"""Deprecated. Use new LLM package intstead."""
+
 from koda.providers.base import Provider, ProviderAdapter
 from koda.providers.berget import BergetAIProvider
 from koda.providers.events import ProviderEvent
