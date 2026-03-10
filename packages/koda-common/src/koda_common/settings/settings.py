@@ -15,6 +15,14 @@ class Settings(BaseModel):
     theme: Literal["dark", "light"] = Field(default="dark", description="UI theme")
     show_scrollbar: bool = Field(default=True, description="Show chat scrollbar")
     queue_inputs: bool = Field(default=True, description="Queue inputs during streaming")
+    allow_web_search: bool = Field(
+        default=False,
+        description=(
+            "Allow supported models to use web search when available. This may improve "
+            "freshness and factual grounding for time-sensitive questions, but can increase "
+            "latency and send search queries to external services."
+        ),
+    )
     allow_extended_prompt_retention: bool = Field(
         default=False,
         description=(
@@ -42,6 +50,14 @@ class EnvSettings(BaseSettings):
     # Setting overrides (KODA_<field> -> <field>, None = don't override)
     koda_provider: str | None = Field(default=None, description="LLM provider")
     koda_model: str | None = Field(default=None, description="Model name")
+    koda_allow_web_search: bool | None = Field(
+        default=None,
+        description=(
+            "Allow supported models to use web search when available. This may improve "
+            "freshness and factual grounding for time-sensitive questions, but can increase "
+            "latency and send search queries to external services."
+        ),
+    )
     koda_allow_extended_prompt_retention: bool | None = Field(
         default=None,
         description=(

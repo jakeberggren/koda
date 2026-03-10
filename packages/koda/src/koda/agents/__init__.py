@@ -1,3 +1,3 @@
-from koda.agents.agent import Agent
+from koda.agents.agent import Agent, AgentConfig
 
-__all__ = ["Agent"]
+__all__ = ["Agent", "AgentConfig"]
