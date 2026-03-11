@@ -50,7 +50,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
-            ThinkingLevel.EXTRA_HIGH,
+            ThinkingLevel.XHIGH,
         },
         capabilities={
             ModelCapabilities.WEB_SEARCH,
@@ -65,7 +65,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
-            ThinkingLevel.EXTRA_HIGH,
+            ThinkingLevel.XHIGH,
         },
         capabilities={
             ModelCapabilities.WEB_SEARCH,
@@ -80,7 +80,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
-            ThinkingLevel.EXTRA_HIGH,
+            ThinkingLevel.XHIGH,
         },
         capabilities={
             ModelCapabilities.WEB_SEARCH,
@@ -95,7 +95,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
-            ThinkingLevel.EXTRA_HIGH,
+            ThinkingLevel.XHIGH,
         },
         capabilities={
             ModelCapabilities.WEB_SEARCH,
@@ -156,6 +156,16 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
 
 
 class OpenAIResponseAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Omit, Response]):
+    @staticmethod
+    def _parse_tool_call_arguments(raw_arguments: str) -> dict[str, Any]:
+        try:
+            arguments = json.loads(raw_arguments)
+        except json.JSONDecodeError as e:
+            raise InvalidToolCallArgumentsError from e
+        if not isinstance(arguments, dict):
+            raise InvalidToolCallArgumentsError
+        return arguments
+
     @staticmethod
     def _to_provider_user_message(message: UserMessage) -> EasyInputMessageParam:
         return EasyInputMessageParam(role="user", content=message.content, type="message")
@@ -238,13 +248,10 @@ class OpenAIResponseAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Omi
         for output in response.output:
             if not isinstance(output, ResponseFunctionToolCall):
                 continue
-            arguments = json.loads(output.arguments)
-            if not isinstance(arguments, dict):
-                raise InvalidToolCallArgumentsError
             calls.append(
                 ToolCall(
                     tool_name=output.name,
-                    arguments=arguments,
+                    arguments=self._parse_tool_call_arguments(output.arguments),
                     call_id=output.call_id,
                 )
             )
@@ -268,8 +275,8 @@ class OpenAILLMProvider(LLMProviderBase):
         model_definition: ModelDefinition,
     ) -> None:
         super().__init__(driver=driver)
-        self.model: str = model_definition.id
-        self.capabilities: set[ModelCapabilities] = set(model_definition.capabilities)
+        self.model = model_definition.id
+        self.capabilities = set(model_definition.capabilities)
 
     @classmethod
     def from_config(

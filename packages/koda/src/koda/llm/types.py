@@ -2,6 +2,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
+from koda.llm.models import ThinkingLevel
 from koda.messages import AssistantMessage, Message
 from koda.tools import ToolCall, ToolDefinition, ToolResult
 
@@ -16,6 +17,7 @@ class LLMRequestOptions:
     parallel_tool_calls: bool = True
     web_search: bool = False
     temperature: float | None = None
+    reasoning: ThinkingLevel | None = None
     top_logprobs: int | None = None
     top_p: float | None = None
     truncation: Literal["auto", "disabled"] = "disabled"
