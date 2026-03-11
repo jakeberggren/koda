@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
-from openai import AsyncOpenAI, Omit, omit
+from openai import AsyncOpenAI, Omit, OpenAIError, omit
 from openai.types.responses import (
     Response,
     ResponseCompletedEvent,
@@ -37,6 +37,9 @@ from koda_common.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable, Iterator
 
+    from openai.types.shared_params.reasoning import Reasoning
+
+    from koda.llm.models import ThinkingLevel
     from koda.llm.types import LLMRequest
 
 
@@ -54,6 +57,7 @@ class _CreateParams:
     model: str
     parallel_tool_calls: bool
     prompt_cache_retention: Literal["24h"] | Omit
+    reasoning: Reasoning | Omit
     temperature: float | Omit
     tools: list[ToolParam] | Omit
     top_logprobs: int | Omit
@@ -78,10 +82,7 @@ class ResponsesDriver(LLM):
     ) -> None:
         self.config: ResponsesDriverConfig = config
         self.adapter: ResponsesAdapter = adapter
-        self.client: AsyncOpenAI = client_factory(
-            api_key=config.api_key,
-            base_url=config.base_url,
-        )
+        self.client: AsyncOpenAI = client_factory(api_key=config.api_key, base_url=config.base_url)
 
     @staticmethod
     def _to_omit[T](value: T | None) -> T | Omit:
@@ -91,6 +92,12 @@ class ResponsesDriver(LLM):
         self, *, extended_prompt_retention: bool
     ) -> Literal["24h"] | Omit:
         return self._to_omit("24h" if extended_prompt_retention else None)
+
+    @staticmethod
+    def _resolve_reasoning(*, reasoning: ThinkingLevel | None) -> Reasoning | Omit:
+        if reasoning is None:
+            return omit
+        return {"effort": reasoning.value}
 
     def _resolve_create_params(self, request: LLMRequest) -> _CreateParams:
         return _CreateParams(
@@ -103,6 +110,7 @@ class ResponsesDriver(LLM):
             prompt_cache_retention=self._resolve_prompt_cache_retention(
                 extended_prompt_retention=request.options.extended_prompt_retention
             ),
+            reasoning=self._resolve_reasoning(reasoning=request.options.reasoning),
             temperature=self._to_omit(request.options.temperature),
             tools=self._resolve_tools(request),
             top_logprobs=self._to_omit(request.options.top_logprobs),
@@ -158,6 +166,7 @@ class ResponsesDriver(LLM):
                 model=create_params.model,
                 parallel_tool_calls=create_params.parallel_tool_calls,
                 prompt_cache_retention=create_params.prompt_cache_retention,
+                reasoning=create_params.reasoning,
                 temperature=create_params.temperature,
                 tools=create_params.tools,
                 top_logprobs=create_params.top_logprobs,
@@ -165,7 +174,7 @@ class ResponsesDriver(LLM):
                 truncation=create_params.truncation,
             )
             return self._adapt_response(response)
-        except Exception as e:
+        except OpenAIError as e:
             raise_llm_error_from_openai(e, backend="responses")
 
     def _process_output_item_done_event(
@@ -221,6 +230,7 @@ class ResponsesDriver(LLM):
                 model=create_params.model,
                 parallel_tool_calls=create_params.parallel_tool_calls,
                 prompt_cache_retention=create_params.prompt_cache_retention,
+                reasoning=create_params.reasoning,
                 stream=True,
                 temperature=create_params.temperature,
                 tools=create_params.tools,
@@ -231,7 +241,7 @@ class ResponsesDriver(LLM):
             async for event in stream:
                 for processed_event in self._process_stream_event(event):
                     yield processed_event
-        except Exception as e:
+        except OpenAIError as e:
             raise_llm_error_from_openai(e, backend="responses")
 
     async def generate_structured[T: BaseModel](

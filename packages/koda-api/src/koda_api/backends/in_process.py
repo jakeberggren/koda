@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from koda.llm.exceptions import LLMAuthenticationError
@@ -25,7 +24,7 @@ from koda_common.contracts import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Sequence
+    from collections.abc import AsyncIterator, Callable, Sequence
     from pathlib import Path
     from uuid import UUID
 
@@ -33,8 +32,6 @@ if TYPE_CHECKING:
     from koda.messages import Message as CoreMessage
     from koda.telemetry import Telemetry
     from koda_common.settings import SettingsManager
-
-type AgentFactory = Callable[..., Agent]
 
 
 class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
@@ -46,7 +43,7 @@ class InProcessBackend(KodaBackend[StreamEvent, ModelDefinition, Message]):
         sandbox_dir: Path,
         registries: bootstrap.Registries,
         telemetry: Telemetry | None = None,
-        agent_factory: AgentFactory = bootstrap.create_agent,
+        agent_factory: Callable[..., Agent] = bootstrap.create_agent,
     ) -> None:
         self._settings = settings
         self._sandbox_dir = sandbox_dir

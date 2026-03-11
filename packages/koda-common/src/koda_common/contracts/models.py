@@ -4,10 +4,12 @@ from pydantic import BaseModel, Field
 
 
 class ThinkingLevel(StrEnum):
+    NONE = auto()
+    MINIMAL = auto()
     LOW = auto()
     MEDIUM = auto()
     HIGH = auto()
-    EXTRA_HIGH = auto()
+    XHIGH = auto()
 
 
 class ModelCapability(StrEnum):

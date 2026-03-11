@@ -1,5 +1,5 @@
-from koda.providers.registry import ModelCapabilities, ThinkingLevel
-from koda.providers.registry import ModelDefinition as CoreModelDefinition
+from koda.llm.models import ModelCapabilities, ThinkingLevel
+from koda.llm.models import ModelDefinition as CoreModelDefinition
 from koda_api.mappers import map_model_definition_to_contract_model_definition
 
 
