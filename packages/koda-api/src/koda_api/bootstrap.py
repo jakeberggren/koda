@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING
 
 from koda.agents import Agent, AgentConfig
 from koda.llm import LLMRequestOptions
+from koda.llm.providers import BERGETAI_MODELS
+from koda.llm.providers.bergetai import create_bergetai_llm
 from koda.llm.providers.openai import OPENAI_MODELS, create_openai_llm
 from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
@@ -25,12 +27,14 @@ class Registries:
 def create_model_registry() -> ModelRegistry:
     model_registry = ModelRegistry()
     model_registry.register_all(OPENAI_MODELS)
+    model_registry.register_all(BERGETAI_MODELS)
     return model_registry
 
 
 def create_provider_registry() -> ProviderRegistry:
     provider_registry = ProviderRegistry()
     provider_registry.register("openai", create_openai_llm)
+    provider_registry.register("bergetai", create_bergetai_llm)
     return provider_registry
 
 
