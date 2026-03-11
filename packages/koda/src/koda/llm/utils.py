@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import NoReturn
+import importlib
+from typing import TYPE_CHECKING, NoReturn
 
 from openai import (
     APIConnectionError,
@@ -13,7 +14,24 @@ from openai import (
 from koda.llm import exceptions
 from koda_common.logging import get_logger
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from openai import AsyncOpenAI
+
+    from koda_common.settings import SettingsManager
+
 logger = get_logger(__name__)
+
+
+def resolve_openai_client(settings: SettingsManager) -> Callable[..., AsyncOpenAI]:
+    if not settings.langfuse_tracing_enabled:
+        return importlib.import_module("openai").AsyncOpenAI
+    try:
+        return importlib.import_module("langfuse.openai").AsyncOpenAI
+    except ModuleNotFoundError:
+        logger.warning("langfuse_client_unavailable_falling_back_to_openai")
+        return importlib.import_module("openai").AsyncOpenAI
 
 
 def raise_llm_error_from_openai(
