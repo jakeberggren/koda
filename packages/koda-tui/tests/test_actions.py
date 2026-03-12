@@ -9,13 +9,16 @@ from koda_common.contracts import (
     BackendSessionNotFoundError,
     ModelDefinition,
     SessionInfo,
+    ThinkingLevel,
     UserMessage,
 )
 from koda_tui.actions import (
+    cycle_thinking,
     delete_session,
     new_session,
     select_model,
     set_provider_api_key,
+    set_thinking,
     switch_session,
     toggle_queue_inputs,
     toggle_scrollbar,
@@ -190,6 +193,16 @@ class _AppearanceSettings:
         setattr(self, name, value)
 
 
+class _ThinkingSettings:
+    def __init__(self, thinking: ThinkingLevel) -> None:
+        self.thinking = thinking
+        self.set_calls: list[tuple[str, object]] = []
+
+    def set(self, name: str, value: object) -> None:
+        self.set_calls.append((name, value))
+        setattr(self, name, value)
+
+
 def test_toggle_theme_switches_dark_to_light() -> None:
     settings = _AppearanceSettings(theme="dark", show_scrollbar=True, queue_inputs=True)
 
@@ -218,6 +231,29 @@ def test_toggle_queue_inputs_flips_value() -> None:
     assert result.ok is True
     assert settings.set_calls == [("queue_inputs", True)]
     assert settings.queue_inputs is True
+
+
+def test_set_thinking_updates_setting() -> None:
+    settings = _ThinkingSettings(ThinkingLevel.NONE)
+
+    result = set_thinking(ThinkingLevel.HIGH, settings)
+
+    assert result.ok is True
+    assert settings.set_calls == [("thinking", ThinkingLevel.HIGH)]
+    assert settings.thinking is ThinkingLevel.HIGH
+
+
+def test_cycle_thinking_advances_to_next_supported_level() -> None:
+    settings = _ThinkingSettings(ThinkingLevel.LOW)
+
+    result = cycle_thinking(
+        [ThinkingLevel.NONE, ThinkingLevel.LOW, ThinkingLevel.MEDIUM],
+        settings,
+    )
+
+    assert result.ok is True
+    assert result.payload is ThinkingLevel.MEDIUM
+    assert settings.set_calls == [("thinking", ThinkingLevel.MEDIUM)]
 
 
 class _ProviderSettings:

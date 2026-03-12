@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 from koda.llm import LLMEvent, LLMResponse, LLMTokenUsage
 from koda.llm.exceptions import StructuredOutputNotSupportedError
+from koda.llm.models import ThinkingLevel
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponseCompleted,
@@ -39,7 +40,6 @@ if TYPE_CHECKING:
 
     from openai.types.shared_params.reasoning import Reasoning
 
-    from koda.llm.models import ThinkingLevel
     from koda.llm.types import LLMRequest
 
 
@@ -94,8 +94,8 @@ class ResponsesDriver(LLM):
         return self._to_omit("24h" if extended_prompt_retention else None)
 
     @staticmethod
-    def _resolve_reasoning(*, reasoning: ThinkingLevel | None) -> Reasoning | Omit:
-        if reasoning is None:
+    def _resolve_reasoning(*, reasoning: ThinkingLevel) -> Reasoning | Omit:
+        if reasoning is ThinkingLevel.NONE:
             return omit
         return {"effort": reasoning.value}
 
@@ -110,7 +110,7 @@ class ResponsesDriver(LLM):
             prompt_cache_retention=self._resolve_prompt_cache_retention(
                 extended_prompt_retention=request.options.extended_prompt_retention
             ),
-            reasoning=self._resolve_reasoning(reasoning=request.options.reasoning),
+            reasoning=self._resolve_reasoning(reasoning=request.options.thinking),
             temperature=self._to_omit(request.options.temperature),
             tools=self._resolve_tools(request),
             top_logprobs=self._to_omit(request.options.top_logprobs),

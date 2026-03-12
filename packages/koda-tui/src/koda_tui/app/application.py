@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
 
+from koda_tui import actions
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.output import SynchronizedOutput
 from koda_tui.app.queue import MessageQueue
@@ -16,6 +17,7 @@ from koda_tui.ui.styles import get_style
 
 if TYPE_CHECKING:
     from koda_api.backends import KodaBackend
+    from koda_common.contracts import ThinkingLevel
     from koda_common.settings import SettingChange, SettingsManager
 
 
@@ -52,6 +54,7 @@ class KodaTuiApp:
         self.state = AppState(
             provider_name=self._settings.provider,
             model_name=self._settings.model,
+            thinking=self._settings.thinking,
             show_scrollbar=self._settings.show_scrollbar,
             queue_inputs=self._settings.queue_inputs,
         )
@@ -104,15 +107,23 @@ class KodaTuiApp:
 
     @staticmethod
     def _has_backend_change(change_names: set[str]) -> bool:
-        return bool({"provider", "model"} & change_names) or any(
-            name.startswith("api_keys.") for name in change_names
-        )
+        return bool(
+            {
+                "provider",
+                "model",
+                "thinking",
+                "allow_web_search",
+                "allow_extended_prompt_retention",
+            }
+            & change_names
+        ) or any(name.startswith("api_keys.") for name in change_names)
 
     def _apply_backend_setting_changes(self, change_names: set[str]) -> bool:
         if not self._has_backend_change(change_names):
             return False
         self.state.provider_name = self._settings.provider
         self.state.model_name = self._settings.model
+        self.state.thinking = self._settings.thinking
         self._backend.reconfigure()
         return True
 
@@ -164,6 +175,14 @@ class KodaTuiApp:
         if self._app:
             self._app.invalidate()
 
+    @property
+    def settings(self) -> SettingsManager:
+        return self._settings
+
+    @property
+    def backend(self) -> KodaBackend:
+        return self._backend
+
     def enqueue_message(self, text: str, *, cancel_current: bool = False) -> None:
         """Queue a message to be sent after the current stream completes."""
         self._message_queue.enqueue(text, cancel_current=cancel_current)
@@ -180,6 +199,9 @@ class KodaTuiApp:
     def cancel_streaming(self) -> None:
         """Cancel the current streaming operation."""
         self._stream_processor.cancel_stream()
+
+    def cycle_thinking(self, levels: list[ThinkingLevel]):
+        return actions.cycle_thinking(levels, self._settings)
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""

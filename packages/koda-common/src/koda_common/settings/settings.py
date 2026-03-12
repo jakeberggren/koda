@@ -4,6 +4,8 @@ from typing import Literal
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from koda_common.contracts import ThinkingLevel
+
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
@@ -14,6 +16,10 @@ class Settings(BaseModel):
 
     provider: str = Field(default="openai", description="LLM provider")
     model: str = Field(default="gpt-5.2", description="Model name")
+    thinking: ThinkingLevel = Field(
+        default=ThinkingLevel.NONE,
+        description="Model thinking effort for supported reasoning models.",
+    )
     theme: Literal["dark", "light"] = Field(default="dark", description="UI theme")
     show_scrollbar: bool = Field(default=True, description="Show chat scrollbar")
     queue_inputs: bool = Field(default=True, description="Queue inputs during streaming")
@@ -52,6 +58,10 @@ class EnvSettings(BaseSettings):
     # Setting overrides (KODA_<field> -> <field>, None = don't override)
     koda_provider: str | None = Field(default=None, description="LLM provider")
     koda_model: str | None = Field(default=None, description="Model name")
+    koda_thinking: ThinkingLevel | None = Field(
+        default=None,
+        description="Model thinking effort for supported reasoning models.",
+    )
     koda_allow_web_search: bool | None = Field(
         default=None,
         description=(

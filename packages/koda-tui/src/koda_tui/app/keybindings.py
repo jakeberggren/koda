@@ -6,7 +6,11 @@ from prompt_toolkit.input.ansi_escape_sequences import ANSI_SEQUENCES
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
 from prompt_toolkit.keys import Keys
 
+from koda_common.contracts import ThinkingLevel
+
 if TYPE_CHECKING:
+    from koda_common.contracts import KodaBackend
+    from koda_common.settings import SettingsManager
     from koda_tui.app.application import KodaTuiApp
 
 
@@ -67,6 +71,41 @@ def _handle_palette_toggle(app: KodaTuiApp) -> None:
     app.toggle_palette()
 
 
+def _get_cycle_thinking_levels(
+    backend: KodaBackend,
+    settings: SettingsManager,
+) -> list[ThinkingLevel]:
+    active_model = next(
+        (
+            model
+            for model in backend.list_models(settings.provider)
+            if model.provider == settings.provider and model.id == settings.model
+        ),
+        None,
+    )
+    if active_model is None:
+        return [ThinkingLevel.NONE]
+
+    thinking_order = [
+        ThinkingLevel.NONE,
+        ThinkingLevel.MINIMAL,
+        ThinkingLevel.LOW,
+        ThinkingLevel.MEDIUM,
+        ThinkingLevel.HIGH,
+        ThinkingLevel.XHIGH,
+    ]
+    supported = set(active_model.thinking)
+    return [level for level in thinking_order if level in supported]
+
+
+def _handle_cycle_thinking(app: KodaTuiApp) -> None:
+    """Cycle through supported thinking levels."""
+    levels = _get_cycle_thinking_levels(app.backend, app.settings)
+    result = app.cycle_thinking(levels)
+    if result.ok:
+        app.invalidate()
+
+
 def create_keybindings(app: KodaTuiApp) -> KeyBindings:
     """Create key bindings for the TUI."""
     kb = KeyBindings()
@@ -77,5 +116,6 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:
     kb.add(Keys.ControlC)(lambda _: _handle_cancel_or_exit(app))
     kb.add(Keys.Escape)(lambda _: _handle_escape(app))
     kb.add(Keys.ControlP)(lambda _: _handle_palette_toggle(app))
+    kb.add(Keys.ControlT)(lambda _: _handle_cycle_thinking(app))
 
     return kb

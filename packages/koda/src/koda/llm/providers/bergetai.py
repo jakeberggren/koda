@@ -29,6 +29,7 @@ from koda.llm.exceptions import (
 from koda.llm.models import ModelDefinition
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.providers.base import LLMProviderBase
+from koda.llm.types import ThinkingLevel
 from koda.llm.utils import resolve_openai_client
 from koda.messages import AssistantMessage, Message, ToolMessage, UserMessage
 from koda.tools import ToolCall, ToolDefinition
@@ -44,29 +45,34 @@ BERGETAI_BASE_URL = "https://api.berget.ai/v1"
 
 BERGETAI_MODELS: Sequence[ModelDefinition] = [
     ModelDefinition(
-        id="meta-llama/Llama-3.1-8B-Instruct",
-        name="Llama-3.1-8B-Instruct",
+        id="zai-org/GLM-4.7",
+        name="GLM-4.7",
         provider="bergetai",
-    ),
-    ModelDefinition(
-        id="meta-llama/Llama-3.3-70B-Instruct",
-        name="Llama-3.3-70B-Instruct",
-        provider="bergetai",
+        thinking={ThinkingLevel.NONE},
     ),
     ModelDefinition(
         id="openai/gpt-oss-120b",
         name="gpt-oss-120b",
         provider="bergetai",
-    ),
-    ModelDefinition(
-        id="zai-org/GLM-4.7",
-        name="GLM-4.7",
-        provider="bergetai",
+        thinking={ThinkingLevel.NONE},
     ),
     ModelDefinition(
         id="mistralai/Mistral-Small-3.2-24B-Instruct-2506",
         name="Mistral-Small-3.2-24B-Instruct-2506",
         provider="bergetai",
+        thinking=set(),
+    ),
+    ModelDefinition(
+        id="meta-llama/Llama-3.1-8B-Instruct",
+        name="Llama-3.1-8B-Instruct",
+        provider="bergetai",
+        thinking=set(),
+    ),
+    ModelDefinition(
+        id="meta-llama/Llama-3.3-70B-Instruct",
+        name="Llama-3.3-70B-Instruct",
+        provider="bergetai",
+        thinking=set(),
     ),
 ]
 
