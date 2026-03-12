@@ -7,6 +7,7 @@ from koda_common.contracts import (
     BackendNoActiveSessionError,
     BackendSessionNotFoundError,
     KodaBackend,
+    ThinkingLevel,
 )
 from koda_tui.converters import convert_messages
 
@@ -19,6 +20,12 @@ if TYPE_CHECKING:
 
 class ModelSelectionSettings(Protocol):
     def update(self, **changes: object) -> None: ...
+
+
+class ThinkingSettings(Protocol):
+    thinking: ThinkingLevel
+
+    def set(self, name: str, value: object) -> None: ...
 
 
 class AppearanceSettings(Protocol):
@@ -105,6 +112,32 @@ def select_model(
         return ActionResult(ok=True)
     except ValueError:
         return ActionResult(ok=False, error="Invalid model selection")
+
+
+def set_thinking(
+    thinking: ThinkingLevel,
+    settings: ThinkingSettings,
+) -> ActionResult[None]:
+    """Set model thinking effort."""
+    settings.set("thinking", thinking)
+    return ActionResult(ok=True)
+
+
+def cycle_thinking(
+    levels: list[ThinkingLevel],
+    settings: ThinkingSettings,
+) -> ActionResult[ThinkingLevel]:
+    """Cycle to the next supported thinking level."""
+    if not levels:
+        return ActionResult(ok=False, error="No supported thinking levels")
+
+    try:
+        current_index = levels.index(settings.thinking)
+    except ValueError:
+        current_index = -1
+    next_level = levels[(current_index + 1) % len(levels)]
+    settings.set("thinking", next_level)
+    return ActionResult(ok=True, payload=next_level)
 
 
 # --- Provider actions ---

@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 
-from koda_common.contracts import ToolCall
+from koda_common.contracts import ThinkingLevel, ToolCall
 
 
 class MessageRole(Enum):
@@ -38,6 +38,7 @@ class AppState:
     pending_inputs: list[str] = field(default_factory=list)
     model_name: str = ""
     provider_name: str = ""
+    thinking: ThinkingLevel = ThinkingLevel.NONE
     show_scrollbar: bool = True
     queue_inputs: bool = True
     exit_requested: bool = False

@@ -17,7 +17,7 @@ class LLMRequestOptions:
     parallel_tool_calls: bool = True
     web_search: bool = False
     temperature: float | None = None
-    reasoning: ThinkingLevel | None = None
+    thinking: ThinkingLevel = ThinkingLevel.NONE
     top_logprobs: int | None = None
     top_p: float | None = None
     truncation: Literal["auto", "disabled"] = "disabled"

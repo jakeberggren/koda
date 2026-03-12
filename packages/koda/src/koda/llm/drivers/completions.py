@@ -18,6 +18,7 @@ from koda.llm.exceptions import (
     InvalidToolCallArgumentsError,
     StructuredOutputNotSupportedError,
 )
+from koda.llm.models import ThinkingLevel
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponseCompleted,
@@ -39,7 +40,6 @@ if TYPE_CHECKING:
     from openai.types.chat.completion_create_params import ReasoningEffort
     from openai.types.completion_usage import CompletionUsage
 
-    from koda.llm.models import ThinkingLevel
     from koda.llm.types import LLMRequest
 
 
@@ -148,8 +148,8 @@ class CompletionsDriver(LLM):
         return True if top_logprobs is not None else omit
 
     @staticmethod
-    def _resolve_reasoning(*, reasoning: ThinkingLevel | None) -> ReasoningEffort | Omit:
-        if reasoning is None:
+    def _resolve_reasoning(*, reasoning: ThinkingLevel) -> ReasoningEffort | Omit:
+        if reasoning is ThinkingLevel.NONE:
             return omit
         return reasoning.value
 
@@ -163,7 +163,7 @@ class CompletionsDriver(LLM):
             prompt_cache_retention=self._resolve_prompt_cache_retention(
                 extended_prompt_retention=request.options.extended_prompt_retention
             ),
-            reasoning=self._resolve_reasoning(reasoning=request.options.reasoning),
+            reasoning=self._resolve_reasoning(reasoning=request.options.thinking),
             temperature=self._to_omit(request.options.temperature),
             tools=self.adapter.to_provider_tools(request.tools),
             top_logprobs=self._to_omit(request.options.top_logprobs),

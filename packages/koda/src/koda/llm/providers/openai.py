@@ -47,6 +47,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         name="gpt-5.4",
         provider="openai",
         thinking={
+            ThinkingLevel.NONE,
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
@@ -62,6 +63,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         name="gpt-5.3-codex",
         provider="openai",
         thinking={
+            ThinkingLevel.NONE,
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
@@ -77,6 +79,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         name="gpt-5.2-codex",
         provider="openai",
         thinking={
+            ThinkingLevel.NONE,
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
@@ -92,6 +95,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         name="gpt-5.2",
         provider="openai",
         thinking={
+            ThinkingLevel.NONE,
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
@@ -107,6 +111,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         name="gpt-5.1-codex",
         provider="openai",
         thinking={
+            ThinkingLevel.NONE,
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
@@ -121,6 +126,22 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         name="gpt-5.1",
         provider="openai",
         thinking={
+            ThinkingLevel.NONE,
+            ThinkingLevel.LOW,
+            ThinkingLevel.MEDIUM,
+            ThinkingLevel.HIGH,
+        },
+        capabilities={
+            ModelCapabilities.WEB_SEARCH,
+            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
+        },
+    ),
+    ModelDefinition(
+        id="gpt-5",
+        name="gpt-5",
+        provider="openai",
+        thinking={
+            ThinkingLevel.NONE,
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
@@ -135,6 +156,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         name="gpt-5-mini",
         provider="openai",
         thinking={
+            ThinkingLevel.NONE,
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,
@@ -146,6 +168,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         name="gpt-5-nano",
         provider="openai",
         thinking={
+            ThinkingLevel.NONE,
             ThinkingLevel.LOW,
             ThinkingLevel.MEDIUM,
             ThinkingLevel.HIGH,

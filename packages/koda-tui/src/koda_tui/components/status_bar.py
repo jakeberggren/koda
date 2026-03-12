@@ -5,7 +5,11 @@ from pathlib import Path
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.layout import UIContent, UIControl
 
+from koda_common.contracts import ThinkingLevel
 from koda_tui.state import AppState
+
+_DIVIDER = " · "
+_FOOTER_BINDINGS = [("ctrl+t", "thinking"), ("ctrl+p", "palette")]
 
 
 class StatusBarControl(UIControl):
@@ -28,24 +32,59 @@ class StatusBarControl(UIControl):
             return "Press Ctrl+C again to exit"
         return "Ready"
 
+    def _get_footer_fragments(self) -> tuple[list[tuple[str, str]], str]:
+        """Return styled footer binding fragments and their plain-text representation."""
+        fragments: list[tuple[str, str]] = []
+        text_parts: list[str] = []
+
+        for index, (keybinding, label) in enumerate(_FOOTER_BINDINGS):
+            if index > 0:
+                fragments.append(("class:status-bar.muted", _DIVIDER))
+                text_parts.append(_DIVIDER)
+
+            fragments.append(("class:status-bar.keybinding", keybinding))
+            fragments.append(("class:status-bar.muted", f" {label}"))
+            text_parts.append(f"{keybinding} {label}")
+
+        return fragments, "".join(text_parts)
+
     def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002 - unused argument
         """Create the status bar content."""
         # Left side: provider/model info
         path = f" ~/{self._path_relative_to_home()}"
-        provider_and_model = f"{self._state.provider_name} · {self._state.model_name}"
-        left = f"{path} · {provider_and_model}"
+        left_fragments: list[tuple[str, str]] = [
+            ("class:status-bar.left", path),
+            ("class:status-bar.muted", _DIVIDER),
+            (
+                "class:status-bar.left",
+                f"{self._state.provider_name}{_DIVIDER}{self._state.model_name}",
+            ),
+        ]
+        left_text = f"{path}{_DIVIDER}{self._state.provider_name}{_DIVIDER}{self._state.model_name}"
+        if self._state.thinking is not ThinkingLevel.NONE:
+            left_fragments.extend(
+                [
+                    ("class:status-bar.muted", _DIVIDER),
+                    ("class:status-bar.thinking", self._state.thinking.value),
+                ]
+            )
+            left_text += f"{_DIVIDER}{self._state.thinking.value}"
 
-        # Right side: status
+        # Right side: footer help + status
         status = self._get_status()
+        footer_fragments, footer_text = self._get_footer_fragments()
+        right_text = f"{footer_text}{_DIVIDER}{status}"
 
         # Calculate padding
-        padding = width - len(left) - len(status) - 2
+        padding = width - len(left_text) - len(right_text) - 2
         padding = max(1, padding)
 
         line = FormattedText(
             [
-                ("class:status-bar.left", left),
+                *left_fragments,
                 ("class:status-bar", " " * padding),
+                *footer_fragments,
+                ("class:status-bar.muted", _DIVIDER),
                 ("class:status-bar.right", status + " "),
             ]
         )

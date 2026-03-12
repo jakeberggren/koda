@@ -4,7 +4,12 @@ from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
 from koda_tui import actions
-from koda_tui.ui.palette.commands import model_commands, provider_commands, session_commands
+from koda_tui.ui.palette.commands import (
+    model_commands,
+    provider_commands,
+    session_commands,
+    thinking_commands,
+)
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
@@ -37,6 +42,14 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_switch_model() -> None:
         commands = model_commands.get_commands(
+            backend=backend,
+            settings=settings,
+            palette_manager=palette_manager,
+        )
+        palette_manager.open_palette(commands)
+
+    def cmd_set_thinking() -> None:
+        commands = thinking_commands.get_commands(
             backend=backend,
             settings=settings,
             palette_manager=palette_manager,
@@ -90,6 +103,12 @@ def get_commands(  # noqa: C901 - allow complex
             "Switch Model",
             cmd_switch_model,
             "Select a different model",
+            group="Agent",
+        ),
+        Command(
+            "Set Thinking Level",
+            cmd_set_thinking,
+            "Select model reasoning effort",
             group="Agent",
         ),
         Command(

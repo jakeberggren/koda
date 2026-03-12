@@ -66,6 +66,7 @@ def create_agent(
         registries.model_registry,
     )
     request_options = LLMRequestOptions(
+        thinking=settings.thinking,
         web_search=settings.allow_web_search,
         extended_prompt_retention=settings.allow_extended_prompt_retention,
     )
