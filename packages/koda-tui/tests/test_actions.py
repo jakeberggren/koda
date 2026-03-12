@@ -139,27 +139,18 @@ def test_delete_session_not_found_returns_error() -> None:
 
 class _ModelSettings:
     def __init__(self, provider: str, model: str, fail_model_id: str | None = None) -> None:
-        self._provider = provider
-        self._model = model
+        self.provider = provider
+        self.model = model
         self._fail_model_id = fail_model_id
+        self.update_calls: list[dict[str, object]] = []
 
-    @property
-    def provider(self) -> str:
-        return self._provider
-
-    @provider.setter
-    def provider(self, value: str) -> None:
-        self._provider = value
-
-    @property
-    def model(self) -> str:
-        return self._model
-
-    @model.setter
-    def model(self, value: str) -> None:
-        if self._fail_model_id is not None and value == self._fail_model_id:
+    def update(self, **changes: object) -> None:
+        self.update_calls.append(changes)
+        model = str(changes["model"])
+        if self._fail_model_id is not None and model == self._fail_model_id:
             raise ValueError("invalid model")
-        self._model = value
+        self.provider = str(changes["provider"])
+        self.model = model
 
 
 def test_select_model_success_updates_settings() -> None:
@@ -169,6 +160,7 @@ def test_select_model_success_updates_settings() -> None:
     result = select_model(model, settings)
 
     assert result.ok is True
+    assert settings.update_calls == [{"provider": "openai", "model": "gpt-5.2"}]
     assert settings.provider == "openai"
     assert settings.model == "gpt-5.2"
 
@@ -181,6 +173,7 @@ def test_select_model_invalid_rolls_back_settings() -> None:
 
     assert result.ok is False
     assert result.error == "Invalid model selection"
+    assert settings.update_calls == [{"provider": "bergetai", "model": "invalid-model"}]
     assert settings.provider == "openai"
     assert settings.model == "gpt-5"
 
@@ -190,6 +183,11 @@ class _AppearanceSettings:
         self.theme = theme
         self.show_scrollbar = show_scrollbar
         self.queue_inputs = queue_inputs
+        self.set_calls: list[tuple[str, object]] = []
+
+    def set(self, name: str, value: object) -> None:
+        self.set_calls.append((name, value))
+        setattr(self, name, value)
 
 
 def test_toggle_theme_switches_dark_to_light() -> None:
@@ -198,6 +196,7 @@ def test_toggle_theme_switches_dark_to_light() -> None:
     result = toggle_theme(settings)
 
     assert result.ok is True
+    assert settings.set_calls == [("theme", "light")]
     assert settings.theme == "light"
 
 
@@ -207,6 +206,7 @@ def test_toggle_scrollbar_flips_value() -> None:
     result = toggle_scrollbar(settings)
 
     assert result.ok is True
+    assert settings.set_calls == [("show_scrollbar", False)]
     assert settings.show_scrollbar is False
 
 
@@ -216,6 +216,7 @@ def test_toggle_queue_inputs_flips_value() -> None:
     result = toggle_queue_inputs(settings)
 
     assert result.ok is True
+    assert settings.set_calls == [("queue_inputs", True)]
     assert settings.queue_inputs is True
 
 

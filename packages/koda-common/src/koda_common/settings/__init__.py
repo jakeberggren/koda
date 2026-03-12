@@ -1,4 +1,4 @@
-from koda_common.settings.manager import SettingsManager
+from koda_common.settings.manager import SettingChange, SettingsManager
 from koda_common.settings.settings import EnvSettings, Settings
 from koda_common.settings.store import (
     JsonFileSettingsStore,
@@ -14,6 +14,7 @@ __all__ = [
     "KeyChainSecretsStore",
     "KeyringNotInstalledError",
     "SecretsStore",
+    "SettingChange",
     "Settings",
     "SettingsManager",
     "SettingsStore",
