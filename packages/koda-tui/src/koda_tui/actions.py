@@ -18,14 +18,15 @@ if TYPE_CHECKING:
 
 
 class ModelSelectionSettings(Protocol):
-    provider: str
-    model: str
+    def update(self, **changes: object) -> None: ...
 
 
 class AppearanceSettings(Protocol):
     theme: str
     show_scrollbar: bool
     queue_inputs: bool
+
+    def set(self, name: str, value: object) -> None: ...
 
 
 class ProviderSettings(Protocol):
@@ -99,15 +100,10 @@ def select_model(
     settings: ModelSelectionSettings,
 ) -> ActionResult[None]:
     """Select an active model/provider pair in settings."""
-    old_provider = settings.provider
-    old_model = settings.model
     try:
-        settings.provider = model.provider
-        settings.model = model.id
+        settings.update(provider=model.provider, model=model.id)
         return ActionResult(ok=True)
     except ValueError:
-        settings.provider = old_provider
-        settings.model = old_model
         return ActionResult(ok=False, error="Invalid model selection")
 
 
@@ -129,17 +125,17 @@ def set_provider_api_key(
 
 def toggle_theme(settings: AppearanceSettings) -> ActionResult[None]:
     """Toggle between dark and light theme."""
-    settings.theme = "light" if settings.theme == "dark" else "dark"
+    settings.set("theme", "light" if settings.theme == "dark" else "dark")
     return ActionResult(ok=True)
 
 
 def toggle_scrollbar(settings: AppearanceSettings) -> ActionResult[None]:
     """Toggle chat scrollbar visibility."""
-    settings.show_scrollbar = not settings.show_scrollbar
+    settings.set("show_scrollbar", not settings.show_scrollbar)
     return ActionResult(ok=True)
 
 
 def toggle_queue_inputs(settings: AppearanceSettings) -> ActionResult[None]:
     """Toggle queue-inputs behavior during streaming."""
-    settings.queue_inputs = not settings.queue_inputs
+    settings.set("queue_inputs", not settings.queue_inputs)
     return ActionResult(ok=True)

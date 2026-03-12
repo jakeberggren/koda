@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import suppress
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from koda_common.logging import get_logger
@@ -13,7 +14,16 @@ if TYPE_CHECKING:
         SettingsStore,
     )
 
-type SettingsChangeCallback = Callable[[str, Any, Any], None]
+
+@dataclass(slots=True, frozen=True)
+class SettingChange:
+    name: str
+    old_value: Any
+    new_value: Any
+
+
+type SettingsChangeSet = tuple[SettingChange, ...]
+type SettingsChangeCallback = Callable[[SettingsChangeSet], None]
 
 # Prefix for env var to settings field mapping
 _ENV_PREFIX = "koda_"
@@ -82,11 +92,12 @@ class SettingsManager:
         """Persist non-secret settings to file storage."""
         self._settings_store.save(self._settings.model_dump(mode="json"))
 
-    def _notify(self, name: str, old_value: Any, new_value: Any) -> None:
-        """Notify subscribers of a setting change."""
-        if old_value != new_value:
-            for callback in self._callbacks:
-                callback(name, old_value, new_value)
+    def _notify(self, changes: SettingsChangeSet) -> None:
+        """Notify subscribers of committed setting changes."""
+        if not changes:
+            return
+        for callback in tuple(self._callbacks):
+            callback(changes)
 
     def subscribe(self, callback: SettingsChangeCallback) -> Callable[[], None]:
         """Subscribe to setting changes. Returns unsubscribe function."""
@@ -103,6 +114,46 @@ class SettingsManager:
 
         return unsubscribe
 
+    def set(self, name: str, value: Any) -> None:
+        """Set a single managed setting."""
+        self.update(**{name: value})
+
+    def update(self, **changes: Any) -> None:
+        """Atomically update managed settings with validation."""
+        unknown_fields = [name for name in changes if name not in Settings.model_fields]
+        if unknown_fields:
+            raise AttributeError(unknown_fields[0])
+        if not changes:
+            return
+
+        current_settings = self._settings.model_dump()
+        merged = current_settings.copy()
+        merged.update(changes)
+        updated_settings = Settings.model_validate(merged)
+        updated_values = updated_settings.model_dump()
+        changed_fields = tuple(
+            SettingChange(
+                name=name,
+                old_value=current_settings[name],
+                new_value=updated_values[name],
+            )
+            for name in changes
+            if current_settings[name] != updated_values[name]
+        )
+        if not changed_fields:
+            return
+
+        self._settings = updated_settings
+        self._save_settings()
+        self._notify(changed_fields)
+        for change in changed_fields:
+            log.info(
+                "setting_changed",
+                setting=change.name,
+                old_value=change.old_value,
+                new_value=change.new_value,
+            )
+
     # Dynamic attribute access - forwards to Settings model
 
     def __getattr__(self, name: str) -> Any:
@@ -114,14 +165,9 @@ class SettingsManager:
         raise AttributeError(name)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        """Set a setting value by name, with auto-save and notification."""
+        """Reject direct writes to managed settings and allow internal attributes."""
         if name in Settings.model_fields:
-            old = getattr(self._settings, name)
-            setattr(self._settings, name, value)
-            self._save_settings()
-            self._notify(name, old, value)
-            log.info("setting_changed", setting=name, old_value=old, new_value=value)
-            return
+            raise AttributeError(name)
         super().__setattr__(name, value)
 
     # API keys - cached from keychain/env
@@ -135,8 +181,11 @@ class SettingsManager:
 
     def set_api_key(self, provider: str, key: str) -> None:
         """Set API key for a provider (saves to secrets store)."""
-        old = self._api_key_cache.get(provider)
+        old = self.get_api_key(provider)
         self._secrets_store.set_key(provider, key)
         self._api_key_cache[provider] = key
-        self._notify(f"api_keys.{provider}", old, key)
+        if old == key:
+            # Avoid false-positive backend reconfiguration for unchanged keys.
+            return
+        self._notify((SettingChange(name=f"api_keys.{provider}", old_value=old, new_value=key),))
         log.info("api_key_updated", provider=provider)

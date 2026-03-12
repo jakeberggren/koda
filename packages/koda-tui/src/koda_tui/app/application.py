@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
 
@@ -16,7 +16,7 @@ from koda_tui.ui.styles import get_style
 
 if TYPE_CHECKING:
     from koda_api.backends import KodaBackend
-    from koda_common.settings import SettingsManager
+    from koda_common.settings import SettingChange, SettingsManager
 
 
 class _KodaApplication(Application):
@@ -102,25 +102,41 @@ class KodaTuiApp:
 
         return app
 
-    def _on_settings_changed(self, name: str, _old: Any, _new: Any) -> None:
-        """Handle settings changes."""
-        if name in ("provider", "model") or name.startswith("api_keys."):
-            self.state.provider_name = self._settings.provider
-            self.state.model_name = self._settings.model
-            self._backend.reconfigure()
-            self.invalidate()
-            return
-        if name == "show_scrollbar":
+    @staticmethod
+    def _has_backend_change(change_names: set[str]) -> bool:
+        return bool({"provider", "model"} & change_names) or any(
+            name.startswith("api_keys.") for name in change_names
+        )
+
+    def _apply_backend_setting_changes(self, change_names: set[str]) -> bool:
+        if not self._has_backend_change(change_names):
+            return False
+        self.state.provider_name = self._settings.provider
+        self.state.model_name = self._settings.model
+        self._backend.reconfigure()
+        return True
+
+    def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
+        should_invalidate = False
+        if "show_scrollbar" in change_names:
             self.state.show_scrollbar = self._settings.show_scrollbar
-            self.invalidate()
-            return
-        if name == "queue_inputs":
+            should_invalidate = True
+        if "queue_inputs" in change_names:
             self.state.queue_inputs = self._settings.queue_inputs
-            self.invalidate()
-            return
-        if name == "theme" and self._app:
+            should_invalidate = True
+        if "theme" in change_names and self._app:
             self._app.style = get_style(self._settings.theme)
             self.layout.renderer.set_theme(self._settings.theme)
+            should_invalidate = True
+        return should_invalidate
+
+    def _on_settings_changed(self, changes: tuple[SettingChange, ...]) -> None:
+        """Handle committed settings changes."""
+        change_names = {change.name for change in changes}
+        should_invalidate = self._apply_backend_setting_changes(change_names)
+        if self._apply_ui_setting_changes(change_names):
+            should_invalidate = True
+        if should_invalidate:
             self.invalidate()
 
     def _on_exit_timeout(self) -> None:

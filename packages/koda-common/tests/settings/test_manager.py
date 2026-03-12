@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from koda_common.settings.manager import SettingsManager
+from koda_common.settings.manager import SettingChange, SettingsManager
 
 from .conftest import SpySecretsStore, SpySettingsStore
 
@@ -62,16 +62,15 @@ def test_invalid_store_value_raises_validation_error(secrets_store: SpySecretsSt
         SettingsManager(settings_store=store, secrets_store=secrets_store)
 
 
-def test_setting_attribute_persists_and_notifies(
+def test_set_persists_and_notifies_single_change(
     manager: SettingsManager, settings_store: SpySettingsStore
 ) -> None:
-    changes: list[tuple[str, str, str]] = []
-    manager.subscribe(lambda n, o, v: changes.append((n, o, v)))
+    changes: list[tuple[SettingChange, ...]] = []
+    manager.subscribe(changes.append)
 
-    manager.provider = "anthropic"
+    manager.set("provider", "anthropic")
 
     assert manager.provider == "anthropic"
-    # persisted payload must be JSON-friendly
     assert settings_store.save_calls[-1] == {
         "provider": "anthropic",
         "model": "gpt-5.2",
@@ -81,44 +80,101 @@ def test_setting_attribute_persists_and_notifies(
         "allow_web_search": False,
         "allow_extended_prompt_retention": False,
     }
-    assert changes == [("provider", "openai", "anthropic")]
+    assert changes == [
+        (SettingChange(name="provider", old_value="openai", new_value="anthropic"),),
+    ]
 
 
-def test_setting_same_value_does_not_notify(manager: SettingsManager) -> None:
-    changes: list[tuple[str, str, str]] = []
-    manager.subscribe(lambda n, o, v: changes.append((n, o, v)))
+def test_update_commits_all_changes_before_notifying(
+    manager: SettingsManager, settings_store: SpySettingsStore
+) -> None:
+    observed: list[tuple[tuple[str, str], tuple[SettingChange, ...]]] = []
 
-    manager.provider = "openai"
+    def _record(changes: tuple[SettingChange, ...]) -> None:
+        observed.append(((manager.provider, manager.model), changes))
+
+    manager.subscribe(_record)
+
+    manager.update(provider="bergetai", model="zai-org/GLM-4.7")
+
+    assert manager.provider == "bergetai"
+    assert manager.model == "zai-org/GLM-4.7"
+    assert settings_store.save_calls[-1] == {
+        "provider": "bergetai",
+        "model": "zai-org/GLM-4.7",
+        "theme": "dark",
+        "show_scrollbar": True,
+        "queue_inputs": True,
+        "allow_web_search": False,
+        "allow_extended_prompt_retention": False,
+    }
+    assert observed == [
+        (
+            ("bergetai", "zai-org/GLM-4.7"),
+            (
+                SettingChange(name="provider", old_value="openai", new_value="bergetai"),
+                SettingChange(name="model", old_value="gpt-5.2", new_value="zai-org/GLM-4.7"),
+            ),
+        ),
+    ]
+
+
+def test_invalid_update_raises_without_mutating(
+    manager: SettingsManager, settings_store: SpySettingsStore
+) -> None:
+    with pytest.raises(ValidationError):
+        manager.set("theme", "bogus")
+
+    assert manager.theme == "dark"
+    assert settings_store.save_calls == []
+
+
+def test_direct_assignment_to_managed_setting_is_rejected(manager: SettingsManager) -> None:
+    with pytest.raises(AttributeError, match="provider"):
+        manager.provider = "anthropic"
+
+
+def test_setting_same_value_does_not_notify_or_save(
+    manager: SettingsManager, settings_store: SpySettingsStore
+) -> None:
+    changes: list[tuple[SettingChange, ...]] = []
+    manager.subscribe(changes.append)
+
+    manager.set("provider", "openai")
 
     assert changes == []
+    assert settings_store.save_calls == []
 
 
 def test_unsubscribe_stops_notifications(manager: SettingsManager) -> None:
-    changes: list[tuple[str, str, str]] = []
-    unsubscribe = manager.subscribe(lambda n, o, v: changes.append((n, o, v)))
+    changes: list[tuple[SettingChange, ...]] = []
+    unsubscribe = manager.subscribe(changes.append)
 
     unsubscribe()
-    manager.provider = "anthropic"
+    manager.set("provider", "anthropic")
 
     assert changes == []
 
 
 def test_unsubscribe_is_idempotent(manager: SettingsManager) -> None:
-    unsubscribe = manager.subscribe(lambda _n, _o, _v: None)
+    unsubscribe = manager.subscribe(lambda _changes: None)
     unsubscribe()
     unsubscribe()
 
 
 def test_multiple_subscribers_all_called(manager: SettingsManager) -> None:
-    c1: list[tuple[str, str, str]] = []
-    c2: list[tuple[str, str, str]] = []
-    manager.subscribe(lambda n, o, v: c1.append((n, o, v)))
-    manager.subscribe(lambda n, o, v: c2.append((n, o, v)))
+    c1: list[tuple[SettingChange, ...]] = []
+    c2: list[tuple[SettingChange, ...]] = []
+    manager.subscribe(c1.append)
+    manager.subscribe(c2.append)
 
-    manager.provider = "anthropic"
+    manager.set("provider", "anthropic")
 
-    assert c1 == [("provider", "openai", "anthropic")]
-    assert c2 == [("provider", "openai", "anthropic")]
+    expected = [
+        (SettingChange(name="provider", old_value="openai", new_value="anthropic"),),
+    ]
+    assert c1 == expected
+    assert c2 == expected
 
 
 def test_get_api_key_from_env_is_cached_and_does_not_hit_secrets_store(
@@ -141,18 +197,36 @@ def test_get_api_key_lazy_loads_and_caches(settings_store: SpySettingsStore) -> 
     assert manager.get_api_key("openai") == "sk-keychain"
     assert manager.get_api_key("openai") == "sk-keychain"
 
-    # should only call underlying store once due to cache
     assert secrets.get_calls == ["openai"]
 
 
 def test_set_api_key_writes_secrets_store_and_notifies(
     manager: SettingsManager, secrets_store: SpySecretsStore
 ) -> None:
-    changes: list[tuple[str, str | None, str]] = []
-    manager.subscribe(lambda n, o, v: changes.append((n, o, v)))
+    changes: list[tuple[SettingChange, ...]] = []
+    manager.subscribe(changes.append)
 
     manager.set_api_key("openai", "sk-new")
 
     assert secrets_store.set_calls == [("openai", "sk-new")]
     assert manager.get_api_key("openai") == "sk-new"
-    assert changes == [("api_keys.openai", None, "sk-new")]
+    assert changes == [
+        (SettingChange(name="api_keys.openai", old_value=None, new_value="sk-new"),),
+    ]
+
+
+def test_set_api_key_same_cached_value_does_not_notify(
+    settings_store: SpySettingsStore,
+    secrets_store: SpySecretsStore,
+) -> None:
+    secrets_store.keys["openai"] = "sk-existing"
+    manager = SettingsManager(settings_store=settings_store, secrets_store=secrets_store)
+    changes: list[tuple[SettingChange, ...]] = []
+    manager.subscribe(changes.append)
+
+    assert manager.get_api_key("openai") == "sk-existing"
+
+    manager.set_api_key("openai", "sk-existing")
+
+    assert changes == []
+    assert secrets_store.set_calls == [("openai", "sk-existing")]
