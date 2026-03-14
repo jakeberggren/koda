@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
 from koda_tui import actions
+from koda_tui.thinking import find_model
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
@@ -35,11 +36,17 @@ def _format_model_label(model: ModelDefinition, settings: SettingsManager) -> st
 
 def _select_model(
     model: ModelDefinition,
+    backend: KodaBackend,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> None:
     """Select a model and close the palette."""
-    result = actions.select_model(model, settings)
+    current_model = find_model(
+        backend.list_models(settings.provider),
+        provider=settings.provider,
+        model_id=settings.model,
+    )
+    result = actions.select_model(current_model, model, settings)
     if not result.ok:
         log.warning("cmd_select_model_failed", model_id=model.id, provider=model.provider)
         # TODO: surface action errors in the palette/status UI.
@@ -58,7 +65,7 @@ def get_commands(
     return [
         Command(
             label=_format_model_label(model, settings),
-            handler=partial(_select_model, model, settings, palette_manager),
+            handler=partial(_select_model, model, backend, settings, palette_manager),
             description="",
             group=_provider_display_name(model.provider),
         )

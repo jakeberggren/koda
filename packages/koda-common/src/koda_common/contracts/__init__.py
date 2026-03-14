@@ -32,7 +32,14 @@ from koda_common.contracts.messages import (
     ToolMessage,
     UserMessage,
 )
-from koda_common.contracts.models import ModelCapability, ModelDefinition, ThinkingLevel
+from koda_common.contracts.models import (
+    ModelCapability,
+    ModelDefinition,
+    ThinkingOption,
+    ThinkingOptionDescription,
+    ThinkingOptionId,
+    ThinkingOptionLabel,
+)
 from koda_common.contracts.tools import ToolCall, ToolOutput, ToolResult
 
 __all__ = [
@@ -52,7 +59,10 @@ __all__ = [
     "SystemMessage",
     "TextDelta",
     "ThinkingDelta",
-    "ThinkingLevel",
+    "ThinkingOption",
+    "ThinkingOptionDescription",
+    "ThinkingOptionId",
+    "ThinkingOptionLabel",
     "ToolCall",
     "ToolCallRequested",
     "ToolCallResult",

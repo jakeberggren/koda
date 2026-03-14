@@ -11,13 +11,14 @@ from koda_tui.app.output import SynchronizedOutput
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
 from koda_tui.state import AppState
+from koda_tui.thinking import find_model, resolve_thinking_option
 from koda_tui.ui.layout import TUILayout
 from koda_tui.ui.palette import PaletteManager
 from koda_tui.ui.styles import get_style
 
 if TYPE_CHECKING:
     from koda_api.backends import KodaBackend
-    from koda_common.contracts import ThinkingLevel
+    from koda_common.contracts import ThinkingOptionId
     from koda_common.settings import SettingChange, SettingsManager
 
 
@@ -49,12 +50,17 @@ class KodaTuiApp:
         # Subscribe to settings changes
         self._unsubscribe = self._settings.subscribe(self._on_settings_changed)
         self._closed = False
+        initial_model = find_model(
+            self._backend.list_models(self._settings.provider),
+            provider=self._settings.provider,
+            model_id=self._settings.model,
+        )
 
         # Initialize state
         self.state = AppState(
             provider_name=self._settings.provider,
             model_name=self._settings.model,
-            thinking=self._settings.thinking,
+            thinking=resolve_thinking_option(initial_model, self._settings.thinking),
             show_scrollbar=self._settings.show_scrollbar,
             queue_inputs=self._settings.queue_inputs,
         )
@@ -123,7 +129,12 @@ class KodaTuiApp:
             return False
         self.state.provider_name = self._settings.provider
         self.state.model_name = self._settings.model
-        self.state.thinking = self._settings.thinking
+        active_model = find_model(
+            self._backend.list_models(self._settings.provider),
+            provider=self._settings.provider,
+            model_id=self._settings.model,
+        )
+        self.state.thinking = resolve_thinking_option(active_model, self._settings.thinking)
         self._backend.reconfigure()
         return True
 
@@ -200,8 +211,8 @@ class KodaTuiApp:
         """Cancel the current streaming operation."""
         self._stream_processor.cancel_stream()
 
-    def cycle_thinking(self, levels: list[ThinkingLevel]):
-        return actions.cycle_thinking(levels, self._settings)
+    def cycle_thinking(self, options: list[ThinkingOptionId]):
+        return actions.cycle_thinking(options, self._settings)
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""

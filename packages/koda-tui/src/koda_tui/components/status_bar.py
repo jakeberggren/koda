@@ -5,7 +5,6 @@ from pathlib import Path
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.layout import UIContent, UIControl
 
-from koda_common.contracts import ThinkingLevel
 from koda_tui.state import AppState
 
 _DIVIDER = " · "
@@ -61,14 +60,15 @@ class StatusBarControl(UIControl):
             ),
         ]
         left_text = f"{path}{_DIVIDER}{self._state.provider_name}{_DIVIDER}{self._state.model_name}"
-        if self._state.thinking is not ThinkingLevel.NONE:
+        if self._state.thinking.id != "none":
+            thinking_label = self._state.thinking.label.lower()
             left_fragments.extend(
                 [
                     ("class:status-bar.muted", _DIVIDER),
-                    ("class:status-bar.thinking", self._state.thinking.value),
+                    ("class:status-bar.thinking", thinking_label),
                 ]
             )
-            left_text += f"{_DIVIDER}{self._state.thinking.value}"
+            left_text += f"{_DIVIDER}{thinking_label}"
 
         # Right side: footer help + status
         status = self._get_status()
