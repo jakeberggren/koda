@@ -101,6 +101,7 @@ class ChatAreaControl(UIControl):
         return (
             message.role,
             message.content,
+            message.thinking_content,
             message.tool_call.call_id if message.tool_call else None,
             message.tool_running,
             message.tool_error,
@@ -164,6 +165,11 @@ class ChatAreaControl(UIControl):
         for message in self._state.messages:
             all_lines.extend(self._get_message_lines(message, width))
             all_lines.append(FormattedText([]))  # blank separator
+
+        if self._state.is_streaming and self._state.current_thinking_content:
+            fragment = self._renderer.render_thinking_content(self._state.current_thinking_content)
+            all_lines.extend(self._split_into_lines(fragment, width))
+            all_lines.append(FormattedText([]))
 
         if self._state.is_streaming and self._state.current_streaming_content:
             fragment = self._renderer.render_streaming_content(

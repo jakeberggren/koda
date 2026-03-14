@@ -27,8 +27,14 @@ def convert_messages(messages: Sequence[Message]) -> list[TUIMessage]:  # noqa: 
             result.append(TUIMessage(role=MessageRole.USER, content=msg.content))
 
         elif isinstance(msg, AssistantMessage):
-            if msg.content:
-                result.append(TUIMessage(role=MessageRole.ASSISTANT, content=msg.content))
+            if msg.content or msg.thinking_content:
+                result.append(
+                    TUIMessage(
+                        role=MessageRole.ASSISTANT,
+                        content=msg.content,
+                        thinking_content=msg.thinking_content,
+                    )
+                )
             for tc in msg.tool_calls:
                 tui_msg = TUIMessage(
                     role=MessageRole.TOOL,

@@ -74,6 +74,7 @@ def test_set_persists_and_notifies_single_change(
     assert settings_store.save_calls[-1] == {
         "provider": "anthropic",
         "model": "gpt-5.2",
+        "thinking": "none",
         "theme": "dark",
         "show_scrollbar": True,
         "queue_inputs": True,
@@ -102,6 +103,7 @@ def test_update_commits_all_changes_before_notifying(
     assert settings_store.save_calls[-1] == {
         "provider": "bergetai",
         "model": "zai-org/GLM-4.7",
+        "thinking": "none",
         "theme": "dark",
         "show_scrollbar": True,
         "queue_inputs": True,

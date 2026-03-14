@@ -225,7 +225,11 @@ class TestJsonSessionStore:
         session = store.create_session()
 
         tool_call = ToolCall(tool_name="read_file", arguments={"path": "/tmp/x"}, call_id="tc_1")
-        assistant_msg = AssistantMessage(content="Let me read that.", tool_calls=[tool_call])
+        assistant_msg = AssistantMessage(
+            content="Let me read that.",
+            thinking_content="Need to inspect the file first.",
+            tool_calls=[tool_call],
+        )
         tool_msg = ToolMessage(
             content="file contents here",
             tool_name="read_file",
@@ -239,6 +243,7 @@ class TestJsonSessionStore:
 
         # AssistantMessage.tool_calls preserved
         assert isinstance(reloaded.messages[0], AssistantMessage)
+        assert reloaded.messages[0].thinking_content == "Need to inspect the file first."
         assert len(reloaded.messages[0].tool_calls) == 1
         assert reloaded.messages[0].tool_calls[0].tool_name == "read_file"
         assert reloaded.messages[0].tool_calls[0].call_id == "tc_1"

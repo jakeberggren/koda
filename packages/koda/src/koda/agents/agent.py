@@ -9,6 +9,7 @@ from koda.llm.types import (
     LLMEvent,
     LLMResponseCompleted,
     LLMTextDelta,
+    LLMThinkingDelta,
     LLMToolCallRequested,
     LLMToolCallResult,
     LLMToolCompleted,
@@ -65,14 +66,18 @@ class Agent:
         if not response_chunks and event.response.output.content:
             response_chunks.append(event.response.output.content)
 
-    def _process_event(
+    def _process_event(  # noqa: C901 - allow complex
         self,
         event: LLMEvent,
         response_chunks: list[str],
+        thinking_chunks: list[str],
         pending_tool_calls: list[ToolCall],
     ) -> list[LLMEvent]:
         if isinstance(event, LLMTextDelta):
             response_chunks.append(event.text)
+            return [event]
+        if isinstance(event, LLMThinkingDelta):
+            thinking_chunks.append(event.text)
             return [event]
         if isinstance(event, LLMToolCallRequested):
             pending_tool_calls.append(event.call)
@@ -88,12 +93,14 @@ class Agent:
         self,
         stream: AsyncIterator[LLMEvent],
         response_chunks: list[str],
+        thinking_chunks: list[str],
         pending_tool_calls: list[ToolCall],
     ) -> AsyncIterator[LLMEvent]:
         async for event in stream:
             for processed_event in self._process_event(
                 event,
                 response_chunks,
+                thinking_chunks,
                 pending_tool_calls,
             ):
                 yield processed_event
@@ -155,16 +162,24 @@ class Agent:
         )
         stream = self.llm.generate_stream(request)
         response_chunks: list[str] = []
+        thinking_chunks: list[str] = []
 
-        async for event in self._process_events(stream, response_chunks, pending_tool_calls):
+        async for event in self._process_events(
+            stream,
+            response_chunks,
+            thinking_chunks,
+            pending_tool_calls,
+        ):
             yield event
 
         content = "".join(response_chunks)
-        if content or pending_tool_calls:
+        thinking_content = "".join(thinking_chunks)
+        if content or thinking_content or pending_tool_calls:
             self._append_message(
                 session_id,
                 AssistantMessage(
                     content=content,
+                    thinking_content=thinking_content,
                     tool_calls=pending_tool_calls,
                 ),
             )

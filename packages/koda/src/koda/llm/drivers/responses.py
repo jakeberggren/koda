@@ -10,6 +10,7 @@ from openai.types.responses import (
     ResponseFunctionWebSearch,
     ResponseInputParam,
     ResponseOutputItemDoneEvent,
+    ResponseReasoningSummaryTextDeltaEvent,
     ResponseStreamEvent,
     ResponseTextDeltaEvent,
     ResponseWebSearchCallInProgressEvent,
@@ -26,6 +27,7 @@ from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponseCompleted,
     LLMTextDelta,
+    LLMThinkingDelta,
     LLMToolCallRequested,
     LLMToolCompleted,
     LLMToolStarted,
@@ -97,7 +99,7 @@ class ResponsesDriver(LLM):
     def _resolve_reasoning(*, reasoning: ThinkingLevel) -> Reasoning | Omit:
         if reasoning is ThinkingLevel.NONE:
             return omit
-        return {"effort": reasoning.value}
+        return {"effort": reasoning.value, "summary": "auto"}
 
     def _resolve_create_params(self, request: LLMRequest) -> _CreateParams:
         return _CreateParams(
@@ -205,9 +207,12 @@ class ResponsesDriver(LLM):
             )
         )
 
-    def _process_stream_event(self, event: ResponseStreamEvent) -> Iterator[LLMEvent]:
+    def _process_stream_event(self, event: ResponseStreamEvent) -> Iterator[LLMEvent]:  # noqa: C901 - allow coplex.
         if isinstance(event, ResponseTextDeltaEvent):
             yield LLMTextDelta(text=event.delta)
+            return
+        if isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
+            yield LLMThinkingDelta(text=event.delta)
             return
         if isinstance(event, ResponseWebSearchCallInProgressEvent):
             call = ToolCall(tool_name="web_search", call_id=event.item_id, arguments={})

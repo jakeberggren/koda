@@ -12,6 +12,10 @@ class TextDelta(EventBase):
     text: str
 
 
+class ThinkingDelta(EventBase):
+    text: str
+
+
 class ToolCallRequested(EventBase):
     call: ToolCall
 
@@ -31,5 +35,10 @@ class ProviderToolCompleted(EventBase):
 
 
 StreamEvent = (
-    TextDelta | ToolCallRequested | ToolCallResult | ProviderToolStarted | ProviderToolCompleted
+    TextDelta
+    | ThinkingDelta
+    | ToolCallRequested
+    | ToolCallResult
+    | ProviderToolStarted
+    | ProviderToolCompleted
 )

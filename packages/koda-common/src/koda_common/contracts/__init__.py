@@ -15,6 +15,7 @@ from koda_common.contracts.events import (
     ProviderToolStarted,
     StreamEvent,
     TextDelta,
+    ThinkingDelta,
     ToolCallRequested,
     ToolCallResult,
 )
@@ -50,6 +51,7 @@ __all__ = [
     "StreamEvent",
     "SystemMessage",
     "TextDelta",
+    "ThinkingDelta",
     "ThinkingLevel",
     "ToolCall",
     "ToolCallRequested",

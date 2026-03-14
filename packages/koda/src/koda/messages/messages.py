@@ -23,6 +23,7 @@ class UserMessage(Message):
 
 class AssistantMessage(Message):
     role: Literal[MessageRole.ASSISTANT] = Field(default=MessageRole.ASSISTANT, frozen=True)
+    thinking_content: str = Field(default="")
     tool_calls: list[ToolCall] = Field(default_factory=list)
 
 

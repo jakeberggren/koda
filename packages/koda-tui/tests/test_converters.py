@@ -48,6 +48,24 @@ class TestConvertMessages:
         assert result[0].role == MessageRole.ASSISTANT
         assert result[0].content == "hi there"
 
+    def test_assistant_message_with_thinking(self) -> None:
+        result = convert_messages(
+            [AssistantMessage(content="hi there", thinking_content="Compare options")]
+        )
+
+        assert len(result) == 1
+        assert result[0].role == MessageRole.ASSISTANT
+        assert result[0].content == "hi there"
+        assert result[0].thinking_content == "Compare options"
+
+    def test_assistant_message_with_only_thinking(self) -> None:
+        result = convert_messages([AssistantMessage(content="", thinking_content="Need a tool")])
+
+        assert len(result) == 1
+        assert result[0].role == MessageRole.ASSISTANT
+        assert result[0].content == ""
+        assert result[0].thinking_content == "Need a tool"
+
     def test_user_assistant_roundtrip(self) -> None:
         messages = [
             UserMessage(content="hello"),

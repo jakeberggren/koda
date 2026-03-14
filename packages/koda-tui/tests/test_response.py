@@ -22,6 +22,21 @@ class TestResponseLifecycle:
         assert state.current_streaming_content == ""
         assert state.messages[1].content == "Hello world"
 
+    def test_end_persists_thinking_content(
+        self, state: AppState, lifecycle: ResponseLifecycle
+    ) -> None:
+        """Thinking content should persist on the finalized assistant message."""
+        lifecycle.begin("user message")
+        lifecycle.append_thinking("Comparing approaches")
+        lifecycle.append_content("Final answer")
+
+        lifecycle.end()
+
+        assert state.messages[1].role == MessageRole.ASSISTANT
+        assert state.messages[1].thinking_content == "Comparing approaches"
+        assert state.messages[1].content == "Final answer"
+        assert state.current_thinking_content == ""
+
     def test_single_tool_lifecycle(self, state: AppState, lifecycle: ResponseLifecycle) -> None:
         """A single tool should be tracked through transition and completion."""
         tool = ToolCall(tool_name="read_file", arguments={"path": "/tmp/a"}, call_id="c1")
@@ -135,3 +150,18 @@ class TestResponseLifecycle:
         assert state.current_streaming_content == ""
         # Tool message follows
         assert state.messages[2].role == MessageRole.TOOL
+
+    def test_transition_to_tool_persists_thinking_content(
+        self, state: AppState, lifecycle: ResponseLifecycle
+    ) -> None:
+        """transition_to_tool() should keep thinking content on the finalized message."""
+        lifecycle.begin("msg")
+        lifecycle.append_thinking("Need to search first")
+        tool = ToolCall(tool_name="search", arguments={}, call_id="c1")
+
+        lifecycle.transition_to_tool(tool)
+
+        assert state.messages[1].role == MessageRole.ASSISTANT
+        assert state.messages[1].thinking_content == "Need to search first"
+        assert state.messages[1].content == ""
+        assert state.current_thinking_content == ""

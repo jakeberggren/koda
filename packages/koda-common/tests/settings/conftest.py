@@ -74,6 +74,7 @@ def clean_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "ANTHROPIC_API_KEY",
         "KODA_PROVIDER",
         "KODA_MODEL",
+        "KODA_THINKING",
         "KODA_ALLOW_EXTENDED_PROMPT_RETENTION",
         "KODA_USE_MOCK_CLIENT",
     ):

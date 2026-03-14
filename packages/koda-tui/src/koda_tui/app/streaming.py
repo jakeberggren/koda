@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 
 from koda_common.contracts import (
     BackendAuthenticationError,
-    ProviderToolCompleted,
     ProviderToolStarted,
+    StreamEvent,
     TextDelta,
+    ThinkingDelta,
     ToolCallRequested,
-    ToolCallResult,
 )
 from koda_common.logging import get_logger
 from koda_tui.app.response import ResponseLifecycle
@@ -55,19 +55,29 @@ class StreamProcessor:
                 await self._spinner_task
             self._spinner_task = None
 
+    def _handle_event(
+        self,
+        event: StreamEvent,
+    ) -> None:
+        if isinstance(event, TextDelta):
+            self._lifecycle.append_content(event.text)
+            return
+        if isinstance(event, ThinkingDelta):
+            self._lifecycle.append_thinking(event.text)
+            return
+        if isinstance(event, ToolCallRequested | ProviderToolStarted):
+            self._lifecycle.transition_to_tool(event.call)
+            return
+        self._lifecycle.complete_tool(
+            call_id=event.result.call_id,
+            display=event.result.output.display,
+            is_error=event.result.output.is_error,
+            error_message=event.result.output.error_message,
+        )
+
     async def _process_stream(self, message: str, backend: KodaBackend) -> None:
         async for event in backend.chat(message):
-            if isinstance(event, TextDelta):
-                self._lifecycle.append_content(event.text)
-            elif isinstance(event, ToolCallRequested | ProviderToolStarted):
-                self._lifecycle.transition_to_tool(event.call)
-            elif isinstance(event, ToolCallResult | ProviderToolCompleted):
-                self._lifecycle.complete_tool(
-                    call_id=event.result.call_id,
-                    display=event.result.output.display,
-                    is_error=event.result.output.is_error,
-                    error_message=event.result.output.error_message,
-                )
+            self._handle_event(event)
             self._invalidate()
 
     async def stream(self, text: str, backend: KodaBackend) -> None:

@@ -28,10 +28,15 @@ def test_map_user_message_to_contract_message() -> None:
 
 def test_map_assistant_message_to_contract_message() -> None:
     mapped = map_message_to_contract_message(
-        CoreAssistantMessage(content="Working...", tool_calls=[_make_core_tool_call()])
+        CoreAssistantMessage(
+            content="Working...",
+            thinking_content="Comparing approaches",
+            tool_calls=[_make_core_tool_call()],
+        )
     )
     assert isinstance(mapped, AssistantMessage)
     assert mapped.content == "Working..."
+    assert mapped.thinking_content == "Comparing approaches"
     assert len(mapped.tool_calls) == 1
     assert mapped.tool_calls[0].tool_name == "search"
 

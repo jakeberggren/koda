@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from koda_common.contracts import ThinkingLevel
 from koda_common.settings import SettingChange
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.ui.palette.palette_manager import PaletteManager
@@ -15,6 +16,7 @@ def _make_settings_mock(unsubscribe: Mock) -> Mock:
             "subscribe",
             "provider",
             "model",
+            "thinking",
             "show_scrollbar",
             "queue_inputs",
             "theme",
@@ -22,6 +24,7 @@ def _make_settings_mock(unsubscribe: Mock) -> Mock:
     )
     settings.provider = "openai"
     settings.model = "gpt-5.2"
+    settings.thinking = ThinkingLevel.NONE
     settings.show_scrollbar = True
     settings.queue_inputs = True
     settings.theme = "dark"

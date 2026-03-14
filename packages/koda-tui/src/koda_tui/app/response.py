@@ -21,10 +21,15 @@ class ResponseLifecycle:
         self._state.messages.append(Message(role=MessageRole.USER, content=user_message))
         self._state.is_streaming = True
         self._state.current_streaming_content = ""
+        self._state.current_thinking_content = ""
 
     def append_content(self, text: str) -> None:
         """Append text to current streaming content."""
         self._state.current_streaming_content += text
+
+    def append_thinking(self, text: str) -> None:
+        """Append text to current streaming thinking content."""
+        self._state.current_thinking_content += text
 
     def transition_to_tool(self, tool_call: ToolCall) -> None:
         """Transition from streaming content to tool execution."""
@@ -71,14 +76,17 @@ class ResponseLifecycle:
 
         self._state.is_streaming = False
         self._state.current_streaming_content = ""
+        self._state.current_thinking_content = ""
 
     def _finalize_content(self) -> None:
         """Save any pending streaming content as an assistant message."""
-        if self._state.current_streaming_content:
+        if self._state.current_streaming_content or self._state.current_thinking_content:
             self._state.messages.append(
                 Message(
                     role=MessageRole.ASSISTANT,
                     content=self._state.current_streaming_content,
+                    thinking_content=self._state.current_thinking_content,
                 )
             )
             self._state.current_streaming_content = ""
+            self._state.current_thinking_content = ""
