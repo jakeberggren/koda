@@ -11,7 +11,7 @@ from koda_common.contracts import (
     ThinkingOptionId,
 )
 from koda_tui.converters import convert_messages
-from koda_tui.thinking import normalize_thinking_option, supported_thinking_options
+from koda_tui.utils.model_selection import normalize_thinking_option, supported_thinking_options
 
 if TYPE_CHECKING:
     from uuid import UUID

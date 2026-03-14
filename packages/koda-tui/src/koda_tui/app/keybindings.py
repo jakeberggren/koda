@@ -6,7 +6,7 @@ from prompt_toolkit.input.ansi_escape_sequences import ANSI_SEQUENCES
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
 from prompt_toolkit.keys import Keys
 
-from koda_tui.thinking import find_model, supported_thinking_options
+from koda_tui.utils.model_selection import find_model, supported_thinking_options
 
 if TYPE_CHECKING:
     from koda_common.contracts import KodaBackend, ThinkingOptionId
