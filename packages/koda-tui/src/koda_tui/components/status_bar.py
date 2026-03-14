@@ -8,7 +8,7 @@ from prompt_toolkit.layout import UIContent, UIControl
 from koda_tui.state import AppState
 
 _DIVIDER = " · "
-_FOOTER_BINDINGS = [("ctrl+t", "thinking"), ("ctrl+p", "palette")]
+_BASE_FOOTER_BINDINGS = [("ctrl+p", "palette")]
 
 
 class StatusBarControl(UIControl):
@@ -35,8 +35,11 @@ class StatusBarControl(UIControl):
         """Return styled footer binding fragments and their plain-text representation."""
         fragments: list[tuple[str, str]] = []
         text_parts: list[str] = []
+        footer_bindings = list(_BASE_FOOTER_BINDINGS)
+        if self._state.thinking_supported:
+            footer_bindings.insert(0, ("ctrl+t", "thinking"))
 
-        for index, (keybinding, label) in enumerate(_FOOTER_BINDINGS):
+        for index, (keybinding, label) in enumerate(footer_bindings):
             if index > 0:
                 fragments.append(("class:status-bar.muted", _DIVIDER))
                 text_parts.append(_DIVIDER)

@@ -14,7 +14,7 @@ from koda_tui.state import AppState
 from koda_tui.ui.layout import TUILayout
 from koda_tui.ui.palette import PaletteManager
 from koda_tui.ui.styles import get_style
-from koda_tui.utils.model_selection import find_model, resolve_thinking_option
+from koda_tui.utils.model_selection import find_model, resolve_thinking_option, supports_thinking
 
 if TYPE_CHECKING:
     from koda_api.backends import KodaBackend
@@ -61,6 +61,7 @@ class KodaTuiApp:
             provider_name=self._settings.provider,
             model_name=self._settings.model,
             thinking=resolve_thinking_option(initial_model, self._settings.thinking),
+            thinking_supported=supports_thinking(initial_model),
             show_scrollbar=self._settings.show_scrollbar,
             queue_inputs=self._settings.queue_inputs,
         )
@@ -135,6 +136,7 @@ class KodaTuiApp:
             model_id=self._settings.model,
         )
         self.state.thinking = resolve_thinking_option(active_model, self._settings.thinking)
+        self.state.thinking_supported = supports_thinking(active_model)
         self._backend.reconfigure()
         return True
 
