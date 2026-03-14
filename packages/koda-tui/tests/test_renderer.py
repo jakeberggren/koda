@@ -42,6 +42,30 @@ class TestMessageRendererMessages:
         content = "".join(t[1] for t in result)
         assert "I can help" in content
 
+    def test_render_assistant_message_with_thinking(self, converter: MessageRenderer) -> None:
+        """render_message() should keep persisted thinking content visible."""
+        message = Message(
+            role=MessageRole.ASSISTANT,
+            content="I can help",
+            thinking_content="Comparing options",
+        )
+        result = converter.render_message(message)
+        content = "".join(t[1] for t in result)
+        assert "Comparing options" in content
+        assert "I can help" in content
+
+    def test_render_assistant_thinking_renders_markdown(self, converter: MessageRenderer) -> None:
+        """thinking content should be rendered through markdown, not as literal markers."""
+        message = Message(
+            role=MessageRole.ASSISTANT,
+            content="",
+            thinking_content="**Exploring the meaning of 42**",
+        )
+        result = converter.render_message(message)
+        content = "".join(t[1] for t in result)
+        assert "Exploring the meaning of 42" in content
+        assert "**Exploring the meaning of 42**" not in content
+
     def test_render_tool_message(self, converter: MessageRenderer) -> None:
         """render_message() should render tool messages."""
         tool_call = ToolCall(
@@ -95,3 +119,10 @@ class TestMessageRendererStreaming:
         assert "Hello wor" in content
         # Should have cursor block
         assert "\u2588" in content
+
+    def test_render_thinking_content_renders_markdown(self, converter: MessageRenderer) -> None:
+        """render_thinking_content() should parse markdown markers."""
+        result = converter.render_thinking_content("**Exploring the meaning of 42**")
+        content = "".join(t[1] for t in result)
+        assert "Exploring the meaning of 42" in content
+        assert "**Exploring the meaning of 42**" not in content

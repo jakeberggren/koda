@@ -37,7 +37,11 @@ def _(core_message: CoreUserMessage) -> Message:
 @map_message_to_contract_message.register
 def _(core_message: CoreAssistantMessage) -> Message:
     tool_calls = [map_tool_call_to_contract_tool_call(call) for call in core_message.tool_calls]
-    return AssistantMessage(content=core_message.content, tool_calls=tool_calls)
+    return AssistantMessage(
+        content=core_message.content,
+        thinking_content=core_message.thinking_content,
+        tool_calls=tool_calls,
+    )
 
 
 @map_message_to_contract_message.register

@@ -4,6 +4,7 @@ from functools import singledispatch
 
 from koda.llm.types import LLMEvent
 from koda.llm.types import LLMTextDelta as CoreTextDelta
+from koda.llm.types import LLMThinkingDelta as CoreThinkingDelta
 from koda.llm.types import LLMToolCallRequested as CoreToolCallRequested
 from koda.llm.types import LLMToolCallResult as CoreToolCallResult
 from koda.llm.types import LLMToolCompleted as CoreProviderToolCompleted
@@ -17,6 +18,7 @@ from koda_common.contracts import (
     ProviderToolStarted,
     StreamEvent,
     TextDelta,
+    ThinkingDelta,
     ToolCallRequested,
     ToolCallResult,
 )
@@ -37,6 +39,11 @@ def map_llm_event_to_stream_event(llm_event: LLMEvent) -> StreamEvent:
 @map_llm_event_to_stream_event.register
 def _(event: CoreTextDelta) -> StreamEvent:
     return TextDelta(text=event.text)
+
+
+@map_llm_event_to_stream_event.register
+def _(event: CoreThinkingDelta) -> StreamEvent:
+    return ThinkingDelta(text=event.text)
 
 
 # Core tool lifecycle events

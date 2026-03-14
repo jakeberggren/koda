@@ -19,6 +19,7 @@ class Message:
 
     role: MessageRole
     content: str
+    thinking_content: str = ""
     tool_call: ToolCall | None = None
     tool_running: bool = False
     tool_error: bool = False
@@ -33,6 +34,7 @@ class AppState:
     messages: list[Message] = field(default_factory=list)
     cwd: Path = field(default_factory=Path.cwd)
     current_streaming_content: str = ""
+    current_thinking_content: str = ""
     is_streaming: bool = False
     active_tools: dict[str, ToolCall] = field(default_factory=dict)
     pending_inputs: list[str] = field(default_factory=list)
@@ -48,5 +50,6 @@ class AppState:
         """Clear all conversation and streaming state."""
         self.messages.clear()
         self.current_streaming_content = ""
+        self.current_thinking_content = ""
         self.is_streaming = False
         self.active_tools.clear()

@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass, field
 from typing import ClassVar, Literal
 
-from prompt_toolkit.formatted_text import FormattedText
+from prompt_toolkit.formatted_text import FormattedText, merge_formatted_text, to_formatted_text
 from rich.cells import cell_len
 from rich.color import Color, ColorType
 from rich.console import Console, ConsoleOptions, Group, RenderResult
@@ -41,6 +41,7 @@ _THEME_COLORS = {
 }
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+CURSOR_BLOCK = "\u2588"
 
 # Rich standard color number → prompt_toolkit color name.
 # Note: Rich "white" (7) maps to PT "ansigray", Rich "bright_white" (15) to PT "ansiwhite".
@@ -308,6 +309,39 @@ class MessageRenderer:
             return message.tool_error_message
         return result_display
 
+    @staticmethod
+    def _combine_formatted_text(*fragments: FormattedText) -> FormattedText:
+        return to_formatted_text(merge_formatted_text(fragments))
+
+    def _render_thinking_markdown(
+        self,
+        content: str,
+        *,
+        add_spacing: bool = False,
+    ) -> FormattedText:
+        fragment = self.convert(self._markdown_cls(content, style=Style(dim=True, italic=True)))
+        if not add_spacing:
+            return fragment
+        return self._combine_formatted_text(fragment, FormattedText([("", "\n")]))
+
+    def _render_assistant_message(self, message: Message) -> FormattedText:
+        fragments: list[FormattedText] = []
+        if message.thinking_content:
+            fragments.append(
+                self._render_thinking_markdown(
+                    message.thinking_content,
+                    add_spacing=bool(message.content),
+                )
+            )
+        if message.content:
+            fragments.append(self.convert(self._markdown_cls(message.content)))
+
+        if not fragments:
+            return FormattedText([])
+        if len(fragments) == 1:
+            return fragments[0]
+        return self._combine_formatted_text(*fragments)
+
     def render_message(self, message: Message) -> FormattedText:
         """Render a single message to FormattedText."""
         match message.role:
@@ -326,7 +360,7 @@ class MessageRenderer:
                 )
                 return self.convert(quoted_content)
             case MessageRole.ASSISTANT:
-                return self.convert(self._markdown_cls(message.content))
+                return self._render_assistant_message(message)
             case MessageRole.TOOL if message.tool_call:
                 return self.render_tool_call(
                     message.tool_call,
@@ -423,8 +457,12 @@ class MessageRenderer:
 
     def render_streaming_content(self, content: str) -> FormattedText:
         """Render currently streaming content with cursor inside a panel."""
-        md = self._markdown_cls(content + "\u2588")  # Cursor block
+        md = self._markdown_cls(content + CURSOR_BLOCK)
         return self.convert(md)
+
+    def render_thinking_content(self, content: str) -> FormattedText:
+        """Render currently streaming thinking content."""
+        return self._render_thinking_markdown(content + CURSOR_BLOCK)
 
     def render_thinking_spinner(self, text: str = "Working... (esc to interrupt)") -> FormattedText:
         """Render an animated thinking spinner."""

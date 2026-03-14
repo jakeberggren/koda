@@ -62,6 +62,11 @@ class LLMTextDelta:
 
 
 @dataclass(frozen=True, slots=True)
+class LLMThinkingDelta:
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
 class LLMToolCallRequested:
     call: ToolCall
 
@@ -90,6 +95,7 @@ class LLMResponseCompleted:
 
 LLMEvent = (
     LLMTextDelta
+    | LLMThinkingDelta
     | LLMToolCallRequested
     | LLMToolCallResult
     | LLMToolStarted

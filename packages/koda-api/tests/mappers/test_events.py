@@ -1,6 +1,7 @@
 import pytest
 
 from koda.llm.types import LLMTextDelta as CoreTextDelta
+from koda.llm.types import LLMThinkingDelta as CoreThinkingDelta
 from koda.llm.types import LLMToolCallRequested as CoreToolCallRequested
 from koda.llm.types import LLMToolCallResult as CoreToolCallResult
 from koda.llm.types import LLMToolCompleted as CoreProviderToolCompleted
@@ -14,6 +15,7 @@ from koda_common.contracts import (
     ProviderToolCompleted,
     ProviderToolStarted,
     TextDelta,
+    ThinkingDelta,
     ToolCallRequested,
     ToolCallResult,
 )
@@ -31,6 +33,12 @@ def test_map_provider_text_delta_event() -> None:
     mapped = map_llm_event_to_stream_event(CoreTextDelta(text="hi"))
     assert isinstance(mapped, TextDelta)
     assert mapped.text == "hi"
+
+
+def test_map_provider_thinking_delta_event() -> None:
+    mapped = map_llm_event_to_stream_event(CoreThinkingDelta(text="thinking"))
+    assert isinstance(mapped, ThinkingDelta)
+    assert mapped.text == "thinking"
 
 
 def test_map_provider_tool_call_requested_event() -> None:
