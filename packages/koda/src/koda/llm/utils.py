@@ -8,6 +8,7 @@ from openai import (
     APIError,
     APITimeoutError,
     AuthenticationError,
+    OpenAIError,
     RateLimitError,
 )
 
@@ -35,7 +36,7 @@ def resolve_openai_client(settings: SettingsManager) -> Callable[..., AsyncOpenA
 
 
 def raise_llm_error_from_openai(
-    error: Exception,
+    error: OpenAIError,
     *,
     backend: str,
 ) -> NoReturn:
