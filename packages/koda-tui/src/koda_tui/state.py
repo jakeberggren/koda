@@ -43,6 +43,7 @@ class AppState:
     thinking: ThinkingOption = field(
         default_factory=lambda: ThinkingOption(id="none", label="none")
     )
+    thinking_supported: bool = False
     show_scrollbar: bool = True
     queue_inputs: bool = True
     exit_requested: bool = False

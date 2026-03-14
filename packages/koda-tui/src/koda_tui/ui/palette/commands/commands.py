@@ -92,7 +92,7 @@ def get_commands(  # noqa: C901 - allow complex
     def cmd_list_sessions() -> None:
         session_commands.open_session_list(backend, state, palette_manager, cancel_streaming)
 
-    return [
+    commands = [
         Command(
             "Connect Provider",
             cmd_connect_provider,
@@ -103,12 +103,6 @@ def get_commands(  # noqa: C901 - allow complex
             "Switch Model",
             cmd_switch_model,
             "Select a different model",
-            group="Agent",
-        ),
-        Command(
-            "Set Thinking Level",
-            cmd_set_thinking,
-            "Select model reasoning effort",
             group="Agent",
         ),
         Command(
@@ -142,3 +136,14 @@ def get_commands(  # noqa: C901 - allow complex
             group="System",
         ),
     ]
+    if state.thinking_supported:
+        commands.insert(
+            2,
+            Command(
+                "Set Thinking Level",
+                cmd_set_thinking,
+                "Select model reasoning effort",
+                group="Agent",
+            ),
+        )
+    return commands

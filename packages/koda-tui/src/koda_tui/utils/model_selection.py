@@ -17,6 +17,12 @@ def find_model(
     )
 
 
+def supports_thinking(model: ModelDefinition | None) -> bool:
+    if model is None:
+        return False
+    return any(option.id != "none" for option in model.thinking_options)
+
+
 def supported_thinking_options(model: ModelDefinition | None) -> list[ThinkingOption]:
     if model is None or not model.thinking_options:
         return [_DEFAULT_THINKING_OPTION]
