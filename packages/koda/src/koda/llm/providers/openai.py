@@ -23,7 +23,7 @@ from koda.llm.exceptions import (
     LLMAuthenticationError,
     UnknownMessageTypeError,
 )
-from koda.llm.models import ModelCapabilities, ModelDefinition, ThinkingLevel
+from koda.llm.models import ModelCapabilities, ModelDefinition, ThinkingOption
 from koda.llm.protocols import LLMAdapter
 from koda.llm.providers.base import LLMProviderBase
 from koda.llm.utils import resolve_openai_client
@@ -34,6 +34,10 @@ from koda_common.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
+    from openai.types.chat.completion_create_params import ReasoningEffort
+    from openai.types.shared_params.reasoning import Reasoning
+
+    from koda.llm.models import ThinkingOptionId
     from koda.llm.protocols import LLM
     from koda.llm.registry import ModelRegistry
     from koda.llm.types import LLMRequest, LLMResponse
@@ -41,18 +45,36 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+_OPENAI_THINKING_LOW_TO_XHIGH = [
+    ThinkingOption(id="none", label="Off", description="No interleaved thinking."),
+    ThinkingOption(id="low", label="Low", description="Low effort for straightforward tasks."),
+    ThinkingOption(id="medium", label="Medium", description="Balanced effort for most tasks."),
+    ThinkingOption(id="high", label="High", description="High effort for complex tasks."),
+    ThinkingOption(id="xhigh", label="XHigh", description="Extra high effort for complex tasks."),
+]
+
+_OPENAI_THINKING_LOW_TO_HIGH = [
+    ThinkingOption(id="none", label="Off", description="No interleaved thinking."),
+    ThinkingOption(id="low", label="Low", description="Low effort for straightforward tasks."),
+    ThinkingOption(id="medium", label="Medium", description="Balanced effort for most tasks."),
+    ThinkingOption(id="high", label="High", description="High effort for complex tasks."),
+]
+
+_OPENAI_REASONING_EFFORTS: dict[ThinkingOptionId, ReasoningEffort] = {
+    "none": "none",
+    "minimal": "minimal",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "xhigh": "xhigh",
+}
+
 OPENAI_MODELS: Sequence[ModelDefinition] = [
     ModelDefinition(
         id="gpt-5.4",
         name="gpt-5.4",
         provider="openai",
-        thinking={
-            ThinkingLevel.NONE,
-            ThinkingLevel.LOW,
-            ThinkingLevel.MEDIUM,
-            ThinkingLevel.HIGH,
-            ThinkingLevel.XHIGH,
-        },
+        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
         capabilities={
             ModelCapabilities.WEB_SEARCH,
             ModelCapabilities.EXTENDED_PROMPT_RETENTION,
@@ -62,13 +84,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.3-codex",
         name="gpt-5.3-codex",
         provider="openai",
-        thinking={
-            ThinkingLevel.NONE,
-            ThinkingLevel.LOW,
-            ThinkingLevel.MEDIUM,
-            ThinkingLevel.HIGH,
-            ThinkingLevel.XHIGH,
-        },
+        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
         capabilities={
             ModelCapabilities.WEB_SEARCH,
             ModelCapabilities.EXTENDED_PROMPT_RETENTION,
@@ -78,13 +94,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.2-codex",
         name="gpt-5.2-codex",
         provider="openai",
-        thinking={
-            ThinkingLevel.NONE,
-            ThinkingLevel.LOW,
-            ThinkingLevel.MEDIUM,
-            ThinkingLevel.HIGH,
-            ThinkingLevel.XHIGH,
-        },
+        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
         capabilities={
             ModelCapabilities.WEB_SEARCH,
             ModelCapabilities.EXTENDED_PROMPT_RETENTION,
@@ -94,13 +104,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.2",
         name="gpt-5.2",
         provider="openai",
-        thinking={
-            ThinkingLevel.NONE,
-            ThinkingLevel.LOW,
-            ThinkingLevel.MEDIUM,
-            ThinkingLevel.HIGH,
-            ThinkingLevel.XHIGH,
-        },
+        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
         capabilities={
             ModelCapabilities.WEB_SEARCH,
             ModelCapabilities.EXTENDED_PROMPT_RETENTION,
@@ -110,12 +114,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.1-codex",
         name="gpt-5.1-codex",
         provider="openai",
-        thinking={
-            ThinkingLevel.NONE,
-            ThinkingLevel.LOW,
-            ThinkingLevel.MEDIUM,
-            ThinkingLevel.HIGH,
-        },
+        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
         capabilities={
             ModelCapabilities.WEB_SEARCH,
             ModelCapabilities.EXTENDED_PROMPT_RETENTION,
@@ -125,12 +124,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.1",
         name="gpt-5.1",
         provider="openai",
-        thinking={
-            ThinkingLevel.NONE,
-            ThinkingLevel.LOW,
-            ThinkingLevel.MEDIUM,
-            ThinkingLevel.HIGH,
-        },
+        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
         capabilities={
             ModelCapabilities.WEB_SEARCH,
             ModelCapabilities.EXTENDED_PROMPT_RETENTION,
@@ -140,12 +134,7 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5",
         name="gpt-5",
         provider="openai",
-        thinking={
-            ThinkingLevel.NONE,
-            ThinkingLevel.LOW,
-            ThinkingLevel.MEDIUM,
-            ThinkingLevel.HIGH,
-        },
+        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
         capabilities={
             ModelCapabilities.WEB_SEARCH,
             ModelCapabilities.EXTENDED_PROMPT_RETENTION,
@@ -155,24 +144,14 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5-mini",
         name="gpt-5-mini",
         provider="openai",
-        thinking={
-            ThinkingLevel.NONE,
-            ThinkingLevel.LOW,
-            ThinkingLevel.MEDIUM,
-            ThinkingLevel.HIGH,
-        },
+        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
         capabilities={ModelCapabilities.WEB_SEARCH},
     ),
     ModelDefinition(
         id="gpt-5-nano",
         name="gpt-5-nano",
         provider="openai",
-        thinking={
-            ThinkingLevel.NONE,
-            ThinkingLevel.LOW,
-            ThinkingLevel.MEDIUM,
-            ThinkingLevel.HIGH,
-        },
+        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
         capabilities={ModelCapabilities.WEB_SEARCH},
     ),
 ]
@@ -291,6 +270,11 @@ class OpenAILLMProviderConfig:
 class OpenAILLMProvider(LLMProviderBase):
     provider_name: str = "openai"
 
+    @staticmethod
+    def _resolve_reasoning(reasoning: ThinkingOptionId) -> Reasoning | Omit:
+        effort = _OPENAI_REASONING_EFFORTS[reasoning]
+        return {"effort": effort, "summary": "auto"}
+
     def __init__(
         self,
         driver: ResponsesDriver,
@@ -322,6 +306,7 @@ class OpenAILLMProvider(LLMProviderBase):
         driver = ResponsesDriver(
             config=driver_config,
             adapter=OpenAIResponseAdapter(),
+            reasoning_resolver=cls._resolve_reasoning,
             client_factory=client_factory,
         )
         return cls(

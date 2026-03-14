@@ -6,10 +6,10 @@ from prompt_toolkit.input.ansi_escape_sequences import ANSI_SEQUENCES
 from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
 from prompt_toolkit.keys import Keys
 
-from koda_common.contracts import ThinkingLevel
+from koda_tui.thinking import find_model, supported_thinking_options
 
 if TYPE_CHECKING:
-    from koda_common.contracts import KodaBackend
+    from koda_common.contracts import KodaBackend, ThinkingOptionId
     from koda_common.settings import SettingsManager
     from koda_tui.app.application import KodaTuiApp
 
@@ -71,37 +71,22 @@ def _handle_palette_toggle(app: KodaTuiApp) -> None:
     app.toggle_palette()
 
 
-def _get_cycle_thinking_levels(
+def _get_cycle_thinking_options(
     backend: KodaBackend,
     settings: SettingsManager,
-) -> list[ThinkingLevel]:
-    active_model = next(
-        (
-            model
-            for model in backend.list_models(settings.provider)
-            if model.provider == settings.provider and model.id == settings.model
-        ),
-        None,
+) -> list[ThinkingOptionId]:
+    active_model = find_model(
+        backend.list_models(settings.provider),
+        provider=settings.provider,
+        model_id=settings.model,
     )
-    if active_model is None:
-        return [ThinkingLevel.NONE]
-
-    thinking_order = [
-        ThinkingLevel.NONE,
-        ThinkingLevel.MINIMAL,
-        ThinkingLevel.LOW,
-        ThinkingLevel.MEDIUM,
-        ThinkingLevel.HIGH,
-        ThinkingLevel.XHIGH,
-    ]
-    supported = set(active_model.thinking)
-    return [level for level in thinking_order if level in supported]
+    return [option.id for option in supported_thinking_options(active_model)]
 
 
 def _handle_cycle_thinking(app: KodaTuiApp) -> None:
     """Cycle through supported thinking levels."""
-    levels = _get_cycle_thinking_levels(app.backend, app.settings)
-    result = app.cycle_thinking(levels)
+    options = _get_cycle_thinking_options(app.backend, app.settings)
+    result = app.cycle_thinking(options)
     if result.ok:
         app.invalidate()
 

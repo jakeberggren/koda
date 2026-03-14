@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from openai import AsyncOpenAI, Omit, omit
 from openai.types.chat import ChatCompletion
@@ -26,10 +26,9 @@ from koda.llm.exceptions import (
     LLMAuthenticationError,
     UnknownMessageTypeError,
 )
-from koda.llm.models import ModelDefinition
+from koda.llm.models import ModelDefinition, ThinkingOption
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.providers.base import LLMProviderBase
-from koda.llm.types import ThinkingLevel
 from koda.llm.utils import resolve_openai_client
 from koda.messages import AssistantMessage, Message, ToolMessage, UserMessage
 from koda.tools import ToolCall, ToolDefinition
@@ -37,42 +36,49 @@ from koda.tools import ToolCall, ToolDefinition
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
+    from openai.types.chat.completion_create_params import ReasoningEffort
+
+    from koda.llm.models import ThinkingOptionId
     from koda.llm.registry import ModelRegistry
     from koda.llm.types import LLMRequest, LLMResponse
     from koda_common.settings import SettingsManager
 
 BERGETAI_BASE_URL = "https://api.berget.ai/v1"
 
+_BERGETAI_THINKING_OFF = [
+    ThinkingOption(id="none", label="Off", description="No interleaved thinking.")
+]
+
 BERGETAI_MODELS: Sequence[ModelDefinition] = [
     ModelDefinition(
         id="zai-org/GLM-4.7",
         name="GLM-4.7",
         provider="bergetai",
-        thinking={ThinkingLevel.NONE},
+        thinking_options=_BERGETAI_THINKING_OFF,
     ),
     ModelDefinition(
         id="openai/gpt-oss-120b",
         name="gpt-oss-120b",
         provider="bergetai",
-        thinking={ThinkingLevel.NONE},
+        thinking_options=_BERGETAI_THINKING_OFF,
     ),
     ModelDefinition(
         id="mistralai/Mistral-Small-3.2-24B-Instruct-2506",
         name="Mistral-Small-3.2-24B-Instruct-2506",
         provider="bergetai",
-        thinking=set(),
+        thinking_options=[],
     ),
     ModelDefinition(
         id="meta-llama/Llama-3.1-8B-Instruct",
         name="Llama-3.1-8B-Instruct",
         provider="bergetai",
-        thinking=set(),
+        thinking_options=[],
     ),
     ModelDefinition(
         id="meta-llama/Llama-3.3-70B-Instruct",
         name="Llama-3.3-70B-Instruct",
         provider="bergetai",
-        thinking=set(),
+        thinking_options=[],
     ),
 ]
 
@@ -242,6 +248,12 @@ class BergetAILLMProviderConfig:
 class BergetAILLMProvider(LLMProviderBase):
     provider_name: str = "bergetai"
 
+    @staticmethod
+    def _resolve_reasoning(reasoning: ThinkingOptionId) -> ReasoningEffort | Omit:
+        if reasoning == "none":
+            return omit
+        return cast("ReasoningEffort", reasoning)
+
     def __init__(
         self,
         driver: CompletionsDriver,
@@ -272,6 +284,7 @@ class BergetAILLMProvider(LLMProviderBase):
         driver = CompletionsDriver(
             config=driver_config,
             adapter=BergetAICompletionsAdapter(),
+            reasoning_resolver=cls._resolve_reasoning,
             client_factory=client_factory,
         )
         return cls(

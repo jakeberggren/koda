@@ -22,7 +22,6 @@ from pydantic import BaseModel
 
 from koda.llm import LLMEvent, LLMResponse, LLMTokenUsage
 from koda.llm.exceptions import StructuredOutputNotSupportedError
-from koda.llm.models import ThinkingLevel
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponseCompleted,
@@ -42,12 +41,15 @@ if TYPE_CHECKING:
 
     from openai.types.shared_params.reasoning import Reasoning
 
+    from koda.llm.models import ThinkingOptionId
     from koda.llm.types import LLMRequest
 
 
 logger = get_logger(__name__)
 
 type ResponsesAdapter = LLMAdapter[ResponseInputParam, list[ToolParam] | Omit, Response]
+type OpenAIClientFactory = Callable[..., AsyncOpenAI]
+type ResponsesReasoningResolver = Callable[[ThinkingOptionId], Reasoning | Omit]
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,10 +82,12 @@ class ResponsesDriver(LLM):
         config: ResponsesDriverConfig,
         *,
         adapter: ResponsesAdapter,
-        client_factory: Callable[..., AsyncOpenAI] = AsyncOpenAI,
+        reasoning_resolver: ResponsesReasoningResolver,
+        client_factory: OpenAIClientFactory = AsyncOpenAI,
     ) -> None:
         self.config: ResponsesDriverConfig = config
         self.adapter: ResponsesAdapter = adapter
+        self.reasoning_resolver = reasoning_resolver
         self.client: AsyncOpenAI = client_factory(api_key=config.api_key, base_url=config.base_url)
 
     @staticmethod
@@ -94,12 +98,6 @@ class ResponsesDriver(LLM):
         self, *, extended_prompt_retention: bool
     ) -> Literal["24h"] | Omit:
         return self._to_omit("24h" if extended_prompt_retention else None)
-
-    @staticmethod
-    def _resolve_reasoning(*, reasoning: ThinkingLevel) -> Reasoning | Omit:
-        if reasoning is ThinkingLevel.NONE:
-            return omit
-        return {"effort": reasoning.value, "summary": "auto"}
 
     def _resolve_create_params(self, request: LLMRequest) -> _CreateParams:
         return _CreateParams(
@@ -112,7 +110,7 @@ class ResponsesDriver(LLM):
             prompt_cache_retention=self._resolve_prompt_cache_retention(
                 extended_prompt_retention=request.options.extended_prompt_retention
             ),
-            reasoning=self._resolve_reasoning(reasoning=request.options.thinking),
+            reasoning=self.reasoning_resolver(request.options.thinking),
             temperature=self._to_omit(request.options.temperature),
             tools=self._resolve_tools(request),
             top_logprobs=self._to_omit(request.options.top_logprobs),

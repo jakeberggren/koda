@@ -1,5 +1,5 @@
 from koda.llm.models import ModelDefinition as CoreModelDefinition
-from koda_common.contracts import ModelCapability, ModelDefinition, ThinkingLevel
+from koda_common.contracts import ModelCapability, ModelDefinition, ThinkingOption
 
 
 def map_model_definition_to_contract_model_definition(
@@ -10,6 +10,13 @@ def map_model_definition_to_contract_model_definition(
         id=core_model.id,
         name=core_model.name,
         provider=core_model.provider,
-        thinking={ThinkingLevel(level.value) for level in core_model.thinking},
+        thinking_options=[
+            ThinkingOption(
+                id=option.id,
+                label=option.label,
+                description=option.description,
+            )
+            for option in core_model.thinking_options
+        ],
         capabilities={ModelCapability(capability.value) for capability in core_model.capabilities},
     )

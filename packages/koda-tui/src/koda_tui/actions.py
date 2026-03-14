@@ -7,23 +7,28 @@ from koda_common.contracts import (
     BackendNoActiveSessionError,
     BackendSessionNotFoundError,
     KodaBackend,
-    ThinkingLevel,
+    ModelDefinition,
+    ThinkingOptionId,
 )
 from koda_tui.converters import convert_messages
+from koda_tui.thinking import normalize_thinking_option, supported_thinking_options
 
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from koda_common.contracts import ModelDefinition
     from koda_tui.state import AppState
 
 
 class ModelSelectionSettings(Protocol):
+    provider: str
+    model: str
+    thinking: ThinkingOptionId
+
     def update(self, **changes: object) -> None: ...
 
 
 class ThinkingSettings(Protocol):
-    thinking: ThinkingLevel
+    thinking: ThinkingOptionId
 
     def set(self, name: str, value: object) -> None: ...
 
@@ -99,23 +104,32 @@ def delete_session(
         return ActionResult(ok=False, error="Session not found")
 
 
-# --- Model actions ---
-
-
 def select_model(
+    current_model: ModelDefinition | None,
     model: ModelDefinition,
     settings: ModelSelectionSettings,
 ) -> ActionResult[None]:
     """Select an active model/provider pair in settings."""
     try:
-        settings.update(provider=model.provider, model=model.id)
+        changes: dict[str, object] = {
+            "provider": model.provider,
+            "model": model.id,
+        }
+        normalized_thinking = normalize_thinking_option(
+            settings.thinking,
+            current_options=supported_thinking_options(current_model),
+            new_options=supported_thinking_options(model),
+        )
+        if normalized_thinking != settings.thinking:
+            changes["thinking"] = normalized_thinking
+        settings.update(**changes)
         return ActionResult(ok=True)
     except ValueError:
         return ActionResult(ok=False, error="Invalid model selection")
 
 
 def set_thinking(
-    thinking: ThinkingLevel,
+    thinking: ThinkingOptionId,
     settings: ThinkingSettings,
 ) -> ActionResult[None]:
     """Set model thinking effort."""
@@ -124,18 +138,18 @@ def set_thinking(
 
 
 def cycle_thinking(
-    levels: list[ThinkingLevel],
+    options: list[ThinkingOptionId],
     settings: ThinkingSettings,
-) -> ActionResult[ThinkingLevel]:
+) -> ActionResult[ThinkingOptionId]:
     """Cycle to the next supported thinking level."""
-    if not levels:
+    if not options:
         return ActionResult(ok=False, error="No supported thinking levels")
 
     try:
-        current_index = levels.index(settings.thinking)
+        current_index = options.index(settings.thinking)
     except ValueError:
         current_index = -1
-    next_level = levels[(current_index + 1) % len(levels)]
+    next_level = options[(current_index + 1) % len(options)]
     settings.set("thinking", next_level)
     return ActionResult(ok=True, payload=next_level)
 

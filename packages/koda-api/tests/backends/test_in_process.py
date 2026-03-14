@@ -10,7 +10,7 @@ import pytest
 
 from koda.llm.exceptions import LLMAuthenticationError
 from koda.llm.models import ModelDefinition as CoreModelDefinition
-from koda.llm.models import ThinkingLevel
+from koda.llm.models import ThinkingOption
 from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.llm.types import LLMTextDelta as CoreTextDelta
 from koda.messages import AssistantMessage as CoreAssistantMessage
@@ -183,7 +183,13 @@ def test_list_models_maps_contract_models(monkeypatch: pytest.MonkeyPatch) -> No
         id="gpt-5.2",
         name="GPT 5.2",
         provider="openai",
-        thinking={ThinkingLevel.HIGH},
+        thinking_options=[
+            ThinkingOption(
+                id="high",
+                label="High",
+                description="High effort for complex tasks.",
+            )
+        ],
     )
     fake_model_registry = ModelRegistry()
     monkeypatch.setattr(fake_model_registry, "supported", lambda _provider=None: [core_model])
@@ -202,7 +208,7 @@ def test_list_models_maps_contract_models(monkeypatch: pytest.MonkeyPatch) -> No
 
     assert len(models) == 1
     assert models[0].id == "gpt-5.2"
-    assert models[0].thinking
+    assert models[0].thinking_options
 
 
 def test_list_sessions_filters_empty_sessions() -> None:

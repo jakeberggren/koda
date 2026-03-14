@@ -3,73 +3,48 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from koda_common.contracts import ThinkingLevel
 from koda_common.logging import get_logger
 from koda_tui import actions
+from koda_tui.thinking import find_model, supported_thinking_options
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
-    from koda_common.contracts import KodaBackend
+    from koda_common.contracts import KodaBackend, ThinkingOption
     from koda_common.settings import SettingsManager
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 log = get_logger(__name__)
 
-_THINKING_LABELS: dict[ThinkingLevel, str] = {
-    ThinkingLevel.NONE: "None",
-    ThinkingLevel.MINIMAL: "Minimal",
-    ThinkingLevel.LOW: "Low",
-    ThinkingLevel.MEDIUM: "Medium",
-    ThinkingLevel.HIGH: "High",
-    ThinkingLevel.XHIGH: "XHigh",
-}
 
-_THINKING_ORDER = [
-    ThinkingLevel.NONE,
-    ThinkingLevel.MINIMAL,
-    ThinkingLevel.LOW,
-    ThinkingLevel.MEDIUM,
-    ThinkingLevel.HIGH,
-    ThinkingLevel.XHIGH,
-]
-
-
-def _format_label(level: ThinkingLevel, settings: SettingsManager) -> str:
-    label = _THINKING_LABELS[level]
-    if settings.thinking is level:
+def _format_label(option: ThinkingOption, settings: SettingsManager) -> str:
+    label = option.label
+    if settings.thinking == option.id:
         label += " [active]"
     return label
 
 
 def _set_thinking(
-    level: ThinkingLevel,
+    option: ThinkingOption,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> None:
-    result = actions.set_thinking(level, settings)
+    result = actions.set_thinking(option.id, settings)
     if not result.ok:
-        log.warning("cmd_set_thinking_failed", thinking=level.value, error=result.error)
+        log.warning("cmd_set_thinking_failed", thinking=option.id, error=result.error)
         return
     palette_manager.close_all()
 
 
-def _get_supported_thinking_levels(
+def _get_supported_thinking_options(
     backend: KodaBackend,
     settings: SettingsManager,
-) -> list[ThinkingLevel]:
-    active_model = next(
-        (
-            model
-            for model in backend.list_models(settings.provider)
-            if model.provider == settings.provider and model.id == settings.model
-        ),
-        None,
+) -> list[ThinkingOption]:
+    active_model = find_model(
+        backend.list_models(settings.provider),
+        provider=settings.provider,
+        model_id=settings.model,
     )
-    if active_model is None:
-        return [ThinkingLevel.NONE]
-
-    supported = set(active_model.thinking)
-    return [level for level in _THINKING_ORDER if level in supported]
+    return supported_thinking_options(active_model)
 
 
 def get_commands(
@@ -79,9 +54,9 @@ def get_commands(
 ) -> list[Command]:
     return [
         Command(
-            label=_format_label(level, settings),
-            handler=partial(_set_thinking, level, settings, palette_manager),
-            description="Select model reasoning effort",
+            label=_format_label(option, settings),
+            handler=partial(_set_thinking, option, settings, palette_manager),
+            description=option.description or "Select model reasoning effort",
         )
-        for level in _get_supported_thinking_levels(backend, settings)
+        for option in _get_supported_thinking_options(backend, settings)
     ]

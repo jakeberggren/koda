@@ -18,7 +18,6 @@ from koda.llm.exceptions import (
     InvalidToolCallArgumentsError,
     StructuredOutputNotSupportedError,
 )
-from koda.llm.models import ThinkingLevel
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponseCompleted,
@@ -40,6 +39,7 @@ if TYPE_CHECKING:
     from openai.types.chat.completion_create_params import ReasoningEffort
     from openai.types.completion_usage import CompletionUsage
 
+    from koda.llm.models import ThinkingOptionId
     from koda.llm.types import LLMRequest
 
 
@@ -48,6 +48,8 @@ type CompletionsAdapter = LLMAdapter[
     list[ChatCompletionToolUnionParam] | Omit,
     ChatCompletion,
 ]
+type OpenAIClientFactory = Callable[..., AsyncOpenAI]
+type CompletionsReasoningResolver = Callable[[ThinkingOptionId], ReasoningEffort | Omit]
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,10 +121,12 @@ class CompletionsDriver(LLM):
         config: CompletionsDriverConfig,
         *,
         adapter: CompletionsAdapter,
-        client_factory: Callable[..., AsyncOpenAI] = AsyncOpenAI,
+        reasoning_resolver: CompletionsReasoningResolver,
+        client_factory: OpenAIClientFactory = AsyncOpenAI,
     ) -> None:
         self.config: CompletionsDriverConfig = config
         self.adapter: CompletionsAdapter = adapter
+        self.reasoning_resolver = reasoning_resolver
         self.client: AsyncOpenAI = client_factory(api_key=config.api_key, base_url=config.base_url)
 
     @staticmethod
@@ -147,12 +151,6 @@ class CompletionsDriver(LLM):
     def _resolve_logprobs(*, top_logprobs: int | None) -> bool | Omit:
         return True if top_logprobs is not None else omit
 
-    @staticmethod
-    def _resolve_reasoning(*, reasoning: ThinkingLevel) -> ReasoningEffort | Omit:
-        if reasoning is ThinkingLevel.NONE:
-            return omit
-        return reasoning.value
-
     def _resolve_create_params(self, request: LLMRequest) -> _CreateParams:
         return _CreateParams(
             logprobs=self._resolve_logprobs(top_logprobs=request.options.top_logprobs),
@@ -163,7 +161,7 @@ class CompletionsDriver(LLM):
             prompt_cache_retention=self._resolve_prompt_cache_retention(
                 extended_prompt_retention=request.options.extended_prompt_retention
             ),
-            reasoning=self._resolve_reasoning(reasoning=request.options.thinking),
+            reasoning=self.reasoning_resolver(request.options.thinking),
             temperature=self._to_omit(request.options.temperature),
             tools=self.adapter.to_provider_tools(request.tools),
             top_logprobs=self._to_omit(request.options.top_logprobs),

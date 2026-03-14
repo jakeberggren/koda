@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 from unittest.mock import Mock
 from uuid import uuid4
 
@@ -9,7 +10,8 @@ from koda_common.contracts import (
     BackendSessionNotFoundError,
     ModelDefinition,
     SessionInfo,
-    ThinkingLevel,
+    ThinkingOption,
+    ThinkingOptionId,
     UserMessage,
 )
 from koda_tui.actions import (
@@ -141,9 +143,21 @@ def test_delete_session_not_found_returns_error() -> None:
 
 
 class _ModelSettings:
-    def __init__(self, provider: str, model: str, fail_model_id: str | None = None) -> None:
+    provider: str
+    model: str
+    thinking: ThinkingOptionId
+
+    def __init__(
+        self,
+        provider: str,
+        model: str,
+        *,
+        thinking: ThinkingOptionId = "none",
+        fail_model_id: str | None = None,
+    ) -> None:
         self.provider = provider
         self.model = model
+        self.thinking = thinking
         self._fail_model_id = fail_model_id
         self.update_calls: list[dict[str, object]] = []
 
@@ -154,13 +168,15 @@ class _ModelSettings:
             raise ValueError("invalid model")
         self.provider = str(changes["provider"])
         self.model = model
+        if "thinking" in changes:
+            self.thinking = cast("ThinkingOptionId", changes["thinking"])
 
 
 def test_select_model_success_updates_settings() -> None:
     settings = _ModelSettings(provider="openai", model="gpt-5")
     model = ModelDefinition(id="gpt-5.2", name="GPT 5.2", provider="openai")
 
-    result = select_model(model, settings)
+    result = select_model(None, model, settings)
 
     assert result.ok is True
     assert settings.update_calls == [{"provider": "openai", "model": "gpt-5.2"}]
@@ -168,11 +184,98 @@ def test_select_model_success_updates_settings() -> None:
     assert settings.model == "gpt-5.2"
 
 
+def test_select_model_clamps_unsupported_thinking_level() -> None:
+    settings = _ModelSettings(
+        provider="openai",
+        model="gpt-5.4",
+        thinking="xhigh",
+    )
+    current_model = ModelDefinition(
+        id="gpt-5.4",
+        name="GPT 5.4",
+        provider="openai",
+        thinking_options=[
+            ThinkingOption(id="none", label="none"),
+            ThinkingOption(id="minimal", label="minimal"),
+            ThinkingOption(id="low", label="low"),
+            ThinkingOption(id="medium", label="medium"),
+            ThinkingOption(id="high", label="high"),
+            ThinkingOption(id="xhigh", label="xhigh"),
+        ],
+    )
+    model = ModelDefinition(
+        id="gpt-5",
+        name="GPT 5",
+        provider="openai",
+        thinking_options=[
+            ThinkingOption(id="none", label="none"),
+            ThinkingOption(id="low", label="low"),
+            ThinkingOption(id="medium", label="medium"),
+            ThinkingOption(id="high", label="high"),
+        ],
+    )
+
+    result = select_model(current_model, model, settings)
+
+    assert result.ok is True
+    assert settings.update_calls == [
+        {
+            "provider": "openai",
+            "model": "gpt-5",
+            "thinking": "high",
+        }
+    ]
+    assert settings.thinking == "high"
+
+
+def test_select_model_resets_thinking_when_model_supports_none_only() -> None:
+    settings = _ModelSettings(
+        provider="openai",
+        model="gpt-5.4",
+        thinking="xhigh",
+    )
+    current_model = ModelDefinition(
+        id="gpt-5.4",
+        name="GPT 5.4",
+        provider="openai",
+        thinking_options=[
+            ThinkingOption(id="none", label="none"),
+            ThinkingOption(id="minimal", label="minimal"),
+            ThinkingOption(id="low", label="low"),
+            ThinkingOption(id="medium", label="medium"),
+            ThinkingOption(id="high", label="high"),
+            ThinkingOption(id="xhigh", label="xhigh"),
+        ],
+    )
+    model = ModelDefinition(
+        id="zai-org/GLM-4.7",
+        name="GLM-4.7",
+        provider="bergetai",
+        thinking_options=[ThinkingOption(id="none", label="none")],
+    )
+
+    result = select_model(current_model, model, settings)
+
+    assert result.ok is True
+    assert settings.update_calls == [
+        {
+            "provider": "bergetai",
+            "model": "zai-org/GLM-4.7",
+            "thinking": "none",
+        }
+    ]
+    assert settings.thinking == "none"
+
+
 def test_select_model_invalid_rolls_back_settings() -> None:
-    settings = _ModelSettings(provider="openai", model="gpt-5", fail_model_id="invalid-model")
+    settings = _ModelSettings(
+        provider="openai",
+        model="gpt-5",
+        fail_model_id="invalid-model",
+    )
     model = ModelDefinition(id="invalid-model", name="Broken", provider="bergetai")
 
-    result = select_model(model, settings)
+    result = select_model(None, model, settings)
 
     assert result.ok is False
     assert result.error == "Invalid model selection"
@@ -194,7 +297,9 @@ class _AppearanceSettings:
 
 
 class _ThinkingSettings:
-    def __init__(self, thinking: ThinkingLevel) -> None:
+    thinking: ThinkingOptionId
+
+    def __init__(self, thinking: ThinkingOptionId) -> None:
         self.thinking = thinking
         self.set_calls: list[tuple[str, object]] = []
 
@@ -234,26 +339,26 @@ def test_toggle_queue_inputs_flips_value() -> None:
 
 
 def test_set_thinking_updates_setting() -> None:
-    settings = _ThinkingSettings(ThinkingLevel.NONE)
+    settings = _ThinkingSettings("none")
 
-    result = set_thinking(ThinkingLevel.HIGH, settings)
+    result = set_thinking("high", settings)
 
     assert result.ok is True
-    assert settings.set_calls == [("thinking", ThinkingLevel.HIGH)]
-    assert settings.thinking is ThinkingLevel.HIGH
+    assert settings.set_calls == [("thinking", "high")]
+    assert settings.thinking == "high"
 
 
 def test_cycle_thinking_advances_to_next_supported_level() -> None:
-    settings = _ThinkingSettings(ThinkingLevel.LOW)
+    settings = _ThinkingSettings("low")
 
     result = cycle_thinking(
-        [ThinkingLevel.NONE, ThinkingLevel.LOW, ThinkingLevel.MEDIUM],
+        ["none", "low", "medium"],
         settings,
     )
 
     assert result.ok is True
-    assert result.payload is ThinkingLevel.MEDIUM
-    assert settings.set_calls == [("thinking", ThinkingLevel.MEDIUM)]
+    assert result.payload == "medium"
+    assert settings.set_calls == [("thinking", "medium")]
 
 
 class _ProviderSettings:
