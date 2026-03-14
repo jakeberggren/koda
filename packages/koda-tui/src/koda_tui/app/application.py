@@ -11,10 +11,10 @@ from koda_tui.app.output import SynchronizedOutput
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
 from koda_tui.state import AppState
-from koda_tui.thinking import find_model, resolve_thinking_option
 from koda_tui.ui.layout import TUILayout
 from koda_tui.ui.palette import PaletteManager
 from koda_tui.ui.styles import get_style
+from koda_tui.utils.model_selection import find_model, resolve_thinking_option
 
 if TYPE_CHECKING:
     from koda_api.backends import KodaBackend

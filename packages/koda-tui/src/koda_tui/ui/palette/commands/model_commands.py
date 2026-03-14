@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
 from koda_tui import actions
-from koda_tui.thinking import find_model
 from koda_tui.ui.palette.commands.command import Command
+from koda_tui.utils.model_selection import find_model
 
 if TYPE_CHECKING:
     from koda_common.contracts import KodaBackend, ModelDefinition
