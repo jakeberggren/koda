@@ -11,34 +11,33 @@
 </pre>
 </div>
 
-koda-tui is the terminal interface for Koda, focused on a simple chat loop, streaming responses, and rich rendering
-for code and tool output. It sits on top of the core agent package and provides the interactive experience.
+koda-tui is the terminal interface for Koda. It owns the interactive chat experience,
+streams service events into UI state, and renders model/tool output in the terminal.
+It sits on top of `koda-service`, which provides the in-process runtime used today.
 
 ## Core Components
 
-- **prompt_toolkit** for the application loop, layouts, and keybindings.
-- **Rich** for markdown/code rendering, diffs, and styled output.
-- **Async streaming** pipelines that update shared UI state as events arrive.
-- **Backend abstraction** to swap between local and mock backends.
+- **prompt_toolkit** for the application loop, layouts, dialogs, and keybindings.
+- **Rich** for markdown, code, diffs, and styled output rendering.
+- **Streaming coordination** for turning service events into incremental UI updates.
+- **Command palette flows** for model selection, session management, thinking controls, and API key entry.
 
 ## Project Structure
 
-```
+```text
 packages/koda-tui/
 ├── src/koda_tui/
 │   ├── app/
-│   │   ├── application.py      # App entrypoint
+│   │   ├── application.py      # App entrypoint and orchestration
 │   │   ├── keybindings.py      # Keyboard shortcuts
-│   │   ├── output.py           # Synchronized Output
-│   │   └── __init__.py
-│   ├── clients/
-│   │   ├── base.py             # Client interface
-│   │   ├── local.py            # Local client wrapper
-│   │   ├── mock.py             # Mock client
-│   │   └── __init__.py
+│   │   ├── output.py           # Synchronized terminal output
+│   │   ├── queue.py            # Queued input handling
+│   │   ├── response.py         # Response lifecycle helpers
+│   │   └── streaming.py        # Stream event processing
 │   ├── components/
 │   │   ├── chat_area.py        # Chat transcript view
 │   │   ├── input_area.py       # Prompt input widget
+│   │   ├── queued_inputs.py    # Queued input display
 │   │   ├── status_bar.py       # Status/footer UI
 │   │   └── __init__.py
 │   ├── rendering/
@@ -47,9 +46,11 @@ packages/koda-tui/
 │   ├── ui/
 │   │   ├── layout.py           # Layout composition
 │   │   ├── styles.py           # Prompt_toolkit styles
-│   │   └── palette/            # Command Palette UI and Management
-│   ├── __main__.py             # Module entrypoint
+│   │   └── palette/            # Command palette, dialogs, and palette commands
+│   ├── actions.py              # TUI actions backed by the service layer
+│   ├── converters.py           # Service DTO -> TUI state conversion
 │   ├── state.py                # Shared TUI state
+│   ├── __main__.py             # Module entrypoint
 │   └── __init__.py
 └── tests/
 ```
