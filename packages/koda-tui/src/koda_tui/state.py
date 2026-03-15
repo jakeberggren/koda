@@ -13,6 +13,15 @@ class MessageRole(Enum):
     TOOL = auto()
 
 
+class ResponsePhase(Enum):
+    """Current phase of an in-flight response."""
+
+    IDLE = auto()
+    WORKING = auto()
+    RESPONDING = auto()
+    TOOLS = auto()
+
+
 @dataclass
 class Message:
     """A single message in the chat history."""
@@ -36,6 +45,8 @@ class AppState:
     current_streaming_content: str = ""
     current_thinking_content: str = ""
     is_streaming: bool = False
+    is_thinking: bool = False
+    response_phase: ResponsePhase = ResponsePhase.IDLE
     active_tools: dict[str, ToolCall] = field(default_factory=dict)
     pending_inputs: list[str] = field(default_factory=list)
     model_name: str = ""
@@ -55,4 +66,6 @@ class AppState:
         self.current_streaming_content = ""
         self.current_thinking_content = ""
         self.is_streaming = False
+        self.is_thinking = False
+        self.response_phase = ResponsePhase.IDLE
         self.active_tools.clear()

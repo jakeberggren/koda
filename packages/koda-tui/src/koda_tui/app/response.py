@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_tui.state import Message, MessageRole
+from koda_tui.state import AppState, Message, MessageRole, ResponsePhase
 
 if TYPE_CHECKING:
     from koda_service.types import ToolCall
-    from koda_tui.state import AppState
 
 
 class ResponseLifecycle:
@@ -20,21 +19,34 @@ class ResponseLifecycle:
         self._state.exit_requested = False
         self._state.messages.append(Message(role=MessageRole.USER, content=user_message))
         self._state.is_streaming = True
+        self._state.is_thinking = False
         self._state.current_streaming_content = ""
         self._state.current_thinking_content = ""
+        self._state.response_phase = ResponsePhase.WORKING
 
     def append_content(self, text: str) -> None:
         """Append text to current streaming content."""
         self._state.current_streaming_content += text
+        self._state.is_thinking = False
+        self._state.response_phase = ResponsePhase.RESPONDING
 
     def append_thinking(self, text: str) -> None:
         """Append text to current streaming thinking content."""
         self._state.current_thinking_content += text
+        self._state.is_thinking = True
+        if self._state.response_phase is not ResponsePhase.TOOLS:
+            self._state.response_phase = ResponsePhase.WORKING
 
     def transition_to_tool(self, tool_call: ToolCall) -> None:
         """Transition from streaming content to tool execution."""
         self._finalize_content()
+        self._state.is_thinking = False
+        if tool_call.call_id in self._state.active_tools:
+            self._state.response_phase = ResponsePhase.TOOLS
+            return
+
         self._state.active_tools[tool_call.call_id] = tool_call
+        self._state.response_phase = ResponsePhase.TOOLS
         self._state.messages.append(
             Message(
                 role=MessageRole.TOOL,
@@ -66,6 +78,9 @@ class ResponseLifecycle:
                 message.tool_result_display = display or (error_message if is_error else None)
                 break
 
+        self._state.active_tools.pop(call_id, None)
+        self._set_phase_after_tool_completion()
+
     def end(self) -> None:
         """End the response cycle."""
         self._finalize_content()
@@ -75,8 +90,10 @@ class ResponseLifecycle:
         self._state.active_tools.clear()
 
         self._state.is_streaming = False
+        self._state.is_thinking = False
         self._state.current_streaming_content = ""
         self._state.current_thinking_content = ""
+        self._state.response_phase = ResponsePhase.IDLE
 
     def _finalize_content(self) -> None:
         """Save any pending streaming content as an assistant message."""
@@ -90,3 +107,20 @@ class ResponseLifecycle:
             )
             self._state.current_streaming_content = ""
             self._state.current_thinking_content = ""
+
+    def _set_phase_after_tool_completion(self) -> None:
+        """Update phase after a tool completes based on remaining in-flight state."""
+        if self._state.active_tools:
+            self._state.response_phase = ResponsePhase.TOOLS
+        elif self._state.current_streaming_content:
+            self._state.is_thinking = False
+            self._state.response_phase = ResponsePhase.RESPONDING
+        elif self._state.current_thinking_content:
+            self._state.is_thinking = True
+            self._state.response_phase = ResponsePhase.WORKING
+        elif self._state.is_streaming:
+            self._state.is_thinking = False
+            self._state.response_phase = ResponsePhase.WORKING
+        else:
+            self._state.is_thinking = False
+            self._state.response_phase = ResponsePhase.IDLE
