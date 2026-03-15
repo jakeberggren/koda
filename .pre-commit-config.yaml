@@ -66,14 +66,6 @@ repos:
         stages: [pre-push]
         pass_filenames: false
 
-      - id: pytest-koda-api # unit tests for koda-api (pre-push)
-        name: pytest koda-api
-        entry: uv run pytest packages/koda-api
-        language: system
-        files: ^packages/koda-api/
-        stages: [pre-push]
-        pass_filenames: false
-
       - id: pytest-koda-tui # unit tests for koda-tui (pre-push)
         name: pytest koda-tui
         entry: uv run pytest packages/koda-tui
@@ -87,6 +79,14 @@ repos:
         entry: uv run pytest packages/koda-common
         language: system
         files: ^packages/koda-common/
+        stages: [pre-push]
+        pass_filenames: false
+
+      - id: pytest-koda-service # unit tests for koda-service (pre-push)
+        name: pytest koda-service
+        entry: uv run pytest packages/koda-service
+        language: system
+        files: ^packages/koda-service/
         stages: [pre-push]
         pass_filenames: false
 
