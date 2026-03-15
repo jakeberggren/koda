@@ -9,8 +9,9 @@ from prompt_toolkit.keys import Keys
 from koda_tui.utils.model_selection import find_model, supported_thinking_options
 
 if TYPE_CHECKING:
-    from koda_common.contracts import KodaBackend, ThinkingOptionId
     from koda_common.settings import SettingsManager
+    from koda_service import KodaService
+    from koda_service.types import ThinkingOptionId
     from koda_tui.app.application import KodaTuiApp
 
 
@@ -72,11 +73,11 @@ def _handle_palette_toggle(app: KodaTuiApp) -> None:
 
 
 def _get_cycle_thinking_options(
-    backend: KodaBackend,
+    service: KodaService,
     settings: SettingsManager,
 ) -> list[ThinkingOptionId]:
     active_model = find_model(
-        backend.list_models(settings.provider),
+        service.list_models(settings.provider),
         provider=settings.provider,
         model_id=settings.model,
     )
@@ -85,7 +86,7 @@ def _get_cycle_thinking_options(
 
 def _handle_cycle_thinking(app: KodaTuiApp) -> None:
     """Cycle through supported thinking levels."""
-    options = _get_cycle_thinking_options(app.backend, app.settings)
+    options = _get_cycle_thinking_options(app.service, app.settings)
     result = app.cycle_thinking(options)
     if result.ok:
         app.invalidate()

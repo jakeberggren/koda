@@ -1,6 +1,6 @@
 """Tests for koda_tui.converters.convert_messages."""
 
-from koda_common.contracts import (
+from koda_service.types import (
     AssistantMessage,
     SystemMessage,
     ToolCall,

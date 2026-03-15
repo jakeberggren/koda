@@ -5,9 +5,8 @@ from typing import cast
 from unittest.mock import Mock
 from uuid import uuid4
 
-from koda_common.contracts import (
-    BackendNoActiveSessionError,
-    BackendSessionNotFoundError,
+from koda_service.exceptions import ServiceNoActiveSessionError, ServiceSessionNotFoundError
+from koda_service.types import (
     ModelDefinition,
     SessionInfo,
     ThinkingOption,
@@ -48,14 +47,14 @@ def _state_with_conversation() -> AppState:
 
 def test_new_session_success_resets_state() -> None:
     state = _state_with_conversation()
-    backend = Mock(spec=["new_session"])
-    backend.new_session.return_value = _session_info()
+    service = Mock(spec=["new_session"])
+    service.new_session.return_value = _session_info()
 
-    result = new_session(backend, state)
+    result = new_session(service, state)
 
     assert result.ok is True
     assert result.error is None
-    backend.new_session.assert_called_once_with()
+    service.new_session.assert_called_once_with()
     assert state.messages == []
     assert state.current_streaming_content == ""
     assert state.is_streaming is False
@@ -63,10 +62,10 @@ def test_new_session_success_resets_state() -> None:
 
 def test_new_session_returns_error_when_no_active_session() -> None:
     state = _state_with_conversation()
-    backend = Mock(spec=["new_session"])
-    backend.new_session.side_effect = BackendNoActiveSessionError
+    service = Mock(spec=["new_session"])
+    service.new_session.side_effect = ServiceNoActiveSessionError
 
-    result = new_session(backend, state)
+    result = new_session(service, state)
 
     assert result.ok is False
     assert result.error == "No active session available"
@@ -75,14 +74,14 @@ def test_new_session_returns_error_when_no_active_session() -> None:
 
 def test_switch_session_success_converts_messages() -> None:
     state = _state_with_conversation()
-    backend = Mock(spec=["switch_session"])
-    backend.switch_session.return_value = (_session_info(), [UserMessage(content="hello")])
+    service = Mock(spec=["switch_session"])
+    service.switch_session.return_value = (_session_info(), [UserMessage(content="hello")])
     session_id = uuid4()
 
-    result = switch_session(session_id, backend, state)
+    result = switch_session(session_id, service, state)
 
     assert result.ok is True
-    backend.switch_session.assert_called_once_with(session_id)
+    service.switch_session.assert_called_once_with(session_id)
     assert len(state.messages) == 1
     assert state.messages[0].role == MessageRole.USER
     assert state.messages[0].content == "hello"
@@ -90,10 +89,10 @@ def test_switch_session_success_converts_messages() -> None:
 
 def test_switch_session_not_found_returns_error() -> None:
     state = _state_with_conversation()
-    backend = Mock(spec=["switch_session"])
-    backend.switch_session.side_effect = BackendSessionNotFoundError
+    service = Mock(spec=["switch_session"])
+    service.switch_session.side_effect = ServiceSessionNotFoundError
 
-    result = switch_session(uuid4(), backend, state)
+    result = switch_session(uuid4(), service, state)
 
     assert result.ok is False
     assert result.error == "Session not found"
@@ -104,25 +103,25 @@ def test_switch_session_not_found_returns_error() -> None:
 
 def test_delete_session_active_removed_resets_state() -> None:
     state = _state_with_conversation()
-    backend = Mock(spec=["delete_session"])
-    backend.delete_session.return_value = _session_info()
+    service = Mock(spec=["delete_session"])
+    service.delete_session.return_value = _session_info()
     session_id = uuid4()
 
-    result = delete_session(session_id, backend, state)
+    result = delete_session(session_id, service, state)
 
     assert result.ok is True
     assert result.payload is not None
     assert result.payload.removed_active_session is True
-    backend.delete_session.assert_called_once_with(session_id)
+    service.delete_session.assert_called_once_with(session_id)
     assert state.messages == []
 
 
 def test_delete_session_non_active_keeps_state() -> None:
     state = _state_with_conversation()
-    backend = Mock(spec=["delete_session"])
-    backend.delete_session.return_value = None
+    service = Mock(spec=["delete_session"])
+    service.delete_session.return_value = None
 
-    result = delete_session(uuid4(), backend, state)
+    result = delete_session(uuid4(), service, state)
 
     assert result.ok is True
     assert result.payload is not None
@@ -132,10 +131,10 @@ def test_delete_session_non_active_keeps_state() -> None:
 
 def test_delete_session_not_found_returns_error() -> None:
     state = _state_with_conversation()
-    backend = Mock(spec=["delete_session"])
-    backend.delete_session.side_effect = BackendSessionNotFoundError
+    service = Mock(spec=["delete_session"])
+    service.delete_session.side_effect = ServiceSessionNotFoundError
 
-    result = delete_session(uuid4(), backend, state)
+    result = delete_session(uuid4(), service, state)
 
     assert result.ok is False
     assert result.error == "Session not found"

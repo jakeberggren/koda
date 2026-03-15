@@ -1,6 +1,6 @@
 from rich.text import Text
 
-from koda_common.contracts import ToolCall
+from koda_service.types import ToolCall
 from koda_tui.rendering import MessageRenderer
 from koda_tui.state import Message, MessageRole
 

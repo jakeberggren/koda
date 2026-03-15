@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 
-from koda_common.contracts import ThinkingOption, ToolCall
+from koda_service.types import ThinkingOption, ToolCall
 
 
 class MessageRole(Enum):

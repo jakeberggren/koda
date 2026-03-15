@@ -22,8 +22,9 @@ from openai.types.chat.chat_completion_user_message_param import ChatCompletionU
 
 from koda.llm.drivers import CompletionsDriver, CompletionsDriverConfig
 from koda.llm.exceptions import (
+    ApiKeyNotConfiguredError,
+    EmptyApiKeyError,
     InvalidToolCallArgumentsError,
-    LLMAuthenticationError,
     UnknownMessageTypeError,
 )
 from koda.llm.models import ModelDefinition
@@ -264,7 +265,7 @@ class BergetAILLMProvider(LLMProviderBase):
     ) -> BergetAILLMProvider:
         api_key = config.api_key.strip()
         if not api_key:
-            raise LLMAuthenticationError(cls.provider_name, ValueError("API key cannot be empty"))
+            raise EmptyApiKeyError(cls.provider_name)
 
         model_definition = model_registry.get(cls.provider_name, config.model)
         driver_config = CompletionsDriverConfig(
@@ -294,7 +295,7 @@ def create_bergetai_llm(settings: SettingsManager, model_registry: ModelRegistry
     provider = BergetAILLMProvider.provider_name
     api_key = settings.get_api_key(provider)
     if api_key is None:
-        raise LLMAuthenticationError(provider, ValueError("API key not configured"))
+        raise ApiKeyNotConfiguredError(provider)
     config = BergetAILLMProviderConfig(api_key=api_key, model=settings.model)
     client_factory = resolve_openai_client(settings)
     return BergetAILLMProvider.from_config(

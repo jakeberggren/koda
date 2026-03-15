@@ -4,8 +4,8 @@ from unittest.mock import Mock
 
 import pytest
 
-from koda_common.contracts import ModelDefinition, ThinkingOption
 from koda_common.settings import SettingChange
+from koda_service.types import ModelDefinition, ThinkingOption
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.ui.palette.palette_manager import PaletteManager
 
@@ -35,8 +35,8 @@ def _make_settings_mock(unsubscribe: Mock) -> Mock:
 def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
     unsubscribe = Mock()
     settings = _make_settings_mock(unsubscribe)
-    backend = Mock(spec=["list_models", "reconfigure"])
-    backend.list_models.return_value = [
+    service = Mock(spec=["list_models", "reconfigure"])
+    service.list_models.return_value = [
         ModelDefinition(
             id="gpt-5.2",
             name="GPT 5.2",
@@ -44,18 +44,18 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
             thinking_options=[ThinkingOption(id="none", label="None")],
         )
     ]
-    return KodaTuiApp(settings=settings, backend=backend), settings, backend, unsubscribe
+    return KodaTuiApp(settings=settings, service=service), settings, service, unsubscribe
 
 
 def test_close_is_idempotent() -> None:
-    app, _settings, _backend, unsubscribe = _make_app()
+    app, _settings, _service, unsubscribe = _make_app()
     app.close()
     app.close()
     unsubscribe.assert_called_once_with()
 
 
 def test_batched_provider_and_model_changes_reconfigure_once() -> None:
-    app, settings, backend, _unsubscribe = _make_app()
+    app, settings, service, _unsubscribe = _make_app()
     settings.provider = "bergetai"
     settings.model = "zai-org/GLM-4.7"
     on_settings_changed = settings.subscribe.call_args.args[0]
@@ -67,14 +67,14 @@ def test_batched_provider_and_model_changes_reconfigure_once() -> None:
         )
     )
 
-    backend.reconfigure.assert_called_once_with()
+    service.reconfigure.assert_called_once_with()
     assert app.state.provider_name == "bergetai"
     assert app.state.model_name == "zai-org/GLM-4.7"
 
 
 @pytest.mark.asyncio
 async def test_run_always_closes(monkeypatch: pytest.MonkeyPatch) -> None:
-    app, _settings, _backend, unsubscribe = _make_app()
+    app, _settings, _service, unsubscribe = _make_app()
 
     class _FakeApp:
         async def run_async(self) -> None:

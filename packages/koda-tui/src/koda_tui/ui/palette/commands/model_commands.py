@@ -9,8 +9,9 @@ from koda_tui.ui.palette.commands.command import Command
 from koda_tui.utils.model_selection import find_model
 
 if TYPE_CHECKING:
-    from koda_common.contracts import KodaBackend, ModelDefinition
     from koda_common.settings import SettingsManager
+    from koda_service import KodaService
+    from koda_service.types import ModelDefinition
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 log = get_logger(__name__)
@@ -36,13 +37,13 @@ def _format_model_label(model: ModelDefinition, settings: SettingsManager) -> st
 
 def _select_model(
     model: ModelDefinition,
-    backend: KodaBackend,
+    service: KodaService,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> None:
     """Select a model and close the palette."""
     current_model = find_model(
-        backend.list_models(settings.provider),
+        service.list_models(settings.provider),
         provider=settings.provider,
         model_id=settings.model,
     )
@@ -55,17 +56,17 @@ def _select_model(
 
 
 def get_commands(
-    backend: KodaBackend,
+    service: KodaService,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> list[Command]:
     """Get commands for the model selection palette."""
-    models = backend.list_models()
+    models = service.list_models()
 
     return [
         Command(
             label=_format_model_label(model, settings),
-            handler=partial(_select_model, model, backend, settings, palette_manager),
+            handler=partial(_select_model, model, service, settings, palette_manager),
             description="",
             group=_provider_display_name(model.provider),
         )

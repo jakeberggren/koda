@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from koda_common.contracts import (
+from koda_service.types import (
     TextDelta,
     ToolCall,
     ToolCallRequested,

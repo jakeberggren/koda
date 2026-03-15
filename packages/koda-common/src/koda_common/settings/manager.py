@@ -185,7 +185,7 @@ class SettingsManager:
         self._secrets_store.set_key(provider, key)
         self._api_key_cache[provider] = key
         if old == key:
-            # Avoid false-positive backend reconfiguration for unchanged keys.
+            # Avoid false-positive service reconfiguration for unchanged keys.
             return
         self._notify((SettingChange(name=f"api_keys.{provider}", old_value=old, new_value=key),))
         log.info("api_key_updated", provider=provider)

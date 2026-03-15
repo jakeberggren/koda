@@ -6,7 +6,15 @@ class LLMError(Exception):
         self.message = message
 
 
-class LLMAPIError(LLMError):
+class LLMConfigurationError(LLMError):
+    """Configuration or setup errors for LLM integrations."""
+
+
+class LLMRuntimeError(LLMError):
+    """Errors that happen while talking to an LLM backend."""
+
+
+class LLMAPIError(LLMRuntimeError):
     """API-related errors from LLM backends."""
 
     def __init__(
@@ -72,14 +80,14 @@ class EmptyMessageError(LLMValidationError):
         super().__init__("Message cannot be empty")
 
 
-class EmptyApiKeyError(LLMValidationError):
+class EmptyApiKeyError(LLMConfigurationError):
     """API key cannot be empty."""
 
     def __init__(self, backend_name: str = "LLM backend") -> None:
         super().__init__(f"{backend_name} API key cannot be empty")
 
 
-class ApiKeyNotConfiguredError(LLMValidationError):
+class ApiKeyNotConfiguredError(LLMConfigurationError):
     """API key is not configured."""
 
     def __init__(self, backend_name: str) -> None:
@@ -105,11 +113,11 @@ class StructuredOutputNotSupportedError(LLMError):
     """Structured outputs are not supported by this backend implementation."""
 
 
-class ModelConfigurationError(LLMError):
+class ModelConfigurationError(LLMConfigurationError):
     """LLM model configuration or registry error."""
 
 
-class ProviderConfigurationError(LLMError):
+class ProviderConfigurationError(LLMConfigurationError):
     """LLM provider configuration or registry error."""
 
 

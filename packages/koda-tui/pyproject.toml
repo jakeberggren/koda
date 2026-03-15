@@ -6,16 +6,16 @@ readme = "README.md"
 
 requires-python = ">=3.13"
 dependencies = [
-    "koda-api",
-    "koda-common[keychain]",
+    "koda-common",
+    "koda-service",
     "prompt-toolkit~=3.0.52",
     "rich~=14.2.0",
     "wcwidth~=0.2.14",
 ]
 
 [tool.uv.sources]
-koda-api = { workspace = true }
 koda-common = { workspace = true }
+koda-service = { workspace = true }
 
 [project.scripts]
 koda = "koda_tui:main"

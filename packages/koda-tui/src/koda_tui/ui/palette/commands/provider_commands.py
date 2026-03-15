@@ -8,8 +8,8 @@ from koda_tui import actions
 from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
-    from koda_common.contracts import KodaBackend
     from koda_common.settings import SettingsManager
+    from koda_service import KodaService
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 log = get_logger(__name__)
@@ -54,12 +54,12 @@ def _open_api_key_dialog(
 
 
 def get_commands(
-    backend: KodaBackend,
+    service: KodaService,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> list[Command]:
     """Get commands for the provider selection palette."""
-    providers = backend.list_providers()
+    providers = service.list_providers()
 
     return [
         Command(

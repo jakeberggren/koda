@@ -5,7 +5,11 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from openai import AsyncOpenAI
 
-from koda.llm.exceptions import LLMAuthenticationError, ModelNotSupportedError
+from koda.llm.exceptions import (
+    ApiKeyNotConfiguredError,
+    EmptyApiKeyError,
+    ModelNotSupportedError,
+)
 from koda.llm.providers.openai import (
     OPENAI_MODELS,
     OpenAILLMProvider,
@@ -35,14 +39,14 @@ def _client_factory() -> Callable[..., AsyncOpenAI]:
 
 
 def test_from_config_rejects_blank_api_key() -> None:
-    with pytest.raises(LLMAuthenticationError) as exc_info:
+    with pytest.raises(EmptyApiKeyError) as exc_info:
         OpenAILLMProvider.from_config(
             OpenAILLMProviderConfig(api_key="   ", model="gpt-5.2"),
             client_factory=_client_factory(),
             model_registry=_model_registry(),
         )
 
-    assert str(exc_info.value) == "openai authentication failed: API key cannot be empty"
+    assert str(exc_info.value) == "openai API key cannot be empty"
 
 
 def test_from_config_validates_model_eagerly() -> None:
@@ -74,7 +78,7 @@ def test_create_openai_llm_rejects_missing_api_key() -> None:
         get_api_key=lambda _provider: None,
     )
 
-    with pytest.raises(LLMAuthenticationError) as exc_info:
+    with pytest.raises(ApiKeyNotConfiguredError) as exc_info:
         create_openai_llm(cast("SettingsManager", settings), _model_registry())
 
-    assert str(exc_info.value) == "openai authentication failed: API key not configured"
+    assert str(exc_info.value) == "openai API key not configured"

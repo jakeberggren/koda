@@ -1,0 +1,113 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
+from uuid import UUID, uuid4
+
+from koda.llm.exceptions import LLMAuthenticationError
+from koda.llm.registry import ModelRegistry, ProviderRegistry
+from koda.messages import UserMessage as CoreUserMessage
+from koda.sessions import Session
+from koda_service import bootstrap
+
+if TYPE_CHECKING:
+    from koda_common.settings import SettingsManager
+
+
+@dataclass(slots=True)
+class FakeAgentBehavior:
+    errors: dict[str, Exception] = field(default_factory=dict)
+    delete_return: Session | None = None
+    active_session: Session | None = None
+
+
+class FakeAgent:
+    def __init__(
+        self,
+        events: list[object] | None = None,
+        session: Session | None = None,
+        sessions: list[Session] | None = None,
+        behavior: FakeAgentBehavior | None = None,
+    ) -> None:
+        behavior = behavior or FakeAgentBehavior()
+        self._events = events or []
+        self._session = session or Session()
+        self._sessions = sessions or [self._session]
+        self._delete_return = behavior.delete_return
+        self._active_session = behavior.active_session or self._session
+        self._errors = behavior.errors
+
+    @property
+    def active_session(self) -> Session:
+        if active_session_error := self._errors.get("active_session"):
+            raise active_session_error
+        return self._active_session
+
+    async def run(self, _message: str):
+        for event in self._events:
+            yield event
+
+    def list_sessions(self) -> list[Session]:
+        return self._sessions
+
+    def new_session(self) -> Session:
+        return self._session
+
+    def switch_session(self, _session_id: UUID) -> Session:
+        if switch_error := self._errors.get("switch_session"):
+            raise switch_error
+        return self._session
+
+    def delete_session(self, _session_id: UUID) -> Session | None:
+        if delete_error := self._errors.get("delete_session"):
+            raise delete_error
+        return self._delete_return
+
+
+class RaisingAuthAgent:
+    async def run(self, _message: str):
+        raise LLMAuthenticationError("openai", Exception("bad key"))
+        yield  # pragma: no cover
+
+
+def settings() -> SettingsManager:
+    return cast("SettingsManager", SimpleNamespace(provider="openai", model="gpt-5.2"))
+
+
+def registries() -> bootstrap.Registries:
+    return bootstrap.Registries(
+        model_registry=ModelRegistry(),
+        provider_registry=ProviderRegistry(),
+    )
+
+
+def runtime_factory(
+    *,
+    create_agent=bootstrap.create_agent,
+    current_settings: SettingsManager | None = None,
+    sandbox_dir: Path | None = None,
+    current_registries: bootstrap.Registries | None = None,
+):
+    return bootstrap.create_in_process_runtime_factory(
+        settings=current_settings or settings(),
+        sandbox_dir=sandbox_dir or Path.cwd(),
+        registries=current_registries or registries(),
+        create_agent=create_agent,
+    )
+
+
+def core_session(
+    *,
+    content: str = "hello",
+    name: str | None = None,
+    session_id: UUID | None = None,
+) -> Session:
+    return Session(
+        session_id=session_id or uuid4(),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        messages=[CoreUserMessage(content=content)],
+        name=name,
+    )

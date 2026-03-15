@@ -14,7 +14,7 @@ from rich.style import Style
 from rich.syntax import Syntax
 from rich.text import Text
 
-from koda_common.contracts import ToolCall
+from koda_service.types import ToolCall
 from koda_tui.state import Message, MessageRole
 
 Theme = Literal["dark", "light"]
