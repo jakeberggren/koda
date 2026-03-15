@@ -4,9 +4,8 @@ from typing import Literal
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from koda_common.contracts import ThinkingOptionId
-
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+type ThinkingOptionId = str
 
 
 class Settings(BaseModel):
@@ -86,9 +85,9 @@ class EnvSettings(BaseSettings):
     bergetai_api_key: SecretStr | None = Field(default=None, description="BergetAI API key")
 
     # Flags
-    koda_backend: Literal["in_process"] = Field(
+    koda_service: Literal["in_process"] = Field(
         default="in_process",
-        description="Backend selection for Koda clients",
+        description="Koda Service boundary selection for Koda clients",
     )
 
     # Database

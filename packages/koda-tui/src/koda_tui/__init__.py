@@ -2,14 +2,21 @@ import asyncio
 import sys
 from pathlib import Path
 
-from koda_api.backends import create_backend
+from structlog.stdlib import BoundLogger
+
 from koda_common.logging import LoggingConfig, configure_logging, get_logger
-from koda_common.settings import JsonFileSettingsStore, KeyChainSecretsStore
-from koda_common.settings.manager import SettingsManager
+from koda_service.exceptions import StartupError
+from koda_service.startup import create_startup_context
 from koda_tui.app import KodaTuiApp
 from koda_tui.state import AppState
 
 __all__ = ["AppState", "KodaTuiApp", "main"]
+
+
+def _report_startup_error(error: StartupError, logger: BoundLogger) -> None:
+    # Expected startup failures should be concise and user-fixable, not tracebacks.
+    logger.error("startup_failed", summary=error.summary, details=error.details)
+    print(error, file=sys.stderr)
 
 
 def main() -> None:
@@ -18,13 +25,12 @@ def main() -> None:
     logger = get_logger(__name__)
 
     try:
-        settings = SettingsManager(
-            settings_store=JsonFileSettingsStore(),
-            secrets_store=KeyChainSecretsStore(),
-        )
-        backend = create_backend(settings, Path.cwd().resolve())
-        app = KodaTuiApp(settings=settings, backend=backend)
+        context = create_startup_context(Path.cwd().resolve())
+        app = KodaTuiApp(settings=context.settings, service=context.service)
         asyncio.run(app.run())
+    except StartupError as error:
+        _report_startup_error(error, logger)
+        sys.exit(1)
     except Exception:
         logger.exception("unhandled_exception")
         sys.exit(1)

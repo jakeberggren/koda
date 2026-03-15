@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from koda_common.contracts import ModelDefinition, ThinkingOption, ThinkingOptionId
+from koda_service.types import ModelDefinition, ThinkingOption, ThinkingOptionId
 
 _DEFAULT_THINKING_OPTION = ThinkingOption(id="none", label="none")
 

@@ -1,0 +1,19 @@
+[project]
+name = "koda-service"
+version = "0.1.0"
+description = "Service boundary and runtime orchestration for the Koda core."
+readme = "README.md"
+
+requires-python = ">=3.13"
+dependencies = [
+    "koda",
+    "koda-common[keychain]",
+]
+
+[tool.uv.sources]
+koda = { workspace = true }
+koda-common = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.9.10,<0.10.0"]
+build-backend = "uv_build"

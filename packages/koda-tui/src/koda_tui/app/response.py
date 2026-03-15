@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from koda_tui.state import Message, MessageRole
 
 if TYPE_CHECKING:
-    from koda_common.contracts import ToolCall
+    from koda_service.types import ToolCall
     from koda_tui.state import AppState
 
 

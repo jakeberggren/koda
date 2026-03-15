@@ -3,19 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from koda_common.contracts import (
-    BackendNoActiveSessionError,
-    BackendSessionNotFoundError,
-    KodaBackend,
-    ModelDefinition,
-    ThinkingOptionId,
-)
+from koda_service.exceptions import ServiceNoActiveSessionError, ServiceSessionNotFoundError
 from koda_tui.converters import convert_messages
 from koda_tui.utils.model_selection import normalize_thinking_option, supported_thinking_options
 
 if TYPE_CHECKING:
     from uuid import UUID
 
+    from koda_service import KodaService
+    from koda_service.types import ModelDefinition, ThinkingOptionId
     from koda_tui.state import AppState
 
 
@@ -56,30 +52,30 @@ class ActionResult[T]:
 
 
 def new_session(
-    backend: KodaBackend,
+    service: KodaService,
     state: AppState,
 ) -> ActionResult[None]:
     """Create a new session and reset conversation state."""
     try:
-        backend.new_session()
+        service.new_session()
         state.reset_conversation()
         return ActionResult(ok=True)
-    except BackendNoActiveSessionError:
+    except ServiceNoActiveSessionError:
         return ActionResult(ok=False, error="No active session available")
 
 
 def switch_session(
     session_id: UUID,
-    backend: KodaBackend,
+    service: KodaService,
     state: AppState,
 ) -> ActionResult[None]:
     """Switch to a session and sync conversation state."""
     try:
-        _, messages = backend.switch_session(session_id)
+        _, messages = service.switch_session(session_id)
         state.reset_conversation()
         state.messages = convert_messages(messages)
         return ActionResult(ok=True)
-    except BackendSessionNotFoundError:
+    except ServiceSessionNotFoundError:
         return ActionResult(ok=False, error="Session not found")
 
 
@@ -90,17 +86,17 @@ class DeleteSessionPayload:
 
 def delete_session(
     session_id: UUID,
-    backend: KodaBackend,
+    service: KodaService,
     state: AppState,
 ) -> ActionResult[DeleteSessionPayload]:
     """Delete a session and clear state if the active session was removed."""
     try:
-        new_active = backend.delete_session(session_id)
+        new_active = service.delete_session(session_id)
         if new_active is None:
             return ActionResult(ok=True, payload=DeleteSessionPayload(removed_active_session=False))
         state.reset_conversation()
         return ActionResult(ok=True, payload=DeleteSessionPayload(removed_active_session=True))
-    except BackendSessionNotFoundError:
+    except ServiceSessionNotFoundError:
         return ActionResult(ok=False, error="Session not found")
 
 

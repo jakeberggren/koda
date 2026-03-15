@@ -15,8 +15,8 @@ from koda_tui.ui.palette.commands.command import Command
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_common.contracts import KodaBackend
     from koda_common.settings import SettingsManager
+    from koda_service import KodaService
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
@@ -24,7 +24,7 @@ log = get_logger(__name__)
 
 
 def get_commands(  # noqa: C901 - allow complex
-    backend: KodaBackend,
+    service: KodaService,
     settings: SettingsManager,
     state: AppState,
     palette_manager: PaletteManager,
@@ -34,7 +34,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_connect_provider() -> None:
         commands = provider_commands.get_commands(
-            backend=backend,
+            service=service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -42,7 +42,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_switch_model() -> None:
         commands = model_commands.get_commands(
-            backend=backend,
+            service=service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -50,7 +50,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_set_thinking() -> None:
         commands = thinking_commands.get_commands(
-            backend=backend,
+            service=service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -82,7 +82,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_new_session() -> None:
         cancel_streaming()
-        result = actions.new_session(backend, state)
+        result = actions.new_session(service, state)
         if not result.ok:
             log.warning("cmd_new_session_failed", error=result.error)
             # TODO: surface action errors in the palette/status UI.
@@ -90,7 +90,7 @@ def get_commands(  # noqa: C901 - allow complex
         palette_manager.close_all()
 
     def cmd_list_sessions() -> None:
-        session_commands.open_session_list(backend, state, palette_manager, cancel_streaming)
+        session_commands.open_session_list(service, state, palette_manager, cancel_streaming)
 
     commands = [
         Command(

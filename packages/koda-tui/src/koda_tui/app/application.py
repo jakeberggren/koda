@@ -17,9 +17,9 @@ from koda_tui.ui.styles import get_style
 from koda_tui.utils.model_selection import find_model, resolve_thinking_option, supports_thinking
 
 if TYPE_CHECKING:
-    from koda_api.backends import KodaBackend
-    from koda_common.contracts import ThinkingOptionId
     from koda_common.settings import SettingChange, SettingsManager
+    from koda_service import KodaService
+    from koda_service.types import ThinkingOptionId
 
 
 class _KodaApplication(Application):
@@ -42,16 +42,16 @@ class KodaTuiApp:
     def __init__(
         self,
         settings: SettingsManager,
-        backend: KodaBackend,
+        service: KodaService,
     ) -> None:
         self._settings = settings
-        self._backend = backend
+        self._service = service
 
         # Subscribe to settings changes
         self._unsubscribe = self._settings.subscribe(self._on_settings_changed)
         self._closed = False
         initial_model = find_model(
-            self._backend.list_models(self._settings.provider),
+            self._service.list_models(self._settings.provider),
             provider=self._settings.provider,
             model_id=self._settings.model,
         )
@@ -113,7 +113,7 @@ class KodaTuiApp:
         return app
 
     @staticmethod
-    def _has_backend_change(change_names: set[str]) -> bool:
+    def _has_service_change(change_names: set[str]) -> bool:
         return bool(
             {
                 "provider",
@@ -125,19 +125,19 @@ class KodaTuiApp:
             & change_names
         ) or any(name.startswith("api_keys.") for name in change_names)
 
-    def _apply_backend_setting_changes(self, change_names: set[str]) -> bool:
-        if not self._has_backend_change(change_names):
+    def _apply_service_setting_changes(self, change_names: set[str]) -> bool:
+        if not self._has_service_change(change_names):
             return False
         self.state.provider_name = self._settings.provider
         self.state.model_name = self._settings.model
         active_model = find_model(
-            self._backend.list_models(self._settings.provider),
+            self._service.list_models(self._settings.provider),
             provider=self._settings.provider,
             model_id=self._settings.model,
         )
         self.state.thinking = resolve_thinking_option(active_model, self._settings.thinking)
         self.state.thinking_supported = supports_thinking(active_model)
-        self._backend.reconfigure()
+        self._service.reconfigure()
         return True
 
     def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
@@ -157,7 +157,7 @@ class KodaTuiApp:
     def _on_settings_changed(self, changes: tuple[SettingChange, ...]) -> None:
         """Handle committed settings changes."""
         change_names = {change.name for change in changes}
-        should_invalidate = self._apply_backend_setting_changes(change_names)
+        should_invalidate = self._apply_service_setting_changes(change_names)
         if self._apply_ui_setting_changes(change_names):
             should_invalidate = True
         if should_invalidate:
@@ -193,8 +193,8 @@ class KodaTuiApp:
         return self._settings
 
     @property
-    def backend(self) -> KodaBackend:
-        return self._backend
+    def service(self) -> KodaService:
+        return self._service
 
     def enqueue_message(self, text: str, *, cancel_current: bool = False) -> None:
         """Queue a message to be sent after the current stream completes."""
@@ -206,7 +206,7 @@ class KodaTuiApp:
 
     async def send_message(self, text: str) -> None:
         """Send a message and process the response stream."""
-        await self._stream_processor.stream(text, self._backend)
+        await self._stream_processor.stream(text, self._service)
         self._message_queue.kick()
 
     def cancel_streaming(self) -> None:
@@ -218,7 +218,7 @@ class KodaTuiApp:
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""
-        self._palette_manager.toggle(self._backend)
+        self._palette_manager.toggle(self._service)
 
     def exit(self) -> None:
         """Exit the application."""

@@ -74,7 +74,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.isort]
-known-first-party = ["koda", "koda_api", "koda_tui", "koda_common"]
+known-first-party = ["koda", "koda_common", "koda_service", "koda_tui"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 5
@@ -88,8 +88,8 @@ required-environments = [
 asyncio_mode = "auto"
 testpaths = [
     "packages/koda/tests",
-    "packages/koda-api/tests",
-    "packages/koda-tui/tests",
     "packages/koda-common/tests",
+    "packages/koda-service/tests",
+    "packages/koda-tui/tests",
 ]
-addopts = "--import-mode=importlib --cov=koda --cov=koda_api --cov=koda_tui --cov=koda_common --cov-report=term"
+addopts = "--import-mode=importlib --cov=koda --cov=koda_common --cov=koda_service --cov=koda_tui --cov-report=term"
