@@ -522,7 +522,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "koda-common", editable = "packages/koda-common" },
-    { name = "langfuse", specifier = "~=3.14.4" },
+    { name = "langfuse", specifier = "~=4.0.0" },
     { name = "openai", specifier = "~=2.14.0" },
     { name = "pathspec", specifier = "~=1.0.3" },
     { name = "pydantic", specifier = "~=2.12.5" },
@@ -630,7 +630,7 @@ dev = [
 
 [[package]]
 name = "langfuse"
-version = "3.14.4"
+version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
@@ -641,12 +641,11 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "packaging" },
     { name = "pydantic" },
-    { name = "requests" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9f/b8/8a165154fa5597a831cd87375622f23bb63871d6e9e4de60f5a114bac859/langfuse-3.14.4.tar.gz", hash = "sha256:f05f853d17eadb1f54ef29b974409ddfcec275753adcf0a2e4d99fa4386b521a", size = 235283, upload-time = "2026-02-19T11:03:09.432Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e9/4b/8df7cd1684b46b6760d9c03893cbbc9ddbdd3f72eaf003b3859cec308587/langfuse-4.0.0.tar.gz", hash = "sha256:10df126c8d68e5746ff39a0a5100233f9f29446626c478e7770b1c775e4c4e17", size = 271030, upload-time = "2026-03-10T16:21:51.748Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b7/1c/68ba27f42c52b3869d32521796fad2e5c7db63473e1569b30c13f233892b/langfuse-3.14.4-py3-none-any.whl", hash = "sha256:effb053601bfcdfd46639bfc99066b04d1312623448d445bfde31d9f448a490c", size = 420450, upload-time = "2026-02-19T11:03:07.341Z" },
+    { url = "https://files.pythonhosted.org/packages/84/56/7f14cbe189e8a10c805609d52a4578b5f1bca3d4060b531baf920827d4f5/langfuse-4.0.0-py3-none-any.whl", hash = "sha256:4afe6a114937fa544e7f5f86c34533c711f0f12ebf77480239b626da28bbae68", size = 462159, upload-time = "2026-03-10T16:21:49.701Z" },
 ]
 
 [[package]]
