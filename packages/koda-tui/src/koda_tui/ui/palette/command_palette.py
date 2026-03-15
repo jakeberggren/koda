@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.buffer import Buffer
-from prompt_toolkit.completion import FuzzyWordCompleter
+from prompt_toolkit.completion import CompleteEvent, FuzzyWordCompleter
+from prompt_toolkit.document import Document
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import (
@@ -46,11 +48,11 @@ class CommandPalette:
 
         # Create fuzzy completer from command labels
         command_labels = [cmd.label for cmd in commands]
-        completer = FuzzyWordCompleter(command_labels)
+        self._completer = FuzzyWordCompleter(command_labels)
 
         # Search buffer
         self.search_buffer = Buffer(
-            completer=completer,
+            completer=self._completer,
             complete_while_typing=True,
             on_text_changed=self._on_search_changed,
         )
@@ -61,15 +63,40 @@ class CommandPalette:
         # Build the container
         self._container = self._build_container()
 
+    def _get_completion_labels(self, buffer: Buffer) -> list[str]:
+        """Return fuzzy-matched labels from the search buffer."""
+        document = Document(text=buffer.text, cursor_position=len(buffer.text))
+        complete_event = CompleteEvent(text_inserted=True, completion_requested=False)
+        return [
+            completion.text
+            for completion in self._completer.get_completions(document, complete_event)
+        ]
+
+    def _get_commands_by_label(self) -> dict[str, deque[Command]]:
+        """Group commands by label so duplicate labels map back deterministically."""
+        commands_by_label: dict[str, deque[Command]] = defaultdict(deque)
+        for cmd in self.commands:
+            commands_by_label[cmd.label].append(cmd)
+        return commands_by_label
+
+    def _get_commands_from_completions(self, buffer: Buffer) -> list[Command]:
+        """Return commands in the same order as the prompt_toolkit fuzzy completer."""
+        commands_by_label = self._get_commands_by_label()
+        matches: list[Command] = []
+
+        for label in self._get_completion_labels(buffer):
+            commands = commands_by_label.get(label)
+            if commands:
+                matches.append(commands.popleft())
+
+        return matches
+
     def _on_search_changed(self, buffer: Buffer) -> None:
         """Filter commands based on search text."""
-        search_text = buffer.text.lower()
-        if not search_text:
+        if not buffer.text.strip():
             self._filtered_commands = list(self.commands)
         else:
-            self._filtered_commands = [
-                cmd for cmd in self.commands if search_text in cmd.label.lower()
-            ]
+            self._filtered_commands = self._get_commands_from_completions(buffer)
         # Reset selection when filter changes
         self.selected_index = 0
 
