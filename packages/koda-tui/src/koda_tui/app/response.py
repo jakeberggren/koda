@@ -56,6 +56,23 @@ class ResponseLifecycle:
             )
         )
 
+    def _set_phase_after_tool_completion(self) -> None:
+        """Update phase after a tool completes based on remaining in-flight state."""
+        if self._state.active_tools:
+            self._state.response_phase = ResponsePhase.TOOLS
+        elif self._state.current_streaming_content:
+            self._state.is_thinking = False
+            self._state.response_phase = ResponsePhase.RESPONDING
+        elif self._state.current_thinking_content:
+            self._state.is_thinking = True
+            self._state.response_phase = ResponsePhase.WORKING
+        elif self._state.is_streaming:
+            self._state.is_thinking = False
+            self._state.response_phase = ResponsePhase.WORKING
+        else:
+            self._state.is_thinking = False
+            self._state.response_phase = ResponsePhase.IDLE
+
     def complete_tool(
         self,
         *,
@@ -81,20 +98,6 @@ class ResponseLifecycle:
         self._state.active_tools.pop(call_id, None)
         self._set_phase_after_tool_completion()
 
-    def end(self) -> None:
-        """End the response cycle."""
-        self._finalize_content()
-
-        for call_id in list(self._state.active_tools):
-            self.complete_tool(call_id=call_id)
-        self._state.active_tools.clear()
-
-        self._state.is_streaming = False
-        self._state.is_thinking = False
-        self._state.current_streaming_content = ""
-        self._state.current_thinking_content = ""
-        self._state.response_phase = ResponsePhase.IDLE
-
     def _finalize_content(self) -> None:
         """Save any pending streaming content as an assistant message."""
         if self._state.current_streaming_content or self._state.current_thinking_content:
@@ -108,19 +111,16 @@ class ResponseLifecycle:
             self._state.current_streaming_content = ""
             self._state.current_thinking_content = ""
 
-    def _set_phase_after_tool_completion(self) -> None:
-        """Update phase after a tool completes based on remaining in-flight state."""
-        if self._state.active_tools:
-            self._state.response_phase = ResponsePhase.TOOLS
-        elif self._state.current_streaming_content:
-            self._state.is_thinking = False
-            self._state.response_phase = ResponsePhase.RESPONDING
-        elif self._state.current_thinking_content:
-            self._state.is_thinking = True
-            self._state.response_phase = ResponsePhase.WORKING
-        elif self._state.is_streaming:
-            self._state.is_thinking = False
-            self._state.response_phase = ResponsePhase.WORKING
-        else:
-            self._state.is_thinking = False
-            self._state.response_phase = ResponsePhase.IDLE
+    def end(self) -> None:
+        """End the response cycle."""
+        self._finalize_content()
+
+        for call_id in list(self._state.active_tools):
+            self.complete_tool(call_id=call_id)
+        self._state.active_tools.clear()
+
+        self._state.is_streaming = False
+        self._state.is_thinking = False
+        self._state.current_streaming_content = ""
+        self._state.current_thinking_content = ""
+        self._state.response_phase = ResponsePhase.IDLE

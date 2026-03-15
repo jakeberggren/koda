@@ -21,20 +21,9 @@ class StatusBarControl(UIControl):
         """Return the path relative to the repository root."""
         return self._state.cwd.relative_to(Path.home())
 
-    def _get_tool_status(self) -> str:
-        tool_count = len(self._state.active_tools)
-        if tool_count > 1:
-            return f"running {tool_count} tools"
-        if tool_count == 1:
-            tool = next(iter(self._state.active_tools.values()))
-            return f"running: {tool.tool_name}"
-        return "running tools"
-
-    def _get_status(self) -> str:  # noqa: C901 - allow complex
+    def _get_status(self) -> str:
         if self._state.exit_requested:
             return "press ctrl+c again to exit"
-        if self._state.response_phase is ResponsePhase.TOOLS:
-            return self._get_tool_status()
         if self._state.is_thinking:
             return "thinking"
         if self._state.response_phase is ResponsePhase.RESPONDING:
