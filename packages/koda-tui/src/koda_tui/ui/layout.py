@@ -11,6 +11,7 @@ from prompt_toolkit.widgets import Box
 from koda_tui.components import (
     ChatAreaControl,
     ChatScrollbarMargin,
+    FileSuggestions,
     InputArea,
     QueuedInputs,
     StatusBarControl,
@@ -33,6 +34,7 @@ class TUILayout:
         self.chat_area = ChatAreaControl(state, self.renderer)
         self.queued_inputs = QueuedInputs(state)
         self.input_area = InputArea(state)
+        self.file_suggestions = FileSuggestions(self.input_area)
         self.status_bar = StatusBarControl(state)
 
     def create_layout(self) -> Layout:
@@ -42,17 +44,14 @@ class TUILayout:
             style="class:chat-area",
             right_margins=[ChatScrollbarMargin(self.chat_area, self._state)],
         )
-
         separator = Window(
             height=SEPARATOR_HEIGHT,
             char="",
             style="class:separator",
         )
-
         queued_inputs = self.queued_inputs.create_window()
-
+        file_suggestions = self.file_suggestions.create_window()
         input = self.input_area.create_window()
-
         status_bar = Window(
             content=self.status_bar,
             height=STATUS_BAR_HEIGHT,
@@ -66,6 +65,7 @@ class TUILayout:
                     Box(chat_area, padding=0, padding_left=1, padding_top=1),
                     separator,
                     queued_inputs,
+                    file_suggestions,
                     input,  # Dynamic height 1-10 lines
                     separator,
                     status_bar,  # Fixed 1 line
