@@ -25,6 +25,12 @@ TUI_DARK_STYLE = Style.from_dict(
         # Queued inputs
         "queued-inputs": "fg:ansibrightblack bg:#4e4e4e italic",
         "queued-inputs.title": "bold noitalic",
+        # File discovery
+        "file-discovery": "fg:ansibrightblack bg:#4e4e4e italic",
+        "file-discovery.title": "bold noitalic",
+        "file-discovery.item": "",
+        "file-discovery.selected": "bg:ansimagenta fg:ansiwhite noitalic",
+        "file-discovery.empty": "fg:ansibrightblack italic",
         # Command palette
         "palette.frame": "fg:ansibrightblack bg:default",
         "palette.box": "bg:default",
@@ -70,6 +76,12 @@ TUI_LIGHT_STYLE = Style.from_dict(
         # Queued inputs
         "queued-inputs": "fg:ansibrightblack bg:#e4e4e4 italic",
         "queued-inputs.title": "bold noitalic",
+        # File discovery
+        "file-discovery": "fg:ansibrightblack bg:#e4e4e4 italic",
+        "file-discovery.title": "bold noitalic",
+        "file-discovery.item": "",
+        "file-discovery.selected": "bg:#c6c6c6 fg:ansiblack noitalic",
+        "file-discovery.empty": "fg:ansibrightblack italic",
         # Command palette
         "palette.frame": "fg:ansibrightblack bg:default",
         "palette.box": "bg:default",

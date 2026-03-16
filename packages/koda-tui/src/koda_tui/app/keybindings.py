@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from prompt_toolkit.filters import Condition
 from prompt_toolkit.input.ansi_escape_sequences import ANSI_SEQUENCES
-from prompt_toolkit.key_binding import KeyBindings, KeyPressEvent
+from prompt_toolkit.key_binding import (
+    ConditionalKeyBindings,
+    KeyBindings,
+    KeyBindingsBase,
+    KeyPressEvent,
+    merge_key_bindings,
+)
 from prompt_toolkit.keys import Keys
 
 from koda_tui.utils.model_selection import find_model, supported_thinking_options
@@ -27,25 +34,31 @@ def _register_terminal_sequences() -> None:
     ANSI_SEQUENCES["\x1b\r"] = Keys.ControlJ
 
 
-async def _handle_enter(app: KodaTuiApp, event: KeyPressEvent) -> None:
-    """Submit message on Enter, or queue if streaming."""
-    text = event.current_buffer.text.strip()
+async def _submit_buffer(
+    app: KodaTuiApp,
+    *,
+    cancel_current_if_streaming: bool,
+) -> None:
+    """Submit the current buffer, optionally interrupting the current stream."""
+    text = app.layout.input_area.get_text().strip()
     if not text:
         return
 
-    event.current_buffer.reset()  # clear input buffer
+    app.layout.input_area.clear()
 
     if app.state.is_streaming:
-        cancel_current = not app.state.queue_inputs
-        app.enqueue_message(text, cancel_current=cancel_current)
+        app.enqueue_message(text, cancel_current=cancel_current_if_streaming)
         return
 
     await app.send_message(text)
 
 
-def _handle_newline(event: KeyPressEvent) -> None:
-    """Insert a literal newline."""
-    event.current_buffer.insert_text("\n")
+async def _handle_enter(app: KodaTuiApp) -> None:
+    """Submit message on Enter, or queue if streaming."""
+    await _submit_buffer(
+        app,
+        cancel_current_if_streaming=not app.state.queue_inputs,
+    )
 
 
 def _handle_cancel_or_exit(app: KodaTuiApp) -> None:
@@ -59,17 +72,9 @@ def _handle_cancel_or_exit(app: KodaTuiApp) -> None:
 
 
 def _handle_escape(app: KodaTuiApp) -> None:
-    """Clear queue on Escape, or cancel streaming if queue is empty."""
-    if app.state.pending_inputs:
-        app.dequeue_all()
-        return
+    """Cancel streaming on Escape."""
     if app.state.is_streaming:
         app.cancel_streaming()
-
-
-def _handle_palette_toggle(app: KodaTuiApp) -> None:
-    """Toggle command palette visibility."""
-    app.toggle_palette()
 
 
 def _get_cycle_thinking_options(
@@ -92,16 +97,122 @@ def _handle_cycle_thinking(app: KodaTuiApp) -> None:
         app.invalidate()
 
 
-def create_keybindings(app: KodaTuiApp) -> KeyBindings:
-    """Create key bindings for the TUI."""
-    kb = KeyBindings()
-    _register_terminal_sequences()
+# --- Conditions
 
-    kb.add(Keys.Enter)(lambda event: _handle_enter(app, event))
-    kb.add(Keys.ControlJ)(_handle_newline)
-    kb.add(Keys.ControlC)(lambda _: _handle_cancel_or_exit(app))
-    kb.add(Keys.Escape)(lambda _: _handle_escape(app))
-    kb.add(Keys.ControlP)(lambda _: _handle_palette_toggle(app))
-    kb.add(Keys.ControlT)(lambda _: _handle_cycle_thinking(app))
+
+def _file_discovery_open(app: KodaTuiApp) -> Condition:
+    """Return whether file discovery bindings should be active."""
+    return Condition(
+        lambda: app.layout.input_area.is_file_discovery_open and not app.state.palette_open
+    )
+
+
+def _file_discovery_has_selection(app: KodaTuiApp) -> Condition:
+    """Return whether file discovery has a selectable result."""
+    return Condition(
+        lambda: app.layout.input_area.has_file_discovery_selection and not app.state.palette_open
+    )
+
+
+def _cancelable(app: KodaTuiApp) -> Condition:
+    """Return whether there is in-flight work to cancel."""
+    return Condition(lambda: app.state.is_streaming)
+
+
+def _queue_pending(app: KodaTuiApp) -> Condition:
+    """Return whether queued inputs are waiting to be sent."""
+    return Condition(lambda: bool(app.state.pending_inputs))
+
+
+# --- Keybinding Groups
+
+
+def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
+    """Create key bindings for the main input area."""
+    kb = KeyBindings()
+
+    @kb.add(Keys.Enter)
+    async def _submit(_event: KeyPressEvent) -> None:
+        await _handle_enter(app)
+
+    @kb.add(Keys.ControlJ)
+    def _newline(event: KeyPressEvent) -> None:
+        event.current_buffer.insert_text("\n")
+
+    @kb.add(Keys.ControlC)
+    def _cancel_or_exit(_event: KeyPressEvent) -> None:
+        _handle_cancel_or_exit(app)
+
+    @kb.add(Keys.Escape, filter=_cancelable(app))
+    def _escape(_event: KeyPressEvent) -> None:
+        _handle_escape(app)
+
+    @kb.add(Keys.ControlP)
+    def _toggle_palette(_event: KeyPressEvent) -> None:
+        app.toggle_palette()
+
+    @kb.add(Keys.ControlT)
+    def _cycle_thinking(_event: KeyPressEvent) -> None:
+        _handle_cycle_thinking(app)
 
     return kb
+
+
+def _create_queue_keybindings(app: KodaTuiApp) -> KeyBindings:
+    """Create key bindings active while queued inputs are present."""
+    kb = KeyBindings()
+
+    @kb.add(Keys.Escape)
+    def _clear_queue(_event: KeyPressEvent) -> None:
+        app.dequeue_all()
+
+    return kb
+
+
+def _create_file_discovery_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
+    """Create key bindings active while the file discovery menu is open."""
+    kb = KeyBindings()
+
+    @kb.add(Keys.Up, eager=True, filter=_file_discovery_has_selection(app))
+    def _move_up(_event: KeyPressEvent) -> None:
+        if app.layout.input_area.move_file_discovery_selection(-1):
+            app.invalidate()
+
+    @kb.add(Keys.Down, eager=True, filter=_file_discovery_has_selection(app))
+    def _move_down(_event: KeyPressEvent) -> None:
+        if app.layout.input_area.move_file_discovery_selection(1):
+            app.invalidate()
+
+    @kb.add(Keys.Enter, eager=True, filter=_file_discovery_has_selection(app))
+    def _accept_enter(_event: KeyPressEvent) -> None:
+        if app.layout.input_area.accept_file_discovery_selection():
+            app.invalidate()
+
+    @kb.add(Keys.Tab, eager=True, filter=_file_discovery_has_selection(app))
+    def _accept_tab(_event: KeyPressEvent) -> None:
+        if app.layout.input_area.accept_file_discovery_selection():
+            app.invalidate()
+
+    return kb
+
+
+# --- Public API
+
+
+def create_keybindings(app: KodaTuiApp) -> KeyBindingsBase:
+    """Create key bindings for the TUI."""
+    _register_terminal_sequences()
+
+    return merge_key_bindings(
+        [
+            _create_main_keybindings(app),
+            ConditionalKeyBindings(
+                _create_queue_keybindings(app),
+                filter=_queue_pending(app),
+            ),
+            ConditionalKeyBindings(
+                _create_file_discovery_keybindings(app),
+                filter=_file_discovery_open(app),
+            ),
+        ]
+    )

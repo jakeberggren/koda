@@ -21,6 +21,11 @@ wheels/
 # Coverage
 .coverage
 
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
 # Claude local settings
 settings.local.json
 
