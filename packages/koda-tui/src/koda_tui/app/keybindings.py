@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from prompt_toolkit.filters import Condition
+from prompt_toolkit.filters import Condition, has_focus
 from prompt_toolkit.input.ansi_escape_sequences import ANSI_SEQUENCES
 from prompt_toolkit.key_binding import (
     ConditionalKeyBindings,
@@ -97,9 +97,6 @@ def _handle_cycle_thinking(app: KodaTuiApp) -> None:
         app.invalidate()
 
 
-# --- Conditions
-
-
 def _file_discovery_open(app: KodaTuiApp) -> Condition:
     """Return whether file discovery bindings should be active."""
     return Condition(
@@ -122,9 +119,6 @@ def _cancelable(app: KodaTuiApp) -> Condition:
 def _queue_pending(app: KodaTuiApp) -> Condition:
     """Return whether queued inputs are waiting to be sent."""
     return Condition(lambda: bool(app.state.pending_inputs))
-
-
-# --- Keybinding Groups
 
 
 def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
@@ -154,6 +148,14 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
     @kb.add(Keys.ControlT)
     def _cycle_thinking(_event: KeyPressEvent) -> None:
         _handle_cycle_thinking(app)
+
+    @kb.add(Keys.Up, eager=True, filter=has_focus(app.layout.input_area.buffer))
+    def _move_up(event: KeyPressEvent) -> None:
+        app.layout.input_area.move_cursor_up(event.arg)
+
+    @kb.add(Keys.Down, eager=True, filter=has_focus(app.layout.input_area.buffer))
+    def _move_down(event: KeyPressEvent) -> None:
+        app.layout.input_area.move_cursor_down(event.arg)
 
     return kb
 
@@ -194,9 +196,6 @@ def _create_file_discovery_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa:
             app.invalidate()
 
     return kb
-
-
-# --- Public API
 
 
 def create_keybindings(app: KodaTuiApp) -> KeyBindingsBase:
