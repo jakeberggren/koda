@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import os
 import shutil
+import typing
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pathspec
+from prompt_toolkit.application.current import get_app
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.completion import (
     CompleteEvent,
@@ -15,11 +18,15 @@ from prompt_toolkit.completion import (
     Completion,
     FuzzyCompleter,
 )
+from prompt_toolkit.data_structures import Point
 from prompt_toolkit.document import Document
 from prompt_toolkit.layout import BufferControl, UIContent, Window
 from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.margins import Margin
-from wcwidth import wcswidth
+from prompt_toolkit.layout.processors import explode_text_fragments
+from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
+from prompt_toolkit.search import SearchState
+from wcwidth import wcswidth, wrap
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -28,7 +35,6 @@ if TYPE_CHECKING:
     from prompt_toolkit.layout.containers import WindowRenderInfo
 
     from koda_tui.state import AppState
-
 
 IGNORE_FILENAMES = (".gitignore", ".ignore")
 
@@ -113,6 +119,322 @@ class _WorkspaceFileCompleter(Completer):
             yield Completion(path, start_position=-len(text))
 
 
+@dataclass(slots=True, frozen=True)
+class _WrappedLine:
+    """Metadata for one visual wrapped line."""
+
+    row: int
+    start: int
+    end: int
+    fragments: tuple[tuple[str, str], ...]
+
+
+def _char_width(char: str) -> int:
+    """Return printable width for a single character."""
+    return max(wcswidth(char), 0)
+
+
+def _text_width(text: str) -> int:
+    """Return printable width for a string."""
+    return max(wcswidth(text), 0)
+
+
+def _wrap_line_ranges(text: str, width: int) -> list[tuple[int, int]]:
+    """Return source index ranges for visual word-wrapped lines."""
+    if width <= 0:
+        return [(0, 0)]
+    if not text:
+        return [(0, 0)]
+
+    wrapped_lines = wrap(
+        text,
+        width=width,
+        expand_tabs=False,
+        replace_whitespace=False,
+        drop_whitespace=False,
+        break_on_hyphens=False,
+    )
+
+    ranges: list[tuple[int, int]] = []
+    start = 0
+    for wrapped_line in wrapped_lines:
+        end = start + len(wrapped_line)
+        ranges.append((start, end))
+        start = end
+
+    return ranges or [(0, 0)]
+
+
+def _wrap_content_width(width: int) -> int:
+    """Reserve one visible cell for the cursor block when possible."""
+    return width - 1 if width > 1 else width
+
+
+class _WordWrapBufferControl(BufferControl):
+    """Buffer control with wcwidth-aware word wrapping."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._wrapped_lines: list[_WrappedLine] = []
+
+    def _get_document(self, *, preview_search: bool) -> Document:
+        """Return the current document, matching BufferControl behavior."""
+        buffer = self.buffer
+        search_control = self.search_buffer_control
+        preview_now = preview_search or bool(
+            self.preview_search()
+            and search_control
+            and search_control.buffer.text
+            and get_app().layout.search_target_buffer_control == self
+        )
+
+        if preview_now and search_control is not None:
+            ss = self.search_state
+            return buffer.document_for_search(
+                SearchState(
+                    text=search_control.buffer.text,
+                    direction=ss.direction,
+                    ignore_case=ss.ignore_case,
+                )
+            )
+
+        return buffer.document
+
+    @staticmethod
+    def _cursor_belongs_to_segment(cursor_col: int, start: int, end: int, line_length: int) -> bool:
+        """Return whether cursor should render on this visual segment."""
+        if cursor_col == line_length:
+            return end == line_length
+        return start <= cursor_col < end
+
+    def _build_wrapped_lines(
+        self,
+        document: Document,
+        wrap_width: int,
+    ) -> tuple[list[_WrappedLine], Point]:
+        """Build wrapped content rows and the corresponding cursor position."""
+        wrapped_lines: list[_WrappedLine] = []
+        cursor_position = Point(x=0, y=0)
+        cursor_row = document.cursor_position_row
+        cursor_col = document.cursor_position_col
+
+        for row in range(document.line_count):
+            line_text = document.lines[row]
+            line_length = len(line_text)
+            ranges = _wrap_line_ranges(line_text, wrap_width)
+
+            for start, end in ranges:
+                wrapped_lines.append(
+                    _WrappedLine(
+                        row=row,
+                        start=start,
+                        end=end,
+                        # Reserve one visible cell so prompt_toolkit has a stable
+                        # cursor slot at wrapped segment boundaries.
+                        fragments=(("", line_text[start:end]), ("", " ")),
+                    )
+                )
+
+                if row == cursor_row and self._cursor_belongs_to_segment(
+                    cursor_col,
+                    start,
+                    end,
+                    line_length,
+                ):
+                    cursor_position = Point(
+                        x=_text_width(line_text[start:cursor_col]),
+                        y=len(wrapped_lines) - 1,
+                    )
+
+        return wrapped_lines or [_WrappedLine(0, 0, 0, (("", " "),))], cursor_position
+
+    def _find_wrapped_cursor_position(self, document: Document) -> tuple[int, int] | None:
+        """Return the current visual wrapped row and display column."""
+        cursor_row: int = document.cursor_position_row
+        cursor_col: int = document.cursor_position_col
+        line_text: str = document.lines[cursor_row]
+        for wrapped_index, wrapped in enumerate(self._wrapped_lines):
+            if wrapped.row != cursor_row:
+                continue
+            if not self._cursor_belongs_to_segment(
+                cursor_col,
+                wrapped.start,
+                wrapped.end,
+                len(line_text),
+            ):
+                continue
+            return wrapped_index, _text_width(line_text[wrapped.start : cursor_col])
+        return None
+
+    def move_cursor_vertical(self, direction: int) -> bool:
+        """Move the cursor by visual wrapped rows."""
+        document = self.buffer.document
+        current = self._find_wrapped_cursor_position(document)
+        if current is None:
+            return False
+
+        wrapped_index, display_x = current
+        target_index = wrapped_index + direction
+        if not 0 <= target_index < len(self._wrapped_lines):
+            return False
+
+        target = self._wrapped_lines[target_index]
+        target_line = document.lines[target.row]
+        source_col = self._source_col_from_display_x(
+            target_line,
+            target.start,
+            target.end,
+            display_x,
+        )
+        self.buffer.cursor_position = document.translate_row_col_to_index(target.row, source_col)
+        return True
+
+    def sync_wrapped_lines(self, width: int) -> None:
+        """Refresh wrapped line metadata for the current document and width."""
+        wrap_width = max(1, _wrap_content_width(width))
+        self._wrapped_lines, _ = self._build_wrapped_lines(self.buffer.document, wrap_width)
+
+    @staticmethod
+    def _slice_processed_fragments(
+        fragments: StyleAndTextTuples,
+        start: int,
+        end: int,
+    ) -> tuple[tuple[str, str], ...]:
+        """Slice processed line fragments for one wrapped source segment."""
+        exploded = explode_text_fragments(fragments)
+        # Keep only the first 2 items (text and style) from each tuple
+        sliced = tuple((item[0], item[1]) for item in exploded[start:end])
+        return (*sliced, ("", " "))
+
+    def _processed_wrapped_lines(
+        self,
+        document: Document,
+        width: int,
+        height: int,
+        wrapped_lines: list[_WrappedLine],
+    ) -> list[_WrappedLine]:
+        """Apply prompt_toolkit's standard processors to wrapped segments."""
+        get_processed_line = self._create_get_processed_line_func(document, width, height)
+
+        return [
+            _WrappedLine(
+                row=wrapped.row,
+                start=wrapped.start,
+                end=wrapped.end,
+                fragments=self._slice_processed_fragments(
+                    get_processed_line(wrapped.row).fragments,
+                    wrapped.start,
+                    wrapped.end,
+                ),
+            )
+            for wrapped in wrapped_lines
+        ]
+
+    def _get_menu_position(self, buffer: Buffer) -> Point | None:
+        """Return native prompt_toolkit completion menu position, if any."""
+        menu_position = self.menu_position() if self.menu_position else None
+        if menu_position is not None:
+            menu_row, menu_col = buffer.document.translate_index_to_position(menu_position)
+            return Point(x=menu_col, y=menu_row)
+
+        if buffer.complete_state:
+            menu_row, menu_col = buffer.document.translate_index_to_position(
+                min(
+                    buffer.cursor_position,
+                    buffer.complete_state.original_document.cursor_position,
+                )
+            )
+            return Point(x=menu_col, y=menu_row)
+
+        return None
+
+    @typing.override
+    def create_content(
+        self,
+        width: int,
+        height: int,
+        preview_search: bool = False,
+    ) -> UIContent:
+        """Create content with word-wrapped visual lines."""
+        buffer = self.buffer
+        buffer.load_history_if_not_yet_loaded()
+        document = self._get_document(preview_search=preview_search)
+        wrap_width = max(1, _wrap_content_width(width))
+        self._wrapped_lines, cursor_position = self._build_wrapped_lines(document, wrap_width)
+        self._wrapped_lines = self._processed_wrapped_lines(
+            document,
+            width,
+            height,
+            self._wrapped_lines,
+        )
+
+        def get_line(i: int) -> StyleAndTextTuples:
+            if 0 <= i < len(self._wrapped_lines):
+                return list(self._wrapped_lines[i].fragments)
+            return [("", " ")]
+
+        content = UIContent(
+            get_line=get_line,
+            line_count=len(self._wrapped_lines),
+            cursor_position=cursor_position,
+        )
+
+        if get_app().layout.current_control == self:
+            content.menu_position = self._get_menu_position(buffer)
+
+        return content
+
+    @staticmethod
+    def _source_col_from_display_x(
+        line_text: str,
+        start: int,
+        end: int,
+        display_x: int,
+    ) -> int:
+        """Translate a wrapped segment display x to a source column."""
+        source_col = start
+        current_width = 0
+
+        while source_col < end:
+            char_width = _char_width(line_text[source_col])
+            if current_width + char_width > display_x:
+                break
+            current_width += char_width
+            source_col += 1
+
+        return source_col
+
+    def _mouse_index(self, mouse_event: MouseEvent) -> int | None:
+        """Return source index for a mouse position on wrapped content."""
+        if not (0 <= mouse_event.position.y < len(self._wrapped_lines)):
+            return None
+
+        wrapped = self._wrapped_lines[mouse_event.position.y]
+        line_text = self.buffer.document.lines[wrapped.row]
+        source_col = self._source_col_from_display_x(
+            line_text,
+            wrapped.start,
+            wrapped.end,
+            mouse_event.position.x,
+        )
+        return self.buffer.document.translate_row_col_to_index(wrapped.row, source_col)
+
+    def _apply_mouse_index(self, mouse_event: MouseEvent, index: int) -> None:
+        """Update the cursor from a resolved mouse index."""
+        buffer = self.buffer
+        if mouse_event.event_type in {MouseEventType.MOUSE_DOWN, MouseEventType.MOUSE_UP}:
+            buffer.cursor_position = index
+
+    def mouse_handler(self, mouse_event: MouseEvent):
+        """Translate clicks from visual wrapped lines back to source lines."""
+
+        index = self._mouse_index(mouse_event)
+        if index is None:
+            return
+        self._apply_mouse_index(mouse_event, index)
+        return
+
+
 class InputArea:
     """Dynamic-height input area that grows with content."""
 
@@ -139,27 +461,15 @@ class InputArea:
             on_text_changed=self._update_file_discovery,
             on_cursor_position_changed=self._update_file_discovery,
         )
-        self._control = BufferControl(buffer=self.buffer)
+        self._control = _WordWrapBufferControl(buffer=self.buffer)
 
     def _count_wrapped_lines(self, text: str, width: int) -> int:
         """Count visual lines after wrapping."""
         if width <= 0:
             return 1
 
-        line_count = 0
-        for line in text.split("\n"):
-            if not line:
-                line_count += 1
-                continue
-
-            line_width = wcswidth(line)
-            if line_width <= 0:
-                line_count += 1
-            else:
-                # Ceiling division to count wrapped lines
-                line_count += (line_width + width - 1) // width
-
-        return max(1, line_count)
+        wrap_width = max(1, _wrap_content_width(width))
+        return max(1, sum(len(_wrap_line_ranges(line, wrap_width)) for line in text.split("\n")))
 
     def _get_input_width(self) -> int:
         """Return current input content width (without margins)."""
@@ -168,6 +478,10 @@ class InputArea:
 
         width_offset = self.DEFAULT_WIDTH_OFFSET if self._state.show_scrollbar else 2
         return max(1, shutil.get_terminal_size().columns - width_offset)
+
+    def _sync_wrapped_lines(self) -> None:
+        """Refresh wrapped line metadata from the current buffer state."""
+        self._control.sync_wrapped_lines(self._get_input_width())
 
     @staticmethod
     def _workspace_file_sort_key(path: str) -> tuple[int, int, int, str]:
@@ -337,7 +651,7 @@ class InputArea:
         self._window = Window(
             content=self._control,
             height=self.get_height,
-            wrap_lines=True,
+            wrap_lines=False,
             dont_extend_height=True,
             left_margins=[_PromptMargin()],
         )
@@ -350,6 +664,20 @@ class InputArea:
     def clear(self) -> None:
         """Clear the input buffer."""
         self.buffer.reset()
+
+    def move_cursor_up(self, count: int = 1) -> None:
+        """Move up by wrapped visual rows, falling back to buffer history behavior."""
+        for _ in range(count):
+            self._sync_wrapped_lines()
+            if not self._control.move_cursor_vertical(-1):
+                self.buffer.auto_up()
+
+    def move_cursor_down(self, count: int = 1) -> None:
+        """Move down by wrapped visual rows, falling back to buffer history behavior."""
+        for _ in range(count):
+            self._sync_wrapped_lines()
+            if not self._control.move_cursor_vertical(1):
+                self.buffer.auto_down()
 
     def move_file_discovery_selection(self, delta: int) -> bool:
         """Move the discovered file selection."""
