@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from prompt_toolkit.layout import Float
 
 from koda_tui.ui.palette.api_key_dialog import ApiKeyDialog
-from koda_tui.ui.palette.command_palette import CommandPalette
+from koda_tui.ui.palette.command_palette import CommandPalette, PaletteOptions
 from koda_tui.ui.palette.commands.commands import get_commands
 from koda_tui.ui.palette.confirm_dialog import ConfirmDialog
 
@@ -127,9 +127,12 @@ class PaletteManager:
         palette = CommandPalette(
             commands=commands,
             on_close=self.close,
-            height=height,
-            footer=footer,
-            shortcuts=shortcuts,
+            invalidate=self._invalidate,
+            options=PaletteOptions(
+                height=height,
+                footer=footer,
+                shortcuts=shortcuts,
+            ),
         )
         self._push(palette, width=width)
         self._state.palette_open = True
