@@ -82,6 +82,26 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         },
     ),
     ModelDefinition(
+        id="gpt-5.4-mini",
+        name="gpt-5.4-mini",
+        provider="openai",
+        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
+        capabilities={
+            ModelCapabilities.WEB_SEARCH,
+            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
+        },
+    ),
+    ModelDefinition(
+        id="gpt-5.4-nano",
+        name="gpt-5.4-nano",
+        provider="openai",
+        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
+        capabilities={
+            ModelCapabilities.WEB_SEARCH,
+            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
+        },
+    ),
+    ModelDefinition(
         id="gpt-5.3-codex",
         name="gpt-5.3-codex",
         provider="openai",
