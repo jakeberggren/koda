@@ -707,7 +707,7 @@ class InputArea:
         before = self.buffer.text[:start]
         after = self.buffer.text[end:]
         suffix = "" if not after or after[:1].isspace() else " "
-        replacement = f"@{selected}{suffix}"
+        replacement = f"{selected}{suffix}"
         cursor_position = len(before) + len(replacement)
         self.buffer.set_document(
             Document(text=f"{before}{replacement}{after}", cursor_position=cursor_position),
