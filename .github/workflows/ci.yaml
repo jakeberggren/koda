@@ -54,8 +54,18 @@ jobs:
         run: uv run ty check
 
   test:
-    name: Test
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.name }})
+    runs-on: ${{ matrix.runs_on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS arm64
+            runs_on: macos-latest
+          - name: Linux x86_64
+            runs_on: ubuntu-latest
+          - name: Linux arm64
+            runs_on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
 
@@ -72,8 +82,13 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Install ripgrep
+      - name: Install ripgrep on Linux
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+      - name: Install ripgrep on macOS
+        if: runner.os == 'macOS'
+        run: brew install ripgrep
 
       - name: Run tests
         run: uv run pytest
