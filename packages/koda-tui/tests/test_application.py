@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
@@ -44,7 +45,12 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
             thinking_options=[ThinkingOption(id="none", label="None")],
         )
     ]
-    return KodaTuiApp(settings=settings, service=service), settings, service, unsubscribe
+    app = KodaTuiApp(
+        settings=settings,
+        service=service,
+        workspace_root=Path("/workspace"),
+    )
+    return (app, settings, service, unsubscribe)
 
 
 def test_close_is_idempotent() -> None:

@@ -450,7 +450,7 @@ class InputArea:
         self._state = state
         self._window: Window | None = None
         self._workspace_files: list[str] | None = None
-        self._ignore_matcher = _IgnoreMatcher(state.cwd)
+        self._ignore_matcher = _IgnoreMatcher(state.workspace_root)
         self._file_discovery_results: list[str] = []
         self._file_discovery_selected_index = 0
         self._active_file_token_range: tuple[int, int] | None = None
@@ -495,7 +495,7 @@ class InputArea:
 
     def _refresh_workspace_files(self) -> None:
         """Build the cached list of workspace-relative file paths."""
-        root = self._state.cwd
+        root = self._state.workspace_root
         files: list[str] = []
 
         for dirpath, dirnames, filenames in os.walk(root):

@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
+import platformdirs
+
 from koda.sessions.exceptions import SessionNotFoundError
 from koda.sessions.session import Session
 
@@ -84,7 +86,7 @@ class InMemorySessionStore(SessionStore):
         del self._sessions[session_id]
 
 
-_DEFAULT_DIR = Path.home() / ".config" / "koda" / "sessions"
+_DEFAULT_DIR = Path(platformdirs.user_data_dir("koda", appauthor=False)) / "sessions"
 
 
 class JsonSessionStore:

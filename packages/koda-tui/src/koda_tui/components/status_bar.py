@@ -17,9 +17,9 @@ class StatusBarControl(UIControl):
     def __init__(self, state: AppState) -> None:
         self._state = state
 
-    def _path_relative_to_home(self) -> Path:
+    def _workspace_path_relative_to_home(self) -> Path:
         """Return the path relative to the repository root."""
-        return self._state.cwd.relative_to(Path.home())
+        return self._state.workspace_root.relative_to(Path.home())
 
     def _get_status(self) -> str:
         if self._state.exit_requested:
@@ -54,7 +54,7 @@ class StatusBarControl(UIControl):
     def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002 - unused argument
         """Create the status bar content."""
         # Left side: provider/model info
-        path = f" ~/{self._path_relative_to_home()}"
+        path = f" ~/{self._workspace_path_relative_to_home()}"
         left_fragments: list[tuple[str, str]] = [
             ("class:status-bar.left", path),
             ("class:status-bar.muted", _DIVIDER),

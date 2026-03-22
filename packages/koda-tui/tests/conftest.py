@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from koda_tui import AppState
@@ -14,7 +16,11 @@ def converter() -> MessageRenderer:
 @pytest.fixture
 def state() -> AppState:
     """An AppState for testing."""
-    return AppState(provider_name="test", model_name="test-model")
+    return AppState(
+        provider_name="test",
+        model_name="test-model",
+        workspace_root=Path("/workspace"),
+    )
 
 
 @pytest.fixture

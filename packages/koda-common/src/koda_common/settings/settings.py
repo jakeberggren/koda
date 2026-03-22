@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
+import platformdirs
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -92,7 +93,7 @@ class EnvSettings(BaseSettings):
 
     # Database
     koda_db_path: Path = Field(
-        default=Path.home() / ".config" / "koda" / "koda.db",
+        default=Path(platformdirs.user_data_dir("koda", appauthor=False)) / "koda.db",
         description="Database file path",
     )
     koda_db_sync_url: AnyHttpUrl | None = Field(default=None, description="Database sync URL")

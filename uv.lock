@@ -515,6 +515,7 @@ dependencies = [
     { name = "langfuse" },
     { name = "openai" },
     { name = "pathspec" },
+    { name = "platformdirs" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
 ]
@@ -525,6 +526,7 @@ requires-dist = [
     { name = "langfuse", specifier = "~=4.0.0" },
     { name = "openai", specifier = "~=2.14.0" },
     { name = "pathspec", specifier = "~=1.0.4" },
+    { name = "platformdirs", specifier = "~=4.5.0" },
     { name = "pydantic", specifier = "~=2.12.5" },
     { name = "pydantic-settings", specifier = "~=2.12.0" },
 ]
@@ -534,6 +536,7 @@ name = "koda-common"
 version = "0.1.0"
 source = { editable = "packages/koda-common" }
 dependencies = [
+    { name = "platformdirs" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy-libsql" },
@@ -549,6 +552,7 @@ keychain = [
 [package.metadata]
 requires-dist = [
     { name = "keyring", marker = "extra == 'keychain'", specifier = "~=25.7.0" },
+    { name = "platformdirs", specifier = "~=4.5.0" },
     { name = "pydantic", specifier = "~=2.12.5" },
     { name = "pydantic-settings", specifier = "~=2.12.0" },
     { name = "sqlalchemy-libsql", specifier = ">=0.2.0" },

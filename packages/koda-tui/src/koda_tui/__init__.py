@@ -25,8 +25,13 @@ def main() -> None:
     logger = get_logger(__name__)
 
     try:
-        context = create_startup_context(Path.cwd().resolve())
-        app = KodaTuiApp(settings=context.settings, service=context.service)
+        workspace_root = Path.cwd().resolve()
+        context = create_startup_context(workspace_root)
+        app = KodaTuiApp(
+            settings=context.settings,
+            service=context.service,
+            workspace_root=workspace_root,
+        )
         asyncio.run(app.run())
     except StartupError as error:
         _report_startup_error(error, logger)
