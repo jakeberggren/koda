@@ -1,5 +1,6 @@
 """Integration tests for builtin tools."""
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -751,6 +752,13 @@ class TestGlobTool:
 class TestGrepTool:
     """Integration tests for grep tool."""
 
+    rg_required = pytest.mark.skipif(
+        shutil.which("rg") is None,
+        reason="ripgrep (rg) is not installed",
+    )
+
+    @rg_required
+    @pytest.mark.requires_rg
     @pytest.mark.asyncio
     async def test_grep_finds_matches(self, sandbox_dir: Path) -> None:
         """grep tool finds matching lines across files."""
@@ -776,6 +784,8 @@ class TestGrepTool:
         assert "file1.txt:3:hello again" in text
         assert "file2.txt:2:hello there" in text
 
+    @rg_required
+    @pytest.mark.requires_rg
     @pytest.mark.asyncio
     async def test_grep_respects_limit(self, sandbox_dir: Path) -> None:
         """grep tool truncates results when exceeding limit."""
@@ -801,6 +811,8 @@ class TestGrepTool:
         assert line_count == limit
         assert "showing first 2" in text
 
+    @rg_required
+    @pytest.mark.requires_rg
     @pytest.mark.asyncio
     async def test_grep_no_matches(self, sandbox_dir: Path) -> None:
         """grep tool reports when no matches are found."""
@@ -842,6 +854,8 @@ class TestGrepTool:
         assert result.output.error_message is not None
         assert "missing" in result.output.error_message
 
+    @rg_required
+    @pytest.mark.requires_rg
     @pytest.mark.asyncio
     async def test_grep_pattern_starting_with_dash(self, sandbox_dir: Path) -> None:
         """grep tool treats patterns starting with '-' as literals."""
@@ -863,6 +877,8 @@ class TestGrepTool:
         assert result.output.is_error is False
         assert "file.txt:1:-match" in result.output.content["text"]
 
+    @rg_required
+    @pytest.mark.requires_rg
     @pytest.mark.asyncio
     async def test_grep_file_path_formats_relative_path(self, sandbox_dir: Path) -> None:
         """grep tool uses the file name when searching a single file."""
