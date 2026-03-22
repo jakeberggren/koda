@@ -92,4 +92,7 @@ testpaths = [
     "packages/koda-service/tests",
     "packages/koda-tui/tests",
 ]
+markers = [
+    "requires_rg: tests that require ripgrep (rg) to be installed",
+]
 addopts = "--import-mode=importlib --cov=koda --cov=koda_common --cov=koda_service --cov=koda_tui --cov-report=term"
