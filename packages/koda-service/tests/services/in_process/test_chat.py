@@ -1,11 +1,22 @@
 import pytest
 
 from koda.llm.types import LLMTextDelta as CoreTextDelta
-from koda_service.exceptions import ServiceAuthenticationError
+from koda_service.exceptions import (
+    ServiceAuthenticationError,
+    ServiceConnectionError,
+    ServiceProviderError,
+    ServiceRateLimitError,
+)
 from koda_service.services.in_process.chat import ChatService
 from koda_service.types import TextDelta
 
-from .test_fakes import FakeAgent, RaisingAuthAgent
+from .test_fakes import (
+    FakeAgent,
+    RaisingApiAgent,
+    RaisingAuthAgent,
+    RaisingConnectionAgent,
+    RaisingRateLimitAgent,
+)
 
 
 @pytest.mark.asyncio
@@ -24,4 +35,28 @@ async def test_chat_maps_auth_error_to_service_auth_error() -> None:
     service = ChatService(RaisingAuthAgent())
 
     with pytest.raises(ServiceAuthenticationError):
+        _ = [event async for event in service.chat("hi")]
+
+
+@pytest.mark.asyncio
+async def test_chat_maps_rate_limit_error_to_service_rate_limit_error() -> None:
+    service = ChatService(RaisingRateLimitAgent())
+
+    with pytest.raises(ServiceRateLimitError):
+        _ = [event async for event in service.chat("hi")]
+
+
+@pytest.mark.asyncio
+async def test_chat_maps_connection_error_to_service_connection_error() -> None:
+    service = ChatService(RaisingConnectionAgent())
+
+    with pytest.raises(ServiceConnectionError):
+        _ = [event async for event in service.chat("hi")]
+
+
+@pytest.mark.asyncio
+async def test_chat_maps_api_error_to_service_provider_error() -> None:
+    service = ChatService(RaisingApiAgent())
+
+    with pytest.raises(ServiceProviderError):
         _ = [event async for event in service.chat("hi")]

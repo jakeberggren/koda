@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda_service.types import (
+    ProviderToolStarted,
+    StreamEvent,
+    TextDelta,
+    ThinkingDelta,
+    ToolCallRequested,
+)
 from koda_tui.state import AppState, Message, MessageRole, ResponsePhase
 
 if TYPE_CHECKING:
@@ -54,6 +61,24 @@ class ResponseLifecycle:
                 tool_call=tool_call,
                 tool_running=True,
             )
+        )
+
+    def apply_event(self, event: StreamEvent) -> None:
+        """Apply a streamed service event to the current response state."""
+        if isinstance(event, TextDelta):
+            self.append_content(event.text)
+            return
+        if isinstance(event, ThinkingDelta):
+            self.append_thinking(event.text)
+            return
+        if isinstance(event, ToolCallRequested | ProviderToolStarted):
+            self.transition_to_tool(event.call)
+            return
+        self.complete_tool(
+            call_id=event.result.call_id,
+            display=event.result.output.display,
+            is_error=event.result.output.is_error,
+            error_message=event.result.output.error_message,
         )
 
     def _set_phase_after_tool_completion(self) -> None:

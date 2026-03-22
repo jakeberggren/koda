@@ -7,7 +7,12 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 from uuid import UUID, uuid4
 
-from koda.llm.exceptions import LLMAuthenticationError
+from koda.llm.exceptions import (
+    LLMAPIError,
+    LLMAuthenticationError,
+    LLMConnectionError,
+    LLMRateLimitError,
+)
 from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.messages import UserMessage as CoreUserMessage
 from koda.sessions import Session
@@ -70,6 +75,24 @@ class FakeAgent:
 class RaisingAuthAgent:
     async def run(self, _message: str):
         raise LLMAuthenticationError("openai", Exception("bad key"))
+        yield  # pragma: no cover
+
+
+class RaisingRateLimitAgent:
+    async def run(self, _message: str):
+        raise LLMRateLimitError("openai", Exception("quota hit"))
+        yield  # pragma: no cover
+
+
+class RaisingConnectionAgent:
+    async def run(self, _message: str):
+        raise LLMConnectionError("openai", Exception("network down"))
+        yield  # pragma: no cover
+
+
+class RaisingApiAgent:
+    async def run(self, _message: str):
+        raise LLMAPIError("openai", Exception("server exploded"))
         yield  # pragma: no cover
 
 

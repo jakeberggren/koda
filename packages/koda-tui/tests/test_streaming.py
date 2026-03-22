@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from koda_service.exceptions import ServiceConnectionError, ServiceRateLimitError
 from koda_service.types import (
     TextDelta,
     ToolCall,
@@ -108,15 +109,15 @@ class TestStreamProcessor:
         assert state.messages[1].tool_result_display == "File not found"
 
     @pytest.mark.asyncio
-    async def test_stream_handles_exception(
+    async def test_stream_handles_rate_limit_error(
         self, state: AppState, processor: StreamProcessor
     ) -> None:
-        """Unknown exceptions should show a generic user-safe error message."""
+        """Rate limit failures should show a user-friendly inline message."""
         client = AsyncMock()
 
         async def mock_chat(_msg: str) -> AsyncIterator:
             yield TextDelta(text="Starting...")
-            raise ValueError("Something went wrong")
+            raise ServiceRateLimitError("openai rate limit exceeded: quota hit")
             yield  # Make it a generator
 
         client.chat = mock_chat
@@ -127,8 +128,43 @@ class TestStreamProcessor:
         _user_msg, assistant_msg = state.messages
         assert "Starting..." in assistant_msg.content
         assert (
-            "An unexpected error occurred while processing the response." in assistant_msg.content
+            f"**Rate limit exceeded for {state.provider_name.title()}.**" in assistant_msg.content
         )
+        assert "quota hit" in assistant_msg.content
+
+    @pytest.mark.asyncio
+    async def test_stream_propagates_unexpected_exception(self, processor: StreamProcessor) -> None:
+        """Unexpected exceptions should escape local handling."""
+        client = AsyncMock()
+
+        async def mock_chat(_msg: str) -> AsyncIterator:
+            raise ValueError("Something went wrong")
+            yield  # Make it a generator
+
+        client.chat = mock_chat
+
+        with pytest.raises(ValueError, match="Something went wrong"):
+            await processor.stream("do something", client)
+
+    @pytest.mark.asyncio
+    async def test_stream_handles_connection_error(
+        self, state: AppState, processor: StreamProcessor
+    ) -> None:
+        """Connection failures should show recovery guidance."""
+        client = AsyncMock()
+
+        async def mock_chat(_msg: str) -> AsyncIterator:
+            raise ServiceConnectionError("openai connection error: network down")
+            yield  # Make it a generator
+
+        client.chat = mock_chat
+
+        await processor.stream("do something", client)
+
+        assert state.is_streaming is False
+        _user_msg, assistant_msg = state.messages
+        assert f"**Connection error with {state.provider_name.title()}.**" in assistant_msg.content
+        assert "network down" in assistant_msg.content
 
     @pytest.mark.asyncio
     async def test_cancel_stream(self, state: AppState, processor: StreamProcessor) -> None:
