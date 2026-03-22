@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import cast
 from unittest.mock import Mock
 from uuid import uuid4
@@ -38,7 +39,11 @@ def _session_info() -> SessionInfo:
 
 
 def _state_with_conversation() -> AppState:
-    state = AppState(provider_name="openai", model_name="gpt-5.2")
+    state = AppState(
+        provider_name="openai",
+        model_name="gpt-5.2",
+        workspace_root=Path("/workspace"),
+    )
     state.messages = [Message(role=MessageRole.USER, content="old")]
     state.current_streaming_content = "partial"
     state.is_streaming = True

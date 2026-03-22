@@ -49,7 +49,7 @@ def create_registries() -> Registries:
 def create_tool_config(sandbox_dir: Path) -> ToolConfig:
     tool_registry = ToolRegistry()
     tool_registry.register_all(get_builtin_tools())
-    tool_context = ToolContext.default(sandbox_dir=sandbox_dir)
+    tool_context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
     return ToolConfig(registry=tool_registry, context=tool_context)
 
 

@@ -40,8 +40,8 @@ class Message:
 class AppState:
     """Shared application state as single source of truth for the UI."""
 
+    workspace_root: Path
     messages: list[Message] = field(default_factory=list)
-    cwd: Path = field(default_factory=Path.cwd)
     current_streaming_content: str = ""
     current_thinking_content: str = ""
     is_streaming: bool = False

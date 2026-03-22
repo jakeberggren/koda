@@ -17,6 +17,8 @@ from koda_tui.ui.styles import get_style
 from koda_tui.utils.model_selection import find_model, resolve_thinking_option, supports_thinking
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from koda_common.settings import SettingChange, SettingsManager
     from koda_service import KodaService
     from koda_service.types import ThinkingOptionId
@@ -43,9 +45,11 @@ class KodaTuiApp:
         self,
         settings: SettingsManager,
         service: KodaService,
+        workspace_root: Path,
     ) -> None:
         self._settings = settings
         self._service = service
+        self._workspace_root = workspace_root
 
         # Subscribe to settings changes
         self._unsubscribe = self._settings.subscribe(self._on_settings_changed)
@@ -58,6 +62,7 @@ class KodaTuiApp:
 
         # Initialize state
         self.state = AppState(
+            workspace_root=self._workspace_root,
             provider_name=self._settings.provider,
             model_name=self._settings.model,
             thinking=resolve_thinking_option(initial_model, self._settings.thinking),

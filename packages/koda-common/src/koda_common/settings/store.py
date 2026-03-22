@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 from typing import Any, Protocol
 
+from platformdirs import user_config_dir
+
 from koda_common.logging import get_logger
 
 log = get_logger(__name__)
@@ -19,7 +21,8 @@ class SettingsStore(Protocol):
 
 class JsonFileSettingsStore(SettingsStore):
     def __init__(self, path: Path | None = None):
-        self.path = path or Path.home() / ".config" / "koda" / "koda.json"
+        default_path = Path(user_config_dir("koda", appauthor=False)) / "koda.json"
+        self.path = path or default_path
 
     def load(self) -> dict[str, Any]:
         if not self.path.exists():

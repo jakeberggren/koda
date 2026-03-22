@@ -11,6 +11,7 @@ dependencies = [
     "langfuse~=4.0.0",
     "openai~=2.29.0",
     "pathspec~=1.0.4",
+    "platformdirs~=4.5.0",
     "pydantic~=2.12.5",
     "pydantic-settings~=2.12.0",
 ]
