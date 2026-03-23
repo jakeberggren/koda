@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, cast
 
+from koda.llm.models import ProviderDefinition
 from koda_service.services.in_process.catalog import CatalogService
 from koda_service.services.in_process.chat import ChatService
 from koda_service.services.in_process.runtime import InProcessRuntime
@@ -76,7 +77,9 @@ def test_reconfigure_swaps_runtime_bundle() -> None:
             sessions=SessionService(FakeAgent()),
             catalog=CatalogService(
                 SimpleNamespace(
-                    provider_registry=SimpleNamespace(supported=lambda: [provider_name]),
+                    provider_registry=SimpleNamespace(
+                        supported=lambda: [ProviderDefinition(id=provider_name, name=provider_name)]
+                    ),
                     model_registry=SimpleNamespace(supported=lambda _provider=None: []),
                 )
             ),
@@ -99,8 +102,8 @@ def test_reconfigure_swaps_runtime_bundle() -> None:
         runtime_factory=cast("InProcessRuntimeFactory", FakeRuntimeFactory()),
     )
 
-    assert service.list_providers() == ["openai"]
+    assert [provider.id for provider in service.list_providers()] == ["openai"]
 
     service.reconfigure()
 
-    assert service.list_providers() == ["bergetai"]
+    assert [provider.id for provider in service.list_providers()] == ["bergetai"]

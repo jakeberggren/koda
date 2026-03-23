@@ -27,7 +27,7 @@ from koda.llm.exceptions import (
     InvalidToolCallArgumentsError,
     UnknownMessageTypeError,
 )
-from koda.llm.models import ModelDefinition
+from koda.llm.models import ModelDefinition, ProviderDefinition
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.providers.base import LLMProviderBase
 from koda.llm.utils import resolve_openai_client
@@ -43,6 +43,11 @@ if TYPE_CHECKING:
     from koda_common.settings import SettingsManager
 
 BERGETAI_BASE_URL = "https://api.berget.ai/v1"
+
+BERGETAI_PROVIDER = ProviderDefinition(
+    id="bergetai",
+    name="BergetAI",
+)
 
 BERGETAI_MODELS: Sequence[ModelDefinition] = [
     ModelDefinition(

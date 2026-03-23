@@ -1,12 +1,6 @@
-from enum import StrEnum, auto
+from __future__ import annotations
 
 from pydantic import BaseModel, Field
-
-
-class ModelCapability(StrEnum):
-    WEB_SEARCH = auto()
-    EXTENDED_PROMPT_RETENTION = auto()
-
 
 type ThinkingOptionId = str
 type ThinkingOptionLabel = str
@@ -19,9 +13,17 @@ class ThinkingOption(BaseModel):
     description: ThinkingOptionDescription | None = None
 
 
+class ProviderDefinition(BaseModel):
+    id: str
+    name: str
+    provider_features: dict[str, object] = Field(default_factory=dict)
+
+
 class ModelDefinition(BaseModel):
     id: str
     name: str
     provider: str
+    context_window: int | None = None
+    max_output_tokens: int | None = None
     thinking_options: list[ThinkingOption] = Field(default_factory=list)
-    capabilities: set[ModelCapability] = Field(default_factory=set)
+    model_features: dict[str, object] = Field(default_factory=dict)

@@ -1,6 +1,6 @@
 from koda.llm.models import (
-    ModelCapabilities,
     ModelDefinition,
+    ProviderDefinition,
     ThinkingOption,
     ThinkingOptionDescription,
     ThinkingOptionId,
@@ -17,9 +17,9 @@ __all__ = [
     "LLMRequestOptions",
     "LLMResponse",
     "LLMTokenUsage",
-    "ModelCapabilities",
     "ModelDefinition",
     "ModelRegistry",
+    "ProviderDefinition",
     "ProviderRegistry",
     "ThinkingOption",
     "ThinkingOptionDescription",

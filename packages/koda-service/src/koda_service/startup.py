@@ -28,13 +28,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from koda_service.protocols import KodaService
-    from koda_service.types import Message, ModelDefinition, StreamEvent
+    from koda_service.types import Message, ModelDefinition, ProviderDefinition, StreamEvent
 
 
 @dataclass(frozen=True, slots=True)
 class StartupContext:
     settings: SettingsManager
-    service: KodaService[StreamEvent, ModelDefinition, Message]
+    service: KodaService[StreamEvent, ProviderDefinition, ModelDefinition, Message]
 
 
 def _create_settings(settings_store: JsonFileSettingsStore) -> SettingsManager:
@@ -59,7 +59,7 @@ def _create_settings(settings_store: JsonFileSettingsStore) -> SettingsManager:
 def _create_service(
     settings: SettingsManager,
     cwd: Path,
-) -> KodaService[StreamEvent, ModelDefinition, Message]:
+) -> KodaService[StreamEvent, ProviderDefinition, ModelDefinition, Message]:
     try:
         registries = create_registries()
         runtime_factory = create_in_process_runtime_factory(

@@ -16,6 +16,7 @@ from openai.types.responses import (
 )
 from openai.types.responses.response_function_tool_call_param import ResponseFunctionToolCallParam
 from openai.types.responses.response_input_param import FunctionCallOutput, ResponseInputItemParam
+from pydantic import BaseModel
 
 from koda.llm.drivers import ResponsesDriver, ResponsesDriverConfig
 from koda.llm.exceptions import (
@@ -24,7 +25,7 @@ from koda.llm.exceptions import (
     InvalidToolCallArgumentsError,
     UnknownMessageTypeError,
 )
-from koda.llm.models import ModelCapabilities, ModelDefinition, ThinkingOption
+from koda.llm.models import ModelDefinition, ProviderDefinition, ThinkingOption
 from koda.llm.protocols import LLMAdapter
 from koda.llm.providers.base import LLMProviderBase
 from koda.llm.utils import resolve_openai_client
@@ -70,110 +71,121 @@ _OPENAI_REASONING_EFFORTS: dict[ThinkingOptionId, ReasoningEffort] = {
     "xhigh": "xhigh",
 }
 
+
+class OpenAIModelFeatures(BaseModel):
+    web_search: bool = False
+    extended_prompt_retention: bool = False
+
+
+OPENAI_PROVIDER = ProviderDefinition(
+    id="openai",
+    name="OpenAI",
+)
+
 OPENAI_MODELS: Sequence[ModelDefinition] = [
     ModelDefinition(
         id="gpt-5.4",
         name="gpt-5.4",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
-        capabilities={
-            ModelCapabilities.WEB_SEARCH,
-            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
-        },
+        model_features=OpenAIModelFeatures(
+            web_search=True,
+            extended_prompt_retention=True,
+        ).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5.4-mini",
         name="gpt-5.4-mini",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
-        capabilities={
-            ModelCapabilities.WEB_SEARCH,
-            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
-        },
+        model_features=OpenAIModelFeatures(
+            web_search=True,
+            extended_prompt_retention=True,
+        ).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5.4-nano",
         name="gpt-5.4-nano",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
-        capabilities={
-            ModelCapabilities.WEB_SEARCH,
-            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
-        },
+        model_features=OpenAIModelFeatures(
+            web_search=True,
+            extended_prompt_retention=True,
+        ).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5.3-codex",
         name="gpt-5.3-codex",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
-        capabilities={
-            ModelCapabilities.WEB_SEARCH,
-            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
-        },
+        model_features=OpenAIModelFeatures(
+            web_search=True,
+            extended_prompt_retention=True,
+        ).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5.2-codex",
         name="gpt-5.2-codex",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
-        capabilities={
-            ModelCapabilities.WEB_SEARCH,
-            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
-        },
+        model_features=OpenAIModelFeatures(
+            web_search=True,
+            extended_prompt_retention=True,
+        ).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5.2",
         name="gpt-5.2",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
-        capabilities={
-            ModelCapabilities.WEB_SEARCH,
-            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
-        },
+        model_features=OpenAIModelFeatures(
+            web_search=True,
+            extended_prompt_retention=True,
+        ).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5.1-codex",
         name="gpt-5.1-codex",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
-        capabilities={
-            ModelCapabilities.WEB_SEARCH,
-            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
-        },
+        model_features=OpenAIModelFeatures(
+            web_search=True,
+            extended_prompt_retention=True,
+        ).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5.1",
         name="gpt-5.1",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
-        capabilities={
-            ModelCapabilities.WEB_SEARCH,
-            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
-        },
+        model_features=OpenAIModelFeatures(
+            web_search=True,
+            extended_prompt_retention=True,
+        ).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5",
         name="gpt-5",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
-        capabilities={
-            ModelCapabilities.WEB_SEARCH,
-            ModelCapabilities.EXTENDED_PROMPT_RETENTION,
-        },
+        model_features=OpenAIModelFeatures(
+            web_search=True,
+            extended_prompt_retention=True,
+        ).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5-mini",
         name="gpt-5-mini",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
-        capabilities={ModelCapabilities.WEB_SEARCH},
+        model_features=OpenAIModelFeatures(web_search=True).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5-nano",
         name="gpt-5-nano",
         provider="openai",
         thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
-        capabilities={ModelCapabilities.WEB_SEARCH},
+        model_features=OpenAIModelFeatures(web_search=True).model_dump(),
     ),
 ]
 
@@ -304,7 +316,7 @@ class OpenAILLMProvider(LLMProviderBase):
     ) -> None:
         super().__init__(driver=driver)
         self.model = model_definition.id
-        self.capabilities = set(model_definition.capabilities)
+        self.model_features = OpenAIModelFeatures.model_validate(model_definition.model_features)
 
     @classmethod
     def from_config(
@@ -336,34 +348,32 @@ class OpenAILLMProvider(LLMProviderBase):
         )
 
     @staticmethod
-    def _apply_capabilities(
+    def _apply_model_features(
         request: LLMRequest,
         *,
-        capabilities: set[ModelCapabilities],
+        model_features: OpenAIModelFeatures,
     ) -> LLMRequest:
         resolved_options = replace(
             request.options,
-            web_search=(
-                request.options.web_search and ModelCapabilities.WEB_SEARCH in capabilities
-            ),
+            web_search=request.options.web_search and model_features.web_search,
             extended_prompt_retention=(
                 request.options.extended_prompt_retention
-                and ModelCapabilities.EXTENDED_PROMPT_RETENTION in capabilities
+                and model_features.extended_prompt_retention
             ),
         )
         return replace(request, options=resolved_options)
 
     async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
-        resolved_request = self._apply_capabilities(
+        resolved_request = self._apply_model_features(
             request,
-            capabilities=self.capabilities,
+            model_features=self.model_features,
         )
         return await self.driver.generate(resolved_request)
 
     def generate_stream(self, request: LLMRequest):
-        resolved_request = self._apply_capabilities(
+        resolved_request = self._apply_model_features(
             request,
-            capabilities=self.capabilities,
+            model_features=self.model_features,
         )
         return self.driver.generate_stream(resolved_request)
 

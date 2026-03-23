@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_service.protocols import KodaService
-from koda_service.types import Message, ModelDefinition, StreamEvent
+from koda_service.types import Message, ModelDefinition, ProviderDefinition, StreamEvent
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from koda_service.types import SessionInfo
 
 
-class InProcessKodaService(KodaService[StreamEvent, ModelDefinition, Message]):
+class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDefinition, Message]):
     """In-process implementation of the Koda service boundary."""
 
     def __init__(
@@ -34,7 +34,7 @@ class InProcessKodaService(KodaService[StreamEvent, ModelDefinition, Message]):
         async for event in self._runtime.chat.chat(message):
             yield event
 
-    def list_providers(self) -> list[str]:
+    def list_providers(self) -> list[ProviderDefinition]:
         return self._runtime.catalog.list_providers()
 
     def list_models(self, provider: str | None = None) -> list[ModelDefinition]:
