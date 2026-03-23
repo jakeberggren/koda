@@ -1,5 +1,5 @@
 from koda.llm.models import ModelDefinition as CoreModelDefinition
-from koda_service.types.models import ModelCapability, ModelDefinition, ThinkingOption
+from koda_service.types.models import ModelDefinition, ThinkingOption
 
 
 def map_model_definition_to_contract_model_definition(
@@ -10,6 +10,8 @@ def map_model_definition_to_contract_model_definition(
         id=core_model.id,
         name=core_model.name,
         provider=core_model.provider,
+        context_window=core_model.context_window,
+        max_output_tokens=core_model.max_output_tokens,
         thinking_options=[
             ThinkingOption(
                 id=option.id,
@@ -18,5 +20,5 @@ def map_model_definition_to_contract_model_definition(
             )
             for option in core_model.thinking_options
         ],
-        capabilities={ModelCapability(capability.value) for capability in core_model.capabilities},
+        model_features=core_model.model_features,
     )

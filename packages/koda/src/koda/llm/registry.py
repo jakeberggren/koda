@@ -8,7 +8,7 @@ from koda.llm import exceptions
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from koda.llm.models import ModelDefinition
+    from koda.llm.models import ModelDefinition, ProviderDefinition
     from koda.llm.protocols import LLM
     from koda_common.settings import SettingsManager
 
@@ -16,22 +16,31 @@ type ProviderFactory = Callable[[SettingsManager, ModelRegistry], LLM]
 
 
 class ProviderRegistry:
-    """Registry for LLM provider factories keyed by provider name."""
+    """Registry for provider definitions and factories keyed by provider name."""
 
     def __init__(self) -> None:
+        self._definitions: dict[str, ProviderDefinition] = {}
         self._factories: dict[str, ProviderFactory] = {}
 
     @staticmethod
     def _normalize(value: str) -> str:
         return value.strip().lower()
 
-    def register(self, name: str, factory: ProviderFactory) -> None:
-        provider_name = self._normalize(name)
+    def register(self, provider_definition: ProviderDefinition, factory: ProviderFactory) -> None:
+        provider_name = self._normalize(provider_definition.id)
         if not provider_name:
             raise exceptions.ProviderNameEmptyError
-        if provider_name in self._factories:
+        if provider_name in self._definitions or provider_name in self._factories:
             raise exceptions.ProviderAlreadyRegisteredError(provider_name)
+        self._definitions[provider_name] = provider_definition
         self._factories[provider_name] = factory
+
+    def get(self, name: str) -> ProviderDefinition:
+        provider_name = self._normalize(name)
+        provider_definition = self._definitions.get(provider_name)
+        if provider_definition is None:
+            raise exceptions.ProviderNotSupportedError(provider_name)
+        return provider_definition
 
     def create(self, name: str, settings: SettingsManager, model_registry: ModelRegistry) -> LLM:
         provider_name = self._normalize(name)
@@ -40,8 +49,11 @@ class ProviderRegistry:
             raise exceptions.ProviderNotSupportedError(provider_name)
         return factory(settings, model_registry)
 
-    def supported(self) -> list[str]:
-        return sorted(self._factories.keys())
+    def supported(self) -> list[ProviderDefinition]:
+        return sorted(
+            self._definitions.values(),
+            key=lambda provider_definition: provider_definition.id,
+        )
 
 
 class ModelRegistry:

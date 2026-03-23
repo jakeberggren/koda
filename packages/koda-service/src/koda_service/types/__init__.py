@@ -16,8 +16,8 @@ from koda_service.types.messages import (
     UserMessage,
 )
 from koda_service.types.models import (
-    ModelCapability,
     ModelDefinition,
+    ProviderDefinition,
     ThinkingOption,
     ThinkingOptionDescription,
     ThinkingOptionId,
@@ -30,8 +30,8 @@ __all__ = [
     "AssistantMessage",
     "Message",
     "MessageRole",
-    "ModelCapability",
     "ModelDefinition",
+    "ProviderDefinition",
     "ProviderToolCompleted",
     "ProviderToolStarted",
     "SessionInfo",

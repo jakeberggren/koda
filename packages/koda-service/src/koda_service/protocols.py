@@ -13,10 +13,10 @@ class ChatService[EventT](Protocol):
         ...
 
 
-class CatalogService[ModelT](Protocol):
+class CatalogService[ProviderT, ModelT](Protocol):
     """Provider and model discovery exposed by the service boundary."""
 
-    def list_providers(self) -> list[str]:
+    def list_providers(self) -> list[ProviderT]:
         """List available providers."""
         ...
 
@@ -49,9 +49,9 @@ class SessionService[MessageT](Protocol):
         ...
 
 
-class KodaService[EventT, ModelT, MessageT](
+class KodaService[EventT, ProviderT, ModelT, MessageT](
     ChatService[EventT],
-    CatalogService[ModelT],
+    CatalogService[ProviderT, ModelT],
     SessionService[MessageT],
     Protocol,
 ):
