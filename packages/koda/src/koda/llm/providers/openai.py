@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-_OPENAI_THINKING_LOW_TO_XHIGH = [
+_LOW_TO_XHIGH = [
     ThinkingOption(id="none", label="Off", description="No interleaved thinking."),
     ThinkingOption(id="low", label="Low", description="Low effort for straightforward tasks."),
     ThinkingOption(id="medium", label="Medium", description="Balanced effort for most tasks."),
@@ -55,7 +55,7 @@ _OPENAI_THINKING_LOW_TO_XHIGH = [
     ThinkingOption(id="xhigh", label="XHigh", description="Extra high effort for complex tasks."),
 ]
 
-_OPENAI_THINKING_LOW_TO_HIGH = [
+_LOW_TO_HIGH = [
     ThinkingOption(id="none", label="Off", description="No interleaved thinking."),
     ThinkingOption(id="low", label="Low", description="Low effort for straightforward tasks."),
     ThinkingOption(id="medium", label="Medium", description="Balanced effort for most tasks."),
@@ -87,7 +87,9 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.4",
         name="gpt-5.4",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
+        context_window=1_000_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_XHIGH,
         model_features=OpenAIModelFeatures(
             web_search=True,
             extended_prompt_retention=True,
@@ -97,7 +99,9 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.4-mini",
         name="gpt-5.4-mini",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_XHIGH,
         model_features=OpenAIModelFeatures(
             web_search=True,
             extended_prompt_retention=True,
@@ -107,7 +111,9 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.4-nano",
         name="gpt-5.4-nano",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_XHIGH,
         model_features=OpenAIModelFeatures(
             web_search=True,
             extended_prompt_retention=True,
@@ -117,7 +123,9 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.3-codex",
         name="gpt-5.3-codex",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_XHIGH,
         model_features=OpenAIModelFeatures(
             web_search=True,
             extended_prompt_retention=True,
@@ -127,7 +135,9 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.2-codex",
         name="gpt-5.2-codex",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_XHIGH,
         model_features=OpenAIModelFeatures(
             web_search=True,
             extended_prompt_retention=True,
@@ -137,7 +147,9 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.2",
         name="gpt-5.2",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_XHIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_XHIGH,
         model_features=OpenAIModelFeatures(
             web_search=True,
             extended_prompt_retention=True,
@@ -147,7 +159,9 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.1-codex",
         name="gpt-5.1-codex",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_HIGH,
         model_features=OpenAIModelFeatures(
             web_search=True,
             extended_prompt_retention=True,
@@ -157,7 +171,9 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5.1",
         name="gpt-5.1",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_HIGH,
         model_features=OpenAIModelFeatures(
             web_search=True,
             extended_prompt_retention=True,
@@ -167,7 +183,9 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5",
         name="gpt-5",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_HIGH,
         model_features=OpenAIModelFeatures(
             web_search=True,
             extended_prompt_retention=True,
@@ -177,14 +195,18 @@ OPENAI_MODELS: Sequence[ModelDefinition] = [
         id="gpt-5-mini",
         name="gpt-5-mini",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_HIGH,
         model_features=OpenAIModelFeatures(web_search=True).model_dump(),
     ),
     ModelDefinition(
         id="gpt-5-nano",
         name="gpt-5-nano",
         provider="openai",
-        thinking_options=_OPENAI_THINKING_LOW_TO_HIGH,
+        context_window=400_000,
+        max_output_tokens=128_000,
+        thinking_options=_LOW_TO_HIGH,
         model_features=OpenAIModelFeatures(web_search=True).model_dump(),
     ),
 ]
