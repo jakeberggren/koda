@@ -9,6 +9,8 @@ from koda_tui.state import AppState, ResponsePhase
 
 _DIVIDER = " · "
 _BASE_FOOTER_BINDINGS = [("ctrl+p", "palette")]
+_ELLIPSIS = "..."
+_MIN_PLAIN_SECTION_PADDING = len(_DIVIDER) + 1
 
 
 class StatusBarControl(UIControl):
@@ -97,54 +99,89 @@ class StatusBarControl(UIControl):
 
         return fragments, "".join(text_parts)
 
-    def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002 - unused argument
-        """Create the status bar content."""
-        # Left side: provider/model info
+    def _get_left_segments(self) -> list[tuple[list[tuple[str, str]], str]]:
         path = f" ~/{self._workspace_path_relative_to_home()}"
-        left_fragments: list[tuple[str, str]] = [
-            ("class:status-bar.left", path),
-            ("class:status-bar.muted", _DIVIDER),
-            (
-                "class:status-bar.left",
-                f"{self._state.provider_name}{_DIVIDER}{self._state.model_name}",
-            ),
+        provider_model = f"{self._state.provider_name}{_DIVIDER}{self._state.model_name}"
+        segments: list[tuple[list[tuple[str, str]], str]] = [
+            ([("class:status-bar.left", path)], path),
+            ([("class:status-bar.left", provider_model)], provider_model),
         ]
-        left_text = f"{path}{_DIVIDER}{self._state.provider_name}{_DIVIDER}{self._state.model_name}"
+
         if self._state.thinking.id != "none":
             thinking_label = self._state.thinking.label.lower()
-            left_fragments.extend(
-                [
-                    ("class:status-bar.muted", _DIVIDER),
-                    ("class:status-bar.thinking", thinking_label),
-                ]
-            )
-            left_text += f"{_DIVIDER}{thinking_label}"
+            segments.append(([("class:status-bar.thinking", thinking_label)], thinking_label))
+
         usage_fragments, usage_text = self._get_usage_fragments()
         if usage_fragments:
-            left_fragments.extend(
-                [
-                    ("class:status-bar.muted", _DIVIDER),
-                    *usage_fragments,
-                ]
-            )
-            left_text += f"{_DIVIDER}{usage_text}"
+            segments.append((usage_fragments, usage_text))
 
-        # Right side: footer help + status
+        return segments
+
+    def _get_right_fragments(self) -> tuple[list[tuple[str, str]], str]:
         status = self._get_status()
+        status_text = status + " "
         footer_fragments, footer_text = self._get_footer_fragments()
-        right_text = f"{footer_text}{_DIVIDER}{status}"
+        return (
+            [
+                *footer_fragments,
+                ("class:status-bar.muted", _DIVIDER),
+                ("class:status-bar.right", status_text),
+            ],
+            f"{footer_text}{_DIVIDER}{status_text}",
+        )
 
-        # Calculate padding
-        padding = width - len(left_text) - len(right_text) - 2
-        padding = max(1, padding)
+    @staticmethod
+    def _join_left_segments(
+        segments: list[tuple[list[tuple[str, str]], str]],
+    ) -> tuple[list[tuple[str, str]], str]:
+        fragments: list[tuple[str, str]] = []
+        text_parts: list[str] = []
+
+        for index, (segment_fragments, segment_text) in enumerate(segments):
+            if index > 0:
+                fragments.append(("class:status-bar.muted", _DIVIDER))
+                text_parts.append(_DIVIDER)
+            fragments.extend(segment_fragments)
+            text_parts.append(segment_text)
+
+        return fragments, "".join(text_parts)
+
+    @staticmethod
+    def _truncate_fragments(
+        fragments: list[tuple[str, str]],
+        max_width: int,
+    ) -> list[tuple[str, str]]:
+        if max_width <= 0:
+            return []
+
+        plain_text = "".join(text for _, text in fragments)
+        if len(plain_text) <= max_width:
+            return fragments
+
+        if max_width <= len(_ELLIPSIS):
+            return [("class:status-bar.muted", _ELLIPSIS[:max_width])]
+
+        return [("class:status-bar.left", plain_text[: max_width - len(_ELLIPSIS)] + _ELLIPSIS)]
+
+    def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002 - unused argument
+        """Create the status bar content."""
+        right_fragments, right_text = self._get_right_fragments()
+        left_segments = self._get_left_segments()
+        left_fragments, left_text = self._join_left_segments(left_segments)
+        padding = width - len(left_text) - len(right_text)
+
+        if padding >= _MIN_PLAIN_SECTION_PADDING:
+            gap_fragments: list[tuple[str, str]] = [("class:status-bar", " " * padding)]
+        else:
+            available_left_width = max(0, width - len(right_text) - len(_DIVIDER))
+            left_fragments = self._truncate_fragments(left_fragments, available_left_width)
+            gap_fragments = [("class:status-bar.muted", _DIVIDER)]
 
         line = FormattedText(
             [
                 *left_fragments,
-                ("class:status-bar", " " * padding),
-                *footer_fragments,
-                ("class:status-bar.muted", _DIVIDER),
-                ("class:status-bar.right", status + " "),
+                *gap_fragments,
+                *right_fragments,
             ]
         )
 
