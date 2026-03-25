@@ -28,8 +28,8 @@ def test_map_model_definition_to_contract_model_definition() -> None:
     assert contract_model.id == "openai/gpt-5"
     assert contract_model.name == "GPT-5"
     assert contract_model.provider == "openai"
-    assert contract_model.context_window == 200_000  # noqa: PLR2004
-    assert contract_model.max_output_tokens == 8_000  # noqa: PLR2004
+    assert contract_model.context_window == 200_000
+    assert contract_model.max_output_tokens == 8_000
     assert contract_model.thinking_options[0].id == "high"
     assert contract_model.thinking_options[0].label == "High"
     assert contract_model.thinking_options[0].description == "Longer reasoning"

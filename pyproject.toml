@@ -66,6 +66,7 @@ ignore = ["COM812"]
     "S101",    # Allow assert in tests
     "ARG002",  # Unused arguments in mocks/fixtures matching interfaces
     "S108",    # Temp paths in tests
+    "PLR2004", # Magic values are often clearer in test assertions
     "TRY003",  # Long exception messages
 ]
 

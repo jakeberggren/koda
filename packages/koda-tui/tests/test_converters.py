@@ -74,7 +74,7 @@ class TestConvertMessages:
 
         result = convert_messages(messages)
 
-        assert len(result) == 2  # noqa: PLR2004
+        assert len(result) == 2
         assert result[0].role == MessageRole.USER
         assert result[1].role == MessageRole.ASSISTANT
 
@@ -102,7 +102,7 @@ class TestConvertMessages:
         result = convert_messages(messages)
 
         # user + tool entry (assistant with no content is skipped, tool result merged)
-        assert len(result) == 2  # noqa: PLR2004
+        assert len(result) == 2
         tool_msg = result[1]
         assert tool_msg.role == MessageRole.TOOL
         assert tool_msg.tool_call == tc
@@ -139,7 +139,7 @@ class TestConvertMessages:
 
         result = convert_messages(messages)
 
-        assert len(result) == 2  # noqa: PLR2004
+        assert len(result) == 2
         assert result[0].tool_result_display == "search result"
         assert result[1].tool_result_display == "file content"
 
@@ -170,7 +170,7 @@ class TestConvertMessages:
         result = convert_messages(messages)
 
         # assistant text + tool entry
-        assert len(result) == 2  # noqa: PLR2004
+        assert len(result) == 2
         assert result[0].role == MessageRole.ASSISTANT
         assert result[0].content == "Let me search"
         assert result[1].role == MessageRole.TOOL

@@ -66,6 +66,7 @@ class KodaTuiApp:
             provider_name=self._settings.provider,
             model_name=self._settings.model,
             thinking=resolve_thinking_option(initial_model, self._settings.thinking),
+            context_window=(initial_model.context_window if initial_model else None),
             thinking_supported=supports_thinking(initial_model),
             show_scrollbar=self._settings.show_scrollbar,
             queue_inputs=self._settings.queue_inputs,
@@ -141,6 +142,7 @@ class KodaTuiApp:
             model_id=self._settings.model,
         )
         self.state.thinking = resolve_thinking_option(active_model, self._settings.thinking)
+        self.state.context_window = active_model.context_window if active_model else None
         self.state.thinking_supported = supports_thinking(active_model)
         self._service.reconfigure()
         return True

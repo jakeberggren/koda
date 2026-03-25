@@ -37,6 +37,19 @@ class Message:
 
 
 @dataclass
+class TokenUsage:
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cached_tokens: int | None = None
+    total_tokens: int | None = None
+
+    def context_window_percentage(self, context_window: int | None) -> int | None:
+        if context_window is None or context_window <= 0 or self.input_tokens is None:
+            return None
+        return round((self.input_tokens / context_window) * 100)
+
+
+@dataclass
 class AppState:
     """Shared application state as single source of truth for the UI."""
 
@@ -54,6 +67,8 @@ class AppState:
     thinking: ThinkingOption = field(
         default_factory=lambda: ThinkingOption(id="none", label="none")
     )
+    context_window: int | None = None
+    latest_usage: TokenUsage | None = None
     thinking_supported: bool = False
     show_scrollbar: bool = True
     queue_inputs: bool = True
@@ -69,3 +84,4 @@ class AppState:
         self.is_thinking = False
         self.response_phase = ResponsePhase.IDLE
         self.active_tools.clear()
+        self.latest_usage = None

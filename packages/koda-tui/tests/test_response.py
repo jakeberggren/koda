@@ -1,4 +1,4 @@
-from koda_service.types import ToolCall
+from koda_service.types import AssistantMessage, ResponseCompleted, TokenUsage, ToolCall
 from koda_tui.app.response import ResponseLifecycle
 from koda_tui.state import AppState, MessageRole, ResponsePhase
 
@@ -197,7 +197,7 @@ class TestResponseLifecycle:
         lifecycle.transition_to_tool(tool)
 
         assert state.active_tools == {"c1": tool}
-        assert len(state.messages) == 2  # noqa: PLR2004
+        assert len(state.messages) == 2
         assert state.messages[1].role == MessageRole.TOOL
         assert state.response_phase is ResponsePhase.TOOLS
 
@@ -229,3 +229,50 @@ class TestResponseLifecycle:
 
         assert state.is_thinking is True
         assert state.response_phase is ResponsePhase.WORKING
+
+    def test_response_completed_persists_usage(
+        self, state: AppState, lifecycle: ResponseLifecycle
+    ) -> None:
+        """ResponseCompleted should persist latest usage for the status bar."""
+        lifecycle.begin("msg")
+
+        lifecycle.apply_event(
+            ResponseCompleted(
+                output=AssistantMessage(content="done"),
+                usage=TokenUsage(
+                    input_tokens=2_000,
+                    output_tokens=500,
+                    cached_tokens=100,
+                    total_tokens=2_500,
+                ),
+            )
+        )
+
+        assert state.latest_usage is not None
+        assert state.latest_usage.input_tokens == 2_000
+        assert state.latest_usage.output_tokens == 500
+        assert state.latest_usage.cached_tokens == 100
+        assert state.latest_usage.total_tokens == 2_500
+
+    def test_end_uses_completed_response_output_as_canonical_message(
+        self, state: AppState, lifecycle: ResponseLifecycle
+    ) -> None:
+        """end() should persist the completed response output instead of buffered chunks."""
+        lifecycle.begin("msg")
+        lifecycle.append_thinking("partial thinking")
+        lifecycle.append_content("partial content")
+
+        lifecycle.apply_event(
+            ResponseCompleted(
+                output=AssistantMessage(
+                    content="final content",
+                    thinking_content="final thinking",
+                )
+            )
+        )
+
+        lifecycle.end()
+
+        assert state.messages[1].role == MessageRole.ASSISTANT
+        assert state.messages[1].content == "final content"
+        assert state.messages[1].thinking_content == "final thinking"

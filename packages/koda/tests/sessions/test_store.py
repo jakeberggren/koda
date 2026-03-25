@@ -54,7 +54,7 @@ class TestInMemorySessionStore:
 
         sessions = store.list_sessions()
 
-        assert len(sessions) == 2  # noqa: PLR2004
+        assert len(sessions) == 2
 
     def test_list_sessions_empty(self) -> None:
         store = InMemorySessionStore()
@@ -150,7 +150,7 @@ class TestJsonSessionStore:
 
         sessions = store.list_sessions()
 
-        assert len(sessions) == 2  # noqa: PLR2004
+        assert len(sessions) == 2
 
     def test_list_sessions_empty(self, tmp_path: Path) -> None:
         store = JsonSessionStore(directory=tmp_path)
