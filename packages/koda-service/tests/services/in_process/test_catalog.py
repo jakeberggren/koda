@@ -9,12 +9,16 @@ from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda_service.services.in_process.catalog import CatalogService
 
 
+class StubProviderRegistry(ProviderRegistry):
+    def supported(self) -> list[CoreProviderDefinition]:
+        return [
+            CoreProviderDefinition(id="openai", name="OpenAI"),
+            CoreProviderDefinition(id="anthropic", name="Anthropic"),
+        ]
+
+
 def test_list_providers_delegates_to_registry() -> None:
-    provider_registry = ProviderRegistry()
-    provider_registry.supported = lambda: [  # type: ignore[method-assign]
-        CoreProviderDefinition(id="openai", name="OpenAI"),
-        CoreProviderDefinition(id="anthropic", name="Anthropic"),
-    ]
+    provider_registry = StubProviderRegistry()
     service = CatalogService(
         SimpleNamespace(
             provider_registry=provider_registry,
