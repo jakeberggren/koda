@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
@@ -7,6 +8,7 @@ from openai import AsyncOpenAI, Omit, OpenAIError, omit
 from openai.types.responses import (
     Response,
     ResponseCompletedEvent,
+    ResponseFunctionToolCall,
     ResponseFunctionWebSearch,
     ResponseInputParam,
     ResponseOutputItemDoneEvent,
@@ -21,7 +23,7 @@ from openai.types.responses.response_function_web_search import ActionSearch
 from pydantic import BaseModel
 
 from koda.llm import LLMEvent, LLMResponse, LLMTokenUsage
-from koda.llm.exceptions import StructuredOutputNotSupportedError
+from koda.llm.exceptions import InvalidToolCallArgumentsError, StructuredOutputNotSupportedError
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponseCompleted,
@@ -155,6 +157,20 @@ class ResponsesDriver(LLM):
             usage=self._adapt_usage(response),
         )
 
+    @staticmethod
+    def _adapt_function_tool_call(output: ResponseFunctionToolCall) -> ToolCall:
+        try:
+            arguments = json.loads(output.arguments)
+        except json.JSONDecodeError as exc:
+            raise InvalidToolCallArgumentsError from exc
+        if not isinstance(arguments, dict):
+            raise InvalidToolCallArgumentsError
+        return ToolCall(
+            tool_name=output.name,
+            arguments=arguments,
+            call_id=output.call_id,
+        )
+
     async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
         create_params = self._resolve_create_params(request)
         try:
@@ -180,6 +196,9 @@ class ResponsesDriver(LLM):
     def _process_output_item_done_event(
         self, event: ResponseOutputItemDoneEvent
     ) -> Iterator[LLMEvent]:
+        if isinstance(event.item, ResponseFunctionToolCall):
+            yield LLMToolCallRequested(call=self._adapt_function_tool_call(event.item))
+            return
         if not isinstance(event.item, ResponseFunctionWebSearch):
             return
         output = ToolOutput(
@@ -192,34 +211,27 @@ class ResponsesDriver(LLM):
     def _process_response_completed_event(
         self, event: ResponseCompletedEvent
     ) -> Iterator[LLMEvent]:
-        tool_calls = self.adapter.extract_tool_calls(event.response)
-        for call in tool_calls:
-            yield LLMToolCallRequested(call=call)
         yield LLMResponseCompleted(
             response=LLMResponse(
                 output=AssistantMessage(
                     content=event.response.output_text or "",
-                    tool_calls=tool_calls,
+                    tool_calls=self.adapter.extract_tool_calls(event.response),
                 ),
                 usage=self._adapt_usage(event.response),
             )
         )
 
-    def _process_stream_event(self, event: ResponseStreamEvent) -> Iterator[LLMEvent]:  # noqa: C901 - allow coplex.
+    def _process_stream_event(self, event: ResponseStreamEvent) -> Iterator[LLMEvent]:  # noqa: C901 - allow complex.
         if isinstance(event, ResponseTextDeltaEvent):
             yield LLMTextDelta(text=event.delta)
-            return
-        if isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
+        elif isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
             yield LLMThinkingDelta(text=event.delta)
-            return
-        if isinstance(event, ResponseWebSearchCallInProgressEvent):
+        elif isinstance(event, ResponseWebSearchCallInProgressEvent):
             call = ToolCall(tool_name="web_search", call_id=event.item_id, arguments={})
             yield LLMToolStarted(call=call)
-            return
-        if isinstance(event, ResponseOutputItemDoneEvent):
+        elif isinstance(event, ResponseOutputItemDoneEvent):
             yield from self._process_output_item_done_event(event)
-            return
-        if isinstance(event, ResponseCompletedEvent):
+        elif isinstance(event, ResponseCompletedEvent):
             yield from self._process_response_completed_event(event)
 
     async def generate_stream(self, request: LLMRequest) -> AsyncIterator[LLMEvent]:
