@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeVar
-
 from koda.tools.base import Tool
-
-T = TypeVar("T", bound=Tool)
 
 _builtin_tools: list[type[Tool]] = []
 
