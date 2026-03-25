@@ -32,6 +32,52 @@ class StatusBarControl(UIControl):
             return "working"
         return "ready"
 
+    @staticmethod
+    def _format_token_count(value: int | None) -> str | None:
+        if value is None:
+            return None
+        for threshold, suffix in ((1_000_000, "M"), (1_000, "k")):
+            if value >= threshold:
+                return f"{value / threshold:.1f}".rstrip("0").rstrip(".") + suffix
+        return str(value)
+
+    def _get_context_usage_text(self) -> str | None:
+        usage = self._state.latest_usage
+        if usage is None:
+            return None
+        context_percentage = usage.context_window_percentage(self._state.context_window)
+        if context_percentage is None:
+            return None
+        return f"ctx {context_percentage}%"
+
+    def _get_io_usage_text(self) -> str | None:
+        usage = self._state.latest_usage
+        if usage is None:
+            return None
+
+        parts: list[str] = []
+        if (input_tokens := self._format_token_count(usage.input_tokens)) is not None:
+            parts.append(f"{input_tokens} in")
+        if (output_tokens := self._format_token_count(usage.output_tokens)) is not None:
+            parts.append(f"{output_tokens} out")
+        if not parts:
+            return None
+        return _DIVIDER.join(parts)
+
+    def _get_usage_text(self) -> str:
+        parts: list[str] = []
+        if (context_usage := self._get_context_usage_text()) is not None:
+            parts.append(context_usage)
+        if (io_usage := self._get_io_usage_text()) is not None:
+            parts.append(io_usage)
+        return _DIVIDER.join(parts)
+
+    def _get_usage_fragments(self) -> tuple[list[tuple[str, str]], str]:
+        usage_text = self._get_usage_text()
+        if not usage_text:
+            return [], ""
+        return [("class:status-bar.left", usage_text)], usage_text
+
     def _get_footer_fragments(self) -> tuple[list[tuple[str, str]], str]:
         """Return styled footer binding fragments and their plain-text representation."""
         fragments: list[tuple[str, str]] = []
@@ -73,6 +119,15 @@ class StatusBarControl(UIControl):
                 ]
             )
             left_text += f"{_DIVIDER}{thinking_label}"
+        usage_fragments, usage_text = self._get_usage_fragments()
+        if usage_fragments:
+            left_fragments.extend(
+                [
+                    ("class:status-bar.muted", _DIVIDER),
+                    *usage_fragments,
+                ]
+            )
+            left_text += f"{_DIVIDER}{usage_text}"
 
         # Right side: footer help + status
         status = self._get_status()

@@ -4,12 +4,13 @@ from typing import TYPE_CHECKING
 
 from koda_service.types import (
     ProviderToolStarted,
+    ResponseCompleted,
     StreamEvent,
     TextDelta,
     ThinkingDelta,
     ToolCallRequested,
 )
-from koda_tui.state import AppState, Message, MessageRole, ResponsePhase
+from koda_tui.state import AppState, Message, MessageRole, ResponsePhase, TokenUsage
 
 if TYPE_CHECKING:
     from koda_service.types import ToolCall
@@ -30,6 +31,18 @@ class ResponseLifecycle:
         self._state.current_streaming_content = ""
         self._state.current_thinking_content = ""
         self._state.response_phase = ResponsePhase.WORKING
+
+    def set_usage(self, event: ResponseCompleted) -> None:
+        """Persist token usage for the latest completed response."""
+        if event.usage is None:
+            self._state.latest_usage = None
+            return
+        self._state.latest_usage = TokenUsage(
+            input_tokens=event.usage.input_tokens,
+            output_tokens=event.usage.output_tokens,
+            cached_tokens=event.usage.cached_tokens,
+            total_tokens=event.usage.total_tokens,
+        )
 
     def append_content(self, text: str) -> None:
         """Append text to current streaming content."""
@@ -70,6 +83,9 @@ class ResponseLifecycle:
             return
         if isinstance(event, ThinkingDelta):
             self.append_thinking(event.text)
+            return
+        if isinstance(event, ResponseCompleted):
+            self.set_usage(event)
             return
         if isinstance(event, ToolCallRequested | ProviderToolStarted):
             self.transition_to_tool(event.call)

@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 
+from koda_service.types.messages import AssistantMessage
 from koda_service.types.tools import ToolCall, ToolResult
 
 
@@ -34,6 +35,18 @@ class ProviderToolCompleted(EventBase):
     result: ToolResult
 
 
+class TokenUsage(EventBase):
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cached_tokens: int | None = None
+    total_tokens: int | None = None
+
+
+class ResponseCompleted(EventBase):
+    output: AssistantMessage
+    usage: TokenUsage | None = None
+
+
 StreamEvent = (
     TextDelta
     | ThinkingDelta
@@ -41,4 +54,5 @@ StreamEvent = (
     | ToolCallResult
     | ProviderToolStarted
     | ProviderToolCompleted
+    | ResponseCompleted
 )

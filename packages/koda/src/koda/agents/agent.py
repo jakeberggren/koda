@@ -86,7 +86,7 @@ class Agent:
             return [event]
         if isinstance(event, LLMResponseCompleted):
             self._process_response_completed(event, response_chunks)
-            return []
+            return [event]
         return []
 
     async def _process_events(

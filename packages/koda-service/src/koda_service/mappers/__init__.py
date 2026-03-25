@@ -1,5 +1,6 @@
 from koda_service.mappers.events import map_llm_event_to_stream_event
 from koda_service.mappers.messages import (
+    map_assistant_message_to_contract_assistant_message,
     map_message_to_contract_message,
     map_messages_to_contract_messages,
 )
@@ -13,6 +14,7 @@ from koda_service.mappers.tools import (
 )
 
 __all__ = [
+    "map_assistant_message_to_contract_assistant_message",
     "map_llm_event_to_stream_event",
     "map_message_to_contract_message",
     "map_messages_to_contract_messages",

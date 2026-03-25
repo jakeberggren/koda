@@ -87,7 +87,7 @@ class TestSessionManager:
 
         sessions = manager.list_sessions()
 
-        assert len(sessions) == 2  # noqa: PLR2004
+        assert len(sessions) == 2
 
     def test_create_session_cleans_up_empty_active(self, manager: SessionManager) -> None:
         empty = manager.create_session()

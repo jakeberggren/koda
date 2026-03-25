@@ -36,6 +36,13 @@ def _(core_message: CoreUserMessage) -> Message:
 # Core assistant/tool messages
 @map_message_to_contract_message.register
 def _(core_message: CoreAssistantMessage) -> Message:
+    return map_assistant_message_to_contract_assistant_message(core_message)
+
+
+def map_assistant_message_to_contract_assistant_message(
+    core_message: CoreAssistantMessage,
+) -> AssistantMessage:
+    """Map a core assistant message to the contract assistant message."""
     tool_calls = [map_tool_call_to_contract_tool_call(call) for call in core_message.tool_calls]
     return AssistantMessage(
         content=core_message.content,

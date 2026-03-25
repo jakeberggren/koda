@@ -1,9 +1,11 @@
 from koda_service.types.events import (
     ProviderToolCompleted,
     ProviderToolStarted,
+    ResponseCompleted,
     StreamEvent,
     TextDelta,
     ThinkingDelta,
+    TokenUsage,
     ToolCallRequested,
     ToolCallResult,
 )
@@ -34,6 +36,7 @@ __all__ = [
     "ProviderDefinition",
     "ProviderToolCompleted",
     "ProviderToolStarted",
+    "ResponseCompleted",
     "SessionInfo",
     "StreamEvent",
     "SystemMessage",
@@ -43,6 +46,7 @@ __all__ = [
     "ThinkingOptionDescription",
     "ThinkingOptionId",
     "ThinkingOptionLabel",
+    "TokenUsage",
     "ToolCall",
     "ToolCallRequested",
     "ToolCallResult",
