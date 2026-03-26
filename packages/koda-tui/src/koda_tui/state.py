@@ -49,6 +49,27 @@ class TokenUsage:
         return round((self.input_tokens / context_window) * 100)
 
 
+def _add_token_value(left: int | None, right: int | None) -> int | None:
+    if left is None:
+        return right
+    if right is None:
+        return left
+    return left + right
+
+
+def add_usage(current: TokenUsage | None, delta: TokenUsage | None) -> TokenUsage | None:
+    if current is None:
+        return delta
+    if delta is None:
+        return current
+    return TokenUsage(
+        input_tokens=_add_token_value(current.input_tokens, delta.input_tokens),
+        output_tokens=_add_token_value(current.output_tokens, delta.output_tokens),
+        cached_tokens=_add_token_value(current.cached_tokens, delta.cached_tokens),
+        total_tokens=_add_token_value(current.total_tokens, delta.total_tokens),
+    )
+
+
 @dataclass
 class AppState:
     """Shared application state as single source of truth for the UI."""

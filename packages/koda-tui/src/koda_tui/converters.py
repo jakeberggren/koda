@@ -9,7 +9,7 @@ from koda_service.types import (
     UserMessage,
 )
 from koda_tui.state import Message as TUIMessage
-from koda_tui.state import MessageRole, TokenUsage
+from koda_tui.state import MessageRole, TokenUsage, add_usage
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -80,7 +80,7 @@ def _map_usage(message: AssistantMessage) -> TokenUsage | None:
 
 
 def convert_messages(messages: Sequence[Message]) -> tuple[list[TUIMessage], TokenUsage | None]:
-    """Convert service messages to TUI messages and restore latest usage."""
+    """Convert service messages to TUI messages and restore aggregated usage."""
     result: list[TUIMessage] = []
     tool_msg_by_call_id: dict[str, TUIMessage] = {}
     usage: TokenUsage | None = None
@@ -90,7 +90,7 @@ def convert_messages(messages: Sequence[Message]) -> tuple[list[TUIMessage], Tok
             _append_user_message(result, message)
         elif isinstance(message, AssistantMessage):
             _append_assistant_message(result, tool_msg_by_call_id, message)
-            usage = _map_usage(message)
+            usage = add_usage(usage, _map_usage(message))
         elif isinstance(message, ToolMessage):
             _apply_tool_result(result, tool_msg_by_call_id, message)
 
