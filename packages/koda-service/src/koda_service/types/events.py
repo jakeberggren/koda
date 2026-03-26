@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict
 
-from koda_service.types.messages import AssistantMessage
+from koda_service.types.messages import AssistantMessage, TokenUsage
 from koda_service.types.tools import ToolCall, ToolResult
 
 
@@ -33,13 +33,6 @@ class ProviderToolStarted(EventBase):
 class ProviderToolCompleted(EventBase):
     tool_name: str
     result: ToolResult
-
-
-class TokenUsage(EventBase):
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    cached_tokens: int | None = None
-    total_tokens: int | None = None
 
 
 class ResponseCompleted(EventBase):

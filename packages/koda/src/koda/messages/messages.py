@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from enum import StrEnum, auto
 from typing import Literal
 
@@ -17,7 +18,8 @@ class Message(BaseModel):
     content: str = Field(default="")
 
 
-class TokenUsage(BaseModel):
+@dataclass(frozen=True, slots=True)
+class TokenUsage:
     input_tokens: int | None = None
     output_tokens: int | None = None
     cached_tokens: int | None = None
