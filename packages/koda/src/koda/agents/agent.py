@@ -83,9 +83,18 @@ class Agent:
     def _process_response_completed(
         event: LLMResponseCompleted,
         response_chunks: list[str],
+        pending_tool_calls: list[ToolCall],
     ) -> None:
         if not response_chunks and event.response.output.content:
             response_chunks.append(event.response.output.content)
+        # Some streams only surface function tool calls in the terminal
+        # response.completed payload, so merge any unseen calls here.
+        pending_call_ids = {call.call_id for call in pending_tool_calls}
+        for tool_call in event.response.output.tool_calls:
+            if tool_call.call_id in pending_call_ids:
+                continue
+            pending_tool_calls.append(tool_call)
+            pending_call_ids.add(tool_call.call_id)
 
     def _process_event(  # noqa: C901 - allow complex
         self,
@@ -106,7 +115,7 @@ class Agent:
         if isinstance(event, (LLMToolStarted, LLMToolCompleted, LLMToolCallResult)):
             return [event]
         if isinstance(event, LLMResponseCompleted):
-            self._process_response_completed(event, response_chunks)
+            self._process_response_completed(event, response_chunks, pending_tool_calls)
             return [event]
         return []
 

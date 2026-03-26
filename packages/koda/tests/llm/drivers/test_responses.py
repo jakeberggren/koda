@@ -44,7 +44,9 @@ def _client_factory(events: Sequence[object]) -> Callable[..., AsyncOpenAI]:
     return cast("Callable[..., AsyncOpenAI]", lambda **kwargs: _FakeClient(events, **kwargs))
 
 
-def _response_with_tool_call(tool_call: ResponseFunctionToolCall) -> Response:
+def _response_with_tool_call(
+    tool_call: ResponseFunctionToolCall, *, usage: dict[str, object] | None = None
+) -> Response:
     return Response.model_validate(
         {
             "id": "resp_1",
@@ -60,7 +62,7 @@ def _response_with_tool_call(tool_call: ResponseFunctionToolCall) -> Response:
             "status": "completed",
             "text": {"format": {"type": "text"}},
             "truncation": "disabled",
-            "usage": None,
+            "usage": usage,
         }
     )
 

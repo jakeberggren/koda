@@ -149,12 +149,14 @@ class ResponsesDriver(LLM):
         )
 
     def _adapt_response(self, response: Response) -> LLMResponse[AssistantMessage]:
+        usage = self._adapt_usage(response)
+        tool_calls = self.adapter.extract_tool_calls(response)
         return LLMResponse(
             output=AssistantMessage(
                 content=response.output_text or "",
-                tool_calls=self.adapter.extract_tool_calls(response),
+                tool_calls=tool_calls,
             ),
-            usage=self._adapt_usage(response),
+            usage=usage,
         )
 
     @staticmethod
@@ -211,15 +213,7 @@ class ResponsesDriver(LLM):
     def _process_response_completed_event(
         self, event: ResponseCompletedEvent
     ) -> Iterator[LLMEvent]:
-        yield LLMResponseCompleted(
-            response=LLMResponse(
-                output=AssistantMessage(
-                    content=event.response.output_text or "",
-                    tool_calls=self.adapter.extract_tool_calls(event.response),
-                ),
-                usage=self._adapt_usage(event.response),
-            )
-        )
+        yield LLMResponseCompleted(response=self._adapt_response(event.response))
 
     def _process_stream_event(self, event: ResponseStreamEvent) -> Iterator[LLMEvent]:  # noqa: C901 - allow complex.
         if isinstance(event, ResponseTextDeltaEvent):
