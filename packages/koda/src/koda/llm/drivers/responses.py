@@ -22,7 +22,7 @@ from openai.types.responses import (
 from openai.types.responses.response_function_web_search import ActionSearch
 from pydantic import BaseModel
 
-from koda.llm import LLMEvent, LLMResponse, LLMTokenUsage
+from koda.llm import LLMEvent, LLMResponse
 from koda.llm.exceptions import InvalidToolCallArgumentsError, StructuredOutputNotSupportedError
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
@@ -34,7 +34,7 @@ from koda.llm.types import (
     LLMToolStarted,
 )
 from koda.llm.utils import raise_llm_error_from_openai
-from koda.messages import AssistantMessage
+from koda.messages import AssistantMessage, TokenUsage
 from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda_common.logging import get_logger
 
@@ -137,11 +137,11 @@ class ResponsesDriver(LLM):
         return f'Searched for "{action.query}"'
 
     @staticmethod
-    def _adapt_usage(response: Response) -> LLMTokenUsage | None:
+    def _adapt_usage(response: Response) -> TokenUsage | None:
         usage = response.usage
         if usage is None:
             return None
-        return LLMTokenUsage(
+        return TokenUsage(
             input_tokens=usage.input_tokens,
             output_tokens=usage.output_tokens,
             cached_tokens=usage.input_tokens_details.cached_tokens,

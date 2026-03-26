@@ -35,9 +35,9 @@ class ResponseLifecycle:
     def set_usage(self, event: ResponseCompleted) -> None:
         """Persist token usage for the latest completed response."""
         if event.usage is None:
-            self._state.latest_usage = None
+            self._state.usage = None
             return
-        self._state.latest_usage = TokenUsage(
+        self._state.usage = TokenUsage(
             input_tokens=event.usage.input_tokens,
             output_tokens=event.usage.output_tokens,
             cached_tokens=event.usage.cached_tokens,

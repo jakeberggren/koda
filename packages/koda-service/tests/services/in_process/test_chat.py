@@ -1,8 +1,8 @@
 import pytest
 
-from koda.llm.types import LLMResponse, LLMResponseCompleted, LLMTokenUsage
+from koda.llm.types import LLMResponse, LLMResponseCompleted
 from koda.llm.types import LLMTextDelta as CoreTextDelta
-from koda.messages import AssistantMessage
+from koda.messages import AssistantMessage, TokenUsage
 from koda_service.exceptions import (
     ServiceAuthenticationError,
     ServiceConnectionError,
@@ -40,7 +40,7 @@ async def test_chat_maps_response_completed_usage_to_stream_event() -> None:
                 LLMResponseCompleted(
                     response=LLMResponse(
                         output=AssistantMessage(content="done"),
-                        usage=LLMTokenUsage(
+                        usage=TokenUsage(
                             input_tokens=1_200,
                             output_tokens=300,
                             cached_tokens=50,

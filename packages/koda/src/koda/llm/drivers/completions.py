@@ -13,7 +13,7 @@ from openai.types.chat.chat_completion_system_message_param import (
 from openai.types.chat.chat_completion_tool_union_param import ChatCompletionToolUnionParam
 from pydantic import BaseModel
 
-from koda.llm import LLMEvent, LLMResponse, LLMTokenUsage
+from koda.llm import LLMEvent, LLMResponse
 from koda.llm.exceptions import (
     InvalidToolCallArgumentsError,
     StructuredOutputNotSupportedError,
@@ -25,7 +25,7 @@ from koda.llm.types import (
     LLMToolCallRequested,
 )
 from koda.llm.utils import raise_llm_error_from_openai
-from koda.messages import AssistantMessage
+from koda.messages import AssistantMessage, TokenUsage
 from koda.tools import ToolCall
 
 if TYPE_CHECKING:
@@ -169,7 +169,7 @@ class CompletionsDriver(LLM):
         )
 
     @staticmethod
-    def _adapt_usage(usage: CompletionUsage | None) -> LLMTokenUsage | None:
+    def _adapt_usage(usage: CompletionUsage | None) -> TokenUsage | None:
         if usage is None:
             return None
         prompt_tokens_details = usage.prompt_tokens_details
@@ -177,7 +177,7 @@ class CompletionsDriver(LLM):
             prompt_tokens_details.cached_tokens if prompt_tokens_details is not None else None
         )
 
-        return LLMTokenUsage(
+        return TokenUsage(
             input_tokens=usage.prompt_tokens,
             output_tokens=usage.completion_tokens,
             cached_tokens=cached_tokens,
@@ -189,7 +189,7 @@ class CompletionsDriver(LLM):
         *,
         content: str,
         tool_calls: list[ToolCall],
-        usage: LLMTokenUsage | None,
+        usage: TokenUsage | None,
     ) -> LLMResponse[AssistantMessage]:
         return LLMResponse(
             output=AssistantMessage(content=content, tool_calls=tool_calls),
@@ -300,7 +300,7 @@ class CompletionsDriver(LLM):
         completed_tool_calls: list[ToolCall] = []
         partial_tool_calls: dict[int, _PartialToolCallState] = {}
         text_chunks: list[str] = []
-        usage: LLMTokenUsage | None = None
+        usage: TokenUsage | None = None
         try:
             stream = await self.client.chat.completions.create(
                 logprobs=create_params.logprobs,

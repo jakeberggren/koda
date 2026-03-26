@@ -8,7 +8,7 @@ from koda.llm.models import (
 )
 from koda.llm.protocols import LLM
 from koda.llm.registry import ModelRegistry, ProviderRegistry
-from koda.llm.types import LLMEvent, LLMRequest, LLMRequestOptions, LLMResponse, LLMTokenUsage
+from koda.llm.types import LLMEvent, LLMRequest, LLMRequestOptions, LLMResponse
 
 __all__ = [
     "LLM",
@@ -16,7 +16,6 @@ __all__ = [
     "LLMRequest",
     "LLMRequestOptions",
     "LLMResponse",
-    "LLMTokenUsage",
     "ModelDefinition",
     "ModelRegistry",
     "ProviderDefinition",

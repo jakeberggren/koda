@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from koda.llm.models import ThinkingOptionId
-from koda.messages import AssistantMessage, Message
+from koda.messages import AssistantMessage, Message, TokenUsage
 from koda.tools import ToolCall, ToolDefinition, ToolResult
 
 _MAX_TOP_LOGPROBS = 20
@@ -40,17 +40,9 @@ class LLMRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class LLMTokenUsage:
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    cached_tokens: int | None = None
-    total_tokens: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class LLMResponse[T]:
     output: T
-    usage: LLMTokenUsage | None = None
+    usage: TokenUsage | None = None
 
 
 # Streaming events

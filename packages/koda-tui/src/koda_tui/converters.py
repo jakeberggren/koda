@@ -5,67 +5,93 @@ from typing import TYPE_CHECKING
 from koda_service.types import (
     AssistantMessage,
     Message,
-    SystemMessage,
     ToolMessage,
     UserMessage,
 )
 from koda_tui.state import Message as TUIMessage
-from koda_tui.state import MessageRole
+from koda_tui.state import MessageRole, TokenUsage
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-def convert_messages(messages: Sequence[Message]) -> list[TUIMessage]:  # noqa: C901 - allow for now
-    """Convert service messages to TUI messages.
+def _append_user_message(result: list[TUIMessage], message: UserMessage) -> None:
+    result.append(TUIMessage(role=MessageRole.USER, content=message.content))
 
-    Walks the message list in order, properly linking tool results
-    back to their corresponding tool calls via call_id.
-    """
+
+def _append_assistant_message(
+    result: list[TUIMessage],
+    tool_msg_by_call_id: dict[str, TUIMessage],
+    message: AssistantMessage,
+) -> None:
+    if message.content or message.thinking_content:
+        result.append(
+            TUIMessage(
+                role=MessageRole.ASSISTANT,
+                content=message.content,
+                thinking_content=message.thinking_content,
+            )
+        )
+
+    for tool_call in message.tool_calls:
+        tool_message = TUIMessage(
+            role=MessageRole.TOOL,
+            content=f"Tool: {tool_call.tool_name}",
+            tool_call=tool_call,
+            tool_running=False,
+        )
+        result.append(tool_message)
+        tool_msg_by_call_id[tool_call.call_id] = tool_message
+
+
+def _apply_tool_result(
+    result: list[TUIMessage],
+    tool_msg_by_call_id: dict[str, TUIMessage],
+    message: ToolMessage,
+) -> None:
+    existing = tool_msg_by_call_id.get(message.tool_result.call_id)
+    if existing is not None:
+        existing.tool_result_display = message.tool_result.output.display
+        existing.tool_error = message.tool_result.output.is_error
+        existing.tool_error_message = message.tool_result.output.error_message
+        return
+
+    result.append(
+        TUIMessage(
+            role=MessageRole.TOOL,
+            content=f"Tool: {message.tool_name}",
+            tool_error=message.tool_result.output.is_error,
+            tool_result_display=message.tool_result.output.display,
+            tool_error_message=message.tool_result.output.error_message,
+        )
+    )
+
+
+def _map_usage(message: AssistantMessage) -> TokenUsage | None:
+    usage = message.usage
+    if usage is None:
+        return None
+    return TokenUsage(
+        input_tokens=usage.input_tokens,
+        output_tokens=usage.output_tokens,
+        cached_tokens=usage.cached_tokens,
+        total_tokens=usage.total_tokens,
+    )
+
+
+def convert_messages(messages: Sequence[Message]) -> tuple[list[TUIMessage], TokenUsage | None]:
+    """Convert service messages to TUI messages and restore latest usage."""
     result: list[TUIMessage] = []
     tool_msg_by_call_id: dict[str, TUIMessage] = {}
+    usage: TokenUsage | None = None
 
-    for msg in messages:
-        if isinstance(msg, SystemMessage):
-            continue
+    for message in messages:
+        if isinstance(message, UserMessage):
+            _append_user_message(result, message)
+        elif isinstance(message, AssistantMessage):
+            _append_assistant_message(result, tool_msg_by_call_id, message)
+            usage = _map_usage(message)
+        elif isinstance(message, ToolMessage):
+            _apply_tool_result(result, tool_msg_by_call_id, message)
 
-        if isinstance(msg, UserMessage):
-            result.append(TUIMessage(role=MessageRole.USER, content=msg.content))
-
-        elif isinstance(msg, AssistantMessage):
-            if msg.content or msg.thinking_content:
-                result.append(
-                    TUIMessage(
-                        role=MessageRole.ASSISTANT,
-                        content=msg.content,
-                        thinking_content=msg.thinking_content,
-                    )
-                )
-            for tc in msg.tool_calls:
-                tui_msg = TUIMessage(
-                    role=MessageRole.TOOL,
-                    content=f"Tool: {tc.tool_name}",
-                    tool_call=tc,
-                    tool_running=False,
-                )
-                result.append(tui_msg)
-                tool_msg_by_call_id[tc.call_id] = tui_msg
-
-        elif isinstance(msg, ToolMessage):
-            existing = tool_msg_by_call_id.get(msg.tool_result.call_id)
-            if existing is not None:
-                existing.tool_result_display = msg.tool_result.output.display
-                existing.tool_error = msg.tool_result.output.is_error
-                existing.tool_error_message = msg.tool_result.output.error_message
-            else:
-                result.append(
-                    TUIMessage(
-                        role=MessageRole.TOOL,
-                        content=f"Tool: {msg.tool_name}",
-                        tool_error=msg.tool_result.output.is_error,
-                        tool_result_display=msg.tool_result.output.display,
-                        tool_error_message=msg.tool_result.output.error_message,
-                    )
-                )
-
-    return result
+    return result, usage
