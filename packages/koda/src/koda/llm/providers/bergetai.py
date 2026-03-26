@@ -54,26 +54,36 @@ BERGETAI_MODELS: Sequence[ModelDefinition] = [
         id="zai-org/GLM-4.7",
         name="GLM-4.7",
         provider="bergetai",
+        context_window=200_000,
+        max_output_tokens=128_000,
     ),
     ModelDefinition(
         id="openai/gpt-oss-120b",
         name="gpt-oss-120b",
         provider="bergetai",
+        context_window=128_000,
+        max_output_tokens=128_000,
     ),
     ModelDefinition(
         id="mistralai/Mistral-Small-3.2-24B-Instruct-2506",
         name="Mistral-Small-3.2-24B-Instruct-2506",
         provider="bergetai",
+        context_window=128_000,
+        max_output_tokens=128_000,
     ),
     ModelDefinition(
         id="meta-llama/Llama-3.1-8B-Instruct",
         name="Llama-3.1-8B-Instruct",
         provider="bergetai",
+        context_window=128_000,
+        max_output_tokens=128_000,
     ),
     ModelDefinition(
         id="meta-llama/Llama-3.3-70B-Instruct",
         name="Llama-3.3-70B-Instruct",
         provider="bergetai",
+        context_window=128_000,
+        max_output_tokens=128_000,
     ),
 ]
 
