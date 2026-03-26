@@ -68,7 +68,7 @@ class AppState:
         default_factory=lambda: ThinkingOption(id="none", label="none")
     )
     context_window: int | None = None
-    latest_usage: TokenUsage | None = None
+    usage: TokenUsage | None = None
     thinking_supported: bool = False
     show_scrollbar: bool = True
     queue_inputs: bool = True
@@ -84,4 +84,4 @@ class AppState:
         self.is_thinking = False
         self.response_phase = ResponsePhase.IDLE
         self.active_tools.clear()
-        self.latest_usage = None
+        self.usage = None

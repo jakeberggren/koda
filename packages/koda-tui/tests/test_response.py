@@ -248,16 +248,16 @@ class TestResponseLifecycle:
             )
         )
 
-        assert state.latest_usage is not None
-        assert state.latest_usage.input_tokens == 2_000
-        assert state.latest_usage.output_tokens == 500
-        assert state.latest_usage.cached_tokens == 100
-        assert state.latest_usage.total_tokens == 2_500
+        assert state.usage is not None
+        assert state.usage.input_tokens == 2_000
+        assert state.usage.output_tokens == 500
+        assert state.usage.cached_tokens == 100
+        assert state.usage.total_tokens == 2_500
 
-    def test_end_uses_completed_response_output_as_canonical_message(
+    def test_end_persists_buffered_content_even_after_response_completed(
         self, state: AppState, lifecycle: ResponseLifecycle
     ) -> None:
-        """end() should persist the completed response output instead of buffered chunks."""
+        """ResponseCompleted should not replace the buffered assistant content path."""
         lifecycle.begin("msg")
         lifecycle.append_thinking("partial thinking")
         lifecycle.append_content("partial content")
@@ -274,5 +274,5 @@ class TestResponseLifecycle:
         lifecycle.end()
 
         assert state.messages[1].role == MessageRole.ASSISTANT
-        assert state.messages[1].content == "final content"
-        assert state.messages[1].thinking_content == "final thinking"
+        assert state.messages[1].content == "partial content"
+        assert state.messages[1].thinking_content == "partial thinking"

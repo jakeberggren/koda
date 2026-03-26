@@ -48,9 +48,6 @@ class ActionResult[T]:
     error: str | None = None
 
 
-# --- Session actions ---
-
-
 def new_session(
     service: KodaService,
     state: AppState,
@@ -73,7 +70,7 @@ def switch_session(
     try:
         _, messages = service.switch_session(session_id)
         state.reset_conversation()
-        state.messages = convert_messages(messages)
+        state.messages, state.usage = convert_messages(messages)
         return ActionResult(ok=True)
     except ServiceSessionNotFoundError:
         return ActionResult(ok=False, error="Session not found")

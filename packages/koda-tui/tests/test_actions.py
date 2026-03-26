@@ -8,12 +8,14 @@ from uuid import uuid4
 
 from koda_service.exceptions import ServiceNoActiveSessionError, ServiceSessionNotFoundError
 from koda_service.types import (
+    AssistantMessage,
     ModelDefinition,
     SessionInfo,
     ThinkingOption,
     ThinkingOptionId,
     UserMessage,
 )
+from koda_service.types.messages import TokenUsage
 from koda_tui.actions import (
     cycle_thinking,
     delete_session,
@@ -90,6 +92,30 @@ def test_switch_session_success_converts_messages() -> None:
     assert len(state.messages) == 1
     assert state.messages[0].role == MessageRole.USER
     assert state.messages[0].content == "hello"
+
+
+def test_switch_session_restores_usage_from_last_assistant_message() -> None:
+    state = _state_with_conversation()
+    service = Mock(spec=["switch_session"])
+    service.switch_session.return_value = (
+        _session_info(),
+        [
+            UserMessage(content="hello"),
+            AssistantMessage(
+                content="done",
+                usage=TokenUsage(input_tokens=1_200, output_tokens=300, total_tokens=1_500),
+            ),
+        ],
+    )
+    session_id = uuid4()
+
+    result = switch_session(session_id, service, state)
+
+    assert result.ok is True
+    assert state.usage is not None
+    assert state.usage.input_tokens == 1_200
+    assert state.usage.output_tokens == 300
+    assert state.usage.total_tokens == 1_500
 
 
 def test_switch_session_not_found_returns_error() -> None:

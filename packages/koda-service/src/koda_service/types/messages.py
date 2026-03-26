@@ -1,4 +1,4 @@
-from enum import StrEnum
+from enum import StrEnum, auto
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -7,15 +7,21 @@ from koda_service.types.tools import ToolCall, ToolResult
 
 
 class MessageRole(StrEnum):
-    USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
-    TOOL = "tool"
+    USER = auto()
+    ASSISTANT = auto()
+    TOOL = auto()
 
 
 class Message(BaseModel):
     role: MessageRole = Field(...)
     content: str = Field(default="")
+
+
+class TokenUsage(BaseModel):
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    cached_tokens: int | None = None
+    total_tokens: int | None = None
 
 
 class UserMessage(Message):
@@ -26,10 +32,7 @@ class AssistantMessage(Message):
     role: Literal[MessageRole.ASSISTANT] = Field(default=MessageRole.ASSISTANT, frozen=True)
     thinking_content: str = Field(default="")
     tool_calls: list[ToolCall] = Field(default_factory=list)
-
-
-class SystemMessage(Message):
-    role: Literal[MessageRole.SYSTEM] = Field(default=MessageRole.SYSTEM, frozen=True)
+    usage: TokenUsage | None = None
 
 
 class ToolMessage(Message):

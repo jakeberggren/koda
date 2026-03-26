@@ -11,6 +11,7 @@ from koda_service.mappers.tools import (
 from koda_service.types.messages import (
     AssistantMessage,
     Message,
+    TokenUsage,
     ToolMessage,
     UserMessage,
 )
@@ -48,6 +49,16 @@ def map_assistant_message_to_contract_assistant_message(
         content=core_message.content,
         thinking_content=core_message.thinking_content,
         tool_calls=tool_calls,
+        usage=(
+            TokenUsage(
+                input_tokens=core_message.usage.input_tokens,
+                output_tokens=core_message.usage.output_tokens,
+                cached_tokens=core_message.usage.cached_tokens,
+                total_tokens=core_message.usage.total_tokens,
+            )
+            if core_message.usage is not None
+            else None
+        ),
     )
 
 

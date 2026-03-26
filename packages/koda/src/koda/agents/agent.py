@@ -58,6 +58,27 @@ class Agent:
         """Append a message to the session."""
         self._session_manager.append_message(session_id, message)
 
+    def _append_assistant_message(
+        self,
+        session_id: UUID,
+        *,
+        content: str,
+        thinking_content: str,
+        tool_calls: list[ToolCall],
+        completed_response: LLMResponseCompleted | None,
+    ) -> None:
+        if not (content or thinking_content or tool_calls):
+            return
+        self._append_message(
+            session_id,
+            AssistantMessage(
+                content=content,
+                thinking_content=thinking_content,
+                tool_calls=tool_calls,
+                usage=(completed_response.response.usage if completed_response else None),
+            ),
+        )
+
     @staticmethod
     def _process_response_completed(
         event: LLMResponseCompleted,
@@ -161,6 +182,7 @@ class Agent:
             options=self._config.request_options,
         )
         stream = self.llm.generate_stream(request)
+        completed_response: LLMResponseCompleted | None = None
         response_chunks: list[str] = []
         thinking_chunks: list[str] = []
 
@@ -170,19 +192,19 @@ class Agent:
             thinking_chunks,
             pending_tool_calls,
         ):
+            if isinstance(event, LLMResponseCompleted):
+                completed_response = event
             yield event
 
         content = "".join(response_chunks)
         thinking_content = "".join(thinking_chunks)
-        if content or thinking_content or pending_tool_calls:
-            self._append_message(
-                session_id,
-                AssistantMessage(
-                    content=content,
-                    thinking_content=thinking_content,
-                    tool_calls=pending_tool_calls,
-                ),
-            )
+        self._append_assistant_message(
+            session_id,
+            content=content,
+            thinking_content=thinking_content,
+            tool_calls=pending_tool_calls,
+            completed_response=completed_response,
+        )
 
         if pending_tool_calls:
             logger.info("tool_calls_pending", count=len(pending_tool_calls))

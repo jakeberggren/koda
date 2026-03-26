@@ -2,7 +2,6 @@
 
 from koda_service.types import (
     AssistantMessage,
-    SystemMessage,
     ToolCall,
     ToolMessage,
     ToolOutput,
@@ -32,24 +31,29 @@ def _make_tool_result(
 
 class TestConvertMessages:
     def test_empty_list(self) -> None:
-        assert convert_messages([]) == []
+        result, usage = convert_messages([])
+
+        assert result == []
+        assert usage is None
 
     def test_user_message(self) -> None:
-        result = convert_messages([UserMessage(content="hello")])
+        result, usage = convert_messages([UserMessage(content="hello")])
 
         assert len(result) == 1
         assert result[0].role == MessageRole.USER
         assert result[0].content == "hello"
+        assert usage is None
 
     def test_assistant_message(self) -> None:
-        result = convert_messages([AssistantMessage(content="hi there")])
+        result, usage = convert_messages([AssistantMessage(content="hi there")])
 
         assert len(result) == 1
         assert result[0].role == MessageRole.ASSISTANT
         assert result[0].content == "hi there"
+        assert usage is None
 
     def test_assistant_message_with_thinking(self) -> None:
-        result = convert_messages(
+        result, usage = convert_messages(
             [AssistantMessage(content="hi there", thinking_content="Compare options")]
         )
 
@@ -57,14 +61,18 @@ class TestConvertMessages:
         assert result[0].role == MessageRole.ASSISTANT
         assert result[0].content == "hi there"
         assert result[0].thinking_content == "Compare options"
+        assert usage is None
 
     def test_assistant_message_with_only_thinking(self) -> None:
-        result = convert_messages([AssistantMessage(content="", thinking_content="Need a tool")])
+        result, usage = convert_messages(
+            [AssistantMessage(content="", thinking_content="Need a tool")]
+        )
 
         assert len(result) == 1
         assert result[0].role == MessageRole.ASSISTANT
         assert result[0].content == ""
         assert result[0].thinking_content == "Need a tool"
+        assert usage is None
 
     def test_user_assistant_roundtrip(self) -> None:
         messages = [
@@ -72,22 +80,12 @@ class TestConvertMessages:
             AssistantMessage(content="hi"),
         ]
 
-        result = convert_messages(messages)
+        result, usage = convert_messages(messages)
 
         assert len(result) == 2
         assert result[0].role == MessageRole.USER
         assert result[1].role == MessageRole.ASSISTANT
-
-    def test_system_message_skipped(self) -> None:
-        messages = [
-            SystemMessage(content="you are helpful"),
-            UserMessage(content="hello"),
-        ]
-
-        result = convert_messages(messages)
-
-        assert len(result) == 1
-        assert result[0].role == MessageRole.USER
+        assert usage is None
 
     def test_tool_call_linked_to_result(self) -> None:
         tc = _make_tool_call(call_id="c1", tool_name="search")
@@ -99,7 +97,7 @@ class TestConvertMessages:
             ToolMessage(tool_name="search", tool_result=tr),
         ]
 
-        result = convert_messages(messages)
+        result, usage = convert_messages(messages)
 
         # user + tool entry (assistant with no content is skipped, tool result merged)
         assert len(result) == 2
@@ -109,6 +107,7 @@ class TestConvertMessages:
         assert tool_msg.tool_running is False
         assert tool_msg.tool_result_display == "found it"
         assert tool_msg.tool_error is False
+        assert usage is None
 
     def test_tool_call_with_error_result(self) -> None:
         tc = _make_tool_call(call_id="c1")
@@ -119,11 +118,12 @@ class TestConvertMessages:
             ToolMessage(tool_name="search", tool_result=tr),
         ]
 
-        result = convert_messages(messages)
+        result, usage = convert_messages(messages)
 
         assert len(result) == 1
         assert result[0].tool_error is True
         assert result[0].tool_error_message == "not found"
+        assert usage is None
 
     def test_multiple_tool_calls_linked(self) -> None:
         tc1 = _make_tool_call(call_id="c1", tool_name="search")
@@ -137,11 +137,12 @@ class TestConvertMessages:
             ToolMessage(tool_name="read", tool_result=tr2),
         ]
 
-        result = convert_messages(messages)
+        result, usage = convert_messages(messages)
 
         assert len(result) == 2
         assert result[0].tool_result_display == "search result"
         assert result[1].tool_result_display == "file content"
+        assert usage is None
 
     def test_orphan_tool_result(self) -> None:
         tr = _make_tool_result(call_id="orphan", display="orphan result")
@@ -150,13 +151,14 @@ class TestConvertMessages:
             ToolMessage(tool_name="unknown", tool_result=tr),
         ]
 
-        result = convert_messages(messages)
+        result, usage = convert_messages(messages)
 
         assert len(result) == 1
         assert result[0].role == MessageRole.TOOL
         assert result[0].content == "Tool: unknown"
         assert result[0].tool_result_display == "orphan result"
         assert result[0].tool_call is None
+        assert usage is None
 
     def test_assistant_with_content_and_tool_calls(self) -> None:
         tc = _make_tool_call(call_id="c1")
@@ -167,15 +169,17 @@ class TestConvertMessages:
             ToolMessage(tool_name="search", tool_result=tr),
         ]
 
-        result = convert_messages(messages)
+        result, usage = convert_messages(messages)
 
         # assistant text + tool entry
         assert len(result) == 2
         assert result[0].role == MessageRole.ASSISTANT
         assert result[0].content == "Let me search"
         assert result[1].role == MessageRole.TOOL
+        assert usage is None
 
     def test_assistant_empty_content_no_tools(self) -> None:
-        result = convert_messages([AssistantMessage(content="")])
+        result, usage = convert_messages([AssistantMessage(content="")])
 
         assert result == []
+        assert usage is None

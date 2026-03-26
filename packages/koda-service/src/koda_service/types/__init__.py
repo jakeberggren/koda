@@ -13,7 +13,6 @@ from koda_service.types.messages import (
     AssistantMessage,
     Message,
     MessageRole,
-    SystemMessage,
     ToolMessage,
     UserMessage,
 )
@@ -39,7 +38,6 @@ __all__ = [
     "ResponseCompleted",
     "SessionInfo",
     "StreamEvent",
-    "SystemMessage",
     "TextDelta",
     "ThinkingDelta",
     "ThinkingOption",

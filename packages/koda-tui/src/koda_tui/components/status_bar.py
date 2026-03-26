@@ -44,7 +44,7 @@ class StatusBarControl(UIControl):
         return str(value)
 
     def _get_context_usage_text(self) -> str | None:
-        usage = self._state.latest_usage
+        usage = self._state.usage
         if usage is None:
             return None
         context_percentage = usage.context_window_percentage(self._state.context_window)
@@ -53,7 +53,7 @@ class StatusBarControl(UIControl):
         return f"ctx {context_percentage}%"
 
     def _get_io_usage_text(self) -> str | None:
-        usage = self._state.latest_usage
+        usage = self._state.usage
         if usage is None:
             return None
 
