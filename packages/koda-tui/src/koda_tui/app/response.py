@@ -10,7 +10,7 @@ from koda_service.types import (
     ThinkingDelta,
     ToolCallRequested,
 )
-from koda_tui.state import AppState, Message, MessageRole, ResponsePhase, TokenUsage
+from koda_tui.state import AppState, Message, MessageRole, ResponsePhase, TokenUsage, add_usage
 
 if TYPE_CHECKING:
     from koda_service.types import ToolCall
@@ -33,16 +33,18 @@ class ResponseLifecycle:
         self._state.response_phase = ResponsePhase.WORKING
 
     def set_usage(self, event: ResponseCompleted) -> None:
-        """Persist token usage for the latest completed response."""
-        if event.usage is None:
-            self._state.usage = None
-            return
-        self._state.usage = TokenUsage(
-            input_tokens=event.usage.input_tokens,
-            output_tokens=event.usage.output_tokens,
-            cached_tokens=event.usage.cached_tokens,
-            total_tokens=event.usage.total_tokens,
+        """Accumulate token usage from each completed provider response."""
+        response_usage = (
+            TokenUsage(
+                input_tokens=event.usage.input_tokens,
+                output_tokens=event.usage.output_tokens,
+                cached_tokens=event.usage.cached_tokens,
+                total_tokens=event.usage.total_tokens,
+            )
+            if event.usage is not None
+            else None
         )
+        self._state.usage = add_usage(self._state.usage, response_usage)
 
     def append_content(self, text: str) -> None:
         """Append text to current streaming content."""
