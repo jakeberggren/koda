@@ -9,17 +9,11 @@ dependencies = [
     "platformdirs~=4.5.0",
     "pydantic~=2.12.5",
     "pydantic-settings~=2.12.0",
-    "sqlalchemy-libsql>=0.2.0",
-    "sqlmodel~=0.0.24",
     "structlog~=25.5.0",
 ]
 
 [project.optional-dependencies]
 keychain = ["keyring~=25.7.0"]
-
-[project.scripts]
-koda-common = "koda_common:main"
-
 
 [build-system]
 requires = ["uv_build>=0.9.10,<0.10.0"]

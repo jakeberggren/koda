@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Literal
 
-import platformdirs
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -90,14 +89,6 @@ class EnvSettings(BaseSettings):
         default="in_process",
         description="Koda Service boundary selection for Koda clients",
     )
-
-    # Database
-    koda_db_path: Path = Field(
-        default=Path(platformdirs.user_data_dir("koda", appauthor=False)) / "koda.db",
-        description="Database file path",
-    )
-    koda_db_sync_url: AnyHttpUrl | None = Field(default=None, description="Database sync URL")
-    koda_db_auth_token: SecretStr | None = Field(default=None, description="Database auth token")
 
     # Logging
     koda_log_enabled: bool = Field(default=True, description="Enable logging")
