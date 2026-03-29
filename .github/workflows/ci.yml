@@ -1,4 +1,4 @@
-name: Koda CI
+name: Typecheck, Lint & Test
 
 on:
   push:
@@ -62,6 +62,8 @@ jobs:
         include:
           - name: macOS arm64
             runs_on: macos-latest
+          - name: macOS x86_64
+            runs_on: macos-15-intel
           - name: Linux x86_64
             runs_on: ubuntu-latest
           - name: Linux arm64
