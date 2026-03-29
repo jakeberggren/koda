@@ -1,4 +1,4 @@
-name: Typecheck, Lint & Test
+name: Validation
 
 on:
   push:
