@@ -11,7 +11,7 @@
 </pre>
 </div>
 
-koda-tui is the terminal interface for Koda. It owns the interactive chat experience,
+`koda-tui` is the terminal interface for Koda. It owns the interactive chat experience,
 streams service events into UI state, and renders model/tool output in the terminal.
 It sits on top of `koda-service`, which provides the in-process runtime used today.
 
@@ -22,7 +22,7 @@ It sits on top of `koda-service`, which provides the in-process runtime used tod
 - **Streaming coordination** for turning service events into incremental UI updates.
 - **Command palette flows** for model selection, session management, thinking controls, and API key entry.
 
-## Project Structure
+## Package Structure
 
 ```text
 packages/koda-tui/
@@ -36,6 +36,7 @@ packages/koda-tui/
 │   │   └── streaming.py        # Stream event processing
 │   ├── components/
 │   │   ├── chat_area.py        # Chat transcript view
+│   │   ├── file_suggestions.py # File suggestion UI
 │   │   ├── input_area.py       # Prompt input widget
 │   │   ├── queued_inputs.py    # Queued input display
 │   │   ├── status_bar.py       # Status/footer UI
@@ -47,6 +48,8 @@ packages/koda-tui/
 │   │   ├── layout.py           # Layout composition
 │   │   ├── styles.py           # Prompt_toolkit styles
 │   │   └── palette/            # Command palette, dialogs, and palette commands
+│   ├── utils/
+│   │   └── model_selection.py  # Model selection helper utilities
 │   ├── actions.py              # TUI actions backed by the service layer
 │   ├── converters.py           # Service DTO -> TUI state conversion
 │   ├── state.py                # Shared TUI state

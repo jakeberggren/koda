@@ -34,13 +34,16 @@ packages/koda/
 │   ├── llm/
 │   │   ├── drivers/                # Provider driver adapters
 │   │   ├── providers/              # OpenAI and BergetAI providers
+│   │   ├── exceptions.py           # LLM-related exceptions
 │   │   ├── models.py               # Model definitions and capabilities
 │   │   ├── protocols.py            # LLM protocol
 │   │   ├── registry.py             # Provider/model registries
-│   │   └── types.py                # Requests, responses, stream events
+│   │   ├── types.py                # Requests, responses, stream events
+│   │   └── utils.py                # Shared LLM helper utilities
 │   ├── messages/
 │   │   └── messages.py             # Internal message types
 │   ├── sessions/
+│   │   ├── exceptions.py           # Session-related exceptions
 │   │   ├── manager.py              # Session orchestration
 │   │   ├── session.py              # Session model
 │   │   └── store.py                # In-memory and JSON session stores
@@ -48,10 +51,14 @@ packages/koda/
 │   │   └── langfuse.py             # Langfuse integration
 │   ├── tools/
 │   │   ├── builtins/               # read/list/glob/grep/edit/write tools
-│   │   ├── executor.py             # Tool execution runtime
-│   │   ├── registry.py             # Tool registration
+│   │   ├── base.py                 # Core tool protocols and base models
 │   │   ├── config.py               # Tool configuration bundle
-│   │   └── context.py              # Sandbox/context information
+│   │   ├── context.py              # Sandbox/context information
+│   │   ├── decorators.py           # Tool registration decorators
+│   │   ├── exceptions.py           # Tool-related exceptions
+│   │   ├── executor.py             # Tool execution runtime
+│   │   ├── policy.py               # Tool access policy helpers
+│   │   └── registry.py             # Tool registration
 │   └── __init__.py
 └── tests/
 ```

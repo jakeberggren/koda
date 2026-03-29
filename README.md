@@ -30,7 +30,7 @@ Koda is a uv-managed monorepo with four workspace packages:
 - **koda** — Core agent/runtime library: agent loop, LLM abstractions, sessions, telemetry, and tools
 - **koda-service** — Service boundary and startup/runtime orchestration used by clients
 - **koda-tui** — Interactive terminal UI built on top of the service layer
-- **koda-common** — Shared settings, logging, and database utilities
+- **koda-common** — Shared settings, logging, and path utilities
 
 ```text
 packages/
@@ -67,15 +67,15 @@ packages/
 │
 └── koda-common/                 # Shared utilities
     ├── src/koda_common/
-    │   ├── db/                  # Database configuration + engine helpers
     │   ├── logging/             # Logging configuration
-    │   └── settings/            # Settings management + secret storage
+    │   ├── settings/            # Settings management + secret storage
+    │   └── paths.py             # Shared filesystem paths
     └── tests/
 ```
 
 ## Development Setup
 
-KODA uses [Astral's](https://astral.sh/) Python toolchain:
+Koda uses [Astral's](https://astral.sh/) Python toolchain:
 
 - **uv** — package and workspace management
 - **ruff** — linting and formatting
