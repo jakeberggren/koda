@@ -91,7 +91,7 @@ jobs:
             "koda-${{ github.ref_name }}-${{ matrix.artifact_label }}"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: koda-${{ github.ref_name }}-${{ matrix.artifact_label }}
           path: dist/*.${{ matrix.archive_ext }}
