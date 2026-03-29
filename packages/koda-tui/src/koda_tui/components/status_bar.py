@@ -53,14 +53,14 @@ class StatusBarControl(UIControl):
         return f"ctx {context_percentage}%"
 
     def _get_io_usage_text(self) -> str | None:
-        usage = self._state.usage
-        if usage is None:
+        total_usage = self._state.total_usage
+        if total_usage is None:
             return None
 
         parts: list[str] = []
-        if (input_tokens := self._format_token_count(usage.input_tokens)) is not None:
+        if (input_tokens := self._format_token_count(total_usage.input_tokens)) is not None:
             parts.append(f"{input_tokens} in")
-        if (output_tokens := self._format_token_count(usage.output_tokens)) is not None:
+        if (output_tokens := self._format_token_count(total_usage.output_tokens)) is not None:
             parts.append(f"{output_tokens} out")
         if not parts:
             return None

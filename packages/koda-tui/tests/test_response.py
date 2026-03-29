@@ -249,10 +249,15 @@ class TestResponseLifecycle:
         )
 
         assert state.usage is not None
+        assert state.total_usage is not None
         assert state.usage.input_tokens == 2_000
         assert state.usage.output_tokens == 500
         assert state.usage.cached_tokens == 100
         assert state.usage.total_tokens == 2_500
+        assert state.total_usage.input_tokens == 2_000
+        assert state.total_usage.output_tokens == 500
+        assert state.total_usage.cached_tokens == 100
+        assert state.total_usage.total_tokens == 2_500
 
     def test_end_persists_buffered_content_even_after_response_completed(
         self, state: AppState, lifecycle: ResponseLifecycle
