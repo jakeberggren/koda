@@ -19,6 +19,13 @@ Lightweight terminal coding assistant that can navigate, understand, and modify 
 curl -fsSL https://raw.githubusercontent.com/jakeberggren/koda/main/install.sh | bash
 ```
 
+## Uninstall
+
+```bash
+rm -f ~/.local/bin/koda
+rm -rf ~/.local/share/koda
+```
+
 ## Usage
 
 Start an interactive chat session:
