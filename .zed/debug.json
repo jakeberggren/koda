@@ -1,0 +1,14 @@
+[
+  {
+    "adapter": "Debugpy",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "env": {
+      "PYTHONPATH": "$ZED_WORKTREE_ROOT/packages/koda-tui/src:$ZED_WORKTREE_ROOT/packages/koda/src"
+    },
+    "justMyCode": false,
+    "label": "Python: Debug TUI",
+    "module": "koda_tui",
+    "python": "$ZED_WORKTREE_ROOT/.venv/bin/python",
+    "request": "launch"
+  }
+]
