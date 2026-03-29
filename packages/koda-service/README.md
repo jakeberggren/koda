@@ -11,7 +11,7 @@
 </pre>
 </div>
 
-koda-service is the service boundary and runtime orchestration layer around the Koda core. It
+`koda-service` is the service boundary and runtime orchestration layer around the Koda core. It
 defines the public service protocol used by clients such as `koda-tui`, owns the boundary DTOs
 that cross that service edge, and wires the in-process implementation used today.
 
