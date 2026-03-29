@@ -8,10 +8,12 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from koda_common.logging.settings import LoggingEnvSettings
+from koda_common.logging.types import LogLevel
+from koda_common.paths import log_file_path
+
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from koda_common.settings.settings import LogLevel
 
 
 class NoHandlersConfiguredError(ValueError):
@@ -24,21 +26,17 @@ class NoHandlersConfiguredError(ValueError):
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class LoggingConfig:
     """Configuration options for structured logging setup."""
 
-    app_name: str | None = None
-    level: LogLevel | None = None
+    app_name: str
+    level: LogLevel | None = LogLevel.INFO
     log_file: Path | None = None
     console: bool = True
     enabled: bool = True
-
-
-_MAX_LOG_BYTES = 5 * 1024 * 1024
-_BACKUP_COUNT = 3
-
-_default_app_name: str | None = None
+    max_log_bytes: int = 5 * 1024 * 1024
+    backup_count: int = 3
 
 
 def _build_shared_processors() -> list[structlog.typing.Processor]:
@@ -67,57 +65,56 @@ def _build_formatter(
 
 def _build_handlers(
     shared_processors: list[structlog.typing.Processor],
+    config: LoggingConfig,
     log_file: Path | None,
     *,
     console: bool = True,
 ) -> list[logging.Handler]:
     handlers: list[logging.Handler] = []
-    formatter = _build_formatter(shared_processors, structlog.dev.ConsoleRenderer(colors=True))
+    console_formatter = _build_formatter(
+        shared_processors,
+        structlog.dev.ConsoleRenderer(colors=True),
+    )
+    file_formatter = _build_formatter(shared_processors, structlog.processors.JSONRenderer())
 
     if console:
         console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setFormatter(formatter)
+        console_handler.setFormatter(console_formatter)
         handlers.append(console_handler)
     if log_file:
         log_file.parent.mkdir(parents=True, exist_ok=True)
         file_handler = RotatingFileHandler(
             log_file,
-            maxBytes=_MAX_LOG_BYTES,
-            backupCount=_BACKUP_COUNT,
+            maxBytes=config.max_log_bytes,
+            backupCount=config.backup_count,
             encoding="utf-8",
         )
-        file_handler.setFormatter(formatter)
+        file_handler.setFormatter(file_formatter)
         handlers.append(file_handler)
     if not handlers:
         raise NoHandlersConfiguredError
     return handlers
 
 
-def _close_handlers(root: logging.Logger) -> None:
-    for handler in root.handlers:
-        handler.close()
-    root.handlers.clear()
-
-
-def configure_logging(config: LoggingConfig | None = None, *, force: bool = False) -> None:
+def configure_logging(
+    config: LoggingConfig,
+    *,
+    env: LoggingEnvSettings | None = None,
+) -> None:
     """Initialize structured logging with console and optional file output."""
-    from koda_common.settings.settings import EnvSettings  # noqa: PLC0415
-
-    global _default_app_name  # noqa: PLW0603
-
-    config = config or LoggingConfig()
-    env = EnvSettings()
+    env = env or LoggingEnvSettings()
 
     if not (config.enabled and env.koda_log_enabled):
         return
 
     root = logging.getLogger()
-    if root.handlers and not force:
-        return
-    resolved_level = config.level or env.koda_log_level
-    resolved_file = config.log_file or env.koda_log_file
 
-    _default_app_name = config.app_name
+    if root.handlers:
+        return
+
+    resolved_level = config.level or env.koda_log_level
+    resolved_file = config.log_file or env.koda_log_file or log_file_path(config.app_name)
+
     shared_processors = _build_shared_processors()
 
     structlog.configure_once(
@@ -126,22 +123,18 @@ def configure_logging(config: LoggingConfig | None = None, *, force: bool = Fals
         cache_logger_on_first_use=True,
     )
 
-    if force:
-        _close_handlers(root)
+    handlers = _build_handlers(shared_processors, config, resolved_file, console=config.console)
 
     logging.basicConfig(
         level=resolved_level,
-        handlers=_build_handlers(shared_processors, resolved_file, console=config.console),
-        force=force,
+        handlers=handlers,
     )
+
+    structlog.contextvars.bind_contextvars(app=config.app_name)
 
 
 def get_logger(
-    name: str | None = None, *, app_name: str | None = None
+    name: str | None = None,
 ) -> structlog.stdlib.BoundLogger:
     """Return a bound logger for the given name, typically __name__."""
-    logger = structlog.get_logger(name)
-    resolved_app_name = app_name or _default_app_name
-    if resolved_app_name:
-        return logger.bind(app=resolved_app_name)
-    return logger
+    return structlog.get_logger(name)

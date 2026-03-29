@@ -1,10 +1,8 @@
-from pathlib import Path
 from typing import Literal
 
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 type ThinkingOptionId = str
 
 
@@ -90,11 +88,6 @@ class EnvSettings(BaseSettings):
         description="Koda Service boundary selection for Koda clients",
     )
 
-    # Logging
-    koda_log_enabled: bool = Field(default=True, description="Enable logging")
-    koda_log_level: LogLevel = Field(default="INFO", description="Log level")
-    koda_log_file: Path | None = Field(default=None, description="Log file path")
-
     # Telemetry
     langfuse_tracing_enabled: bool = Field(default=True, description="Enable telemetry")
     langfuse_secret_key: SecretStr | None = Field(default=None, description="Langfuse secret key")
@@ -104,4 +97,5 @@ class EnvSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore",
     )

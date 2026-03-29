@@ -5,7 +5,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from koda_common.logging import get_logger
+from koda_common.logging.config import get_logger
 from koda_common.settings.settings import EnvSettings, Settings
 
 if TYPE_CHECKING:
