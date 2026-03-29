@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
-
-import platformdirs
 
 from koda.sessions.exceptions import SessionNotFoundError
 from koda.sessions.session import Session
+from koda_common.paths import sessions_dir_path
 
 if TYPE_CHECKING:
+    from pathlib import Path
     from uuid import UUID
 
     from koda.sessions.session import SessionMessage
@@ -86,14 +85,11 @@ class InMemorySessionStore(SessionStore):
         del self._sessions[session_id]
 
 
-_DEFAULT_DIR = Path(platformdirs.user_data_dir("koda", appauthor=False)) / "sessions"
-
-
 class JsonSessionStore:
     """File-based session store using one JSON file per session."""
 
-    def __init__(self, directory: Path = _DEFAULT_DIR) -> None:
-        self._dir = directory
+    def __init__(self, directory: Path | None = None) -> None:
+        self._dir = directory or sessions_dir_path()
         self._dir.mkdir(parents=True, exist_ok=True)
 
     def _path_for(self, session_id: UUID) -> Path:
