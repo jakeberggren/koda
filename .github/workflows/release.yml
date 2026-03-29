@@ -1,0 +1,102 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ github.ref_name }}" > /dev/null 2>&1 || \
+          gh release create "${{ github.ref_name }}" \
+            --title "Release ${{ github.ref_name }}" \
+            --generate-notes
+
+  build:
+    needs: create-release
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+            arch: x86_64
+            archive_ext: tar.gz
+            artifact_label: linux-x86_64
+
+          - runner: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            archive_ext: tar.gz
+            artifact_label: linux-arm64
+
+          - runner: macos-15-intel
+            platform: macos
+            arch: x86_64
+            archive_ext: tar.gz
+            artifact_label: macos-x86_64
+
+          - runner: macos-latest
+            platform: macos
+            arch: arm64
+            archive_ext: tar.gz
+            artifact_label: macos-arm64
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Build
+        run: uv run pyinstaller koda.spec
+
+      - name: Rename output folder
+        shell: bash
+        run: |
+          mv dist/koda "dist/koda-${{ github.ref_name }}-${{ matrix.artifact_label }}"
+
+      - name: Archive build
+        shell: bash
+        run: |
+          cd dist
+          tar -czf "koda-${{ github.ref_name }}-${{ matrix.artifact_label }}.tar.gz" \
+            "koda-${{ github.ref_name }}-${{ matrix.artifact_label }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: koda-${{ github.ref_name }}-${{ matrix.artifact_label }}
+          path: dist/*.${{ matrix.archive_ext }}
+
+      - name: Upload to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ github.ref_name }}" dist/*.${{ matrix.archive_ext }} --clobber

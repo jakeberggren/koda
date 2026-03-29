@@ -13,6 +13,12 @@
 
 Lightweight terminal coding assistant that can navigate, understand, and modify codebases.
 
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jakeberggren/koda/main/install.sh | bash
+```
+
 ## Usage
 
 Start an interactive chat session:
