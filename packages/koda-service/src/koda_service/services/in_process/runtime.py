@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from koda.agents import Agent
     from koda.sessions import SessionManager
     from koda_common.settings import SettingsManager
-    from koda_service.bootstrap import Registries
+    from koda_service.bootstrap import PromptOverrides, Registries
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +31,7 @@ class InProcessRuntimeFactory:
     session_manager: SessionManager
     registries: Registries
     create_agent: Callable[..., Agent]
+    prompt_overrides: PromptOverrides | None = None
 
     def create(self) -> InProcessRuntime:
         agent = self.create_agent(
@@ -38,6 +39,7 @@ class InProcessRuntimeFactory:
             sandbox_dir=self.sandbox_dir,
             session_manager=self.session_manager,
             registries=self.registries,
+            prompt_overrides=self.prompt_overrides,
         )
         return InProcessRuntime(
             chat=ChatService(agent),

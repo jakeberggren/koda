@@ -9,6 +9,16 @@ from koda.tools import ToolCall, ToolDefinition, ToolResult
 _MAX_TOP_LOGPROBS = 20
 
 
+class LLMRequestOptionsError(Exception):
+    """Raised when LLM request options are invalid."""
+
+    def __init__(self, field_name: str, value: object, expected: str) -> None:
+        super().__init__(f"Invalid `{field_name}`: expected {expected}, got {value}.")
+        self.field_name = field_name
+        self.value = value
+        self.expected = expected
+
+
 @dataclass(frozen=True, slots=True)
 class LLMRequestOptions:
     max_output_tokens: int | None = None
@@ -24,11 +34,23 @@ class LLMRequestOptions:
 
     def __post_init__(self) -> None:
         if self.top_logprobs is not None and not 0 <= self.top_logprobs <= _MAX_TOP_LOGPROBS:
-            raise ValueError
+            raise LLMRequestOptionsError(
+                field_name="top_logprobs",
+                value=self.top_logprobs,
+                expected=f"an integer between 0 and {_MAX_TOP_LOGPROBS}",
+            )
         if self.top_p is not None and not 0 <= self.top_p <= 1:
-            raise ValueError
+            raise LLMRequestOptionsError(
+                field_name="top_p",
+                value=self.top_p,
+                expected="a float between 0 and 1",
+            )
         if self.temperature is not None and not 0 <= self.temperature <= 1:
-            raise ValueError
+            raise LLMRequestOptionsError(
+                field_name="temperature",
+                value=self.temperature,
+                expected="a float between 0 and 1",
+            )
 
 
 @dataclass(frozen=True, slots=True)

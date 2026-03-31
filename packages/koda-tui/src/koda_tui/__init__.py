@@ -16,7 +16,7 @@ __all__ = ["AppState", "KodaTuiApp", "main"]
 def _report_startup_error(error: StartupError, logger: BoundLogger) -> None:
     # Expected startup failures should be concise and user-fixable, not tracebacks.
     logger.error("startup_failed", summary=error.summary, details=error.details)
-    print(error, file=sys.stderr)
+    print(f"Application failed to start ({type(error).__name__}): {error}", file=sys.stderr)
 
 
 def main() -> None:

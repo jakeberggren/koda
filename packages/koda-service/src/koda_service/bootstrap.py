@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from koda.agents import Agent, AgentConfig
+from koda.agents import Agent, AgentConfig, PromptContext, SystemPrompt
 from koda.llm import LLMRequestOptions
 from koda.llm.providers import BERGETAI_MODELS
 from koda.llm.providers.bergetai import BERGETAI_PROVIDER, create_bergetai_llm
@@ -23,6 +23,12 @@ if TYPE_CHECKING:
 class Registries:
     model_registry: ModelRegistry
     provider_registry: ProviderRegistry
+
+
+@dataclass(frozen=True, slots=True)
+class PromptOverrides:
+    system_prompt: SystemPrompt | None = None
+    prompt_context: PromptContext | None = None
 
 
 def create_model_registry() -> ModelRegistry:
@@ -59,22 +65,35 @@ def create_agent(
     sandbox_dir: Path,
     session_manager: SessionManager,
     registries: Registries,
-    system_message: str | None = None,
+    prompt_overrides: PromptOverrides | None = None,
 ) -> Agent:
+    model_definition = registries.model_registry.get(settings.provider, settings.model)
+
     llm = registries.provider_registry.create(
         settings.provider,
         settings,
         registries.model_registry,
     )
+
+    prompt_overrides = prompt_overrides or PromptOverrides()
+    system_prompt = prompt_overrides.system_prompt or SystemPrompt()
+    prompt_context = prompt_overrides.prompt_context or PromptContext(
+        model=model_definition.id,
+        provider=model_definition.provider,
+    )
+
     request_options = LLMRequestOptions(
         thinking=settings.thinking,
         web_search=settings.allow_web_search,
         extended_prompt_retention=settings.allow_extended_prompt_retention,
     )
+
     agent_config = AgentConfig(
-        system_message=system_message,
+        system_prompt=system_prompt,
+        prompt_context=prompt_context,
         request_options=request_options,
     )
+
     return Agent(
         llm=llm,
         session_manager=session_manager,
@@ -89,6 +108,7 @@ def create_in_process_runtime_factory(
     sandbox_dir: Path,
     registries: Registries,
     create_agent=create_agent,
+    prompt_overrides: PromptOverrides | None = None,
 ) -> InProcessRuntimeFactory:
     session_manager = SessionManager(JsonSessionStore())
     session_manager.create_session()
@@ -98,4 +118,5 @@ def create_in_process_runtime_factory(
         session_manager=session_manager,
         registries=registries,
         create_agent=create_agent,
+        prompt_overrides=prompt_overrides,
     )
