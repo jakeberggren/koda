@@ -10,7 +10,7 @@ from koda_service.types import (
     ThinkingDelta,
     ToolCallRequested,
 )
-from koda_tui.state import AppState, Message, MessageRole, ResponsePhase, TokenUsage, add_usage
+from koda_tui.state import AppState, Message, MessageRole, ResponsePhase, TokenUsage, sum_usage
 
 if TYPE_CHECKING:
     from koda_service.types import ToolCall
@@ -44,7 +44,8 @@ class ResponseLifecycle:
             if event.usage is not None
             else None
         )
-        self._state.usage = add_usage(self._state.usage, response_usage)
+        self._state.usage = response_usage
+        self._state.total_usage = sum_usage(self._state.total_usage, response_usage)
 
     def append_content(self, text: str) -> None:
         """Append text to current streaming content."""

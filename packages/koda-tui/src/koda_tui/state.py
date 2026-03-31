@@ -49,24 +49,24 @@ class TokenUsage:
         return round((self.input_tokens / context_window) * 100)
 
 
-def _add_token_value(left: int | None, right: int | None) -> int | None:
-    if left is None:
-        return right
-    if right is None:
-        return left
-    return left + right
+def _sum_usage_value(current: int | None, delta: int | None) -> int | None:
+    if current is None:
+        return delta
+    if delta is None:
+        return current
+    return current + delta
 
 
-def add_usage(current: TokenUsage | None, delta: TokenUsage | None) -> TokenUsage | None:
+def sum_usage(current: TokenUsage | None, delta: TokenUsage | None) -> TokenUsage | None:
     if current is None:
         return delta
     if delta is None:
         return current
     return TokenUsage(
-        input_tokens=_add_token_value(current.input_tokens, delta.input_tokens),
-        output_tokens=_add_token_value(current.output_tokens, delta.output_tokens),
-        cached_tokens=_add_token_value(current.cached_tokens, delta.cached_tokens),
-        total_tokens=_add_token_value(current.total_tokens, delta.total_tokens),
+        input_tokens=_sum_usage_value(current.input_tokens, delta.input_tokens),
+        output_tokens=_sum_usage_value(current.output_tokens, delta.output_tokens),
+        cached_tokens=_sum_usage_value(current.cached_tokens, delta.cached_tokens),
+        total_tokens=_sum_usage_value(current.total_tokens, delta.total_tokens),
     )
 
 
@@ -90,6 +90,7 @@ class AppState:
     )
     context_window: int | None = None
     usage: TokenUsage | None = None
+    total_usage: TokenUsage | None = None
     thinking_supported: bool = False
     show_scrollbar: bool = True
     queue_inputs: bool = True
@@ -106,3 +107,4 @@ class AppState:
         self.response_phase = ResponsePhase.IDLE
         self.active_tools.clear()
         self.usage = None
+        self.total_usage = None

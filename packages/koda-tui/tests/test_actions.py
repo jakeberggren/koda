@@ -113,9 +113,13 @@ def test_switch_session_restores_usage_from_last_assistant_message() -> None:
 
     assert result.ok is True
     assert state.usage is not None
+    assert state.total_usage is not None
     assert state.usage.input_tokens == 1_200
     assert state.usage.output_tokens == 300
     assert state.usage.total_tokens == 1_500
+    assert state.total_usage.input_tokens == 1_200
+    assert state.total_usage.output_tokens == 300
+    assert state.total_usage.total_tokens == 1_500
 
 
 def test_switch_session_not_found_returns_error() -> None:

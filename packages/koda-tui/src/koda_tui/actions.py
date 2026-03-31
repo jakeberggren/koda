@@ -70,7 +70,7 @@ def switch_session(
     try:
         _, messages = service.switch_session(session_id)
         state.reset_conversation()
-        state.messages, state.usage = convert_messages(messages)
+        state.messages, state.usage, state.total_usage = convert_messages(messages)
         return ActionResult(ok=True)
     except ServiceSessionNotFoundError:
         return ActionResult(ok=False, error="Session not found")
