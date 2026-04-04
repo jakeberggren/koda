@@ -28,7 +28,10 @@ def test_report_startup_error_logs_and_prints(
     )
 
     captured = capsys.readouterr()
-    assert captured.err == "Invalid configuration\n- theme: Input should be 'dark' or 'light'\n"
+    assert captured.err == (
+        "Application failed to start (StartupConfigurationError): "
+        "Invalid configuration\n- theme: Input should be 'dark' or 'light'\n"
+    )
 
 
 def test_main_prints_startup_error_and_exits(

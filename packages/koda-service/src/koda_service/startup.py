@@ -6,10 +6,12 @@ from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
+from koda.agents import AgentConfigError, PromptRenderError
 from koda.llm.exceptions import (
     LLMAuthenticationError,
     LLMConfigurationError,
 )
+from koda.llm.types import LLMRequestOptionsError
 from koda.telemetry import LangfuseTelemetry
 from koda_common.settings import (
     JsonFileSettingsStore,
@@ -72,7 +74,13 @@ def _create_service(
             runtime_factory=runtime_factory,
             telemetry=telemetry,
         )
-    except (LLMConfigurationError, LLMAuthenticationError) as error:
+    except (
+        AgentConfigError,
+        PromptRenderError,
+        LLMConfigurationError,
+        LLMAuthenticationError,
+        LLMRequestOptionsError,
+    ) as error:
         raise StartupConfigurationError.from_runtime_error(error) from error
     except PermissionError as error:
         raise StartupEnvironmentError.from_permission_error(error) from error

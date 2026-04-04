@@ -38,3 +38,4 @@ def test_runtime_factory_creates_runtime_and_passes_shared_dependencies() -> Non
     assert captured_kwargs["sandbox_dir"] == Path("/tmp/koda-test")
     assert captured_kwargs["session_manager"] is session_manager
     assert captured_kwargs["registries"] is current_registries
+    assert captured_kwargs["prompt_overrides"] is None

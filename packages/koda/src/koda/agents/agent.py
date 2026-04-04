@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from koda.agents.prompts import (
+    PromptContext,
+    SystemPrompt,
+    render_prompt,
+)
 from koda.llm import LLM, LLMRequest, LLMRequestOptions
 from koda.llm import exceptions as llm_exceptions
 from koda.llm.types import (
@@ -32,11 +37,39 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
+class AgentConfigError(Exception):
+    """Raised when agent config is invalid."""
+
+    def __init__(self, field_name: str, value: object, expected: str) -> None:
+        self.field_name = field_name
+        self.value = value
+        self.expected = expected
+        super().__init__(f"Invalid `{field_name}`: expected {expected}, got {value}.")
+
+
 @dataclass(frozen=True, slots=True)
 class AgentConfig:
-    system_message: str | None = None
+    """Static agent configuration.
+
+    Raises `AgentConfigError` at construction time if numeric limits are invalid
+    or if the configured system prompt cannot be rendered.
+    """
+
+    prompt_context: PromptContext | None = None
+    system_prompt: SystemPrompt = field(default_factory=SystemPrompt)
     request_options: LLMRequestOptions = field(default_factory=LLMRequestOptions)
     max_tool_iterations: int = 30
+
+    def __post_init__(self) -> None:
+        if self.max_tool_iterations < 1:
+            raise AgentConfigError(
+                field_name="max_tool_iterations",
+                value=self.max_tool_iterations,
+                expected="an integer greater than or equal to 1",
+            )
+
+        # Validate that system prompt correctly renders at agent initialization.
+        render_prompt(self.system_prompt, self.prompt_context)
 
 
 class Agent:
@@ -51,6 +84,10 @@ class Agent:
         self._config: AgentConfig = config
         self._session_manager: SessionManager = session_manager
         self.tools: ToolConfig | None = tools
+        self._instructions: str | None = render_prompt(
+            self._config.system_prompt,
+            self._config.prompt_context,
+        )
 
         logger.info("agent_initialized", llm=type(llm).__name__)
 
@@ -186,7 +223,7 @@ class Agent:
         session = self._session_manager.get_session(session_id)
         request = LLMRequest(
             messages=session.messages,
-            instructions=self._config.system_message,
+            instructions=self._instructions,
             tools=tool_definitions,
             options=self._config.request_options,
         )
