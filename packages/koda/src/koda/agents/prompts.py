@@ -10,7 +10,9 @@ IDENTITY_PROMPT: Final[str] = (
     "You are Koda, an expert coding assistant built to help the user "
     "navigate, understand, and modify codebases."
 )
-ENVIRONMENT_PROMPT: Final[str] = "You are currently powered by {model} running via {provider}."
+ENVIRONMENT_PROMPT: Final[str] = (
+    "You are running in an execution environment with session state and tool support."
+)
 BEHAVIOR_PROMPT: Final[str] = (
     "Be clear, practical, and concise. "
     "Prefer concrete next steps and implementation details when helpful.\n\n"
@@ -46,17 +48,7 @@ def _normalize(text: str | None) -> str | None:
 class PromptContext:
     """Dynamic values available when rendering prompt templates."""
 
-    model: str | None = None
-    provider: str | None = None
     variables: Mapping[str, object] = field(default_factory=dict)
-
-    def format_kwargs(self) -> dict[str, object]:
-        kwargs = dict(self.variables)
-        if self.model is not None:
-            kwargs["model"] = self.model
-        if self.provider is not None:
-            kwargs["provider"] = self.provider
-        return kwargs
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +63,7 @@ class PromptSection:
 def _default_sections() -> tuple[PromptSection, ...]:
     return (
         PromptSection(name="identity", content=IDENTITY_PROMPT),
-        PromptSection(name="environment", content=ENVIRONMENT_PROMPT, template=True),
+        PromptSection(name="environment", content=ENVIRONMENT_PROMPT),
         PromptSection(name="behavior", content=BEHAVIOR_PROMPT),
     )
 
@@ -115,7 +107,7 @@ def _render_section(section: PromptSection, context: PromptContext | None) -> st
     if context is None:
         raise PromptContextRequiredError(section.name)
     try:
-        return _normalize(text.format(**context.format_kwargs()))
+        return _normalize(text.format(**context.variables))
     except KeyError as error:
         variable_name = error.args[0]
         raise PromptVariableMissingError(section.name, str(variable_name)) from error

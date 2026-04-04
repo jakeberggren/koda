@@ -67,8 +67,6 @@ def create_agent(
     registries: Registries,
     prompt_overrides: PromptOverrides | None = None,
 ) -> Agent:
-    model_definition = registries.model_registry.get(settings.provider, settings.model)
-
     llm = registries.provider_registry.create(
         settings.provider,
         settings,
@@ -76,11 +74,6 @@ def create_agent(
     )
 
     prompt_overrides = prompt_overrides or PromptOverrides()
-    system_prompt = prompt_overrides.system_prompt or SystemPrompt()
-    prompt_context = prompt_overrides.prompt_context or PromptContext(
-        model=model_definition.id,
-        provider=model_definition.provider,
-    )
 
     request_options = LLMRequestOptions(
         thinking=settings.thinking,
@@ -89,8 +82,8 @@ def create_agent(
     )
 
     agent_config = AgentConfig(
-        system_prompt=system_prompt,
-        prompt_context=prompt_context,
+        system_prompt=prompt_overrides.system_prompt or SystemPrompt(),
+        prompt_context=prompt_overrides.prompt_context,
         request_options=request_options,
     )
 

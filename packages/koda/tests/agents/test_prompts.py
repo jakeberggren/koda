@@ -17,12 +17,12 @@ from koda.agents.prompts import (
 
 def test_render_prompt_renders_default_sections_in_order() -> None:
     prompt = SystemPrompt()
-    context = PromptContext(model="GPT-5.4", provider="openai")
+    context = PromptContext(variables={"model": "GPT-5.4", "provider": "openai"})
 
     assert render_prompt(prompt, context) == "\n\n".join(
         [
             IDENTITY_PROMPT,
-            ENVIRONMENT_PROMPT.format(model="GPT-5.4", provider="openai"),
+            ENVIRONMENT_PROMPT,
             BEHAVIOR_PROMPT,
         ]
     )
@@ -53,7 +53,7 @@ def test_render_prompt_raises_for_missing_context_variable() -> None:
     prompt = SystemPrompt(
         sections=(PromptSection(name="client", content="Client: {client_name}", template=True),)
     )
-    context = PromptContext(model="GPT-5.4", provider="openai")
+    context = PromptContext(variables={"model": "GPT-5.4", "provider": "openai"})
 
     with pytest.raises(PromptVariableMissingError, match="client_name"):
         render_prompt(prompt, context)
@@ -66,7 +66,7 @@ def test_system_prompt_section_mutators_preserve_order() -> None:
         .append_sections(PromptSection(name="tui", content="Use concise terminal language"))
         .remove_sections("behavior")
     )
-    context = PromptContext(model="GPT-5.4", provider="openai")
+    context = PromptContext(variables={"model": "GPT-5.4", "provider": "openai"})
 
     assert render_prompt(prompt, context) == "\n\n".join(
         [
