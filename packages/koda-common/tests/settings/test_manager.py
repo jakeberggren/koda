@@ -63,7 +63,7 @@ def test_partial_store_merges_with_defaults(secrets_store: SpySecretsStore) -> N
     store = SpySettingsStore({"provider": "anthropic"})
     manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
     assert manager.provider == "anthropic"
-    assert manager.model == "gpt-5.2"
+    assert manager.model is None
 
 
 def test_invalid_store_value_raises_validation_error(secrets_store: SpySecretsStore) -> None:
@@ -84,7 +84,7 @@ def test_set_persists_and_notifies_single_change(
     assert manager.provider == "anthropic"
     assert settings_store.save_calls[-1] == {
         "provider": "anthropic",
-        "model": "gpt-5.2",
+        "model": None,
         "thinking": "none",
         "theme": "dark",
         "show_scrollbar": True,
@@ -94,7 +94,7 @@ def test_set_persists_and_notifies_single_change(
         "secrets_backend": "json_file",
     }
     assert changes == [
-        (SettingChange(name="provider", old_value="openai", new_value="anthropic"),),
+        (SettingChange(name="provider", old_value=None, new_value="anthropic"),),
     ]
 
 
@@ -127,8 +127,8 @@ def test_update_commits_all_changes_before_notifying(
         (
             ("bergetai", "zai-org/GLM-4.7"),
             (
-                SettingChange(name="provider", old_value="openai", new_value="bergetai"),
-                SettingChange(name="model", old_value="gpt-5.2", new_value="zai-org/GLM-4.7"),
+                SettingChange(name="provider", old_value=None, new_value="bergetai"),
+                SettingChange(name="model", old_value=None, new_value="zai-org/GLM-4.7"),
             ),
         ),
     ]
@@ -155,7 +155,7 @@ def test_setting_same_value_does_not_notify_or_save(
     changes: list[tuple[SettingChange, ...]] = []
     manager.subscribe(changes.append)
 
-    manager.set("provider", "openai")
+    manager.set("provider", None)
 
     assert changes == []
     assert settings_store.save_calls == []
@@ -186,7 +186,7 @@ def test_multiple_subscribers_all_called(manager: SettingsManager) -> None:
     manager.set("provider", "anthropic")
 
     expected = [
-        (SettingChange(name="provider", old_value="openai", new_value="anthropic"),),
+        (SettingChange(name="provider", old_value=None, new_value="anthropic"),),
     ]
     assert c1 == expected
     assert c2 == expected

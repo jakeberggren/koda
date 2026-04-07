@@ -7,6 +7,7 @@ import pytest
 
 from koda.llm.exceptions import ApiKeyNotConfiguredError
 from koda_common.settings.store import JsonFileSettingsStore
+from koda_service import ServiceStatus
 from koda_tui.bootstrap import KodaRuntimeManager
 from koda_tui.bootstrap.errors import StartupConfigurationError
 from koda_tui.bootstrap.settings import create_secrets_store, create_settings_manager
@@ -89,6 +90,10 @@ def test_runtime_manager_translates_runtime_configuration_errors(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    monkeypatch.setattr(
+        "koda_tui.bootstrap.manager.check_in_process_service_status",
+        lambda _settings: ServiceStatus(is_ready=True, summary="Ready"),
+    )
     manager = KodaRuntimeManager(
         settings=cast("SettingsManager", SimpleNamespace()),
         cwd=tmp_path,
@@ -109,6 +114,10 @@ def test_runtime_manager_builds_and_caches_service(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    monkeypatch.setattr(
+        "koda_tui.bootstrap.manager.check_in_process_service_status",
+        lambda _settings: ServiceStatus(is_ready=True, summary="Ready"),
+    )
     settings = SimpleNamespace(
         provider="openai",
         model="gpt-5.2",
