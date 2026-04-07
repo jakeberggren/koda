@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from koda.agents import AgentConfigError, PromptRenderError
 from koda.llm.exceptions import LLMAuthenticationError, LLMConfigurationError
 from koda.llm.types import LLMRequestOptionsError
+from koda_service.exceptions import ServiceNotReadyError
 from koda_service.services.in_process.factories import (
     create_registries,
     create_runtime,
@@ -43,6 +44,9 @@ class KodaRuntimeManager:
         return check_in_process_service_status(self._settings)
 
     def get_runtime(self) -> KodaRuntime[StreamEvent, Message]:
+        status = self.ready()
+        if not status.is_ready:
+            raise ServiceNotReadyError(summary=status.summary, detail=status.detail)
         if self._runtime is None:
             try:
                 self._runtime = create_runtime(

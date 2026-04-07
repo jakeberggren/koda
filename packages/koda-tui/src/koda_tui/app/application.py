@@ -232,9 +232,7 @@ class KodaTuiApp:
 
     async def send_message(self, text: str) -> None:
         """Send a message and process the response stream."""
-        if not self.state.service_status.is_ready:
-            return
-        await self._stream_processor.stream(text, self.runtime)
+        await self._stream_processor.stream(text, self._runtime_manager.get_runtime)
         self._message_queue.kick()
 
     def cancel_streaming(self) -> None:

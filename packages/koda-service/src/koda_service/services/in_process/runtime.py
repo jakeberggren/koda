@@ -37,13 +37,30 @@ if TYPE_CHECKING:
 def _translate_llm_error(error: LLMAPIError) -> ServiceChatError:
     match error:
         case LLMAuthenticationError():
-            return ServiceAuthenticationError(str(error))
+            return ServiceAuthenticationError(
+                summary="Authentication failed.",
+                detail=(
+                    "Please check your API key. Press `Ctrl+P` → `Connect Provider` to update it."
+                ),
+                message=str(error),
+            )
         case LLMRateLimitError():
-            return ServiceRateLimitError(str(error))
+            return ServiceRateLimitError(
+                summary="Rate limit exceeded.",
+                detail=f"{error}\n\nPlease check your plan and billing details.",
+                message=str(error),
+            )
         case LLMConnectionError():
-            return ServiceConnectionError(str(error))
+            return ServiceConnectionError(
+                summary="Connection error.",
+                detail=f"{error}\n\nPlease check your internet connection and try again.",
+                message=str(error),
+            )
         case _:
-            return ServiceProviderError(str(error))
+            return ServiceProviderError(
+                summary="Provider error.",
+                detail=str(error),
+            )
 
 
 class InProcessKodaRuntime(KodaRuntime[StreamEvent, Message]):

@@ -37,7 +37,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("hi", client)
+        await processor.stream("hi", lambda: client)
 
         assert state.is_streaming is False
         user_msg, assistant_msg = state.messages
@@ -66,7 +66,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("read file", client)
+        await processor.stream("read file", lambda: client)
 
         assert state.is_streaming is False
         user_msg, first_assistant, tool_msg, second_assistant = state.messages
@@ -101,7 +101,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("read bad file", client)
+        await processor.stream("read bad file", lambda: client)
 
         assert state.messages[1].role == MessageRole.TOOL
         assert state.messages[1].tool_error is True
@@ -117,17 +117,24 @@ class TestStreamProcessor:
 
         async def mock_chat(_msg: str) -> AsyncIterator:
             yield TextDelta(text="Starting...")
-            raise ServiceRateLimitError("openai rate limit exceeded: quota hit")
+            raise ServiceRateLimitError(
+                summary="Rate limit exceeded.",
+                detail=(
+                    "openai rate limit exceeded: quota hit\n\n"
+                    "Please check your plan and billing details."
+                ),
+                message="openai rate limit exceeded: quota hit",
+            )
             yield  # Make it a generator
 
         client.chat = mock_chat
 
-        await processor.stream("do something", client)
+        await processor.stream("do something", lambda: client)
 
         assert state.is_streaming is False
         _user_msg, assistant_msg = state.messages
         assert "Starting..." in assistant_msg.content
-        assert "**Rate limit exceeded for Test.**" in assistant_msg.content
+        assert "**Rate limit exceeded.**" in assistant_msg.content
         assert "quota hit" in assistant_msg.content
 
     @pytest.mark.asyncio
@@ -142,7 +149,7 @@ class TestStreamProcessor:
         client.chat = mock_chat
 
         with pytest.raises(ValueError, match="Something went wrong"):
-            await processor.stream("do something", client)
+            await processor.stream("do something", lambda: client)
 
     @pytest.mark.asyncio
     async def test_stream_handles_connection_error(
@@ -152,16 +159,23 @@ class TestStreamProcessor:
         client = AsyncMock()
 
         async def mock_chat(_msg: str) -> AsyncIterator:
-            raise ServiceConnectionError("openai connection error: network down")
+            raise ServiceConnectionError(
+                summary="Connection error.",
+                detail=(
+                    "openai connection error: network down\n\n"
+                    "Please check your internet connection and try again."
+                ),
+                message="openai connection error: network down",
+            )
             yield  # Make it a generator
 
         client.chat = mock_chat
 
-        await processor.stream("do something", client)
+        await processor.stream("do something", lambda: client)
 
         assert state.is_streaming is False
         _user_msg, assistant_msg = state.messages
-        assert "**Connection error for Test.**" in assistant_msg.content
+        assert "**Connection error.**" in assistant_msg.content
         assert "network down" in assistant_msg.content
 
     @pytest.mark.asyncio
@@ -179,7 +193,7 @@ class TestStreamProcessor:
         client.chat = mock_chat
 
         # Start streaming in background
-        task = asyncio.create_task(processor.stream("test", client))
+        task = asyncio.create_task(processor.stream("test", lambda: client))
         await asyncio.sleep(0.05)  # Let it start
 
         processor.cancel_stream()

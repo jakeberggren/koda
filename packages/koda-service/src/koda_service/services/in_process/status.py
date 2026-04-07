@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 class ServiceStatus:
     is_ready: bool = False
     summary: str = ""
+    detail: str | None = None
 
 
 def _ready() -> ServiceStatus:
@@ -27,10 +28,11 @@ def _ready() -> ServiceStatus:
     )
 
 
-def _not_ready(*, summary: str) -> ServiceStatus:
+def _not_ready(*, summary: str, detail: str | None = None) -> ServiceStatus:
     return ServiceStatus(
         is_ready=False,
         summary=summary,
+        detail=detail,
     )
 
 
@@ -54,20 +56,35 @@ def _resolve_selection_status(settings: SettingsManager) -> ServiceStatus | None
     catalog = CatalogService(create_registries(), settings)
     connected_provider_ids = {provider.id for provider in catalog.list_connected_providers()}
     if not connected_provider_ids:
-        return _not_ready(summary="Provider setup required")
+        return _not_ready(
+            summary="Provider setup required",
+            detail="Connect a provider API key from the command palette.",
+        )
     if settings.provider is not None and settings.provider not in connected_provider_ids:
-        return _not_ready(summary=f"Connect {settings.provider} to continue")
+        return _not_ready(
+            summary=f"Connect {settings.provider} to continue",
+            detail="The selected provider does not have an API key configured.",
+        )
     if settings.model is None:
-        return _not_ready(summary="Model selection required")
+        return _not_ready(
+            summary="Model selection required",
+            detail="Select a model from the command palette to continue.",
+        )
 
     selectable_model_ids = {
         (model.provider, model.id) for model in catalog.list_selectable_models()
     }
     selected_provider = settings.provider
     if selected_provider is None:
-        return _not_ready(summary="Model selection required")
+        return _not_ready(
+            summary="Model selection required",
+            detail="Select a model from the command palette to continue.",
+        )
     if (selected_provider, settings.model) not in selectable_model_ids:
-        return _not_ready(summary="Selected model unavailable")
+        return _not_ready(
+            summary="Selected model unavailable",
+            detail="Choose a different model from the command palette.",
+        )
     return None
 
 
@@ -80,9 +97,15 @@ def check_in_process_service_status(settings: SettingsManager) -> ServiceStatus:
         _validate_model(settings, registries.model_registry)
         _validate_api_key(settings)
     except KeyringNotInstalledError:
-        return _not_ready(summary="Keychain support is not available")
+        return _not_ready(
+            summary="Keychain support is not available",
+            detail="Install or enable system keychain support to store provider API keys.",
+        )
     except PermissionError:
-        return _not_ready(summary="Koda could not access required local files")
+        return _not_ready(
+            summary="Koda could not access required local files",
+            detail="Check local file permissions and try again.",
+        )
     except Exception as error:
         return _not_ready(summary=str(error))
     return _ready()

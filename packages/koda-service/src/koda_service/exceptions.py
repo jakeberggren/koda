@@ -12,9 +12,24 @@ class ServiceError(KodaServiceError):
 class ServiceChatError(ServiceError):
     """Base class for user-facing chat failures surfaced by the service."""
 
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
+    def __init__(
+        self,
+        *,
+        summary: str,
+        detail: str | None = None,
+        message: str | None = None,
+    ) -> None:
+        super().__init__(summary)
+        self.summary = summary
+        self.detail = detail
+        self.message = message or detail or summary
+
+
+class ServiceNotReadyError(ServiceChatError):
+    """Raised when a runtime-backed operation is attempted before the service is ready."""
+
+    def __init__(self, *, summary: str, detail: str | None = None) -> None:
+        super().__init__(summary=summary, detail=detail)
 
 
 class ServiceSessionError(ServiceError):
