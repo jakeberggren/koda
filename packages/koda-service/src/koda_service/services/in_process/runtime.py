@@ -1,48 +1,94 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from koda_service.services.in_process.catalog import CatalogService
-from koda_service.services.in_process.chat import ChatService
-from koda_service.services.in_process.sessions import SessionService
+from koda.llm.exceptions import (
+    LLMAPIError,
+    LLMAuthenticationError,
+    LLMConnectionError,
+    LLMRateLimitError,
+)
+from koda.sessions.exceptions import NoActiveSessionError, SessionNotFoundError
+from koda_service.exceptions import (
+    ServiceAuthenticationError,
+    ServiceChatError,
+    ServiceConnectionError,
+    ServiceNoActiveSessionError,
+    ServiceProviderError,
+    ServiceRateLimitError,
+    ServiceSessionNotFoundError,
+)
+from koda_service.mappers import (
+    map_llm_event_to_stream_event,
+    map_messages_to_contract_messages,
+    map_session_to_session_info,
+)
+from koda_service.protocols import KodaRuntime
+from koda_service.types import Message, StreamEvent
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-    from pathlib import Path
+    from collections.abc import AsyncIterator, Sequence
+    from uuid import UUID
 
-    from koda.agents import Agent
-    from koda.sessions import SessionManager
-    from koda_common.settings import SettingsManager
-    from koda_service.bootstrap import PromptOverrides, Registries
+    from koda.messages import Message as CoreMessage
+    from koda_service.types import SessionInfo
 
 
-@dataclass(frozen=True, slots=True)
-class InProcessRuntime:
-    chat: ChatService
-    sessions: SessionService
-    catalog: CatalogService
+def _translate_llm_error(error: LLMAPIError) -> ServiceChatError:
+    match error:
+        case LLMAuthenticationError():
+            return ServiceAuthenticationError(str(error))
+        case LLMRateLimitError():
+            return ServiceRateLimitError(str(error))
+        case LLMConnectionError():
+            return ServiceConnectionError(str(error))
+        case _:
+            return ServiceProviderError(str(error))
 
 
-@dataclass(slots=True)
-class InProcessRuntimeFactory:
-    settings: SettingsManager
-    sandbox_dir: Path
-    session_manager: SessionManager
-    registries: Registries
-    create_agent: Callable[..., Agent]
-    prompt_overrides: PromptOverrides | None = None
+class InProcessKodaRuntime(KodaRuntime[StreamEvent, Message]):
+    """Stateful in-process runtime adapter around a single agent instance."""
 
-    def create(self) -> InProcessRuntime:
-        agent = self.create_agent(
-            settings=self.settings,
-            sandbox_dir=self.sandbox_dir,
-            session_manager=self.session_manager,
-            registries=self.registries,
-            prompt_overrides=self.prompt_overrides,
-        )
-        return InProcessRuntime(
-            chat=ChatService(agent),
-            sessions=SessionService(agent),
-            catalog=CatalogService(self.registries),
-        )
+    def __init__(self, agent) -> None:
+        self._agent = agent
+
+    async def chat(self, message: str) -> AsyncIterator[StreamEvent]:
+        try:
+            async for llm_event in self._agent.run(message):
+                yield map_llm_event_to_stream_event(llm_event)
+        except LLMAPIError as error:
+            raise _translate_llm_error(error) from error
+
+    def active_session(self) -> SessionInfo:
+        try:
+            return map_session_to_session_info(self._agent.active_session)
+        except NoActiveSessionError as error:
+            raise ServiceNoActiveSessionError from error
+
+    def list_sessions(self) -> list[SessionInfo]:
+        return [
+            map_session_to_session_info(session)
+            for session in self._agent.list_sessions()
+            if session.messages
+        ]
+
+    def new_session(self) -> SessionInfo:
+        session = self._agent.new_session()
+        return map_session_to_session_info(session)
+
+    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, Sequence[Message]]:
+        try:
+            session = self._agent.switch_session(session_id)
+        except SessionNotFoundError as error:
+            raise ServiceSessionNotFoundError from error
+        messages: list[CoreMessage] = list(session.messages)
+        return map_session_to_session_info(session), map_messages_to_contract_messages(messages)
+
+    def delete_session(self, session_id: UUID) -> SessionInfo | None:
+        try:
+            new_session = self._agent.delete_session(session_id)
+        except SessionNotFoundError as error:
+            raise ServiceSessionNotFoundError from error
+        if new_session is None:
+            return None
+        return map_session_to_session_info(new_session)

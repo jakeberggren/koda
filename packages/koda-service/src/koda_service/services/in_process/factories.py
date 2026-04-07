@@ -11,7 +11,9 @@ from koda.llm.providers.openai import OPENAI_MODELS, OPENAI_PROVIDER, create_ope
 from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.sessions import JsonSessionStore, SessionManager
 from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
-from koda_service.services.in_process.runtime import InProcessRuntimeFactory
+
+from .catalog import CatalogService
+from .runtime import InProcessKodaRuntime
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -95,21 +97,33 @@ def create_agent(
     )
 
 
-def create_in_process_runtime_factory(
+def create_runtime(  # noqa: PLR0913
     *,
     settings: SettingsManager,
     sandbox_dir: Path,
+    session_manager: SessionManager,
     registries: Registries,
-    create_agent=create_agent,
+    create_agent_fn=create_agent,
     prompt_overrides: PromptOverrides | None = None,
-) -> InProcessRuntimeFactory:
-    session_manager = SessionManager(JsonSessionStore())
-    session_manager.create_session()
-    return InProcessRuntimeFactory(
+) -> InProcessKodaRuntime:
+    agent = create_agent_fn(
         settings=settings,
         sandbox_dir=sandbox_dir,
         session_manager=session_manager,
         registries=registries,
-        create_agent=create_agent,
         prompt_overrides=prompt_overrides,
     )
+    return InProcessKodaRuntime(agent)
+
+
+def create_catalog_service(
+    settings: SettingsManager,
+    registries: Registries | None = None,
+) -> CatalogService:
+    return CatalogService(registries or create_registries(), settings)
+
+
+def create_session_manager() -> SessionManager:
+    session_manager = SessionManager(JsonSessionStore())
+    session_manager.create_session()
+    return session_manager

@@ -127,9 +127,7 @@ class TestStreamProcessor:
         assert state.is_streaming is False
         _user_msg, assistant_msg = state.messages
         assert "Starting..." in assistant_msg.content
-        assert (
-            f"**Rate limit exceeded for {state.provider_name.title()}.**" in assistant_msg.content
-        )
+        assert "**Rate limit exceeded for Test.**" in assistant_msg.content
         assert "quota hit" in assistant_msg.content
 
     @pytest.mark.asyncio
@@ -163,7 +161,7 @@ class TestStreamProcessor:
 
         assert state.is_streaming is False
         _user_msg, assistant_msg = state.messages
-        assert f"**Connection error with {state.provider_name.title()}.**" in assistant_msg.content
+        assert "**Connection error for Test.**" in assistant_msg.content
         assert "network down" in assistant_msg.content
 
     @pytest.mark.asyncio

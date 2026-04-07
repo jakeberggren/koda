@@ -19,7 +19,9 @@ if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
     from koda_common.settings import SettingsManager
-    from koda_service import KodaService
+    from koda_service import CatalogService
+    from koda_service.types import ModelDefinition, ProviderDefinition
+    from koda_tui.bootstrap.manager import KodaRuntimeManager
     from koda_tui.state import AppState
     from koda_tui.ui.layout import TUILayout
     from koda_tui.ui.palette.commands.command import Command
@@ -28,11 +30,13 @@ if TYPE_CHECKING:
 class PaletteManager:
     """Manages a stack of floating overlays (palettes, dialogs)."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         layout: TUILayout,
         state: AppState,
         settings: SettingsManager,
+        catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+        runtime_manager: KodaRuntimeManager,
         invalidate: Callable[[], None],
         cancel_streaming: Callable[[], None],
     ) -> None:
@@ -40,6 +44,8 @@ class PaletteManager:
         self._layout = layout
         self._state = state
         self._settings = settings
+        self._catalog_service = catalog_service
+        self._runtime_manager = runtime_manager
         self._invalidate = invalidate
         self._cancel_streaming = cancel_streaming
         self._stack: list[tuple[Any, Float]] = []
@@ -80,13 +86,14 @@ class PaletteManager:
         self._stack.append((content, float_item))
         self._focus_content(content)
 
-    def _get_default_commands(self, service: KodaService) -> list[Command]:
+    def _get_default_commands(self) -> list[Command]:
         """Build the default root command list."""
         return get_commands(
-            service=service,
+            catalog_service=self._catalog_service,
             settings=self._settings,
             state=self._state,
             palette_manager=self,
+            runtime_manager=self._runtime_manager,
             cancel_streaming=self._cancel_streaming,
         )
 
@@ -102,12 +109,12 @@ class PaletteManager:
         height = max(5, min(20, term_height // 2))
         return width, height
 
-    def toggle(self, service: KodaService) -> None:
+    def toggle(self) -> None:
         """Toggle command palette visibility."""
         if self._is_open:
             self.close_all()
         else:
-            commands = self._get_default_commands(service)
+            commands = self._get_default_commands()
             self.open_palette(commands)
 
     def open_palette(

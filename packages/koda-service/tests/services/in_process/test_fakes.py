@@ -2,9 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, cast
 from uuid import UUID, uuid4
 
 from koda.llm.exceptions import (
@@ -13,13 +10,8 @@ from koda.llm.exceptions import (
     LLMConnectionError,
     LLMRateLimitError,
 )
-from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.messages import UserMessage as CoreUserMessage
 from koda.sessions import Session
-from koda_service import bootstrap
-
-if TYPE_CHECKING:
-    from koda_common.settings import SettingsManager
 
 
 @dataclass(slots=True)
@@ -94,32 +86,6 @@ class RaisingApiAgent:
     async def run(self, _message: str):
         raise LLMAPIError("openai", Exception("server exploded"))
         yield  # pragma: no cover
-
-
-def settings() -> SettingsManager:
-    return cast("SettingsManager", SimpleNamespace(provider="openai", model="gpt-5.2"))
-
-
-def registries() -> bootstrap.Registries:
-    return bootstrap.Registries(
-        model_registry=ModelRegistry(),
-        provider_registry=ProviderRegistry(),
-    )
-
-
-def runtime_factory(
-    *,
-    create_agent=bootstrap.create_agent,
-    current_settings: SettingsManager | None = None,
-    sandbox_dir: Path | None = None,
-    current_registries: bootstrap.Registries | None = None,
-):
-    return bootstrap.create_in_process_runtime_factory(
-        settings=current_settings or settings(),
-        sandbox_dir=sandbox_dir or Path.cwd(),
-        registries=current_registries or registries(),
-        create_agent=create_agent,
-    )
 
 
 def core_session(

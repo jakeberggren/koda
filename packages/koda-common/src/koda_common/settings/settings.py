@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+type SecretsBackend = Literal["json_file", "keychain"]
 type ThinkingOptionId = str
 
 
@@ -11,8 +12,8 @@ class Settings(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    provider: str = Field(default="openai", description="LLM provider")
-    model: str = Field(default="gpt-5.2", description="Model name")
+    provider: str | None = Field(default=None, description="LLM provider")
+    model: str | None = Field(default=None, description="Model name")
     thinking: ThinkingOptionId = Field(
         default="none",
         description="Model thinking effort for supported reasoning models.",
@@ -36,6 +37,10 @@ class Settings(BaseModel):
             "prompt data beyond ephemeral processing and is not compatible with Zero "
             "Data Retention (ZDR) requirements."
         ),
+    )
+    secrets_backend: SecretsBackend = Field(
+        default="json_file",
+        description="Secret storage backend to use for provider API keys.",
     )
 
 
@@ -75,6 +80,10 @@ class EnvSettings(BaseSettings):
             "prompt data beyond ephemeral processing and is not compatible with Zero "
             "Data Retention (ZDR) requirements."
         ),
+    )
+    koda_secrets_backend: SecretsBackend | None = Field(
+        default=None,
+        description="Override the secret storage backend used for provider API keys.",
     )
 
     # API keys (override keychain, cached in manager)

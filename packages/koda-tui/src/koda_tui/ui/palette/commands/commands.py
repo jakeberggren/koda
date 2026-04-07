@@ -16,25 +16,34 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from koda_common.settings import SettingsManager
-    from koda_service import KodaService
+    from koda_service import CatalogService
+    from koda_service.types import ModelDefinition, ProviderDefinition
+    from koda_tui.bootstrap.manager import KodaRuntimeManager
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 log = get_logger(__name__)
 
 
-def get_commands(  # noqa: C901 - allow complex
-    service: KodaService,
+def _has_connected_provider(
+    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+) -> bool:
+    return bool(catalog_service.list_connected_providers())
+
+
+def get_commands(  # noqa: C901, PLR0913 - palette root assembly is intentionally centralized
+    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
     settings: SettingsManager,
     state: AppState,
     palette_manager: PaletteManager,
+    runtime_manager: KodaRuntimeManager,
     cancel_streaming: Callable[[], None],
 ) -> list[Command]:
     """Get the root palette commands."""
 
     def cmd_connect_provider() -> None:
         commands = provider_commands.get_commands(
-            service=service,
+            catalog_service=catalog_service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -42,7 +51,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_switch_model() -> None:
         commands = model_commands.get_commands(
-            service=service,
+            catalog_service=catalog_service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -50,7 +59,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_set_thinking() -> None:
         commands = thinking_commands.get_commands(
-            service=service,
+            catalog_service=catalog_service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -82,7 +91,8 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_new_session() -> None:
         cancel_streaming()
-        result = actions.new_session(service, state)
+        runtime = runtime_manager.get_runtime()
+        result = actions.new_session(runtime, state)
         if not result.ok:
             log.warning("cmd_new_session_failed", error=result.error)
             # TODO: surface action errors in the palette/status UI.
@@ -90,7 +100,12 @@ def get_commands(  # noqa: C901 - allow complex
         palette_manager.close_all()
 
     def cmd_list_sessions() -> None:
-        session_commands.open_session_list(service, state, palette_manager, cancel_streaming)
+        session_commands.open_session_list(
+            runtime_manager,
+            state,
+            palette_manager,
+            cancel_streaming,
+        )
 
     commands = [
         Command(
@@ -98,24 +113,6 @@ def get_commands(  # noqa: C901 - allow complex
             cmd_connect_provider,
             "Configure LLM provider API keys",
             group="Agent",
-        ),
-        Command(
-            "Switch Model",
-            cmd_switch_model,
-            "Select a different model",
-            group="Agent",
-        ),
-        Command(
-            "New Session",
-            cmd_new_session,
-            "Start a new conversation",
-            group="Sessions",
-        ),
-        Command(
-            "List Sessions",
-            cmd_list_sessions,
-            "Switch between sessions",
-            group="Sessions",
         ),
         Command(
             "Toggle Theme",
@@ -136,14 +133,44 @@ def get_commands(  # noqa: C901 - allow complex
             group="System",
         ),
     ]
-    if state.thinking_supported:
+
+    if _has_connected_provider(catalog_service):
         commands.insert(
-            2,
+            1,
             Command(
-                "Set Thinking Level",
-                cmd_set_thinking,
-                "Select model reasoning effort",
+                "Switch Model",
+                cmd_switch_model,
+                "Select a different model",
                 group="Agent",
             ),
         )
+
+    if state.service_status.is_ready:
+        agent_commands: list[Command] = []
+        if state.thinking_supported:
+            agent_commands.append(
+                Command(
+                    "Set Thinking Level",
+                    cmd_set_thinking,
+                    "Select model reasoning effort",
+                    group="Agent",
+                )
+            )
+
+        session_root_commands = [
+            Command(
+                "New Session",
+                cmd_new_session,
+                "Start a new conversation",
+                group="Sessions",
+            ),
+            Command(
+                "List Sessions",
+                cmd_list_sessions,
+                "Switch between sessions",
+                group="Sessions",
+            ),
+        ]
+        commands[1:1] = [*agent_commands, *session_root_commands]
+
     return commands

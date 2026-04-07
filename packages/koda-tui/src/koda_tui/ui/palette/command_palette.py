@@ -151,6 +151,7 @@ class _PaletteRow:
 
     kind: str
     text: FormattedText
+    command: Command | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +177,7 @@ class CommandPalette:
         self.on_close = on_close
         self.selected_index = 0
         self._filtered_commands: list[Command] = list(commands)
+        self._rows: list[_PaletteRow] = []
         self._invalidate = invalidate
         self._height = options.height
         self._footer = options.footer
@@ -193,6 +195,24 @@ class CommandPalette:
 
         # Build the container
         self._container = self._build_container()
+        self._rebuild_rows()
+
+    def _rebuild_rows(self) -> None:
+        """Rebuild the canonical display rows and clamp selection to command rows."""
+        self._rows = self._build_rows()
+        self._clamp_selection()
+
+    def _command_row_indexes(self) -> list[int]:
+        """Return display row indexes that correspond to executable commands."""
+        return [index for index, row in enumerate(self._rows) if row.command is not None]
+
+    def _clamp_selection(self) -> None:
+        """Clamp selection to the available command rows."""
+        command_row_indexes = self._command_row_indexes()
+        if not command_row_indexes:
+            self.selected_index = 0
+            return
+        self.selected_index = max(0, min(self.selected_index, len(command_row_indexes) - 1))
 
     def _on_search_changed(self, buffer: Buffer) -> None:
         """Filter commands based on search text."""
@@ -205,23 +225,28 @@ class CommandPalette:
             ]
         # Reset selection when filter changes
         self.selected_index = 0
+        self._rebuild_rows()
         self._list_control.reset_scroll()
         self._invalidate()
 
     def move_selection_wrapped(self, delta: int) -> None:
         """Move selection by delta, wrapping around and keep it visible."""
-        if not self._filtered_commands:
+        command_row_indexes = self._command_row_indexes()
+        if not command_row_indexes:
             return
-        self.selected_index = (self.selected_index + delta) % len(self._filtered_commands)
+        self.selected_index = (self.selected_index + delta) % len(command_row_indexes)
+        self._rebuild_rows()
         self._list_control.ensure_selection_visible()
         self._invalidate()
 
     def move_selection_clamped(self, delta: int) -> None:
         """Move selection by delta without wrapping past the list boundaries."""
-        if not self._filtered_commands:
+        command_row_indexes = self._command_row_indexes()
+        if not command_row_indexes:
             return
         next_index = self.selected_index + delta
-        self.selected_index = max(0, min(next_index, len(self._filtered_commands) - 1))
+        self.selected_index = max(0, min(next_index, len(command_row_indexes) - 1))
+        self._rebuild_rows()
         self._list_control.ensure_selection_visible()
         self._invalidate()
 
@@ -230,16 +255,18 @@ class CommandPalette:
 
         Note: Does not auto-close. Handlers manage stack via palette_manager.
         """
-        if self._filtered_commands:
-            cmd = self._filtered_commands[self.selected_index]
+        cmd = self.selected_command
+        if cmd is not None:
             cmd.handler()
 
     @property
     def selected_command(self) -> Command | None:
         """Return the currently selected command, or None if list is empty."""
-        if self._filtered_commands:
-            return self._filtered_commands[self.selected_index]
-        return None
+        command_row_indexes = self._command_row_indexes()
+        if not command_row_indexes:
+            return None
+        selected_row_index = command_row_indexes[self.selected_index]
+        return self._rows[selected_row_index].command
 
     def _create_keybindings(self) -> KeyBindings:  # noqa: C901 - allow complex
         """Create key bindings for palette navigation."""
@@ -308,68 +335,79 @@ class CommandPalette:
         line: StyleAndTextTuples = [(style, f"{prefix}{padded_label}")]
         if cmd.description:
             line.append((dim_style, f"  {cmd.description}"))
-        return _PaletteRow(kind="item", text=FormattedText(line))
+        return _PaletteRow(kind="item", text=FormattedText(line), command=cmd)
 
-    def _append_group_rows(
+    @staticmethod
+    def _empty_row() -> _PaletteRow:
+        return _PaletteRow(
+            kind="empty",
+            text=FormattedText([("class:palette.empty", "  No results found")]),
+        )
+
+    @staticmethod
+    def _spacer_row() -> _PaletteRow:
+        return _PaletteRow(kind="spacer", text=FormattedText([]))
+
+    @staticmethod
+    def _group_row(group: str) -> _PaletteRow:
+        return _PaletteRow(
+            kind="group",
+            text=FormattedText([("class:palette.group", group)]),
+        )
+
+    def _append_group_header(self, rows: list[_PaletteRow], group: str | None) -> None:
+        if not group:
+            return
+        if rows:
+            rows.append(self._spacer_row())
+        rows.append(self._group_row(group))
+
+    def _append_command_rows(
         self,
         rows: list[_PaletteRow],
-        group: str | None,
         commands: list[Command],
         *,
         max_label_width: int,
-    ) -> int | None:
-        """Append rows for one command group and return the selected row, if any."""
-        if group:
-            if rows:
-                rows.append(_PaletteRow(kind="spacer", text=FormattedText([])))
-            rows.append(
-                _PaletteRow(
-                    kind="group",
-                    text=FormattedText([("class:palette.group", group)]),
-                )
-            )
-
-        selected_row: int | None = None
-        selected_command = self.selected_command
+        command_index: int,
+    ) -> int:
         for cmd in commands:
-            is_selected = cmd is selected_command
-            if is_selected:
-                selected_row = len(rows)
             rows.append(
                 self._build_command_row(
                     cmd,
-                    is_selected=is_selected,
+                    is_selected=command_index == self.selected_index,
                     max_label_width=max_label_width,
                 )
             )
+            command_index += 1
+        return command_index
 
-        return selected_row
-
-    def build_command_rows(self) -> tuple[list[_PaletteRow], int | None]:
-        """Build logical rows for the command list and locate the selected row."""
+    def _build_rows(self) -> list[_PaletteRow]:
+        """Build logical rows for the command list in final display order."""
         if not self._filtered_commands:
-            return [
-                _PaletteRow(
-                    kind="empty",
-                    text=FormattedText([("class:palette.empty", "  No results found")]),
-                )
-            ], None
+            return [self._empty_row()]
 
         rows: list[_PaletteRow] = []
         max_label_width = self._get_max_label_width()
-        selected_row: int | None = None
+        command_index = 0
 
         for group, commands in self._group_commands():
-            group_selected_row = self._append_group_rows(
+            self._append_group_header(rows, group)
+            command_index = self._append_command_rows(
                 rows,
-                group,
                 commands,
                 max_label_width=max_label_width,
+                command_index=command_index,
             )
-            if group_selected_row is not None:
-                selected_row = group_selected_row
 
-        return rows or [_PaletteRow(kind="spacer", text=FormattedText([]))], selected_row
+        return rows or [self._spacer_row()]
+
+    def build_command_rows(self) -> tuple[list[_PaletteRow], int | None]:
+        """Return logical rows and the selected display row index."""
+        command_row_indexes = self._command_row_indexes()
+        selected_row = None
+        if command_row_indexes:
+            selected_row = command_row_indexes[self.selected_index]
+        return self._rows, selected_row
 
     def _build_container(self) -> Frame:
         """Build the palette UI container."""

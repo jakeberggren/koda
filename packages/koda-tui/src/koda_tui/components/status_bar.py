@@ -23,9 +23,7 @@ class StatusBarControl(UIControl):
         """Return the path relative to the repository root."""
         return self._state.workspace_root.relative_to(Path.home())
 
-    def _get_status(self) -> str:
-        if self._state.exit_requested:
-            return "press ctrl+c again to exit"
+    def _get_inflight_status(self) -> str:
         if self._state.is_thinking:
             return "thinking"
         if self._state.response_phase is ResponsePhase.RESPONDING:
@@ -33,6 +31,13 @@ class StatusBarControl(UIControl):
         if self._state.response_phase is ResponsePhase.WORKING:
             return "working"
         return "ready"
+
+    def _get_status(self) -> str:
+        if self._state.exit_requested:
+            return "press ctrl+c again to exit"
+        if not self._state.service_status.is_ready:
+            return self._state.service_status.summary
+        return self._get_inflight_status()
 
     @staticmethod
     def _format_token_count(value: int | None) -> str | None:
@@ -101,11 +106,15 @@ class StatusBarControl(UIControl):
 
     def _get_left_segments(self) -> list[tuple[list[tuple[str, str]], str]]:
         path = f" ~/{self._workspace_path_relative_to_home()}"
-        provider_model = f"{self._state.provider_name}{_DIVIDER}{self._state.model_name}"
         segments: list[tuple[list[tuple[str, str]], str]] = [
             ([("class:status-bar.left", path)], path),
-            ([("class:status-bar.left", provider_model)], provider_model),
         ]
+
+        provider_name = self._state.provider_name
+        model_name = self._state.model_name
+        if provider_name and model_name:
+            provider_model = f"{provider_name}{_DIVIDER}{model_name}"
+            segments.append(([("class:status-bar.left", provider_model)], provider_model))
 
         if self._state.thinking.id != "none":
             thinking_label = self._state.thinking.label.lower()
@@ -121,11 +130,16 @@ class StatusBarControl(UIControl):
         status = self._get_status()
         status_text = status + " "
         footer_fragments, footer_text = self._get_footer_fragments()
+        status_style = (
+            "class:status-bar.warning"
+            if not self._state.service_status.is_ready and not self._state.exit_requested
+            else "class:status-bar.right"
+        )
         return (
             [
                 *footer_fragments,
                 ("class:status-bar.muted", _DIVIDER),
-                ("class:status-bar.right", status_text),
+                (status_style, status_text),
             ],
             f"{footer_text}{_DIVIDER}{status_text}",
         )

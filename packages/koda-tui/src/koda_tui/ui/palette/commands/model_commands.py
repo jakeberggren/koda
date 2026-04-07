@@ -10,8 +10,8 @@ from koda_tui.utils.model_selection import find_model
 
 if TYPE_CHECKING:
     from koda_common.settings import SettingsManager
-    from koda_service import KodaService
-    from koda_service.types import ModelDefinition
+    from koda_service import CatalogService
+    from koda_service.types import ModelDefinition, ProviderDefinition
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 log = get_logger(__name__)
@@ -37,13 +37,14 @@ def _format_model_label(model: ModelDefinition, settings: SettingsManager) -> st
 
 def _select_model(
     model: ModelDefinition,
-    service: KodaService,
+    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> None:
     """Select a model and close the palette."""
+    current_models = catalog_service.list_selectable_models()
     current_model = find_model(
-        service.list_models(settings.provider),
+        current_models,
         provider=settings.provider,
         model_id=settings.model,
     )
@@ -56,17 +57,17 @@ def _select_model(
 
 
 def get_commands(
-    service: KodaService,
+    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> list[Command]:
     """Get commands for the model selection palette."""
-    models = service.list_models()
+    models = catalog_service.list_selectable_models()
 
     return [
         Command(
             label=_format_model_label(model, settings),
-            handler=partial(_select_model, model, service, settings, palette_manager),
+            handler=partial(_select_model, model, catalog_service, settings, palette_manager),
             description="",
             group=_provider_display_name(model.provider),
         )

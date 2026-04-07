@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from koda_common.logging.config import get_logger
-from koda_common.paths import config_file_path
+from koda_common.paths import config_file_path, secrets_file_path
 
 log = get_logger(__name__)
 
@@ -80,3 +80,45 @@ class KeyChainSecretsStore(SecretsStore):
     def delete_key(self, key: str) -> None:
         self._get_keyring().delete_password(self.SERVICE_NAME, key)
         log.debug("keychain_key_deleted", key=key)
+
+
+class JsonFileSecretsStore(SecretsStore):
+    """Store secrets in a JSON file on disk.
+
+    This store provides a simple file-based alternative to OS keychain-backed
+    secret storage. Secrets are persisted as a JSON object where each top-level
+    key is the secret name and each value is the secret value.
+
+    Missing files are treated as empty storage. Parent directories are created
+    automatically when persisting data.
+
+    Args:
+        file_path: Path to the JSON file used for secret persistence.
+    """
+
+    def __init__(self, file_path: Path | None = None) -> None:
+        self._file_path = file_path or secrets_file_path()
+
+    def _load_data(self) -> dict[str, str]:
+        if not self._file_path.exists():
+            return {}
+        return json.loads(self._file_path.read_text())
+
+    def _save_data(self, data: dict[str, str]) -> None:
+        self._file_path.parent.mkdir(parents=True, exist_ok=True)
+        self._file_path.write_text(json.dumps(data, indent=2))
+
+    def get_key(self, key: str) -> str | None:
+        data = self._load_data()
+        return data.get(key)
+
+    def set_key(self, key: str, value: str) -> None:
+        data = self._load_data()
+        data[key] = value
+        self._save_data(data)
+
+    def delete_key(self, key: str) -> None:
+        data = self._load_data()
+        if key in data:
+            del data[key]
+            self._save_data(data)

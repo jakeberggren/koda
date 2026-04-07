@@ -16,7 +16,7 @@ from koda_tui.app.response import ResponseLifecycle
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_service import KodaService
+    from koda_service import KodaRuntime
     from koda_tui.state import AppState
 
 
@@ -24,24 +24,24 @@ def _format_stream_error(title: str, detail: str) -> str:
     return f"\n\n**{title}**\n\n{detail}"
 
 
-def _render_stream_error(error: ServiceChatError, *, provider: str) -> str:
-    provider_name = provider.title()
+def _render_stream_error(error: ServiceChatError, *, provider: str | None) -> str:
+    provider_suffix = f" for {provider.title()}" if provider else ""
 
     match error:
         case ServiceAuthenticationError():
-            title = f"Authentication failed for {provider_name}."
+            title = f"Authentication failed{provider_suffix}."
             detail = "Please check your API key. Press `Ctrl+P` → `Connect Provider` to update it."
         case ServiceRateLimitError():
-            title = f"Rate limit exceeded for {provider_name}."
+            title = f"Rate limit exceeded{provider_suffix}."
             detail = f"{error.message}\n\nPlease check your plan and billing details."
         case ServiceConnectionError():
-            title = f"Connection error with {provider_name}."
+            title = f"Connection error{provider_suffix}."
             detail = f"{error.message}\n\nPlease check your internet connection and try again."
         case ServiceProviderError():
-            title = f"Provider error from {provider_name}."
+            title = f"Provider error{provider_suffix}."
             detail = error.message
         case _:
-            title = f"Unexpected error with {provider_name}."
+            title = f"Unexpected error{provider_suffix}."
             detail = error.message
 
     return _format_stream_error(title, detail)
@@ -84,19 +84,19 @@ class StreamProcessor:
         self._streaming_task = None
         self._invalidate()
 
-    async def _process_stream(self, message: str, service: KodaService) -> None:
-        async for event in service.chat(message):
+    async def _process_stream(self, message: str, runtime: KodaRuntime) -> None:
+        async for event in runtime.chat(message):
             self._lifecycle.apply_event(event)
             self._invalidate()
 
-    async def stream(self, text: str, service: KodaService) -> None:
+    async def stream(self, text: str, runtime: KodaRuntime) -> None:
         """Stream a message and process the full response lifecycle."""
         self._lifecycle.begin(text)
         self._invalidate()
 
         try:
             self._start_spinner()
-            self._streaming_task = asyncio.create_task(self._process_stream(text, service))
+            self._streaming_task = asyncio.create_task(self._process_stream(text, runtime))
             await self._streaming_task
         except asyncio.CancelledError:
             pass

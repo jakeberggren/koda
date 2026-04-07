@@ -5,9 +5,8 @@ from pathlib import Path
 from structlog.stdlib import BoundLogger
 
 from koda_common.logging import LoggingConfig, configure_logging, get_logger
-from koda_service.exceptions import StartupError
-from koda_service.startup import create_startup_context
 from koda_tui.app import KodaTuiApp
+from koda_tui.bootstrap import StartupError, create_startup_context
 from koda_tui.state import AppState
 
 __all__ = ["AppState", "KodaTuiApp", "main"]
@@ -29,13 +28,11 @@ def main() -> None:
         context = create_startup_context(workspace_root)
         app = KodaTuiApp(
             settings=context.settings,
-            service=context.service,
+            catalog_service=context.catalog_service,
+            runtime_manager=context.runtime_manager,
             workspace_root=workspace_root,
         )
         asyncio.run(app.run())
     except StartupError as error:
         _report_startup_error(error, logger)
-        sys.exit(1)
-    except Exception:
-        logger.exception("unhandled_exception")
         sys.exit(1)

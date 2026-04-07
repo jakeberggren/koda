@@ -10,14 +10,14 @@ from koda_tui.utils.model_selection import normalize_thinking_option, supported_
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from koda_service import KodaService
+    from koda_service import KodaRuntime
     from koda_service.types import ModelDefinition, ThinkingOptionId
     from koda_tui.state import AppState
 
 
 class ModelSelectionSettings(Protocol):
-    provider: str
-    model: str
+    provider: str | None
+    model: str | None
     thinking: ThinkingOptionId
 
     def update(self, **changes: object) -> None: ...
@@ -49,7 +49,7 @@ class ActionResult[T]:
 
 
 def new_session(
-    service: KodaService,
+    service: KodaRuntime,
     state: AppState,
 ) -> ActionResult[None]:
     """Create a new session and reset conversation state."""
@@ -63,7 +63,7 @@ def new_session(
 
 def switch_session(
     session_id: UUID,
-    service: KodaService,
+    service: KodaRuntime,
     state: AppState,
 ) -> ActionResult[None]:
     """Switch to a session and sync conversation state."""
@@ -83,7 +83,7 @@ class DeleteSessionPayload:
 
 def delete_session(
     session_id: UUID,
-    service: KodaService,
+    service: KodaRuntime,
     state: AppState,
 ) -> ActionResult[DeleteSessionPayload]:
     """Delete a session and clear state if the active session was removed."""

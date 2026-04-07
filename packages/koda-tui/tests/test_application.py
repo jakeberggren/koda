@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from koda_common.settings import SettingChange
+from koda_service import ServiceStatus
 from koda_service.types import ModelDefinition, ThinkingOption
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.ui.palette.palette_manager import PaletteManager
@@ -33,11 +34,11 @@ def _make_settings_mock(unsubscribe: Mock) -> Mock:
     return settings
 
 
-def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
+def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock]:
     unsubscribe = Mock()
     settings = _make_settings_mock(unsubscribe)
-    service = Mock(spec=["list_models", "reconfigure"])
-    service.list_models.return_value = [
+    catalog_service = Mock(spec=["list_models"])
+    catalog_service.list_models.return_value = [
         ModelDefinition(
             id="gpt-5.2",
             name="GPT 5.2",
@@ -46,26 +47,40 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
             thinking_options=[ThinkingOption(id="none", label="None")],
         )
     ]
+    runtime = Mock(
+        spec=[
+            "chat",
+            "new_session",
+            "switch_session",
+            "delete_session",
+            "list_sessions",
+            "active_session",
+        ]
+    )
+    runtime_manager = Mock(spec=["get_runtime", "invalidate", "ready"])
+    runtime_manager.get_runtime.return_value = runtime
+    runtime_manager.ready.return_value = ServiceStatus(is_ready=True, summary="Ready")
     app = KodaTuiApp(
         settings=settings,
-        service=service,
+        catalog_service=catalog_service,
+        runtime_manager=runtime_manager,
         workspace_root=Path("/workspace"),
     )
-    return (app, settings, service, unsubscribe)
+    return (app, settings, catalog_service, runtime_manager, unsubscribe)
 
 
 def test_close_is_idempotent() -> None:
-    app, _settings, _service, unsubscribe = _make_app()
+    app, _settings, _catalog_service, _runtime_manager, unsubscribe = _make_app()
     app.close()
     app.close()
     unsubscribe.assert_called_once_with()
 
 
-def test_batched_provider_and_model_changes_reconfigure_once() -> None:
-    app, settings, service, _unsubscribe = _make_app()
+def test_batched_provider_and_model_changes_update_app_state() -> None:
+    app, settings, catalog_service, runtime_manager, _unsubscribe = _make_app()
     settings.provider = "bergetai"
     settings.model = "zai-org/GLM-4.7"
-    service.list_models.return_value = [
+    catalog_service.list_models.return_value = [
         ModelDefinition(
             id="zai-org/GLM-4.7",
             name="GLM-4.7",
@@ -83,7 +98,8 @@ def test_batched_provider_and_model_changes_reconfigure_once() -> None:
         )
     )
 
-    service.reconfigure.assert_called_once_with()
+    runtime_manager.invalidate.assert_called_once_with()
+    catalog_service.list_models.assert_called_with("bergetai")
     assert app.state.provider_name == "bergetai"
     assert app.state.model_name == "zai-org/GLM-4.7"
     assert app.state.context_window == 128_000
@@ -91,7 +107,7 @@ def test_batched_provider_and_model_changes_reconfigure_once() -> None:
 
 @pytest.mark.asyncio
 async def test_run_always_closes(monkeypatch: pytest.MonkeyPatch) -> None:
-    app, _settings, _service, unsubscribe = _make_app()
+    app, _settings, _catalog_service, _runtime_manager, unsubscribe = _make_app()
 
     class _FakeApp:
         async def run_async(self) -> None:

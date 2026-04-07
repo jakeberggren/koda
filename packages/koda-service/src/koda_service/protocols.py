@@ -5,28 +5,12 @@ from uuid import UUID
 from koda_service.types import SessionInfo
 
 
-class ChatService[EventT](Protocol):
-    """Streaming chat behavior exposed by the service boundary."""
+class KodaRuntime[EventT, MessageT](Protocol):
+    """Agent runtime behavior exposed by the service boundary."""
 
     def chat(self, message: str) -> AsyncIterator[EventT]:
-        """Send a message and stream response events."""
+        """Run the agent on an event and return a message."""
         ...
-
-
-class CatalogService[ProviderT, ModelT](Protocol):
-    """Provider and model discovery exposed by the service boundary."""
-
-    def list_providers(self) -> list[ProviderT]:
-        """List available providers."""
-        ...
-
-    def list_models(self, provider: str | None = None) -> list[ModelT]:
-        """List available models, optionally filtered by provider."""
-        ...
-
-
-class SessionService[MessageT](Protocol):
-    """Session lifecycle behavior exposed by the service boundary."""
 
     def active_session(self) -> SessionInfo:
         """Get the currently active session."""
@@ -49,14 +33,21 @@ class SessionService[MessageT](Protocol):
         ...
 
 
-class KodaService[EventT, ProviderT, ModelT, MessageT](
-    ChatService[EventT],
-    CatalogService[ProviderT, ModelT],
-    SessionService[MessageT],
-    Protocol,
-):
-    """Composite service boundary used by Koda clients."""
+class CatalogService[ProviderT, ModelT](Protocol):
+    """Provider and model discovery exposed by the service boundary."""
 
-    def reconfigure(self) -> None:
-        """Rebuild internal state for the current settings, preserving sessions."""
+    def list_providers(self) -> list[ProviderT]:
+        """List available providers."""
+        ...
+
+    def list_connected_providers(self) -> list[ProviderT]:
+        """List configured providers that currently have credentials."""
+        ...
+
+    def list_models(self, provider: str | None = None) -> list[ModelT]:
+        """List available models, optionally filtered by provider."""
+        ...
+
+    def list_selectable_models(self) -> list[ModelT]:
+        """List models for currently connected providers."""
         ...

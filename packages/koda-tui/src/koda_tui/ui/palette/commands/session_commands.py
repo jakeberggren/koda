@@ -14,9 +14,9 @@ if TYPE_CHECKING:
 
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-    from koda_service import KodaService
     from koda_service.types import SessionInfo
     from koda_tui.actions import ActionResult, DeleteSessionPayload
+    from koda_tui.bootstrap.manager import KodaRuntimeManager
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
@@ -32,13 +32,13 @@ _SESSION_FOOTER: StyleAndTextTuples = [
 
 
 def open_session_list(
-    service: KodaService,
+    runtime_manager: KodaRuntimeManager,
     state: AppState,
     palette_manager: PaletteManager,
     cancel_streaming: Callable[[], None],
 ) -> None:
     """Open the session list palette."""
-    commands, shortcuts = get_commands(service, state, palette_manager, cancel_streaming)
+    commands, shortcuts = get_commands(runtime_manager, state, palette_manager, cancel_streaming)
     palette_manager.open_palette(commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
 
 
@@ -53,14 +53,15 @@ def _format_session_label(session: SessionInfo, active_session: SessionInfo) -> 
 
 def _switch_session(
     session: SessionInfo,
-    service: KodaService,
+    runtime_manager: KodaRuntimeManager,
     state: AppState,
     palette_manager: PaletteManager,
     cancel_streaming: Callable[[], None],
 ) -> None:
     """Switch to a session and update TUI state."""
     cancel_streaming()
-    result = actions.switch_session(session.session_id, service, state)
+    runtime = runtime_manager.get_runtime()
+    result = actions.switch_session(session.session_id, runtime, state)
     if not result.ok:
         log.warning(
             "cmd_switch_session_failed",
@@ -74,7 +75,7 @@ def _switch_session(
 
 def _confirm_delete_session(
     session: SessionInfo,
-    service: KodaService,
+    runtime_manager: KodaRuntimeManager,
     state: AppState,
     palette_manager: PaletteManager,
     cancel_streaming: Callable[[], None],
@@ -82,6 +83,7 @@ def _confirm_delete_session(
     """Open a confirmation dialog to delete a session."""
 
     def on_confirm() -> None:
+        service = runtime_manager.get_runtime()
         result: ActionResult[DeleteSessionPayload] = actions.delete_session(
             session.session_id, service, state
         )
@@ -97,7 +99,12 @@ def _confirm_delete_session(
             # On deletion of the active session, clear stale messages from the screen.
             cancel_streaming()
         # Replace confirm dialog + stale session list with a fresh session list.
-        commands, shortcuts = get_commands(service, state, palette_manager, cancel_streaming)
+        commands, shortcuts = get_commands(
+            runtime_manager,
+            state,
+            palette_manager,
+            cancel_streaming,
+        )
         palette_manager.replace_top(2, commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
 
     palette_manager.open_confirm(
@@ -107,12 +114,13 @@ def _confirm_delete_session(
 
 
 def get_commands(  # noqa: C901
-    service: KodaService,
+    runtime_manager: KodaRuntimeManager,
     state: AppState,
     palette_manager: PaletteManager,
     cancel_streaming: Callable[[], None],
 ) -> tuple[list[Command], dict[str, Callable[[Command | None], None]]]:
     """Get commands and shortcuts for the session list palette."""
+    service = runtime_manager.get_runtime()
     sessions = service.list_sessions()
     active = service.active_session()
 
@@ -123,7 +131,7 @@ def get_commands(  # noqa: C901
             handler=partial(
                 _switch_session,
                 session,
-                service,
+                runtime_manager,
                 state,
                 palette_manager,
                 cancel_streaming,
@@ -135,6 +143,7 @@ def get_commands(  # noqa: C901
 
     def on_new(_cmd: Command | None) -> None:
         cancel_streaming()
+        service = runtime_manager.get_runtime()
         result = actions.new_session(service, state)
         if not result.ok:
             log.warning("cmd_new_session_shortcut_failed", error=result.error)
@@ -149,7 +158,7 @@ def get_commands(  # noqa: C901
             if command is cmd:
                 _confirm_delete_session(
                     session,
-                    service,
+                    runtime_manager,
                     state,
                     palette_manager,
                     cancel_streaming,

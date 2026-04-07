@@ -20,8 +20,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from koda_common.settings import SettingChange, SettingsManager
-    from koda_service import KodaService
-    from koda_service.types import ThinkingOptionId
+    from koda_service import CatalogService, KodaRuntime
+    from koda_service.types import ModelDefinition, ProviderDefinition, ThinkingOptionId
+    from koda_tui.bootstrap.manager import KodaRuntimeManager
 
 
 class _KodaApplication(Application):
@@ -44,30 +45,29 @@ class KodaTuiApp:
     def __init__(
         self,
         settings: SettingsManager,
-        service: KodaService,
+        catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+        runtime_manager: KodaRuntimeManager,
         workspace_root: Path,
     ) -> None:
         self._settings = settings
-        self._service = service
+        self._catalog_service = catalog_service
+        self._runtime_manager = runtime_manager
         self._workspace_root = workspace_root
 
         # Subscribe to settings changes
         self._unsubscribe = self._settings.subscribe(self._on_settings_changed)
         self._closed = False
-        initial_model = find_model(
-            self._service.list_models(self._settings.provider),
-            provider=self._settings.provider,
-            model_id=self._settings.model,
-        )
 
         # Initialize state
+        service_status = self._runtime_manager.ready()
         self.state = AppState(
             workspace_root=self._workspace_root,
             provider_name=self._settings.provider,
             model_name=self._settings.model,
-            thinking=resolve_thinking_option(initial_model, self._settings.thinking),
-            context_window=(initial_model.context_window if initial_model else None),
-            thinking_supported=supports_thinking(initial_model),
+            service_status=service_status,
+            thinking=resolve_thinking_option(None, self._settings.thinking),
+            context_window=None,
+            thinking_supported=False,
             show_scrollbar=self._settings.show_scrollbar,
             queue_inputs=self._settings.queue_inputs,
         )
@@ -94,9 +94,12 @@ class KodaTuiApp:
             layout=self.layout,
             state=self.state,
             settings=self._settings,
+            catalog_service=self._catalog_service,
+            runtime_manager=self._runtime_manager,
             invalidate=self.invalidate,
             cancel_streaming=self.cancel_streaming,
         )
+        self._refresh_service_state()
 
     def _create_application(self) -> Application:
         """Create the prompt_toolkit Application."""
@@ -134,17 +137,8 @@ class KodaTuiApp:
     def _apply_service_setting_changes(self, change_names: set[str]) -> bool:
         if not self._has_service_change(change_names):
             return False
-        self.state.provider_name = self._settings.provider
-        self.state.model_name = self._settings.model
-        active_model = find_model(
-            self._service.list_models(self._settings.provider),
-            provider=self._settings.provider,
-            model_id=self._settings.model,
-        )
-        self.state.thinking = resolve_thinking_option(active_model, self._settings.thinking)
-        self.state.context_window = active_model.context_window if active_model else None
-        self.state.thinking_supported = supports_thinking(active_model)
-        self._service.reconfigure()
+        self._runtime_manager.invalidate()
+        self._refresh_service_state()
         return True
 
     def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
@@ -200,8 +194,33 @@ class KodaTuiApp:
         return self._settings
 
     @property
-    def service(self) -> KodaService:
-        return self._service
+    def catalog_service(self) -> CatalogService[ProviderDefinition, ModelDefinition]:
+        return self._catalog_service
+
+    @property
+    def runtime(self) -> KodaRuntime:
+        return self._runtime_manager.get_runtime()
+
+    def _refresh_service_state(self) -> None:
+        self.state.provider_name = self._settings.provider
+        self.state.model_name = self._settings.model
+        self.state.service_status = self._runtime_manager.ready()
+
+        active_model = None
+        if (
+            self.state.service_status.is_ready
+            and self._settings.provider is not None
+            and self._settings.model is not None
+        ):
+            active_model = find_model(
+                self._catalog_service.list_models(self._settings.provider),
+                provider=self._settings.provider,
+                model_id=self._settings.model,
+            )
+
+        self.state.thinking = resolve_thinking_option(active_model, self._settings.thinking)
+        self.state.context_window = active_model.context_window if active_model else None
+        self.state.thinking_supported = supports_thinking(active_model)
 
     def enqueue_message(self, text: str, *, cancel_current: bool = False) -> None:
         """Queue a message to be sent after the current stream completes."""
@@ -213,7 +232,9 @@ class KodaTuiApp:
 
     async def send_message(self, text: str) -> None:
         """Send a message and process the response stream."""
-        await self._stream_processor.stream(text, self._service)
+        if not self.state.service_status.is_ready:
+            return
+        await self._stream_processor.stream(text, self.runtime)
         self._message_queue.kick()
 
     def cancel_streaming(self) -> None:
@@ -225,7 +246,7 @@ class KodaTuiApp:
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""
-        self._palette_manager.toggle(self._service)
+        self._palette_manager.toggle()
 
     def exit(self) -> None:
         """Exit the application."""

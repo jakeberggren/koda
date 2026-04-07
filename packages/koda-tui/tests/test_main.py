@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from koda_service.exceptions import StartupConfigurationError
 from koda_tui import _report_startup_error, main
+from koda_tui.bootstrap import StartupConfigurationError
 
 if TYPE_CHECKING:
     from structlog.stdlib import BoundLogger

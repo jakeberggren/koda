@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -7,6 +8,9 @@ from koda.llm.models import ProviderDefinition as CoreProviderDefinition
 from koda.llm.models import ThinkingOption
 from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda_service.services.in_process.catalog import CatalogService
+
+if TYPE_CHECKING:
+    from koda_common.settings import SettingsManager
 
 
 class StubProviderRegistry(ProviderRegistry):
@@ -23,7 +27,8 @@ def test_list_providers_delegates_to_registry() -> None:
         SimpleNamespace(
             provider_registry=provider_registry,
             model_registry=ModelRegistry(),
-        )
+        ),
+        cast("SettingsManager", SimpleNamespace(get_api_key=lambda _provider: None)),
     )
 
     providers = service.list_providers()
@@ -51,7 +56,8 @@ def test_list_models_maps_service_models(monkeypatch: pytest.MonkeyPatch) -> Non
         SimpleNamespace(
             provider_registry=ProviderRegistry(),
             model_registry=model_registry,
-        )
+        ),
+        cast("SettingsManager", SimpleNamespace(get_api_key=lambda _provider: None)),
     )
 
     models = service.list_models("openai")
