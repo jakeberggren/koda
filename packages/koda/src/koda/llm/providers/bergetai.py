@@ -51,7 +51,14 @@ BERGETAI_PROVIDER = ProviderDefinition(
 
 BERGETAI_MODELS: Sequence[ModelDefinition] = [
     ModelDefinition(
-        id="zai-org/GLM-4.7",
+        id="google/gemma-4-31B-it",
+        name="Gemma-4-31B-it",
+        provider="bergetai",
+        context_window=256_000,
+        max_output_tokens=128_000,
+    ),
+    ModelDefinition(
+        id="zai-org/GLM-4.7-FP8",
         name="GLM-4.7",
         provider="bergetai",
         context_window=200_000,
