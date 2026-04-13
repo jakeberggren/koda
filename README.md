@@ -41,7 +41,7 @@ Press Ctrl+C twice to exit the session.
 Koda is a uv-managed monorepo with four workspace packages:
 
 - **koda** — Core agent/runtime library: agent loop, LLM abstractions, sessions, telemetry, and tools
-- **koda-service** — Service boundary and startup/runtime orchestration used by clients
+- **koda-service** — Service boundary and in-process runtime used by clients
 - **koda-tui** — Interactive terminal UI built on top of the service layer
 - **koda-common** — Shared settings, logging, and path utilities
 
@@ -59,9 +59,8 @@ packages/
 │
 ├── koda-service/                # Service boundary used by clients
 │   ├── src/koda_service/
-│   │   ├── bootstrap.py         # Runtime and registry assembly helpers
 │   │   ├── protocols.py         # Public KodaService protocol
-│   │   ├── startup.py           # Startup context creation
+│   │   ├── exceptions.py        # Service/runtime and startup-style errors
 │   │   ├── mappers/             # Core -> service DTO mapping
 │   │   ├── services/            # In-process service implementation
 │   │   └── types/               # Service-boundary DTOs
@@ -69,6 +68,8 @@ packages/
 │
 ├── koda-tui/                    # Terminal user interface
 │   ├── src/koda_tui/
+│   │   ├── __init__.py          # CLI entrypoint and app bootstrap
+│   │   ├── agent.py             # TUI-specific agent builder and tool wiring
 │   │   ├── app/                 # Application loop, streaming, output coordination
 │   │   ├── components/          # UI widgets and panes
 │   │   ├── rendering/           # Rich rendering helpers
