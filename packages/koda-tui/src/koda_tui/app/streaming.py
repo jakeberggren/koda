@@ -10,7 +10,7 @@ from koda_tui.app.response import ResponseLifecycle
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_service import KodaRuntime
+    from koda_service import KodaService
     from koda_tui.state import AppState
 
 
@@ -57,24 +57,23 @@ class StreamProcessor:
         self._streaming_task = None
         self._invalidate()
 
-    async def _process_stream(self, message: str, runtime: KodaRuntime) -> None:
-        async for event in runtime.chat(message):
+    async def _process_stream(self, message: str, service: KodaService) -> None:
+        async for event in service.chat(message):
             self._lifecycle.apply_event(event)
             self._invalidate()
 
     async def stream(
         self,
         text: str,
-        runtime_factory: Callable[[], KodaRuntime],
+        service: KodaService,
     ) -> None:
         """Stream a message and process the full response lifecycle."""
         self._lifecycle.begin(text)
         self._invalidate()
 
         try:
-            runtime = runtime_factory()
             self._start_spinner()
-            self._streaming_task = asyncio.create_task(self._process_stream(text, runtime))
+            self._streaming_task = asyncio.create_task(self._process_stream(text, service))
             await self._streaming_task
         except asyncio.CancelledError:
             pass

@@ -17,8 +17,8 @@ from koda_tui.utils.model_selection import find_model, supported_thinking_option
 
 if TYPE_CHECKING:
     from koda_common.settings import SettingsManager
-    from koda_service import CatalogService
-    from koda_service.types import ModelDefinition, ProviderDefinition, ThinkingOptionId
+    from koda_service import KodaService
+    from koda_service.types import ThinkingOptionId
     from koda_tui.app.application import KodaTuiApp
 
 
@@ -78,7 +78,7 @@ def _handle_escape(app: KodaTuiApp) -> None:
 
 
 def _get_cycle_thinking_options(
-    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+    catalog_service: KodaService,
     settings: SettingsManager,
 ) -> list[ThinkingOptionId]:
     active_model = find_model(
@@ -93,7 +93,7 @@ def _handle_cycle_thinking(app: KodaTuiApp) -> None:
     """Cycle through supported thinking levels."""
     if not app.state.service_status.is_ready:
         return
-    options = _get_cycle_thinking_options(app.catalog_service, app.settings)
+    options = _get_cycle_thinking_options(app.service, app.settings)
     result = app.cycle_thinking(options)
     if result.ok:
         app.invalidate()

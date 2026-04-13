@@ -20,9 +20,8 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from koda_common.settings import SettingChange, SettingsManager
-    from koda_service import CatalogService, KodaRuntime
-    from koda_service.types import ModelDefinition, ProviderDefinition, ThinkingOptionId
-    from koda_tui.bootstrap.manager import KodaRuntimeManager
+    from koda_service import KodaService
+    from koda_service.types import ThinkingOptionId
 
 
 class _KodaApplication(Application):
@@ -45,13 +44,11 @@ class KodaTuiApp:
     def __init__(
         self,
         settings: SettingsManager,
-        catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
-        runtime_manager: KodaRuntimeManager,
+        service: KodaService,
         workspace_root: Path,
     ) -> None:
         self._settings = settings
-        self._catalog_service = catalog_service
-        self._runtime_manager = runtime_manager
+        self._service = service
         self._workspace_root = workspace_root
 
         # Subscribe to settings changes
@@ -59,7 +56,7 @@ class KodaTuiApp:
         self._closed = False
 
         # Initialize state
-        service_status = self._runtime_manager.ready()
+        service_status = self._service.ready()
         self.state = AppState(
             workspace_root=self._workspace_root,
             provider_name=self._settings.provider,
@@ -94,8 +91,7 @@ class KodaTuiApp:
             layout=self.layout,
             state=self.state,
             settings=self._settings,
-            catalog_service=self._catalog_service,
-            runtime_manager=self._runtime_manager,
+            service=self._service,
             invalidate=self.invalidate,
             cancel_streaming=self.cancel_streaming,
         )
@@ -137,7 +133,7 @@ class KodaTuiApp:
     def _apply_service_setting_changes(self, change_names: set[str]) -> bool:
         if not self._has_service_change(change_names):
             return False
-        self._runtime_manager.invalidate()
+        self._service.update_settings(self._settings)
         self._refresh_service_state()
         return True
 
@@ -194,17 +190,13 @@ class KodaTuiApp:
         return self._settings
 
     @property
-    def catalog_service(self) -> CatalogService[ProviderDefinition, ModelDefinition]:
-        return self._catalog_service
-
-    @property
-    def runtime(self) -> KodaRuntime:
-        return self._runtime_manager.get_runtime()
+    def service(self) -> KodaService:
+        return self._service
 
     def _refresh_service_state(self) -> None:
         self.state.provider_name = self._settings.provider
         self.state.model_name = self._settings.model
-        self.state.service_status = self._runtime_manager.ready()
+        self.state.service_status = self._service.ready()
 
         active_model = None
         if (
@@ -213,7 +205,7 @@ class KodaTuiApp:
             and self._settings.model is not None
         ):
             active_model = find_model(
-                self._catalog_service.list_models(self._settings.provider),
+                self._service.list_models(self._settings.provider),
                 provider=self._settings.provider,
                 model_id=self._settings.model,
             )
@@ -232,7 +224,7 @@ class KodaTuiApp:
 
     async def send_message(self, text: str) -> None:
         """Send a message and process the response stream."""
-        await self._stream_processor.stream(text, self._runtime_manager.get_runtime)
+        await self._stream_processor.stream(text, self._service)
         self._message_queue.kick()
 
     def cancel_streaming(self) -> None:

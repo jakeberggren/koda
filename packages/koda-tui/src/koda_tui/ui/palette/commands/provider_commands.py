@@ -9,8 +9,8 @@ from koda_tui.ui.palette.commands.command import Command
 
 if TYPE_CHECKING:
     from koda_common.settings import SettingsManager
-    from koda_service import CatalogService
-    from koda_service.types import ModelDefinition, ProviderDefinition
+    from koda_service import KodaService
+    from koda_service.types import ProviderDefinition
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 log = get_logger(__name__)
@@ -30,7 +30,7 @@ def _format_provider_label(provider: ProviderDefinition, settings: SettingsManag
 
 def _open_api_key_dialog(
     provider: ProviderDefinition,
-    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+    catalog_service: KodaService,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> None:
@@ -49,7 +49,7 @@ def _open_api_key_dialog(
 
 def _auto_select_first_model(
     provider: ProviderDefinition,
-    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+    catalog_service: KodaService,
     settings: SettingsManager,
 ) -> bool:
     if settings.model is not None:
@@ -77,7 +77,7 @@ def _auto_select_first_model(
 
 def _submit_provider_api_key(
     provider: ProviderDefinition,
-    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+    catalog_service: KodaService,
     settings: SettingsManager,
     palette_manager: PaletteManager,
     key: str,
@@ -95,7 +95,7 @@ def _submit_provider_api_key(
 
 
 def get_commands(
-    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+    catalog_service: KodaService,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> list[Command]:

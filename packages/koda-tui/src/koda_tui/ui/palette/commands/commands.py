@@ -16,9 +16,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from koda_common.settings import SettingsManager
-    from koda_service import CatalogService
-    from koda_service.types import ModelDefinition, ProviderDefinition
-    from koda_tui.bootstrap.manager import KodaRuntimeManager
+    from koda_service import KodaService
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
@@ -26,24 +24,23 @@ log = get_logger(__name__)
 
 
 def _has_connected_provider(
-    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+    service: KodaService,
 ) -> bool:
-    return bool(catalog_service.list_connected_providers())
+    return bool(service.list_connected_providers())
 
 
-def get_commands(  # noqa: C901, PLR0913 - palette root assembly is intentionally centralized
-    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+def get_commands(  # noqa: C901 - palette root assembly is intentionally centralized
+    service: KodaService,
     settings: SettingsManager,
     state: AppState,
     palette_manager: PaletteManager,
-    runtime_manager: KodaRuntimeManager,
     cancel_streaming: Callable[[], None],
 ) -> list[Command]:
     """Get the root palette commands."""
 
     def cmd_connect_provider() -> None:
         commands = provider_commands.get_commands(
-            catalog_service=catalog_service,
+            catalog_service=service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -51,7 +48,7 @@ def get_commands(  # noqa: C901, PLR0913 - palette root assembly is intentionall
 
     def cmd_switch_model() -> None:
         commands = model_commands.get_commands(
-            catalog_service=catalog_service,
+            catalog_service=service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -59,7 +56,7 @@ def get_commands(  # noqa: C901, PLR0913 - palette root assembly is intentionall
 
     def cmd_set_thinking() -> None:
         commands = thinking_commands.get_commands(
-            catalog_service=catalog_service,
+            catalog_service=service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -91,8 +88,7 @@ def get_commands(  # noqa: C901, PLR0913 - palette root assembly is intentionall
 
     def cmd_new_session() -> None:
         cancel_streaming()
-        runtime = runtime_manager.get_runtime()
-        result = actions.new_session(runtime, state)
+        result = actions.new_session(service, state)
         if not result.ok:
             log.warning("cmd_new_session_failed", error=result.error)
             # TODO: surface action errors in the palette/status UI.
@@ -101,7 +97,7 @@ def get_commands(  # noqa: C901, PLR0913 - palette root assembly is intentionall
 
     def cmd_list_sessions() -> None:
         session_commands.open_session_list(
-            runtime_manager,
+            service,
             state,
             palette_manager,
             cancel_streaming,
@@ -134,7 +130,7 @@ def get_commands(  # noqa: C901, PLR0913 - palette root assembly is intentionall
         ),
     ]
 
-    if _has_connected_provider(catalog_service):
+    if _has_connected_provider(service):
         commands.insert(
             1,
             Command(

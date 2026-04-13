@@ -4,9 +4,14 @@ from pathlib import Path
 
 from structlog.stdlib import BoundLogger
 
+from koda.telemetry import LangfuseTelemetry
 from koda_common.logging import LoggingConfig, configure_logging, get_logger
+from koda_common.settings import JsonFileSettingsStore, SettingsManager
+from koda_common.settings.store import JsonFileSecretsStore
+from koda_service.exceptions import StartupError
+from koda_service.services.in_process import InProcessKodaService
+from koda_tui.agent import KodaTuiAgent
 from koda_tui.app import KodaTuiApp
-from koda_tui.bootstrap import StartupError, create_startup_context
 from koda_tui.state import AppState
 
 __all__ = ["AppState", "KodaTuiApp", "main"]
@@ -25,11 +30,19 @@ def main() -> None:
 
     try:
         workspace_root = Path.cwd().resolve()
-        context = create_startup_context(workspace_root)
+        settings = SettingsManager(
+            settings_store=JsonFileSettingsStore(),
+            secrets_store=JsonFileSecretsStore(),
+        )
+        service = InProcessKodaService(
+            settings=settings,
+            sandbox_dir=workspace_root,
+            agent_builder=KodaTuiAgent(cwd=workspace_root, sandbox_dir=workspace_root),
+            telemetry=LangfuseTelemetry(),
+        )
         app = KodaTuiApp(
-            settings=context.settings,
-            catalog_service=context.catalog_service,
-            runtime_manager=context.runtime_manager,
+            settings=settings,
+            service=service,
             workspace_root=workspace_root,
         )
         asyncio.run(app.run())

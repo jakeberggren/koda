@@ -1,4 +1,4 @@
-from koda_service.protocols import CatalogService, KodaRuntime
-from koda_service.services.in_process.status import ServiceStatus
+from koda_service.protocols import AgentBuilder, KodaService
+from koda_service.services.in_process.service import ServiceStatus
 
-__all__ = ["CatalogService", "KodaRuntime", "ServiceStatus"]
+__all__ = ["AgentBuilder", "KodaService", "ServiceStatus"]

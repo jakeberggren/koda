@@ -19,9 +19,7 @@ if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
     from koda_common.settings import SettingsManager
-    from koda_service import CatalogService
-    from koda_service.types import ModelDefinition, ProviderDefinition
-    from koda_tui.bootstrap.manager import KodaRuntimeManager
+    from koda_service import KodaService
     from koda_tui.state import AppState
     from koda_tui.ui.layout import TUILayout
     from koda_tui.ui.palette.commands.command import Command
@@ -35,8 +33,7 @@ class PaletteManager:
         layout: TUILayout,
         state: AppState,
         settings: SettingsManager,
-        catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
-        runtime_manager: KodaRuntimeManager,
+        service: KodaService,
         invalidate: Callable[[], None],
         cancel_streaming: Callable[[], None],
     ) -> None:
@@ -44,8 +41,7 @@ class PaletteManager:
         self._layout = layout
         self._state = state
         self._settings = settings
-        self._catalog_service = catalog_service
-        self._runtime_manager = runtime_manager
+        self._service = service
         self._invalidate = invalidate
         self._cancel_streaming = cancel_streaming
         self._stack: list[tuple[Any, Float]] = []
@@ -89,11 +85,10 @@ class PaletteManager:
     def _get_default_commands(self) -> list[Command]:
         """Build the default root command list."""
         return get_commands(
-            catalog_service=self._catalog_service,
+            service=self._service,
             settings=self._settings,
             state=self._state,
             palette_manager=self,
-            runtime_manager=self._runtime_manager,
             cancel_streaming=self._cancel_streaming,
         )
 

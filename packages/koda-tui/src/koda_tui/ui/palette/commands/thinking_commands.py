@@ -10,8 +10,8 @@ from koda_tui.utils.model_selection import find_model, supported_thinking_option
 
 if TYPE_CHECKING:
     from koda_common.settings import SettingsManager
-    from koda_service import CatalogService
-    from koda_service.types import ModelDefinition, ProviderDefinition, ThinkingOption
+    from koda_service import KodaService
+    from koda_service.types import ThinkingOption
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
 log = get_logger(__name__)
@@ -37,7 +37,7 @@ def _set_thinking(
 
 
 def _get_supported_thinking_options(
-    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+    catalog_service: KodaService,
     settings: SettingsManager,
 ) -> list[ThinkingOption]:
     active_model = find_model(
@@ -49,7 +49,7 @@ def _get_supported_thinking_options(
 
 
 def get_commands(
-    catalog_service: CatalogService[ProviderDefinition, ModelDefinition],
+    catalog_service: KodaService,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> list[Command]:

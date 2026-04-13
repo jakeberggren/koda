@@ -37,7 +37,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("hi", lambda: client)
+        await processor.stream("hi", client)
 
         assert state.is_streaming is False
         user_msg, assistant_msg = state.messages
@@ -66,7 +66,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("read file", lambda: client)
+        await processor.stream("read file", client)
 
         assert state.is_streaming is False
         user_msg, first_assistant, tool_msg, second_assistant = state.messages
@@ -101,7 +101,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("read bad file", lambda: client)
+        await processor.stream("read bad file", client)
 
         assert state.messages[1].role == MessageRole.TOOL
         assert state.messages[1].tool_error is True
@@ -129,7 +129,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("do something", lambda: client)
+        await processor.stream("do something", client)
 
         assert state.is_streaming is False
         _user_msg, assistant_msg = state.messages
@@ -149,7 +149,7 @@ class TestStreamProcessor:
         client.chat = mock_chat
 
         with pytest.raises(ValueError, match="Something went wrong"):
-            await processor.stream("do something", lambda: client)
+            await processor.stream("do something", client)
 
     @pytest.mark.asyncio
     async def test_stream_handles_connection_error(
@@ -171,7 +171,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("do something", lambda: client)
+        await processor.stream("do something", client)
 
         assert state.is_streaming is False
         _user_msg, assistant_msg = state.messages
@@ -193,7 +193,7 @@ class TestStreamProcessor:
         client.chat = mock_chat
 
         # Start streaming in background
-        task = asyncio.create_task(processor.stream("test", lambda: client))
+        task = asyncio.create_task(processor.stream("test", client))
         await asyncio.sleep(0.05)  # Let it start
 
         processor.cancel_stream()

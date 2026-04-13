@@ -34,21 +34,17 @@ def _make_settings_mock(unsubscribe: Mock) -> Mock:
     return settings
 
 
-def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock]:
+def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
     unsubscribe = Mock()
     settings = _make_settings_mock(unsubscribe)
-    catalog_service = Mock(spec=["list_models"])
-    catalog_service.list_models.return_value = [
-        ModelDefinition(
-            id="gpt-5.2",
-            name="GPT 5.2",
-            provider="openai",
-            context_window=400_000,
-            thinking_options=[ThinkingOption(id="none", label="None")],
-        )
-    ]
-    runtime = Mock(
+    service = Mock(
         spec=[
+            "ready",
+            "update_settings",
+            "list_models",
+            "list_providers",
+            "list_connected_providers",
+            "list_selectable_models",
             "chat",
             "new_session",
             "switch_session",
@@ -57,30 +53,36 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock]:
             "active_session",
         ]
     )
-    runtime_manager = Mock(spec=["get_runtime", "invalidate", "ready"])
-    runtime_manager.get_runtime.return_value = runtime
-    runtime_manager.ready.return_value = ServiceStatus(is_ready=True, summary="Ready")
+    service.list_models.return_value = [
+        ModelDefinition(
+            id="gpt-5.2",
+            name="GPT 5.2",
+            provider="openai",
+            context_window=400_000,
+            thinking_options=[ThinkingOption(id="none", label="None")],
+        )
+    ]
+    service.ready.return_value = ServiceStatus(is_ready=True, summary="Ready")
     app = KodaTuiApp(
         settings=settings,
-        catalog_service=catalog_service,
-        runtime_manager=runtime_manager,
+        service=service,
         workspace_root=Path("/workspace"),
     )
-    return (app, settings, catalog_service, runtime_manager, unsubscribe)
+    return (app, settings, service, unsubscribe)
 
 
 def test_close_is_idempotent() -> None:
-    app, _settings, _catalog_service, _runtime_manager, unsubscribe = _make_app()
+    app, _settings, _service, unsubscribe = _make_app()
     app.close()
     app.close()
     unsubscribe.assert_called_once_with()
 
 
 def test_batched_provider_and_model_changes_update_app_state() -> None:
-    app, settings, catalog_service, runtime_manager, _unsubscribe = _make_app()
+    app, settings, service, _unsubscribe = _make_app()
     settings.provider = "bergetai"
     settings.model = "zai-org/GLM-4.7"
-    catalog_service.list_models.return_value = [
+    service.list_models.return_value = [
         ModelDefinition(
             id="zai-org/GLM-4.7",
             name="GLM-4.7",
@@ -98,8 +100,8 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
         )
     )
 
-    runtime_manager.invalidate.assert_called_once_with()
-    catalog_service.list_models.assert_called_with("bergetai")
+    service.update_settings.assert_called_once_with(settings)
+    service.list_models.assert_called_with("bergetai")
     assert app.state.provider_name == "bergetai"
     assert app.state.model_name == "zai-org/GLM-4.7"
     assert app.state.context_window == 128_000
@@ -107,7 +109,7 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
 
 @pytest.mark.asyncio
 async def test_run_always_closes(monkeypatch: pytest.MonkeyPatch) -> None:
-    app, _settings, _catalog_service, _runtime_manager, unsubscribe = _make_app()
+    app, _settings, _service, unsubscribe = _make_app()
 
     class _FakeApp:
         async def run_async(self) -> None:

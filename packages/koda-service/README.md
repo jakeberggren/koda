@@ -21,7 +21,7 @@ that cross that service edge, and wires the in-process implementation used today
 - Define service-boundary DTOs in `koda_service.types`.
 - Map Koda core models and events into service DTOs.
 - Own startup orchestration for creating settings and a ready service.
-- Provide the in-process service implementation and runtime wiring.
+- Provide the in-process service implementation and agent wiring.
 
 ## Package Structure
 
@@ -32,16 +32,13 @@ packages/koda-service/
 │   ├── protocols.py                 # KodaService protocol
 │   ├── exceptions.py                # Service and startup exceptions
 │   ├── startup.py                   # StartupContext and startup orchestration
-│   ├── bootstrap.py                 # Lower-level runtime assembly helpers
 │   ├── types/                       # Service-boundary DTOs
 │   ├── mappers/                     # Core -> service mapping helpers
 │   └── services/
 │       └── in_process/
 │           ├── service.py           # InProcessKodaService
-│           ├── runtime.py           # Runtime bundle + runtime factory
-│           ├── chat.py              # Chat behavior
-│           ├── sessions.py          # Session behavior
-│           └── catalog.py           # Provider/model catalog behavior
+│           ├── catalog.py           # Provider/model catalog behavior
+│           └── status.py            # Readiness checks for in-process service
 └── tests/
 ```
 
