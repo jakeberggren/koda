@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from koda_common.settings import SettingsValidationError
 from koda_common.settings.manager import SettingChange, SettingsManager
 
 from .conftest import SpySecretsStore, SpySettingsStore
@@ -66,11 +67,22 @@ def test_partial_store_merges_with_defaults(secrets_store: SpySecretsStore) -> N
     assert manager.model is None
 
 
-def test_invalid_store_value_raises_validation_error(secrets_store: SpySecretsStore) -> None:
+def test_invalid_store_value_raises_settings_validation_error(
+    secrets_store: SpySecretsStore,
+) -> None:
     # model expects str, not int
     store = SpySettingsStore({"model": 123})
-    with pytest.raises(ValidationError):
+    with pytest.raises(SettingsValidationError):
         SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+
+def test_validate_backends_delegates_to_secrets_store(
+    manager: SettingsManager,
+    secrets_store: SpySecretsStore,
+) -> None:
+    manager.validate_backends()
+
+    assert secrets_store.validate_calls == 1
 
 
 def test_set_persists_and_notifies_single_change(

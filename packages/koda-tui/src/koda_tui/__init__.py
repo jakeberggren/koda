@@ -6,12 +6,11 @@ from structlog.stdlib import BoundLogger
 
 from koda.telemetry import LangfuseTelemetry
 from koda_common.logging import LoggingConfig, configure_logging, get_logger
-from koda_common.settings import JsonFileSettingsStore, SettingsManager
-from koda_common.settings.store import JsonFileSecretsStore
 from koda_service.exceptions import StartupError
 from koda_service.services.in_process import InProcessKodaService
 from koda_tui.agent import KodaTuiAgent
 from koda_tui.app import KodaTuiApp
+from koda_tui.startup import create_settings_manager
 from koda_tui.state import AppState
 
 __all__ = ["AppState", "KodaTuiApp", "main"]
@@ -30,10 +29,7 @@ def main() -> None:
 
     try:
         workspace_root = Path.cwd().resolve()
-        settings = SettingsManager(
-            settings_store=JsonFileSettingsStore(),
-            secrets_store=JsonFileSecretsStore(),
-        )
+        settings = create_settings_manager()
         service = InProcessKodaService(
             settings=settings,
             sandbox_dir=workspace_root,

@@ -4,6 +4,12 @@ from typing import Any, Protocol
 
 from koda_common.logging.config import get_logger
 from koda_common.paths import config_file_path, secrets_file_path
+from koda_common.settings.errors import (
+    SecretsDecodeError,
+    SecretsPermissionError,
+    SettingsDecodeError,
+    SettingsPermissionError,
+)
 
 log = get_logger(__name__)
 
@@ -26,17 +32,29 @@ class JsonFileSettingsStore(SettingsStore):
         if not self.path.exists():
             log.debug("settings_file_not_found", path=str(self.path))
             return {}
-        data = json.loads(self.path.read_text())
+        try:
+            data = json.loads(self.path.read_text())
+        except json.JSONDecodeError as error:
+            raise SettingsDecodeError(path=self.path, error=error) from error
+        except PermissionError as error:
+            raise SettingsPermissionError(path=self.path, error=error) from error
         log.debug("settings_file_loaded", path=str(self.path))
         return data
 
     def save(self, data: dict[str, Any]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(data, indent=2))
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps(data, indent=2))
+        except PermissionError as error:
+            raise SettingsPermissionError(path=self.path, error=error) from error
         log.debug("settings_file_saved", path=str(self.path))
 
 
 class SecretsStore(Protocol):
+    def validate(self) -> None:
+        """Validate that the backing store is readable and correctly configured."""
+        ...
+
     def get_key(self, key: str) -> str | None:
         """Retrieve a secret key from the store."""
         ...
@@ -67,6 +85,9 @@ class KeyChainSecretsStore(SecretsStore):
             log.warning("keyring_not_installed")
             raise KeyringNotInstalledError from e
         return keyring
+
+    def validate(self) -> None:
+        self._get_keyring()
 
     def get_key(self, key: str) -> str | None:
         result = self._get_keyring().get_password(self.SERVICE_NAME, key)
@@ -102,11 +123,22 @@ class JsonFileSecretsStore(SecretsStore):
     def _load_data(self) -> dict[str, str]:
         if not self._file_path.exists():
             return {}
-        return json.loads(self._file_path.read_text())
+        try:
+            return json.loads(self._file_path.read_text())
+        except json.JSONDecodeError as error:
+            raise SecretsDecodeError(path=self._file_path, error=error) from error
+        except PermissionError as error:
+            raise SecretsPermissionError(path=self._file_path, error=error) from error
 
     def _save_data(self, data: dict[str, str]) -> None:
-        self._file_path.parent.mkdir(parents=True, exist_ok=True)
-        self._file_path.write_text(json.dumps(data, indent=2))
+        try:
+            self._file_path.parent.mkdir(parents=True, exist_ok=True)
+            self._file_path.write_text(json.dumps(data, indent=2))
+        except PermissionError as error:
+            raise SecretsPermissionError(path=self._file_path, error=error) from error
+
+    def validate(self) -> None:
+        self._load_data()
 
     def get_key(self, key: str) -> str | None:
         data = self._load_data()

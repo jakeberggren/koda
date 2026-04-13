@@ -5,7 +5,10 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from pydantic import ValidationError
+
 from koda_common.logging.config import get_logger
+from koda_common.settings.errors import SettingsValidationError
 from koda_common.settings.settings import EnvSettings, Settings
 
 if TYPE_CHECKING:
@@ -84,7 +87,10 @@ class SettingsManager:
         data: dict[str, Any] = Settings().model_dump()
         data.update(self._settings_store.load())
         self._apply_env_overrides(data)
-        settings = Settings.model_validate(data)
+        try:
+            settings = Settings.model_validate(data)
+        except ValidationError as error:
+            raise SettingsValidationError(error) from error
         log.info("settings_loaded", provider=settings.provider, model=settings.model)
         return settings
 
@@ -113,6 +119,10 @@ class SettingsManager:
                 self._callbacks.remove(callback)
 
         return unsubscribe
+
+    def validate_backends(self) -> None:
+        """Validate configured storage backends needed by the manager."""
+        self._secrets_store.validate()
 
     def set(self, name: str, value: Any) -> None:
         """Set a single managed setting."""

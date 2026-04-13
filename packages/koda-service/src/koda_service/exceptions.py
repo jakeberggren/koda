@@ -2,6 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda_common.settings import (
+    KeyringNotInstalledError,
+    SecretsDecodeError,
+    SecretsLoadError,
+    SecretsPermissionError,
+    SettingsDecodeError,
+    SettingsLoadError,
+    SettingsPermissionError,
+    SettingsValidationError,
+)
+
 if TYPE_CHECKING:
     import json
 
@@ -126,3 +137,20 @@ class StartupEnvironmentError(StartupError):
             "Koda could not access required local files",
             details=(str(error),),
         )
+
+
+def startup_error_from_settings_error(
+    error: SettingsLoadError | SecretsLoadError | KeyringNotInstalledError,
+) -> StartupError:
+    if isinstance(error, SettingsValidationError):
+        return StartupConfigurationError.from_validation_error(error.error)
+    if isinstance(error, (SettingsPermissionError, SecretsPermissionError)):
+        return StartupEnvironmentError.from_permission_error(error.error)
+    if isinstance(error, KeyringNotInstalledError):
+        return StartupEnvironmentError.from_keyring_error(error)
+    if isinstance(error, (SettingsDecodeError, SecretsDecodeError)):
+        return StartupConfigurationError.from_json_decode_error(
+            path=str(error.path),
+            error=error.error,
+        )
+    raise TypeError

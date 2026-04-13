@@ -15,7 +15,7 @@ from koda.sessions import (
     SessionNotFoundError,
 )
 from koda.tools import exceptions as tool_exceptions
-from koda_common.settings import KeyringNotInstalledError
+from koda_common.settings import KeyringNotInstalledError, SecretsLoadError
 from koda_service.exceptions import (
     ServiceAuthenticationError,
     ServiceChatError,
@@ -27,6 +27,8 @@ from koda_service.exceptions import (
     ServiceSessionNotFoundError,
     StartupConfigurationError,
     StartupEnvironmentError,
+    StartupError,
+    startup_error_from_settings_error,
 )
 from koda_service.mappers import (
     map_llm_event_to_stream_event,
@@ -62,17 +64,14 @@ def _not_ready(*, summary: str, detail: str | None = None) -> ServiceStatus:
     return ServiceStatus(is_ready=False, summary=summary, detail=detail)
 
 
-def _api_key_error_status(error: Exception) -> ServiceStatus:
+def _startup_error_status(error: StartupError) -> ServiceStatus:
+    detail = "\n".join(error.details) if error.details else None
+    return _not_ready(summary=error.summary, detail=detail)
+
+
+def _api_key_error_status(error: SecretsLoadError | KeyringNotInstalledError) -> ServiceStatus:
     """Map API-key backend failures to service status."""
-    if isinstance(error, KeyringNotInstalledError):
-        return _not_ready(
-            summary="Keychain support is not available",
-            detail="Install or enable system keychain support to store provider API keys.",
-        )
-    return _not_ready(
-        summary="Koda could not access required local files",
-        detail="Check local file permissions and try again.",
-    )
+    return _startup_error_status(startup_error_from_settings_error(error))
 
 
 def build_registries() -> tuple[ModelRegistry, ProviderRegistry]:
@@ -122,7 +121,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         """Read the provider API key or return a status error."""
         try:
             return self._settings.get_api_key(provider), None
-        except (KeyringNotInstalledError, PermissionError) as error:
+        except (KeyringNotInstalledError, SecretsLoadError) as error:
             return None, _api_key_error_status(error)
 
     def _connected_provider_ids(self) -> tuple[set[str], ServiceStatus | None]:
@@ -133,7 +132,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
                 for provider in self.list_providers()
                 if self._settings.get_api_key(provider.id)
             }
-        except (KeyringNotInstalledError, PermissionError) as error:
+        except (KeyringNotInstalledError, SecretsLoadError) as error:
             return set(), _api_key_error_status(error)
 
         if not connected_provider_ids:
@@ -197,12 +196,12 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         try:
             self._agent = self._agent_builder(self._settings, self._session_manager)
         except StartupConfigurationError as error:
-            detail = "\n".join(error.details) if error.details else None
-            return _not_ready(summary=error.summary, detail=detail)
+            return _startup_error_status(error)
+        except (KeyringNotInstalledError, SecretsLoadError) as error:
+            return _startup_error_status(startup_error_from_settings_error(error))
         except PermissionError as error:
             startup_error = StartupEnvironmentError.from_permission_error(error)
-            detail = "\n".join(startup_error.details) if startup_error.details else None
-            return _not_ready(summary=startup_error.summary, detail=detail)
+            return _startup_error_status(startup_error)
 
         return None
 
@@ -312,7 +311,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
                 for provider in self._provider_registry.supported()
                 if self._settings.get_api_key(provider.id)
             }
-        except (KeyringNotInstalledError, PermissionError):
+        except (KeyringNotInstalledError, SecretsLoadError):
             return []
 
         providers = [

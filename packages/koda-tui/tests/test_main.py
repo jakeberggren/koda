@@ -38,8 +38,8 @@ def test_main_prints_startup_error_and_exits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "koda_tui.SettingsManager",
-        lambda **_kwargs: (_ for _ in ()).throw(
+        "koda_tui.create_settings_manager",
+        lambda: (_ for _ in ()).throw(
             StartupConfigurationError(
                 "Invalid configuration",
                 details=("theme: Input should be 'dark' or 'light'",),
