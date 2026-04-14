@@ -15,7 +15,7 @@ from koda.sessions import (
     SessionNotFoundError,
 )
 from koda.tools import exceptions as tool_exceptions
-from koda_common.settings import KeyringNotInstalledError, SecretsLoadError
+from koda_common.settings import SecretsLoadError
 from koda_service.exceptions import (
     ServiceAuthenticationError,
     ServiceChatError,
@@ -54,9 +54,7 @@ if TYPE_CHECKING:
     from koda.sessions.store import SessionStore
     from koda.telemetry import Telemetry
     from koda_common.settings import SettingsManager
-    from koda_service.types import (
-        SessionInfo,
-    )
+    from koda_service.types import SessionInfo
 
 
 def _not_ready(*, summary: str, detail: str | None = None) -> ServiceStatus:
@@ -69,7 +67,7 @@ def _startup_error_status(error: StartupError) -> ServiceStatus:
     return _not_ready(summary=error.summary, detail=detail)
 
 
-def _api_key_error_status(error: SecretsLoadError | KeyringNotInstalledError) -> ServiceStatus:
+def _api_key_error_status(error: SecretsLoadError) -> ServiceStatus:
     """Map API-key backend failures to service status."""
     return _startup_error_status(startup_error_from_settings_error(error))
 
@@ -121,7 +119,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         """Read the provider API key or return a status error."""
         try:
             return self._settings.get_api_key(provider), None
-        except (KeyringNotInstalledError, SecretsLoadError) as error:
+        except SecretsLoadError as error:
             return None, _api_key_error_status(error)
 
     def _connected_provider_ids(self) -> tuple[set[str], ServiceStatus | None]:
@@ -132,7 +130,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
                 for provider in self.list_providers()
                 if self._settings.get_api_key(provider.id)
             }
-        except (KeyringNotInstalledError, SecretsLoadError) as error:
+        except SecretsLoadError as error:
             return set(), _api_key_error_status(error)
 
         if not connected_provider_ids:
@@ -197,7 +195,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
             self._agent = self._agent_builder(self._settings, self._session_manager)
         except StartupConfigurationError as error:
             return _startup_error_status(error)
-        except (KeyringNotInstalledError, SecretsLoadError) as error:
+        except SecretsLoadError as error:
             return _startup_error_status(startup_error_from_settings_error(error))
         except PermissionError as error:
             startup_error = StartupEnvironmentError.from_permission_error(error)
@@ -311,7 +309,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
                 for provider in self._provider_registry.supported()
                 if self._settings.get_api_key(provider.id)
             }
-        except (KeyringNotInstalledError, SecretsLoadError):
+        except SecretsLoadError:
             return []
 
         providers = [
@@ -361,16 +359,17 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
             session = self._session_manager.switch_session(session_id)
         except SessionNotFoundError as error:
             raise ServiceSessionNotFoundError from error
-        return map_session_to_session_info(session), map_messages_to_contract_messages(
-            session.messages
+        return (
+            map_session_to_session_info(session),
+            map_messages_to_contract_messages(session.messages),
         )
 
     def delete_session(self, session_id: UUID) -> SessionInfo | None:
-        """Delete a session and return the new active session if one was created."""
+        """Delete a session and return the new active session when it changes."""
         try:
-            new_active = self._session_manager.delete_session(session_id)
+            session = self._session_manager.delete_session(session_id)
         except SessionNotFoundError as error:
             raise ServiceSessionNotFoundError from error
-        if new_active is None:
+        if session is None:
             return None
-        return map_session_to_session_info(new_active)
+        return map_session_to_session_info(session)

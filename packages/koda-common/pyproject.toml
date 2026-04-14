@@ -11,9 +11,6 @@ dependencies = [
     "structlog~=25.5.0",
 ]
 
-[project.optional-dependencies]
-keychain = ["keyring~=25.7.0"]
-
 [build-system]
 requires = ["uv_build>=0.9.10,<0.10.0"]
 build-backend = "uv_build"

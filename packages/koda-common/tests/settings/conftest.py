@@ -80,7 +80,6 @@ def clean_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "KODA_MODEL",
         "KODA_THINKING",
         "KODA_ALLOW_EXTENDED_PROMPT_RETENTION",
-        "KODA_SECRETS_BACKEND",
         "KODA_USE_MOCK_CLIENT",
     ):
         monkeypatch.delenv(key, raising=False)

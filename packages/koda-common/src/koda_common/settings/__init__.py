@@ -12,8 +12,6 @@ from koda_common.settings.settings import EnvSettings, Settings
 from koda_common.settings.store import (
     JsonFileSecretsStore,
     JsonFileSettingsStore,
-    KeyChainSecretsStore,
-    KeyringNotInstalledError,
     SecretsStore,
     SettingsStore,
 )
@@ -22,8 +20,6 @@ __all__ = [
     "EnvSettings",
     "JsonFileSecretsStore",
     "JsonFileSettingsStore",
-    "KeyChainSecretsStore",
-    "KeyringNotInstalledError",
     "SecretsDecodeError",
     "SecretsLoadError",
     "SecretsPermissionError",

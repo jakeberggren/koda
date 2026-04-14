@@ -3,7 +3,6 @@ from typing import Literal
 from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-type SecretsBackend = Literal["json_file", "keychain"]
 type ThinkingOptionId = str
 
 
@@ -38,10 +37,6 @@ class Settings(BaseModel):
             "Data Retention (ZDR) requirements."
         ),
     )
-    secrets_backend: SecretsBackend = Field(
-        default="json_file",
-        description="Secret storage backend to use for provider API keys.",
-    )
 
 
 class EnvSettings(BaseSettings):
@@ -50,7 +45,7 @@ class EnvSettings(BaseSettings):
     Setting overrides (T | None, None = don't override):
     - KODA_<field> maps to Settings.<field> (auto-mapped)
 
-    API keys (override keychain):
+    API keys (override stored secrets):
     - <PROVIDER>_API_KEY -> cached for provider
 
     Flags (T with default, not persisted):
@@ -81,12 +76,8 @@ class EnvSettings(BaseSettings):
             "Data Retention (ZDR) requirements."
         ),
     )
-    koda_secrets_backend: SecretsBackend | None = Field(
-        default=None,
-        description="Override the secret storage backend used for provider API keys.",
-    )
 
-    # API keys (override keychain, cached in manager)
+    # API keys (override stored secrets, cached in manager)
     openai_api_key: SecretStr | None = Field(default=None, description="OpenAI API key")
     anthropic_api_key: SecretStr | None = Field(default=None, description="Anthropic API key")
     bergetai_api_key: SecretStr | None = Field(default=None, description="BergetAI API key")

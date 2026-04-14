@@ -52,6 +52,7 @@ class SettingsManager:
         self._env = EnvSettings()
         self._api_key_cache: dict[str, str] = {}
         self._load_api_keys_from_env()
+        self._secrets_store.validate()
         self._settings = self._load_layered()
         self._callbacks: list[SettingsChangeCallback] = []
 
@@ -120,10 +121,6 @@ class SettingsManager:
 
         return unsubscribe
 
-    def validate_backends(self) -> None:
-        """Validate configured storage backends needed by the manager."""
-        self._secrets_store.validate()
-
     def set(self, name: str, value: Any) -> None:
         """Set a single managed setting."""
         self.update(**{name: value})
@@ -180,13 +177,13 @@ class SettingsManager:
             raise AttributeError(name)
         super().__setattr__(name, value)
 
-    # API keys - cached from keychain/env
+    # API keys - cached from secrets store/env
 
     def get_api_key(self, provider: str) -> str | None:
         """Get API key for a provider. Loads from secrets store lazily if not cached."""
         if provider not in self._api_key_cache and (key := self._secrets_store.get_key(provider)):
             self._api_key_cache[provider] = key
-            log.debug("api_key_loaded_from_keychain", provider=provider)
+            log.debug("api_key_loaded_from_store", provider=provider)
         return self._api_key_cache.get(provider)
 
     def set_api_key(self, provider: str, key: str) -> None:
