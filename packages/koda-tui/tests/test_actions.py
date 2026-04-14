@@ -177,14 +177,14 @@ def test_delete_session_not_found_returns_error() -> None:
 
 
 class _ModelSettings:
-    provider: str
-    model: str
+    provider: str | None
+    model: str | None
     thinking: ThinkingOptionId
 
     def __init__(
         self,
-        provider: str,
-        model: str,
+        provider: str | None,
+        model: str | None,
         *,
         thinking: ThinkingOptionId = "none",
         fail_model_id: str | None = None,
@@ -200,7 +200,8 @@ class _ModelSettings:
         model = str(changes["model"])
         if self._fail_model_id is not None and model == self._fail_model_id:
             raise ValueError("invalid model")
-        self.provider = str(changes["provider"])
+        provider = changes["provider"]
+        self.provider = None if provider is None else str(provider)
         self.model = model
         if "thinking" in changes:
             self.thinking = cast("ThinkingOptionId", changes["thinking"])

@@ -102,4 +102,4 @@ class ModelRegistry:
                 for model_definition in models
                 if self._normalize(model_definition.provider) == normalized_provider
             ]
-        return sorted(models, key=lambda model_definition: model_definition.id, reverse=True)
+        return models

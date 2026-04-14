@@ -78,11 +78,11 @@ def _handle_escape(app: KodaTuiApp) -> None:
 
 
 def _get_cycle_thinking_options(
-    service: KodaService,
+    catalog_service: KodaService,
     settings: SettingsManager,
 ) -> list[ThinkingOptionId]:
     active_model = find_model(
-        service.list_models(settings.provider),
+        catalog_service.list_models(settings.provider),
         provider=settings.provider,
         model_id=settings.model,
     )
@@ -91,6 +91,8 @@ def _get_cycle_thinking_options(
 
 def _handle_cycle_thinking(app: KodaTuiApp) -> None:
     """Cycle through supported thinking levels."""
+    if not app.state.service_status.is_ready:
+        return
     options = _get_cycle_thinking_options(app.service, app.settings)
     result = app.cycle_thinking(options)
     if result.ok:

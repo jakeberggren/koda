@@ -23,7 +23,13 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 
-def get_commands(  # noqa: C901 - allow complex
+def _has_connected_provider(
+    service: KodaService,
+) -> bool:
+    return bool(service.list_connected_providers())
+
+
+def get_commands(  # noqa: C901 - palette root assembly is intentionally centralized
     service: KodaService,
     settings: SettingsManager,
     state: AppState,
@@ -34,7 +40,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_connect_provider() -> None:
         commands = provider_commands.get_commands(
-            service=service,
+            catalog_service=service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -42,7 +48,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_switch_model() -> None:
         commands = model_commands.get_commands(
-            service=service,
+            catalog_service=service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -50,7 +56,7 @@ def get_commands(  # noqa: C901 - allow complex
 
     def cmd_set_thinking() -> None:
         commands = thinking_commands.get_commands(
-            service=service,
+            catalog_service=service,
             settings=settings,
             palette_manager=palette_manager,
         )
@@ -90,7 +96,12 @@ def get_commands(  # noqa: C901 - allow complex
         palette_manager.close_all()
 
     def cmd_list_sessions() -> None:
-        session_commands.open_session_list(service, state, palette_manager, cancel_streaming)
+        session_commands.open_session_list(
+            service,
+            state,
+            palette_manager,
+            cancel_streaming,
+        )
 
     commands = [
         Command(
@@ -98,24 +109,6 @@ def get_commands(  # noqa: C901 - allow complex
             cmd_connect_provider,
             "Configure LLM provider API keys",
             group="Agent",
-        ),
-        Command(
-            "Switch Model",
-            cmd_switch_model,
-            "Select a different model",
-            group="Agent",
-        ),
-        Command(
-            "New Session",
-            cmd_new_session,
-            "Start a new conversation",
-            group="Sessions",
-        ),
-        Command(
-            "List Sessions",
-            cmd_list_sessions,
-            "Switch between sessions",
-            group="Sessions",
         ),
         Command(
             "Toggle Theme",
@@ -136,14 +129,44 @@ def get_commands(  # noqa: C901 - allow complex
             group="System",
         ),
     ]
-    if state.thinking_supported:
+
+    if _has_connected_provider(service):
         commands.insert(
-            2,
+            1,
             Command(
-                "Set Thinking Level",
-                cmd_set_thinking,
-                "Select model reasoning effort",
+                "Switch Model",
+                cmd_switch_model,
+                "Select a different model",
                 group="Agent",
             ),
         )
+
+    if state.service_status.is_ready:
+        agent_commands: list[Command] = []
+        if state.thinking_supported:
+            agent_commands.append(
+                Command(
+                    "Set Thinking Level",
+                    cmd_set_thinking,
+                    "Select model reasoning effort",
+                    group="Agent",
+                )
+            )
+
+        session_root_commands = [
+            Command(
+                "New Session",
+                cmd_new_session,
+                "Start a new conversation",
+                group="Sessions",
+            ),
+            Command(
+                "List Sessions",
+                cmd_list_sessions,
+                "Switch between sessions",
+                group="Sessions",
+            ),
+        ]
+        commands[1:1] = [*agent_commands, *session_root_commands]
+
     return commands

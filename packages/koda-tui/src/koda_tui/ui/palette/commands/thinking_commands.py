@@ -37,11 +37,11 @@ def _set_thinking(
 
 
 def _get_supported_thinking_options(
-    service: KodaService,
+    catalog_service: KodaService,
     settings: SettingsManager,
 ) -> list[ThinkingOption]:
     active_model = find_model(
-        service.list_models(settings.provider),
+        catalog_service.list_models(settings.provider),
         provider=settings.provider,
         model_id=settings.model,
     )
@@ -49,7 +49,7 @@ def _get_supported_thinking_options(
 
 
 def get_commands(
-    service: KodaService,
+    catalog_service: KodaService,
     settings: SettingsManager,
     palette_manager: PaletteManager,
 ) -> list[Command]:
@@ -59,5 +59,5 @@ def get_commands(
             handler=partial(_set_thinking, option, settings, palette_manager),
             description=option.description or "Select model reasoning effort",
         )
-        for option in _get_supported_thinking_options(service, settings)
+        for option in _get_supported_thinking_options(catalog_service, settings)
     ]

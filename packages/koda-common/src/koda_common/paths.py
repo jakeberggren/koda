@@ -13,6 +13,11 @@ def config_file_path() -> Path:
     return koda_home_dir() / "config.json"
 
 
+def secrets_file_path() -> Path:
+    """Return the default secrets file path."""
+    return koda_home_dir() / "secrets.json"
+
+
 def log_dir_path() -> Path:
     """Return the default log directory."""
     return koda_home_dir() / "log"

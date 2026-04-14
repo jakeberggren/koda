@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from koda_common.settings import SettingsValidationError
 from koda_common.settings.manager import SettingChange, SettingsManager
 
 from .conftest import SpySecretsStore, SpySettingsStore
@@ -48,18 +49,40 @@ def test_env_overrides_store_for_model(
     assert manager.model == "claude-3.5"
 
 
+def test_env_overrides_store_for_secrets_backend(
+    monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
+) -> None:
+    store = SpySettingsStore({"secrets_backend": "json_file"})
+    monkeypatch.setenv("KODA_SECRETS_BACKEND", "keychain")
+
+    manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+    assert manager.secrets_backend == "keychain"
+
+
 def test_partial_store_merges_with_defaults(secrets_store: SpySecretsStore) -> None:
     store = SpySettingsStore({"provider": "anthropic"})
     manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
     assert manager.provider == "anthropic"
-    assert manager.model == "gpt-5.2"
+    assert manager.model is None
 
 
-def test_invalid_store_value_raises_validation_error(secrets_store: SpySecretsStore) -> None:
+def test_invalid_store_value_raises_settings_validation_error(
+    secrets_store: SpySecretsStore,
+) -> None:
     # model expects str, not int
     store = SpySettingsStore({"model": 123})
-    with pytest.raises(ValidationError):
+    with pytest.raises(SettingsValidationError):
         SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+
+def test_validate_backends_delegates_to_secrets_store(
+    manager: SettingsManager,
+    secrets_store: SpySecretsStore,
+) -> None:
+    manager.validate_backends()
+
+    assert secrets_store.validate_calls == 1
 
 
 def test_set_persists_and_notifies_single_change(
@@ -73,16 +96,17 @@ def test_set_persists_and_notifies_single_change(
     assert manager.provider == "anthropic"
     assert settings_store.save_calls[-1] == {
         "provider": "anthropic",
-        "model": "gpt-5.2",
+        "model": None,
         "thinking": "none",
         "theme": "dark",
         "show_scrollbar": True,
         "queue_inputs": True,
         "allow_web_search": False,
         "allow_extended_prompt_retention": False,
+        "secrets_backend": "json_file",
     }
     assert changes == [
-        (SettingChange(name="provider", old_value="openai", new_value="anthropic"),),
+        (SettingChange(name="provider", old_value=None, new_value="anthropic"),),
     ]
 
 
@@ -109,13 +133,14 @@ def test_update_commits_all_changes_before_notifying(
         "queue_inputs": True,
         "allow_web_search": False,
         "allow_extended_prompt_retention": False,
+        "secrets_backend": "json_file",
     }
     assert observed == [
         (
             ("bergetai", "zai-org/GLM-4.7"),
             (
-                SettingChange(name="provider", old_value="openai", new_value="bergetai"),
-                SettingChange(name="model", old_value="gpt-5.2", new_value="zai-org/GLM-4.7"),
+                SettingChange(name="provider", old_value=None, new_value="bergetai"),
+                SettingChange(name="model", old_value=None, new_value="zai-org/GLM-4.7"),
             ),
         ),
     ]
@@ -142,7 +167,7 @@ def test_setting_same_value_does_not_notify_or_save(
     changes: list[tuple[SettingChange, ...]] = []
     manager.subscribe(changes.append)
 
-    manager.set("provider", "openai")
+    manager.set("provider", None)
 
     assert changes == []
     assert settings_store.save_calls == []
@@ -173,7 +198,7 @@ def test_multiple_subscribers_all_called(manager: SettingsManager) -> None:
     manager.set("provider", "anthropic")
 
     expected = [
-        (SettingChange(name="provider", old_value="openai", new_value="anthropic"),),
+        (SettingChange(name="provider", old_value=None, new_value="anthropic"),),
     ]
     assert c1 == expected
     assert c2 == expected

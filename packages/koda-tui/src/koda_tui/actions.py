@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 
 
 class ModelSelectionSettings(Protocol):
-    provider: str
-    model: str
+    provider: str | None
+    model: str | None
     thinking: ThinkingOptionId
 
     def update(self, **changes: object) -> None: ...

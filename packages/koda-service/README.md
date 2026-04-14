@@ -11,37 +11,32 @@
 </pre>
 </div>
 
-`koda-service` is the service boundary and runtime orchestration layer around the Koda core. It
-defines the public service protocol used by clients such as `koda-tui`, owns the boundary DTOs
-that cross that service edge, and wires the in-process implementation used today.
+`koda-service` is the service boundary around the Koda core. It defines the public protocol
+consumed by clients such as `koda-tui`, owns the DTOs that cross that boundary, and ships the
+in-process service implementation used by the app today.
 
 ## Responsibilities
 
-- Define the public `KodaService` protocol consumed by clients.
+- Define the public `KodaService` protocol and shared `ServiceStatus`.
 - Define service-boundary DTOs in `koda_service.types`.
-- Map Koda core models and events into service DTOs.
-- Own startup orchestration for creating settings and a ready service.
-- Provide the in-process service implementation and runtime wiring.
+- Map Koda core models, messages, sessions, tools, and stream events into service DTOs.
+- Validate runtime readiness for provider credentials, model selection, and agent creation.
+- Provide the in-process implementation for chat, catalogs, and session management.
 
 ## Package Structure
 
 ```text
 packages/koda-service/
 ├── src/koda_service/
-│   ├── __init__.py                  # Minimal public package surface
-│   ├── protocols.py                 # KodaService protocol
-│   ├── exceptions.py                # Service and startup exceptions
-│   ├── startup.py                   # StartupContext and startup orchestration
-│   ├── bootstrap.py                 # Lower-level runtime assembly helpers
+│   ├── __init__.py                  # Public package exports
+│   ├── protocols.py                 # KodaService protocol and AgentBuilder type
+│   ├── exceptions.py                # Service/runtime and startup-style errors
 │   ├── types/                       # Service-boundary DTOs
 │   ├── mappers/                     # Core -> service mapping helpers
 │   └── services/
 │       └── in_process/
-│           ├── service.py           # InProcessKodaService
-│           ├── runtime.py           # Runtime bundle + runtime factory
-│           ├── chat.py              # Chat behavior
-│           ├── sessions.py          # Session behavior
-│           └── catalog.py           # Provider/model catalog behavior
+│           ├── __init__.py          # In-process service exports
+│           └── service.py           # InProcessKodaService and readiness logic
 └── tests/
 ```
 
@@ -49,10 +44,10 @@ packages/koda-service/
 
 For consumers, the intended imports are:
 
-- `koda_service` for the `KodaService` protocol
-- `koda_service.startup` for `create_startup_context`
-- `koda_service.exceptions` for startup and service-layer exceptions
+- `koda_service` for `KodaService`, `AgentBuilder`, and `ServiceStatus`
 - `koda_service.types` for service-boundary DTOs
+- `koda_service.exceptions` for service-layer and user-fixable startup errors
+- `koda_service.services.in_process` for `InProcessKodaService`
 
-Clients should not need to import from implementation modules such as
-`koda_service.services.in_process` unless they are doing lower-level composition or testing.
+Most clients should depend on the protocol and DTOs. Import the concrete in-process
+implementation only when you want the bundled runtime.

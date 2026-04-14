@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 from koda_common.settings import SettingChange
+from koda_service import ServiceStatus
 from koda_service.types import ModelDefinition, ThinkingOption
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.ui.palette.palette_manager import PaletteManager
@@ -36,7 +37,22 @@ def _make_settings_mock(unsubscribe: Mock) -> Mock:
 def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
     unsubscribe = Mock()
     settings = _make_settings_mock(unsubscribe)
-    service = Mock(spec=["list_models", "reconfigure"])
+    service = Mock(
+        spec=[
+            "ready",
+            "update_settings",
+            "list_models",
+            "list_providers",
+            "list_connected_providers",
+            "list_selectable_models",
+            "chat",
+            "new_session",
+            "switch_session",
+            "delete_session",
+            "list_sessions",
+            "active_session",
+        ]
+    )
     service.list_models.return_value = [
         ModelDefinition(
             id="gpt-5.2",
@@ -46,6 +62,7 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
             thinking_options=[ThinkingOption(id="none", label="None")],
         )
     ]
+    service.ready.return_value = ServiceStatus(is_ready=True, summary="Ready")
     app = KodaTuiApp(
         settings=settings,
         service=service,
@@ -61,7 +78,7 @@ def test_close_is_idempotent() -> None:
     unsubscribe.assert_called_once_with()
 
 
-def test_batched_provider_and_model_changes_reconfigure_once() -> None:
+def test_batched_provider_and_model_changes_update_app_state() -> None:
     app, settings, service, _unsubscribe = _make_app()
     settings.provider = "bergetai"
     settings.model = "zai-org/GLM-4.7"
@@ -83,7 +100,8 @@ def test_batched_provider_and_model_changes_reconfigure_once() -> None:
         )
     )
 
-    service.reconfigure.assert_called_once_with()
+    service.update_settings.assert_called_once_with(settings)
+    service.list_models.assert_called_with("bergetai")
     assert app.state.provider_name == "bergetai"
     assert app.state.model_name == "zai-org/GLM-4.7"
     assert app.state.context_window == 128_000

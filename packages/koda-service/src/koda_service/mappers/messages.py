@@ -1,9 +1,11 @@
+from collections.abc import Sequence
 from functools import singledispatch
 
 from koda.messages import AssistantMessage as CoreAssistantMessage
 from koda.messages import Message as CoreMessage
 from koda.messages import ToolMessage as CoreToolMessage
 from koda.messages import UserMessage as CoreUserMessage
+from koda.sessions.session import SessionMessage as CoreSessionMessage
 from koda_service.mappers.tools import (
     map_tool_call_to_contract_tool_call,
     map_tool_result_to_contract_tool_result,
@@ -73,7 +75,7 @@ def _(core_message: CoreToolMessage) -> Message:
 
 
 def map_messages_to_contract_messages(
-    core_messages: list[CoreMessage],
+    core_messages: Sequence[CoreSessionMessage],
 ) -> list[Message]:
     """Map core message list to contract message list."""
     return [map_message_to_contract_message(message) for message in core_messages]

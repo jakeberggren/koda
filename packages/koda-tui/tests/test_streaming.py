@@ -117,7 +117,14 @@ class TestStreamProcessor:
 
         async def mock_chat(_msg: str) -> AsyncIterator:
             yield TextDelta(text="Starting...")
-            raise ServiceRateLimitError("openai rate limit exceeded: quota hit")
+            raise ServiceRateLimitError(
+                summary="Rate limit exceeded.",
+                detail=(
+                    "openai rate limit exceeded: quota hit\n\n"
+                    "Please check your plan and billing details."
+                ),
+                message="openai rate limit exceeded: quota hit",
+            )
             yield  # Make it a generator
 
         client.chat = mock_chat
@@ -127,9 +134,7 @@ class TestStreamProcessor:
         assert state.is_streaming is False
         _user_msg, assistant_msg = state.messages
         assert "Starting..." in assistant_msg.content
-        assert (
-            f"**Rate limit exceeded for {state.provider_name.title()}.**" in assistant_msg.content
-        )
+        assert "**Rate limit exceeded.**" in assistant_msg.content
         assert "quota hit" in assistant_msg.content
 
     @pytest.mark.asyncio
@@ -154,7 +159,14 @@ class TestStreamProcessor:
         client = AsyncMock()
 
         async def mock_chat(_msg: str) -> AsyncIterator:
-            raise ServiceConnectionError("openai connection error: network down")
+            raise ServiceConnectionError(
+                summary="Connection error.",
+                detail=(
+                    "openai connection error: network down\n\n"
+                    "Please check your internet connection and try again."
+                ),
+                message="openai connection error: network down",
+            )
             yield  # Make it a generator
 
         client.chat = mock_chat
@@ -163,7 +175,7 @@ class TestStreamProcessor:
 
         assert state.is_streaming is False
         _user_msg, assistant_msg = state.messages
-        assert f"**Connection error with {state.provider_name.title()}.**" in assistant_msg.content
+        assert "**Connection error.**" in assistant_msg.content
         assert "network down" in assistant_msg.content
 
     @pytest.mark.asyncio

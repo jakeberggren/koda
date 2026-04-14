@@ -97,7 +97,12 @@ def _confirm_delete_session(
             # On deletion of the active session, clear stale messages from the screen.
             cancel_streaming()
         # Replace confirm dialog + stale session list with a fresh session list.
-        commands, shortcuts = get_commands(service, state, palette_manager, cancel_streaming)
+        commands, shortcuts = get_commands(
+            service,
+            state,
+            palette_manager,
+            cancel_streaming,
+        )
         palette_manager.replace_top(2, commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
 
     palette_manager.open_confirm(

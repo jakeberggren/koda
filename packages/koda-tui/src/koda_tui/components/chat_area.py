@@ -186,11 +186,6 @@ class ChatAreaControl(UIControl):
 
         return all_lines or [FormattedText([])]
 
-    def _is_at_bottom(self, height: int) -> bool:
-        """Check if scroll is at or near the bottom."""
-        max_offset = max(0, self._total_lines - height)
-        return self._scroll_offset >= max_offset
-
     def _update_scroll(self, height: int, *, is_at_bottom: bool) -> None:
         """Update scroll offset with auto-scroll and clamping."""
         max_offset = max(0, self._total_lines - height)

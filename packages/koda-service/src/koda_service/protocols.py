@@ -1,32 +1,52 @@
-from collections.abc import AsyncIterator, Sequence
-from typing import Protocol
-from uuid import UUID
+from __future__ import annotations
 
-from koda_service.types import SessionInfo
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Protocol
+
+from koda.agents import Agent
+from koda.sessions import SessionManager
+from koda_common.settings import SettingsManager
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator, Sequence
+    from uuid import UUID
+
+    from koda_service.services.in_process.service import ServiceStatus
+    from koda_service.types import SessionInfo
+
+type AgentBuilder = Callable[[SettingsManager, SessionManager], Agent]
 
 
-class ChatService[EventT](Protocol):
-    """Streaming chat behavior exposed by the service boundary."""
+class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):
+    """Composite service boundary used by Koda clients."""
+
+    def ready(self) -> ServiceStatus:
+        """Return the service status for the current configuration."""
+        ...
+
+    def update_settings(self, settings: SettingsManager) -> None:
+        """Update the service settings."""
+        ...
 
     def chat(self, message: str) -> AsyncIterator[EventT]:
         """Send a message and stream response events."""
         ...
 
-
-class CatalogService[ProviderT, ModelT](Protocol):
-    """Provider and model discovery exposed by the service boundary."""
-
     def list_providers(self) -> list[ProviderT]:
         """List available providers."""
+        ...
+
+    def list_connected_providers(self) -> list[ProviderT]:
+        """List configured providers that currently have credentials."""
         ...
 
     def list_models(self, provider: str | None = None) -> list[ModelT]:
         """List available models, optionally filtered by provider."""
         ...
 
-
-class SessionService[MessageT](Protocol):
-    """Session lifecycle behavior exposed by the service boundary."""
+    def list_selectable_models(self) -> list[ModelT]:
+        """List models for currently connected providers."""
+        ...
 
     def active_session(self) -> SessionInfo:
         """Get the currently active session."""
@@ -46,17 +66,4 @@ class SessionService[MessageT](Protocol):
 
     def delete_session(self, session_id: UUID) -> SessionInfo | None:
         """Delete a session. Returns the new active session if the deleted one was active."""
-        ...
-
-
-class KodaService[EventT, ProviderT, ModelT, MessageT](
-    ChatService[EventT],
-    CatalogService[ProviderT, ModelT],
-    SessionService[MessageT],
-    Protocol,
-):
-    """Composite service boundary used by Koda clients."""
-
-    def reconfigure(self) -> None:
-        """Rebuild internal state for the current settings, preserving sessions."""
         ...

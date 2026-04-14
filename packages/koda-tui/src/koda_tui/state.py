@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
 
+from koda_service import ServiceStatus
 from koda_service.types import ThinkingOption, ToolCall
 
 
@@ -75,6 +76,7 @@ class AppState:
     """Shared application state as single source of truth for the UI."""
 
     workspace_root: Path
+    service_status: ServiceStatus = field(default_factory=ServiceStatus)
     messages: list[Message] = field(default_factory=list)
     current_streaming_content: str = ""
     current_thinking_content: str = ""
@@ -83,8 +85,8 @@ class AppState:
     response_phase: ResponsePhase = ResponsePhase.IDLE
     active_tools: dict[str, ToolCall] = field(default_factory=dict)
     pending_inputs: list[str] = field(default_factory=list)
-    model_name: str = ""
-    provider_name: str = ""
+    model_name: str | None = None
+    provider_name: str | None = None
     thinking: ThinkingOption = field(
         default_factory=lambda: ThinkingOption(id="none", label="none")
     )

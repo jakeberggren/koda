@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from koda_common.settings import SettingsStore
+from koda_common.settings import SecretsStore, SettingsStore
 from koda_common.settings.manager import SettingsManager
 from koda_common.settings.settings import EnvSettings
 
@@ -38,16 +38,20 @@ class SpySettingsStore(SettingsStore):
 
 
 @dataclass
-class SpySecretsStore(SettingsStore):
+class SpySecretsStore(SecretsStore):
     """In-memory secrets store that tracks calls."""
 
     initial_keys: dict[str, str] | None = None
     keys: dict[str, str] = field(default_factory=dict)
     get_calls: list[str] = field(default_factory=list)
     set_calls: list[tuple[str, str]] = field(default_factory=list)
+    validate_calls: int = 0
 
     def __post_init__(self) -> None:
         self.keys = dict(self.initial_keys or {})
+
+    def validate(self) -> None:
+        self.validate_calls += 1
 
     def get_key(self, key: str) -> str | None:
         self.get_calls.append(key)
@@ -76,6 +80,7 @@ def clean_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "KODA_MODEL",
         "KODA_THINKING",
         "KODA_ALLOW_EXTENDED_PROMPT_RETENTION",
+        "KODA_SECRETS_BACKEND",
         "KODA_USE_MOCK_CLIENT",
     ):
         monkeypatch.delenv(key, raising=False)

@@ -2,6 +2,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda_common.settings import (
+    KeyringNotInstalledError,
+    SecretsDecodeError,
+    SecretsLoadError,
+    SecretsPermissionError,
+    SettingsDecodeError,
+    SettingsLoadError,
+    SettingsPermissionError,
+    SettingsValidationError,
+)
+
 if TYPE_CHECKING:
     import json
 
@@ -19,9 +30,24 @@ class ServiceError(KodaServiceError):
 class ServiceChatError(ServiceError):
     """Base class for user-facing chat failures surfaced by the service."""
 
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
+    def __init__(
+        self,
+        *,
+        summary: str,
+        detail: str | None = None,
+        message: str | None = None,
+    ) -> None:
+        super().__init__(summary)
+        self.summary = summary
+        self.detail = detail
+        self.message = message or detail or summary
+
+
+class ServiceNotReadyError(ServiceChatError):
+    """Raised when a runtime-backed operation is attempted before the service is ready."""
+
+    def __init__(self, *, summary: str, detail: str | None = None) -> None:
+        super().__init__(summary=summary, detail=detail)
 
 
 class ServiceSessionError(ServiceError):
@@ -111,3 +137,20 @@ class StartupEnvironmentError(StartupError):
             "Koda could not access required local files",
             details=(str(error),),
         )
+
+
+def startup_error_from_settings_error(
+    error: SettingsLoadError | SecretsLoadError | KeyringNotInstalledError,
+) -> StartupError:
+    if isinstance(error, SettingsValidationError):
+        return StartupConfigurationError.from_validation_error(error.error)
+    if isinstance(error, (SettingsPermissionError, SecretsPermissionError)):
+        return StartupEnvironmentError.from_permission_error(error.error)
+    if isinstance(error, KeyringNotInstalledError):
+        return StartupEnvironmentError.from_keyring_error(error)
+    if isinstance(error, (SettingsDecodeError, SecretsDecodeError)):
+        return StartupConfigurationError.from_json_decode_error(
+            path=str(error.path),
+            error=error.error,
+        )
+    raise TypeError
