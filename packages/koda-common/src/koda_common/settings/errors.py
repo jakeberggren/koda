@@ -43,6 +43,15 @@ class SettingsValidationError(SettingsLoadError):
         self.error = error
 
 
+class SettingsUnknownKeysError(SettingsLoadError):
+    """Raised when persisted settings contain unsupported keys."""
+
+    def __init__(self, keys: set[str]) -> None:
+        self.keys = tuple(sorted(keys))
+        joined = ", ".join(self.keys)
+        super().__init__(f"Unknown settings keys: {joined}")
+
+
 class SecretsError(SettingsError):
     """Base class for secret-storage failures."""
 

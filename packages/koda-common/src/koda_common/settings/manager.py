@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ValidationError
 
 from koda_common.logging.config import get_logger
-from koda_common.settings.errors import SettingsValidationError
+from koda_common.settings.errors import SettingsUnknownKeysError, SettingsValidationError
 from koda_common.settings.settings import EnvSettings, Settings
 
 if TYPE_CHECKING:
@@ -85,8 +85,13 @@ class SettingsManager:
 
     def _load_layered(self) -> Settings:
         """Load settings: defaults -> file -> env vars."""
+        persisted = self._settings_store.load()
+        unknown_keys = set(persisted) - set(Settings.model_fields)
+        if unknown_keys:
+            raise SettingsUnknownKeysError(unknown_keys)
+
         data: dict[str, Any] = Settings().model_dump()
-        data.update(self._settings_store.load())
+        data.update(persisted)
         self._apply_env_overrides(data)
         try:
             settings = Settings.model_validate(data)

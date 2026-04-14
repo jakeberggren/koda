@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from koda_common.settings import SettingsValidationError
+from koda_common.settings import SettingsUnknownKeysError, SettingsValidationError
 from koda_common.settings.manager import SettingChange, SettingsManager
 
 from .conftest import SpySecretsStore, SpySettingsStore
@@ -62,6 +62,17 @@ def test_invalid_store_value_raises_settings_validation_error(
     store = SpySettingsStore({"model": 123})
     with pytest.raises(SettingsValidationError):
         SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+
+def test_unknown_persisted_setting_raises_settings_unknown_keys_error(
+    secrets_store: SpySecretsStore,
+) -> None:
+    store = SpySettingsStore({"not_a_setting": 123})
+
+    with pytest.raises(SettingsUnknownKeysError) as exc_info:
+        SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+    assert exc_info.value.keys == ("not_a_setting",)
 
 
 def test_initialization_validates_secrets_store(

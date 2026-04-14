@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from koda_common.settings import SettingsStore
-from koda_common.settings.errors import SecretsDecodeError, SettingsDecodeError
+from koda_common.settings.errors import (
+    SecretsDecodeError,
+    SettingsDecodeError,
+    SettingsUnknownKeysError,
+)
 from koda_common.settings.store import SecretsStore
 from koda_service.exceptions import StartupConfigurationError
 from koda_tui import _report_startup_error, build_app, main
@@ -70,6 +74,29 @@ class _TelemetryStub:
 
 def _agent_builder_stub(_settings, _session_manager: SessionManager):
     return None
+
+
+def _run_main_with_error(
+    monkeypatch: pytest.MonkeyPatch,
+    error: Exception,
+) -> tuple[int, list[StartupConfigurationError]]:
+    reported: list[StartupConfigurationError] = []
+
+    monkeypatch.setattr(
+        "koda_tui.build_app",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(error),
+    )
+    monkeypatch.setattr("koda_tui.configure_logging", lambda _config: None)
+    monkeypatch.setattr(
+        "koda_tui._report_startup_error",
+        lambda raised, _logger: reported.append(raised),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+
+    assert exc_info.value.code == 1
+    return 1, reported
 
 
 def test_build_app_raises_settings_error_from_store(tmp_path: Path) -> None:
@@ -154,42 +181,33 @@ def test_main_maps_settings_errors_to_startup_error(
         path=path,
         error=json.JSONDecodeError("Expecting value", "{", 1),
     )
-    reported: list[StartupConfigurationError] = []
+    exit_code, reported = _run_main_with_error(monkeypatch, error)
 
-    monkeypatch.setattr(
-        "koda_tui.build_app",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(error),
-    )
-    monkeypatch.setattr("koda_tui.configure_logging", lambda _config: None)
-    monkeypatch.setattr(
-        "koda_tui._report_startup_error",
-        lambda raised, _logger: reported.append(raised),
-    )
-
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-
-    assert exc_info.value.code == 1
+    assert exit_code == 1
     assert reported[0].summary == f"Settings file is not valid JSON: {path}"
     assert reported[0].details == ("Expecting value at line 1, column 2",)
+
+
+def test_main_maps_unknown_settings_keys_to_startup_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = SettingsUnknownKeysError({"not_a_setting"})
+    exit_code, reported = _run_main_with_error(monkeypatch, error)
+
+    assert exit_code == 1
+    assert reported[0].summary == "Unknown settings keys: not_a_setting"
 
 
 def test_main_prints_startup_error_and_exits(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(
-        "koda_tui.build_app",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            StartupConfigurationError(
-                "Invalid configuration",
-                details=("theme: Input should be 'dark' or 'light'",),
-            )
+    exit_code, reported = _run_main_with_error(
+        monkeypatch,
+        StartupConfigurationError(
+            "Invalid configuration",
+            details=("theme: Input should be 'dark' or 'light'",),
         ),
     )
-    monkeypatch.setattr("koda_tui.configure_logging", lambda _config: None)
-    monkeypatch.setattr("koda_tui._report_startup_error", lambda _error, _logger: None)
 
-    with pytest.raises(SystemExit) as exc_info:
-        main()
-
-    assert exc_info.value.code == 1
+    assert exit_code == 1
+    assert reported[0].summary == "Invalid configuration"

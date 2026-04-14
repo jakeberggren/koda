@@ -5,6 +5,7 @@ from koda_common.settings.errors import (
     SettingsDecodeError,
     SettingsLoadError,
     SettingsPermissionError,
+    SettingsUnknownKeysError,
     SettingsValidationError,
 )
 from koda_common.settings.manager import SettingChange, SettingsManager
@@ -31,5 +32,6 @@ __all__ = [
     "SettingsManager",
     "SettingsPermissionError",
     "SettingsStore",
+    "SettingsUnknownKeysError",
     "SettingsValidationError",
 ]

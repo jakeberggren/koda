@@ -9,6 +9,7 @@ from koda_common.settings import (
     SettingsDecodeError,
     SettingsLoadError,
     SettingsPermissionError,
+    SettingsUnknownKeysError,
     SettingsValidationError,
 )
 
@@ -136,6 +137,8 @@ def startup_error_from_settings_error(
 ) -> StartupError:
     if isinstance(error, SettingsValidationError):
         return StartupConfigurationError.from_validation_error(error.error)
+    if isinstance(error, SettingsUnknownKeysError):
+        return StartupConfigurationError.from_runtime_error(error)
     if isinstance(error, (SettingsPermissionError, SecretsPermissionError)):
         return StartupEnvironmentError.from_permission_error(error.error)
     if isinstance(error, (SettingsDecodeError, SecretsDecodeError)):
