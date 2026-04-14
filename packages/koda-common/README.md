@@ -15,7 +15,7 @@
 
 ## Core Components
 
-- **Settings management** with layered configuration: default values, environment variable overrides, JSON file persistence, and system keychain storage for API keys.
+- **Settings management** with layered configuration: default values, environment variable overrides, and JSON file persistence for settings and API keys.
 - **Structured logging** via structlog with console and rotating file output, context variables for correlation, and configurable log levels.
 - **Shared path helpers** for locating the Koda home directory plus default config, log, and session paths.
 
@@ -32,7 +32,7 @@ packages/koda-common/
 │   ├── settings/
 │   │   ├── settings.py          # Settings and environment models
 │   │   ├── manager.py           # Settings manager
-│   │   ├── store.py             # Storage backends (JSON, keychain)
+│   │   ├── store.py             # Storage backends
 │   │   └── __init__.py
 │   ├── paths.py                 # Shared filesystem paths
 │   └── __init__.py

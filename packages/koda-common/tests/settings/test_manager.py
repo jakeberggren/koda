@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from koda_common.settings import SettingsValidationError
+from koda_common.settings import SettingsUnknownKeysError, SettingsValidationError
 from koda_common.settings.manager import SettingChange, SettingsManager
 
 from .conftest import SpySecretsStore, SpySettingsStore
@@ -49,17 +49,6 @@ def test_env_overrides_store_for_model(
     assert manager.model == "claude-3.5"
 
 
-def test_env_overrides_store_for_secrets_backend(
-    monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
-) -> None:
-    store = SpySettingsStore({"secrets_backend": "json_file"})
-    monkeypatch.setenv("KODA_SECRETS_BACKEND", "keychain")
-
-    manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
-
-    assert manager.secrets_backend == "keychain"
-
-
 def test_partial_store_merges_with_defaults(secrets_store: SpySecretsStore) -> None:
     store = SpySettingsStore({"provider": "anthropic"})
     manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
@@ -70,17 +59,26 @@ def test_partial_store_merges_with_defaults(secrets_store: SpySecretsStore) -> N
 def test_invalid_store_value_raises_settings_validation_error(
     secrets_store: SpySecretsStore,
 ) -> None:
-    # model expects str, not int
     store = SpySettingsStore({"model": 123})
     with pytest.raises(SettingsValidationError):
         SettingsManager(settings_store=store, secrets_store=secrets_store)
 
 
-def test_validate_backends_delegates_to_secrets_store(
-    manager: SettingsManager,
+def test_unknown_persisted_setting_raises_settings_unknown_keys_error(
     secrets_store: SpySecretsStore,
 ) -> None:
-    manager.validate_backends()
+    store = SpySettingsStore({"not_a_setting": 123})
+
+    with pytest.raises(SettingsUnknownKeysError) as exc_info:
+        SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+    assert exc_info.value.keys == ("not_a_setting",)
+
+
+def test_initialization_validates_secrets_store(
+    secrets_store: SpySecretsStore,
+) -> None:
+    SettingsManager(settings_store=SpySettingsStore(), secrets_store=secrets_store)
 
     assert secrets_store.validate_calls == 1
 
@@ -103,7 +101,6 @@ def test_set_persists_and_notifies_single_change(
         "queue_inputs": True,
         "allow_web_search": False,
         "allow_extended_prompt_retention": False,
-        "secrets_backend": "json_file",
     }
     assert changes == [
         (SettingChange(name="provider", old_value=None, new_value="anthropic"),),
@@ -133,7 +130,6 @@ def test_update_commits_all_changes_before_notifying(
         "queue_inputs": True,
         "allow_web_search": False,
         "allow_extended_prompt_retention": False,
-        "secrets_backend": "json_file",
     }
     assert observed == [
         (
@@ -218,11 +214,11 @@ def test_get_api_key_from_env_is_cached_and_does_not_hit_secrets_store(
 
 
 def test_get_api_key_lazy_loads_and_caches(settings_store: SpySettingsStore) -> None:
-    secrets = SpySecretsStore({"openai": "sk-keychain"})
+    secrets = SpySecretsStore({"openai": "sk-stored"})
     manager = SettingsManager(settings_store=settings_store, secrets_store=secrets)
 
-    assert manager.get_api_key("openai") == "sk-keychain"
-    assert manager.get_api_key("openai") == "sk-keychain"
+    assert manager.get_api_key("openai") == "sk-stored"
+    assert manager.get_api_key("openai") == "sk-stored"
 
     assert secrets.get_calls == ["openai"]
 

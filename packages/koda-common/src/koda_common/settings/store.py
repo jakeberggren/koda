@@ -68,47 +68,11 @@ class SecretsStore(Protocol):
         ...
 
 
-class KeyringNotInstalledError(ImportError):
-    """Raised when keyring is not installed."""
-
-    def __init__(self) -> None:
-        super().__init__("Install with 'koda-common[keychain]' for keychain support")
-
-
-class KeyChainSecretsStore(SecretsStore):
-    SERVICE_NAME = "koda"
-
-    def _get_keyring(self):
-        try:
-            import keyring  # noqa: PLC0415 - optional dependency
-        except ImportError as e:
-            log.warning("keyring_not_installed")
-            raise KeyringNotInstalledError from e
-        return keyring
-
-    def validate(self) -> None:
-        self._get_keyring()
-
-    def get_key(self, key: str) -> str | None:
-        result = self._get_keyring().get_password(self.SERVICE_NAME, key)
-        log.debug("keychain_key_retrieved", key=key, found=result is not None)
-        return result
-
-    def set_key(self, key: str, value: str) -> None:
-        self._get_keyring().set_password(self.SERVICE_NAME, key, value)
-        log.debug("keychain_key_set", key=key)
-
-    def delete_key(self, key: str) -> None:
-        self._get_keyring().delete_password(self.SERVICE_NAME, key)
-        log.debug("keychain_key_deleted", key=key)
-
-
 class JsonFileSecretsStore(SecretsStore):
     """Store secrets in a JSON file on disk.
 
-    This store provides a simple file-based alternative to OS keychain-backed
-    secret storage. Secrets are persisted as a JSON object where each top-level
-    key is the secret name and each value is the secret value.
+    Secrets are persisted as a JSON object where each top-level key is the
+    secret name and each value is the secret value.
 
     Missing files are treated as empty storage. Parent directories are created
     automatically when persisting data.

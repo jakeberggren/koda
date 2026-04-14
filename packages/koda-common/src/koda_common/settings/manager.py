@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from pydantic import ValidationError
 
 from koda_common.logging.config import get_logger
-from koda_common.settings.errors import SettingsValidationError
+from koda_common.settings.errors import SettingsUnknownKeysError, SettingsValidationError
 from koda_common.settings.settings import EnvSettings, Settings
 
 if TYPE_CHECKING:
@@ -52,6 +52,7 @@ class SettingsManager:
         self._env = EnvSettings()
         self._api_key_cache: dict[str, str] = {}
         self._load_api_keys_from_env()
+        self._secrets_store.validate()
         self._settings = self._load_layered()
         self._callbacks: list[SettingsChangeCallback] = []
 
@@ -84,8 +85,13 @@ class SettingsManager:
 
     def _load_layered(self) -> Settings:
         """Load settings: defaults -> file -> env vars."""
+        persisted = self._settings_store.load()
+        unknown_keys = set(persisted) - set(Settings.model_fields)
+        if unknown_keys:
+            raise SettingsUnknownKeysError(unknown_keys)
+
         data: dict[str, Any] = Settings().model_dump()
-        data.update(self._settings_store.load())
+        data.update(persisted)
         self._apply_env_overrides(data)
         try:
             settings = Settings.model_validate(data)
@@ -119,10 +125,6 @@ class SettingsManager:
                 self._callbacks.remove(callback)
 
         return unsubscribe
-
-    def validate_backends(self) -> None:
-        """Validate configured storage backends needed by the manager."""
-        self._secrets_store.validate()
 
     def set(self, name: str, value: Any) -> None:
         """Set a single managed setting."""
@@ -180,13 +182,13 @@ class SettingsManager:
             raise AttributeError(name)
         super().__setattr__(name, value)
 
-    # API keys - cached from keychain/env
+    # API keys - cached from secrets store/env
 
     def get_api_key(self, provider: str) -> str | None:
         """Get API key for a provider. Loads from secrets store lazily if not cached."""
         if provider not in self._api_key_cache and (key := self._secrets_store.get_key(provider)):
             self._api_key_cache[provider] = key
-            log.debug("api_key_loaded_from_keychain", provider=provider)
+            log.debug("api_key_loaded_from_store", provider=provider)
         return self._api_key_cache.get(provider)
 
     def set_api_key(self, provider: str, key: str) -> None:

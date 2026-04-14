@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_common.settings import (
-    KeyringNotInstalledError,
     SecretsDecodeError,
     SecretsLoadError,
     SecretsPermissionError,
     SettingsDecodeError,
     SettingsLoadError,
     SettingsPermissionError,
+    SettingsUnknownKeysError,
     SettingsValidationError,
 )
 
@@ -125,13 +125,6 @@ class StartupEnvironmentError(StartupError):
     """Raised when startup fails due to local environment or filesystem issues."""
 
     @classmethod
-    def from_keyring_error(cls, error: Exception) -> StartupEnvironmentError:
-        return cls(
-            "Keychain support is not available",
-            details=(str(error),),
-        )
-
-    @classmethod
     def from_permission_error(cls, error: PermissionError) -> StartupEnvironmentError:
         return cls(
             "Koda could not access required local files",
@@ -140,14 +133,14 @@ class StartupEnvironmentError(StartupError):
 
 
 def startup_error_from_settings_error(
-    error: SettingsLoadError | SecretsLoadError | KeyringNotInstalledError,
+    error: SettingsLoadError | SecretsLoadError,
 ) -> StartupError:
     if isinstance(error, SettingsValidationError):
         return StartupConfigurationError.from_validation_error(error.error)
+    if isinstance(error, SettingsUnknownKeysError):
+        return StartupConfigurationError.from_runtime_error(error)
     if isinstance(error, (SettingsPermissionError, SecretsPermissionError)):
         return StartupEnvironmentError.from_permission_error(error.error)
-    if isinstance(error, KeyringNotInstalledError):
-        return StartupEnvironmentError.from_keyring_error(error)
     if isinstance(error, (SettingsDecodeError, SecretsDecodeError)):
         return StartupConfigurationError.from_json_decode_error(
             path=str(error.path),
