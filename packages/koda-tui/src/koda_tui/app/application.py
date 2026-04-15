@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from prompt_toolkit import Application
+from prompt_toolkit.application.current import get_app_session
 
 from koda_tui import actions
 from koda_tui.app.keybindings import create_keybindings
@@ -18,6 +19,8 @@ from koda_tui.utils.model_selection import find_model, resolve_thinking_option, 
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from prompt_toolkit.output import Output
 
     from koda_common.settings import SettingChange, SettingsManager
     from koda_service import KodaService
@@ -99,21 +102,20 @@ class KodaTuiApp:
 
     def _create_application(self) -> Application:
         """Create the prompt_toolkit Application."""
+        # Wrap output in synchronized update sequences (DEC mode 2026).
+        # The terminal buffers all writes between begin/end markers and
+        # displays them atomically, eliminating tearing on scroll/redraw.
+        synced_output = cast("Output", SynchronizedOutput(get_app_session().output))
+
         app = _KodaApplication(
             layout=self.layout.create_layout(),
             key_bindings=create_keybindings(self),
             style=get_style(self._settings.theme),
             full_screen=True,
             mouse_support=True,
+            output=synced_output,
         )
         app.ttimeoutlen = 0.01  # Reduce escape key delay (default 0.5s)
-
-        # Wrap output in synchronized update sequences (DEC mode 2026).
-        # The terminal buffers all writes between begin/end markers and
-        # displays them atomically, eliminating tearing on scroll/redraw.
-        synced = SynchronizedOutput(app.output)
-        app.output = synced
-        app.renderer.output = synced
 
         return app
 
