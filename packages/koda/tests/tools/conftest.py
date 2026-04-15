@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolContext, ToolOutput, ToolRegistry
+from koda.tools import FileCoordinator, ToolContext, ToolOutput, ToolRegistry
 from koda.tools.exceptions import ToolError
 from koda.tools.policy import ToolPolicy
 
@@ -96,7 +96,7 @@ def policy(sandbox_dir: Path) -> ToolPolicy:
 @pytest.fixture
 def context(sandbox_dir: Path, policy: ToolPolicy) -> ToolContext:
     """Create a ToolContext for testing."""
-    return ToolContext(cwd=sandbox_dir, policy=policy)
+    return ToolContext(cwd=sandbox_dir, policy=policy, files=FileCoordinator())
 
 
 @pytest.fixture

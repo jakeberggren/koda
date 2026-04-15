@@ -1,10 +1,51 @@
 """Tests for tools/executor.py - ToolExecutor and call_id preservation."""
 
-import pytest
+import asyncio
+from typing import TYPE_CHECKING
 
-from koda.tools import ToolCall, ToolContext, ToolExecutor, ToolRegistry, ToolResult
+import pytest
+from pydantic import BaseModel, Field
+
+from koda.tools import ToolCall, ToolContext, ToolExecutor, ToolOutput, ToolRegistry, ToolResult
 
 from .conftest import CrashTool, ErrorTool, SimpleTool
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
+class LockingParams(BaseModel):
+    """Parameters for a test tool that coordinates file access."""
+
+    path: str = Field(..., description="Path to the logical file")
+    delay: float = Field(default=0.01, description="Artificial delay while holding the lock")
+
+
+class LockTrackingTool:
+    """Test tool that records maximum concurrency per resolved path."""
+
+    name = "lock_tracking_tool"
+    description = "Records concurrent access while using the file coordinator"
+    parameters_model = LockingParams
+
+    def __init__(self) -> None:
+        self._active_by_path: dict[Path, int] = {}
+        self.max_active_by_path: dict[Path, int] = {}
+
+    async def execute(self, params: LockingParams, ctx: ToolContext) -> ToolOutput:
+        resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+
+        async with ctx.files.lock_for(resolved):
+            active = self._active_by_path.get(resolved, 0) + 1
+            self._active_by_path[resolved] = active
+            previous_max = self.max_active_by_path.get(resolved, 0)
+            self.max_active_by_path[resolved] = max(previous_max, active)
+            try:
+                await asyncio.sleep(params.delay)
+            finally:
+                self._active_by_path[resolved] -= 1
+
+        return ToolOutput(content={"path": params.path})
 
 
 class TestExecuteCall:
@@ -150,6 +191,34 @@ class TestExecuteCalls:
         for i, result in enumerate(results):
             assert result.call_id == f"call_{i}"
             assert result.output.is_error is False
+
+    @pytest.mark.asyncio
+    async def test_parallel_calls_share_file_lock_for_same_path(
+        self, registry: ToolRegistry, context: ToolContext
+    ) -> None:
+        """Parallel calls to the same path are serialized by the file coordinator."""
+        tool = LockTrackingTool()
+        registry.register(tool)
+        executor = ToolExecutor(registry)
+
+        calls = [
+            ToolCall(
+                tool_name="lock_tracking_tool",
+                arguments={"path": "shared.txt", "delay": 0.02},
+                call_id="call_a",
+            ),
+            ToolCall(
+                tool_name="lock_tracking_tool",
+                arguments={"path": "./shared.txt", "delay": 0.02},
+                call_id="call_b",
+            ),
+        ]
+
+        results = await executor.execute_calls(calls, context)
+
+        assert all(result.output.is_error is False for result in results)
+        resolved = context.policy.resolve_path("shared.txt", cwd=context.cwd)
+        assert tool.max_active_by_path[resolved] == 1
 
     @pytest.mark.asyncio
     async def test_mixed_success_and_error(
