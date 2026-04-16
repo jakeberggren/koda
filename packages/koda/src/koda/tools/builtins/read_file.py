@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from itertools import islice
 from typing import TYPE_CHECKING
 
+from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolOutput, exceptions
+from koda.tools import ToolOutput
 from koda.tools.decorators import tool
+from koda.tools.exceptions import FileNotFoundError, NotAFileError, ToolError
+from koda.tools.files import read_text_lines
 
 if TYPE_CHECKING:
     from koda.tools.context import ToolContext
 
 
-class ReadError(exceptions.ToolError):
+class ReadError(ToolError):
     """Failed to read file."""
 
     def __init__(self, path: str, *, cause: Exception) -> None:
@@ -43,24 +45,27 @@ class ReadFileTool:
     async def execute(self, params: ReadFileParams, ctx: ToolContext) -> ToolOutput:
         """Execute the read_file tool."""
         resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+        target = AnyioPath(resolved)
 
-        if not resolved.exists():
-            raise exceptions.FileNotFoundError(params.path)
+        if not await target.exists():
+            raise FileNotFoundError(params.path)
 
-        if not resolved.is_file():
-            raise exceptions.NotAFileError(params.path)
+        if not await target.is_file():
+            raise NotAFileError(params.path)
 
-        try:
-            with resolved.open("r", encoding="utf-8") as handle:
-                lines = list(islice(handle, params.offset, params.offset + params.limit))
-        except PermissionError as e:
-            raise exceptions.PermissionError(params.path) from e
-        except OSError as e:
-            raise ReadError(params.path, cause=e) from e
-
-        text_content = "".join(lines)
-        line_count = len(lines)
+        decoded = await read_text_lines(
+            resolved,
+            params.path,
+            offset=params.offset,
+            limit=params.limit,
+            error=ReadError,
+        )
+        text_content = decoded.text
+        line_count = len(text_content.splitlines())
         noun = "line" if line_count == 1 else "lines"
         display = f"Read {line_count} {noun}"
 
-        return ToolOutput(content={"text": text_content}, display=display)
+        return ToolOutput(
+            content={"text": text_content, "encoding": decoded.encoding},
+            display=display,
+        )

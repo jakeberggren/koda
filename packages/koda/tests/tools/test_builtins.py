@@ -1,17 +1,29 @@
 """Integration tests for builtin tools."""
 
+import os
 import shutil
+import stat
 from pathlib import Path
 
 import pytest
 
 from koda.tools import (
+    FileCoordinator,
     ToolCall,
     ToolContext,
     ToolExecutor,
     ToolRegistry,
     get_builtin_tools,
 )
+from koda.tools.policy import ToolPolicy
+
+
+def _tool_context(sandbox_dir: Path) -> ToolContext:
+    return ToolContext(
+        cwd=sandbox_dir,
+        policy=ToolPolicy.create(sandbox_dir),
+        files=FileCoordinator(),
+    )
 
 
 class TestReadFileTool:
@@ -25,7 +37,7 @@ class TestReadFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -45,7 +57,7 @@ class TestReadFileTool:
         """read_file tool fails when reading outside sandbox."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -66,7 +78,7 @@ class TestReadFileTool:
         """read_file tool returns error for non-existent file."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -90,7 +102,7 @@ class TestReadFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -111,7 +123,7 @@ class TestReadFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -122,11 +134,80 @@ class TestReadFileTool:
 
         result = await executor.execute_call(call, context)
 
-        assert result.output.content == {"text": "line2\nline3"}
+        assert result.output.content == {"text": "line2\nline3", "encoding": "utf-8"}
         assert "line1" not in result.output.content
 
         assert result.output.display is not None
         assert result.output.display == "Read 2 lines"
+
+    @pytest.mark.asyncio
+    async def test_read_file_binary_returns_tool_error(self, sandbox_dir: Path) -> None:
+        """read_file tool rejects binary-like files instead of crashing."""
+        test_file = sandbox_dir / "binary.dat"
+        test_file.write_bytes(b"\x00\x01\x02\x03")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="read_file",
+            arguments={"path": "binary.dat"},
+            call_id="call_binary",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "Failed to decode" in result.output.error_message
+
+    @pytest.mark.asyncio
+    async def test_read_file_accepts_utf8_bom(self, sandbox_dir: Path) -> None:
+        """read_file accepts UTF-8 files with a BOM."""
+        test_file = sandbox_dir / "bom.txt"
+        test_file.write_bytes("hello\nworld\n".encode("utf-8-sig"))
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="read_file",
+            arguments={"path": "bom.txt", "offset": 0, "limit": 2},
+            call_id="call_bom",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert result.output.content == {"text": "hello\nworld\n", "encoding": "utf-8-sig"}
+
+    @pytest.mark.asyncio
+    async def test_read_file_reads_requested_lines_without_decoding_entire_file(
+        self, sandbox_dir: Path
+    ) -> None:
+        """read_file only decodes the requested line window."""
+        test_file = sandbox_dir / "large.txt"
+        test_file.write_bytes(b"line1\nline2\n" + b"a" * 10000 + b"\x80")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="read_file",
+            arguments={"path": "large.txt", "offset": 0, "limit": 2},
+            call_id="call_streaming",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert result.output.content == {"text": "line1\nline2\n", "encoding": "utf-8"}
 
 
 class TestWriteFileTool:
@@ -137,7 +218,7 @@ class TestWriteFileTool:
         """write_file tool can create files within sandbox."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -160,7 +241,7 @@ class TestWriteFileTool:
         """write_file tool creates parent directories."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -179,7 +260,7 @@ class TestWriteFileTool:
         """write_file tool fails when writing outside sandbox."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -199,7 +280,7 @@ class TestWriteFileTool:
         """write_file tool sets appropriate display message."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -213,6 +294,60 @@ class TestWriteFileTool:
         assert result.output.display is not None
         assert "2 lines" in result.output.display
 
+    @pytest.mark.asyncio
+    async def test_write_file_preserves_existing_mode(self, sandbox_dir: Path) -> None:
+        """write_file tool preserves permissions when updating an existing file."""
+        test_file = sandbox_dir / "script.sh"
+        test_file.write_text("#!/bin/sh\necho old\n")
+        test_file.chmod(0o755)
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="write_file",
+            arguments={"path": "script.sh", "content": "#!/bin/sh\necho new\n"},
+            call_id="call_preserve_mode",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert stat.S_IMODE(test_file.stat().st_mode) == 0o755
+
+    @pytest.mark.asyncio
+    async def test_write_file_read_only_existing_file_fails(self, sandbox_dir: Path) -> None:
+        """write_file tool respects read-only permissions on existing files."""
+        test_file = sandbox_dir / "locked.txt"
+        test_file.write_text("original")
+        test_file.chmod(0o444)
+
+        if os.access(test_file, os.W_OK):
+            pytest.skip("platform does not enforce read-only mode for the current user")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        try:
+            call = ToolCall(
+                tool_name="write_file",
+                arguments={"path": "locked.txt", "content": "updated"},
+                call_id="call_read_only",
+            )
+
+            result = await executor.execute_call(call, context)
+        finally:
+            test_file.chmod(0o644)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "Permission denied" in result.output.error_message
+        assert test_file.read_text() == "original"
+
 
 class TestEditFileTool:
     """Integration tests for edit_file tool."""
@@ -225,7 +360,7 @@ class TestEditFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -253,7 +388,7 @@ class TestEditFileTool:
         """edit_file tool fails when editing outside sandbox."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -273,7 +408,7 @@ class TestEditFileTool:
         """edit_file tool returns error for missing file."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -295,7 +430,7 @@ class TestEditFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -318,7 +453,7 @@ class TestEditFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -341,7 +476,7 @@ class TestEditFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -365,7 +500,7 @@ class TestEditFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -393,7 +528,7 @@ class TestEditFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -409,6 +544,37 @@ class TestEditFileTool:
         assert result.output.content["diff"] == ""
         assert result.output.display == "No changes"
 
+    @pytest.mark.asyncio
+    async def test_edit_file_read_only_existing_file_fails(self, sandbox_dir: Path) -> None:
+        """edit_file tool respects read-only permissions on existing files."""
+        test_file = sandbox_dir / "locked.txt"
+        test_file.write_text("line1\nline2")
+        test_file.chmod(0o444)
+
+        if os.access(test_file, os.W_OK):
+            pytest.skip("platform does not enforce read-only mode for the current user")
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        try:
+            call = ToolCall(
+                tool_name="edit_file",
+                arguments={"path": "locked.txt", "old_text": "line2", "new_text": "updated"},
+                call_id="call_read_only_edit",
+            )
+
+            result = await executor.execute_call(call, context)
+        finally:
+            test_file.chmod(0o644)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "Permission denied" in result.output.error_message
+        assert test_file.read_text() == "line1\nline2"
+
 
 class TestListDirectoryTool:
     """Integration tests for list_directory tool."""
@@ -422,7 +588,7 @@ class TestListDirectoryTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -446,7 +612,7 @@ class TestListDirectoryTool:
         """list_directory tool fails when listing outside sandbox."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -470,7 +636,7 @@ class TestListDirectoryTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -498,7 +664,7 @@ class TestGlobTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -529,7 +695,7 @@ class TestGlobTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -553,7 +719,7 @@ class TestGlobTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -577,7 +743,7 @@ class TestGlobTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -600,7 +766,7 @@ class TestGlobTool:
         """glob tool returns error for non-existent path."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -622,7 +788,7 @@ class TestGlobTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -641,7 +807,7 @@ class TestGlobTool:
         """glob tool fails when searching outside sandbox."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -664,7 +830,7 @@ class TestGlobTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -688,7 +854,7 @@ class TestGlobTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -708,7 +874,7 @@ class TestGlobTool:
         """glob tool sets appropriate display message when no files match."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -733,7 +899,7 @@ class TestGlobTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -767,7 +933,7 @@ class TestGrepTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -793,7 +959,7 @@ class TestGrepTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         limit = 2
@@ -820,7 +986,7 @@ class TestGrepTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -839,7 +1005,7 @@ class TestGrepTool:
         """grep tool errors when path does not exist."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -863,7 +1029,7 @@ class TestGrepTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -886,7 +1052,7 @@ class TestGrepTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=sandbox_dir)
+        context = _tool_context(sandbox_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(

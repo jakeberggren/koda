@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
 from koda.tools import ToolOutput, exceptions
@@ -37,15 +38,16 @@ class ListDirectoryTool:
     async def execute(self, params: ListDirectoryParams, ctx: ToolContext) -> ToolOutput:
         """Execute the list_directory tool."""
         resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+        directory = AnyioPath(resolved)
 
-        if not resolved.exists():
+        if not await directory.exists():
             raise exceptions.FileNotFoundError(params.path)
 
-        if not resolved.is_dir():
+        if not await directory.is_dir():
             raise exceptions.NotADirectoryError(params.path)
 
         try:
-            dir_items = list(resolved.iterdir())
+            dir_items = [item async for item in directory.iterdir()]
         except PermissionError as e:
             raise exceptions.PermissionError(params.path) from e
         except OSError as e:
@@ -54,7 +56,7 @@ class ListDirectoryTool:
         items = [
             {
                 "name": item.name,
-                "type": "directory" if item.is_dir() else "file",
+                "type": "directory" if await item.is_dir() else "file",
                 "path": str(item),
             }
             for item in dir_items

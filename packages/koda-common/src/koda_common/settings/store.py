@@ -33,7 +33,7 @@ class JsonFileSettingsStore(SettingsStore):
             log.debug("settings_file_not_found", path=str(self.path))
             return {}
         try:
-            data = json.loads(self.path.read_text())
+            data = json.loads(self.path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             raise SettingsDecodeError(path=self.path, error=error) from error
         except PermissionError as error:
@@ -44,7 +44,7 @@ class JsonFileSettingsStore(SettingsStore):
     def save(self, data: dict[str, Any]) -> None:
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps(data, indent=2))
+            self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         except PermissionError as error:
             raise SettingsPermissionError(path=self.path, error=error) from error
         log.debug("settings_file_saved", path=str(self.path))
@@ -88,7 +88,7 @@ class JsonFileSecretsStore(SecretsStore):
         if not self._file_path.exists():
             return {}
         try:
-            return json.loads(self._file_path.read_text())
+            return json.loads(self._file_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             raise SecretsDecodeError(path=self._file_path, error=error) from error
         except PermissionError as error:
@@ -97,7 +97,7 @@ class JsonFileSecretsStore(SecretsStore):
     def _save_data(self, data: dict[str, str]) -> None:
         try:
             self._file_path.parent.mkdir(parents=True, exist_ok=True)
-            self._file_path.write_text(json.dumps(data, indent=2))
+            self._file_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
         except PermissionError as error:
             raise SecretsPermissionError(path=self._file_path, error=error) from error
 

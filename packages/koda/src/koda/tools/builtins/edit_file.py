@@ -6,8 +6,10 @@ from typing import TYPE_CHECKING
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolOutput, exceptions
+from koda.tools import ToolOutput
 from koda.tools.decorators import tool
+from koda.tools.exceptions import FileNotFoundError, NotAFileError, ToolError
+from koda.tools.files import read_text, write_text
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
     from koda.tools.context import ToolContext
 
 
-class EditError(exceptions.ToolError):
+class EditError(ToolError):
     """Failed to edit file."""
 
     def __init__(self, path: str, *, cause: Exception) -> None:
@@ -24,7 +26,7 @@ class EditError(exceptions.ToolError):
         super().__init__(f"Failed to edit '{path}': {cause}")
 
 
-class TextNotFoundError(exceptions.ToolError):
+class TextNotFoundError(ToolError):
     """Text to replace was not found in file."""
 
     def __init__(self, path: str) -> None:
@@ -32,7 +34,7 @@ class TextNotFoundError(exceptions.ToolError):
         super().__init__(f"Text not found in '{path}'")
 
 
-class MultipleMatchesError(exceptions.ToolError):
+class MultipleMatchesError(ToolError):
     """Text to replace matched more than once in file."""
 
     def __init__(self, path: str, occurrences: int) -> None:
@@ -63,24 +65,6 @@ class EditFileTool:
     )
     parameters_model: type[EditFileParams] = EditFileParams
 
-    async def _read_file(self, resolved: AnyioPath, path: str) -> str:
-        """Read file content with error handling."""
-        try:
-            return await resolved.read_text(encoding="utf-8")
-        except PermissionError as e:
-            raise exceptions.PermissionError(path) from e
-        except OSError as e:
-            raise EditError(path, cause=e) from e
-
-    async def _write_file(self, resolved: AnyioPath, path: str, content: str) -> None:
-        """Write file content with error handling."""
-        try:
-            await resolved.write_text(content, encoding="utf-8")
-        except PermissionError as e:
-            raise exceptions.PermissionError(path) from e
-        except OSError as e:
-            raise EditError(path, cause=e) from e
-
     def _apply_replacement(self, original: str, params: EditFileParams) -> tuple[str, int]:
         occurrences = original.count(params.old_text)
         if occurrences == 0:
@@ -104,23 +88,30 @@ class EditFileTool:
 
     async def execute(self, params: EditFileParams, ctx: ToolContext) -> ToolOutput:
         """Execute the edit_file tool."""
-        resolved: Path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+        resolved_path: Path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
         # Validate we are within the sandbox
-        ctx.policy.resolve_path(str(resolved.parent), cwd=ctx.cwd)
-        async_path = AnyioPath(resolved)
+        ctx.policy.resolve_path(str(resolved_path.parent), cwd=ctx.cwd)
+        target = AnyioPath(resolved_path)
 
-        if not await async_path.exists():
-            raise exceptions.FileNotFoundError(params.path)
-        if not await async_path.is_file():
-            raise exceptions.NotAFileError(params.path)
+        if not await target.exists():
+            raise FileNotFoundError(params.path)
+        if not await target.is_file():
+            raise NotAFileError(params.path)
 
-        original = await self._read_file(async_path, params.path)
-        updated, replacements_made = self._apply_replacement(original, params)
+        async with ctx.files.lock_for(resolved_path):
+            decoded = await read_text(resolved_path, params.path, error=EditError)
+            updated, replacements_made = self._apply_replacement(decoded.text, params)
 
-        if updated != original:
-            await self._write_file(async_path, params.path, updated)
+            if updated != decoded.text:
+                await write_text(
+                    resolved_path,
+                    params.path,
+                    updated,
+                    error=EditError,
+                    encoding=decoded.encoding,
+                )
 
-        diff_text = self._build_diff(original, updated, params.path)
+        diff_text = self._build_diff(decoded.text, updated, params.path)
 
         return ToolOutput(
             content={

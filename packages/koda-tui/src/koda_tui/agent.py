@@ -8,7 +8,8 @@ from koda.llm import LLMRequestOptions, ModelRegistry, ProviderRegistry
 from koda.llm.providers import BERGETAI_MODELS
 from koda.llm.providers.bergetai import BERGETAI_PROVIDER, create_bergetai_llm
 from koda.llm.providers.openai import OPENAI_MODELS, OPENAI_PROVIDER, create_openai_llm
-from koda.tools import ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
+from koda.tools import FileCoordinator, ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
+from koda.tools.policy import ToolPolicy
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,7 +35,11 @@ def _build_tools(*, sandbox_dir: Path, cwd: Path) -> ToolConfig:
     """Build the default tool configuration."""
     registry = ToolRegistry()
     registry.register_all(get_builtin_tools())
-    context = ToolContext.default(sandbox_dir=sandbox_dir, cwd=cwd)
+    context = ToolContext(
+        cwd=cwd.resolve(),
+        policy=ToolPolicy.create(sandbox_dir=sandbox_dir.resolve()),
+        files=FileCoordinator(),
+    )
     return ToolConfig(registry=registry, context=context)
 
 
