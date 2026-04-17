@@ -915,6 +915,167 @@ class TestGlobTool:
         assert f"showing first {limit}" in result.output.display
 
 
+class TestBashTool:
+    """Integration tests for bash tool."""
+
+    bash_required = pytest.mark.skipif(
+        shutil.which("bash") is None,
+        reason="bash is not installed",
+    )
+
+    @bash_required
+    @pytest.mark.asyncio
+    async def test_bash_executes_command_successfully(self, sandbox_dir: Path) -> None:
+        """bash tool executes a command and captures stdout."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "printf 'hello'"},
+            call_id="call_bash",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.call_id == "call_bash"
+        assert result.output.is_error is False
+        assert result.output.content["stdout"] == "hello"
+        assert result.output.content["stderr"] == ""
+        assert result.output.content["exit_code"] == 0
+        assert result.output.display == "Command exited with code 0"
+
+    @bash_required
+    @pytest.mark.asyncio
+    async def test_bash_captures_stderr(self, sandbox_dir: Path) -> None:
+        """bash tool captures stderr output."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "printf 'oops' >&2"},
+            call_id="call_bash_stderr",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert result.output.content["stdout"] == ""
+        assert result.output.content["stderr"] == "oops"
+        assert result.output.content["exit_code"] == 0
+
+    @bash_required
+    @pytest.mark.asyncio
+    async def test_bash_returns_nonzero_exit_without_tool_error(self, sandbox_dir: Path) -> None:
+        """bash tool returns non-zero exit codes without marking tool execution as failed."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "exit 7"},
+            call_id="call_bash_exit",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert result.output.content["exit_code"] == 7
+        assert result.output.display == "Command exited with code 7"
+
+    @bash_required
+    @pytest.mark.asyncio
+    async def test_bash_respects_cwd(self, sandbox_dir: Path) -> None:
+        """bash tool executes within the requested working directory."""
+        nested = sandbox_dir / "nested"
+        nested.mkdir()
+
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "pwd", "cwd": "nested"},
+            call_id="call_bash_cwd",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert result.output.content["stdout"].strip() == str(nested)
+        assert result.output.content["cwd"] == str(nested)
+
+    @pytest.mark.asyncio
+    async def test_bash_cwd_outside_sandbox_fails(self, sandbox_dir: Path) -> None:
+        """bash tool rejects working directories outside the sandbox."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "pwd", "cwd": "/etc"},
+            call_id="call_bash_escape",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "/etc" in result.output.error_message
+
+    @pytest.mark.asyncio
+    async def test_bash_cwd_not_found(self, sandbox_dir: Path) -> None:
+        """bash tool errors when cwd does not exist."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "pwd", "cwd": "missing"},
+            call_id="call_bash_missing",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "missing" in result.output.error_message
+
+    @bash_required
+    @pytest.mark.asyncio
+    async def test_bash_timeout_returns_tool_error(self, sandbox_dir: Path) -> None:
+        """bash tool returns a tool error when execution times out."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "sleep 1", "timeout_seconds": 0.01},
+            call_id="call_bash_timeout",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is True
+        assert result.output.error_message is not None
+        assert "timed out" in result.output.error_message
+
+
 class TestGrepTool:
     """Integration tests for grep tool."""
 
