@@ -1,20 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Protocol
-
-from koda.agents import Agent
-from koda.sessions import SessionManager
-from koda_common.settings import SettingsManager
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
     from uuid import UUID
 
+    from koda_common.settings import SettingsManager
     from koda_service.services.in_process.service import ServiceStatus
     from koda_service.types import SessionInfo
-
-type AgentBuilder = Callable[[SettingsManager, SessionManager], Agent]
 
 
 class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):

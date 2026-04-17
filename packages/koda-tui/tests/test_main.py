@@ -11,7 +11,8 @@ from koda_common.settings.errors import (
     SettingsDecodeError,
     SettingsUnknownKeysError,
 )
-from koda_common.settings.store import SecretsStore
+from koda_common.settings.store import JsonObject, SecretsStore
+from koda_service import InProcessAgentConfig
 from koda_service.exceptions import StartupConfigurationError
 from koda_tui import _report_startup_error, build_app, main
 
@@ -20,8 +21,6 @@ if TYPE_CHECKING:
 
     from structlog.stdlib import BoundLogger
 
-    from koda.sessions import SessionManager
-
 
 class _LoggerStub:
     def error(self, _event: str, **_kwargs: object) -> None:
@@ -29,19 +28,18 @@ class _LoggerStub:
 
 
 class _FakeSettingsStore(SettingsStore):
-    def __init__(
-        self, data: dict[str, object] | None = None, error: Exception | None = None
-    ) -> None:
+    def __init__(self, data: JsonObject | None = None, error: Exception | None = None) -> None:
         self._data = data or {}
         self._error = error
 
-    def load(self) -> dict[str, object]:
+    def load_section(self, name: str) -> JsonObject:
         if self._error is not None:
             raise self._error
-        return self._data
+        value = self._data.get(name, {})
+        return value if isinstance(value, dict) else {}
 
-    def save(self, data: dict[str, object]) -> None:
-        self._data = data
+    def save_section(self, name: str, data: JsonObject) -> None:
+        self._data[name] = data
 
 
 class _FakeSecretsStore(SecretsStore):
@@ -70,10 +68,6 @@ class _TelemetryStub:
 
     def initialize(self, settings) -> None:
         self.settings = settings
-
-
-def _agent_builder_stub(_settings, _session_manager: SessionManager):
-    return None
 
 
 def _run_main_with_error(
@@ -111,7 +105,7 @@ def test_build_app_raises_settings_error_from_store(tmp_path: Path) -> None:
             settings_store=_FakeSettingsStore(error=error),
             secrets_store=_FakeSecretsStore(),
             telemetry=_TelemetryStub(),
-            agent_builder=_agent_builder_stub,
+            agent_config=InProcessAgentConfig(cwd=tmp_path),
         )
 
     assert exc_info.value is error
@@ -129,7 +123,7 @@ def test_build_app_raises_secrets_error_from_store(tmp_path: Path) -> None:
             settings_store=_FakeSettingsStore(),
             secrets_store=_FakeSecretsStore(error=error),
             telemetry=_TelemetryStub(),
-            agent_builder=_agent_builder_stub,
+            agent_config=InProcessAgentConfig(cwd=tmp_path),
         )
 
     assert exc_info.value is error
@@ -144,14 +138,14 @@ def test_build_app_creates_application_with_injected_dependencies(tmp_path: Path
         settings_store=_FakeSettingsStore(),
         secrets_store=secrets_store,
         telemetry=telemetry,
-        agent_builder=_agent_builder_stub,
+        agent_config=InProcessAgentConfig(cwd=tmp_path),
     )
 
-    assert app.settings is not None
+    assert app.app_settings is not None
     assert app.service is not None
     assert app.state.workspace_root == tmp_path
     assert secrets_store.validate_calls == 1
-    assert telemetry.settings is app.settings
+    assert telemetry.settings is app.app_settings.core
 
 
 def test_report_startup_error_logs_and_prints(

@@ -6,35 +6,37 @@ Strict fixtures: track calls, avoid global env leakage, and provide easy helpers
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 
-from koda_common.settings import SecretsStore, SettingsStore
-from koda_common.settings.manager import SettingsManager
-from koda_common.settings.settings import EnvSettings
+from koda_common.settings import SecretsStore, Settings, SettingsManager, SettingsStore
+
+if TYPE_CHECKING:
+    from koda_common.settings.store import JsonObject
 
 
 @dataclass
 class SpySettingsStore(SettingsStore):
     """In-memory settings store that tracks calls and can simulate bad returns."""
 
-    initial_data: dict[str, Any] | None = None
-    data: dict[str, Any] = field(default_factory=dict)
-    load_calls: int = 0
-    save_calls: list[dict[str, Any]] = field(default_factory=list)
+    initial_data: JsonObject | None = None
+    data: JsonObject = field(default_factory=dict)
+    load_calls: list[str] = field(default_factory=list)
+    save_calls: list[tuple[str, JsonObject]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         self.data = dict(self.initial_data or {})
 
-    def load(self) -> dict[str, Any]:
-        self.load_calls += 1
-        return self.data.copy()
+    def load_section(self, name: str) -> JsonObject:
+        self.load_calls.append(name)
+        value = self.data.get(name, {})
+        return value.copy() if isinstance(value, dict) else {}
 
-    def save(self, data: dict[str, Any]) -> None:
+    def save_section(self, name: str, data: JsonObject) -> None:
         # store a deep-ish copy
-        self.data = data.copy()
-        self.save_calls.append(data.copy())
+        self.data[name] = data.copy()
+        self.save_calls.append((name, data.copy()))
 
 
 @dataclass
@@ -70,17 +72,22 @@ def clean_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure tests never read a .env file and start with clean env vars."""
 
     # Prevent surprise .env reads in CI/dev machines.
-    monkeypatch.setattr(EnvSettings, "model_config", {"env_file": None})
+    monkeypatch.setattr(Settings, "model_config", {**Settings.model_config, "env_file": None})
 
-    # Clear env vars used by EnvSettings.
+    # Clear env vars used by Settings.
     for key in (
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
+        "BERGETAI_API_KEY",
         "KODA_PROVIDER",
         "KODA_MODEL",
         "KODA_THINKING",
+        "KODA_ALLOW_WEB_SEARCH",
         "KODA_ALLOW_EXTENDED_PROMPT_RETENTION",
-        "KODA_USE_MOCK_CLIENT",
+        "LANGFUSE_TRACING_ENABLED",
+        "LANGFUSE_SECRET_KEY",
+        "LANGFUSE_PUBLIC_KEY",
+        "LANGFUSE_BASE_URL",
     ):
         monkeypatch.delenv(key, raising=False)
 

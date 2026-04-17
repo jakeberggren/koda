@@ -15,11 +15,11 @@ from koda_common.settings import (
     SettingsManager,
     SettingsStore,
 )
-from koda_service import AgentBuilder
+from koda_service import InProcessAgentConfig
 from koda_service.exceptions import StartupError, startup_error_from_settings_error
 from koda_service.services.in_process import InProcessKodaService
-from koda_tui.agent import KodaTuiAgent
 from koda_tui.app import KodaTuiApp
+from koda_tui.settings import AppSettings, TuiSettingsManager
 from koda_tui.state import AppState
 
 __all__ = ["AppState", "KodaTuiApp", "main"]
@@ -36,20 +36,19 @@ def build_app(
     settings_store: SettingsStore,
     secrets_store: SecretsStore,
     telemetry: Telemetry,
-    agent_builder: AgentBuilder,
+    agent_config: InProcessAgentConfig,
 ) -> KodaTuiApp:
-    settings = SettingsManager(
-        settings_store=settings_store,
-        secrets_store=secrets_store,
-    )
+    core_settings = SettingsManager(settings_store=settings_store, secrets_store=secrets_store)
+    tui_settings = TuiSettingsManager(settings_store=settings_store)
+    app_settings = AppSettings(core=core_settings, tui=tui_settings)
     service = InProcessKodaService(
-        settings=settings,
+        settings=core_settings,
         sandbox_dir=workspace_root,
         telemetry=telemetry,
-        agent_builder=agent_builder,
+        agent_config=agent_config,
     )
     return KodaTuiApp(
-        settings=settings,
+        app_settings=app_settings,
         service=service,
         workspace_root=workspace_root,
     )
@@ -67,7 +66,7 @@ def main() -> None:
             settings_store=JsonFileSettingsStore(),
             secrets_store=JsonFileSecretsStore(),
             telemetry=LangfuseTelemetry(),
-            agent_builder=KodaTuiAgent(cwd=workspace_root, sandbox_dir=workspace_root),
+            agent_config=InProcessAgentConfig(cwd=workspace_root),
         )
         asyncio.run(app.run())
     except (SecretsLoadError, SettingsLoadError) as error:

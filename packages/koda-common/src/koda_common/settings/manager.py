@@ -1,118 +1,65 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+import os
+from abc import ABC, abstractmethod
 from contextlib import suppress
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
-from koda_common.logging.config import get_logger
 from koda_common.settings.errors import SettingsUnknownKeysError, SettingsValidationError
-from koda_common.settings.settings import EnvSettings, Settings
+from koda_common.settings.protocols import (
+    SettingChange,
+    SettingsChangeCallback,
+    SettingsChangeSet,
+    SettingsManagerProtocol,
+)
+from koda_common.settings.settings import PersistedSettings, Settings
+from koda_common.settings.utils import provider_api_key_env_var
 
 if TYPE_CHECKING:
-    from koda_common.settings.store import (
-        SecretsStore,
-        SettingsStore,
-    )
+    from collections.abc import Callable
+
+    from koda_common.settings.protocols import JsonObject, SecretsStore, SettingsStore
 
 
-@dataclass(slots=True, frozen=True)
-class SettingChange:
-    name: str
-    old_value: Any
-    new_value: Any
+class BaseSettingsManager(SettingsManagerProtocol, ABC):
+    """Provide shared subscription behavior for settings managers."""
 
-
-type SettingsChangeSet = tuple[SettingChange, ...]
-type SettingsChangeCallback = Callable[[SettingsChangeSet], None]
-
-# Prefix for env var to settings field mapping
-_ENV_PREFIX = "koda_"
-_API_KEY_SUFFIX = "_api_key"
-
-log = get_logger(__name__)
-
-
-class SettingsManager:
-    """Manages application settings with layered loading and change notifications.
-
-    Settings fields are accessed as attributes on this class. Adding a new field
-    to Settings automatically makes it available here - no manager changes needed.
-    """
-
-    def __init__(
-        self,
-        settings_store: SettingsStore,
-        secrets_store: SecretsStore,
-    ) -> None:
-        self._settings_store = settings_store
-        self._secrets_store = secrets_store
-        self._env = EnvSettings()
-        self._api_key_cache: dict[str, str] = {}
-        self._load_api_keys_from_env()
-        self._secrets_store.validate()
-        self._settings = self._load_layered()
+    def __init__(self) -> None:
         self._callbacks: list[SettingsChangeCallback] = []
 
-    def _load_api_keys_from_env(self) -> None:
-        """Load API key overrides from environment into cache."""
-        for env_field in EnvSettings.model_fields:
-            value = getattr(self._env, env_field)
-            if value is not None and env_field.endswith(_API_KEY_SUFFIX):
-                provider = env_field.removesuffix(_API_KEY_SUFFIX)
-                self._api_key_cache[provider] = value.get_secret_value()
-                log.debug("api_key_loaded_from_env", provider=provider)
+    @staticmethod
+    def changed_fields(
+        previous: BaseModel,
+        current: BaseModel,
+        names: tuple[str, ...],
+    ) -> SettingsChangeSet:
+        """Return the committed field changes for the provided names."""
 
-    def _apply_setting_override(
-        self,
-        data: dict[str, Any],
-        env_field: str,
-        value: Any,
-    ) -> None:
-        """Apply setting override from environment (KODA_<field> -> <field>)."""
-        settings_field = env_field.removeprefix(_ENV_PREFIX)
-        if settings_field in Settings.model_fields:
-            data[settings_field] = value
-
-    def _apply_env_overrides(self, data: dict[str, Any]) -> None:
-        """Apply environment variable overrides to settings data."""
-        for env_field in EnvSettings.model_fields:
-            value = getattr(self._env, env_field)
-            if value is not None and env_field.startswith(_ENV_PREFIX):
-                self._apply_setting_override(data, env_field, value)
-
-    def _load_layered(self) -> Settings:
-        """Load settings: defaults -> file -> env vars."""
-        persisted = self._settings_store.load()
-        unknown_keys = set(persisted) - set(Settings.model_fields)
-        if unknown_keys:
-            raise SettingsUnknownKeysError(unknown_keys)
-
-        data: dict[str, Any] = Settings().model_dump()
-        data.update(persisted)
-        self._apply_env_overrides(data)
-        try:
-            settings = Settings.model_validate(data)
-        except ValidationError as error:
-            raise SettingsValidationError(error) from error
-        log.info("settings_loaded", provider=settings.provider, model=settings.model)
-        return settings
-
-    def _save_settings(self) -> None:
-        """Persist non-secret settings to file storage."""
-        self._settings_store.save(self._settings.model_dump(mode="json"))
+        previous_values = previous.model_dump()
+        current_values = current.model_dump()
+        return tuple(
+            SettingChange(
+                name=name,
+                old_value=previous_values[name],
+                new_value=current_values[name],
+            )
+            for name in names
+            if previous_values[name] != current_values[name]
+        )
 
     def _notify(self, changes: SettingsChangeSet) -> None:
-        """Notify subscribers of committed setting changes."""
+        """Notify subscribers about one committed batch of changes."""
+
         if not changes:
             return
         for callback in tuple(self._callbacks):
             callback(changes)
 
     def subscribe(self, callback: SettingsChangeCallback) -> Callable[[], None]:
-        """Subscribe to setting changes. Returns unsubscribe function."""
+        """Register a callback and return an unsubscribe function."""
+
         self._callbacks.append(callback)
         unsubscribed = False
 
@@ -126,78 +73,143 @@ class SettingsManager:
 
         return unsubscribe
 
-    def set(self, name: str, value: Any) -> None:
-        """Set a single managed setting."""
+    @abstractmethod
+    def update(self, **changes: object) -> None:
+        """Apply one atomic settings update."""
+
+    def set(self, name: str, value: object) -> None:
+        """Update one field by name."""
+
         self.update(**{name: value})
 
-    def update(self, **changes: Any) -> None:
-        """Atomically update managed settings with validation."""
-        unknown_fields = [name for name in changes if name not in Settings.model_fields]
-        if unknown_fields:
-            raise AttributeError(unknown_fields[0])
-        if not changes:
-            return
 
-        current_settings = self._settings.model_dump()
-        merged = current_settings.copy()
-        merged.update(changes)
-        updated_settings = Settings.model_validate(merged)
-        updated_values = updated_settings.model_dump()
-        changed_fields = tuple(
-            SettingChange(
-                name=name,
-                old_value=current_settings[name],
-                new_value=updated_values[name],
-            )
-            for name in changes
-            if current_settings[name] != updated_values[name]
-        )
-        if not changed_fields:
-            return
+_CORE_SECTION = "core"
 
-        self._settings = updated_settings
-        self._save_settings()
-        self._notify(changed_fields)
-        for change in changed_fields:
-            log.info(
-                "setting_changed",
-                setting=change.name,
-                old_value=change.old_value,
-                new_value=change.new_value,
-            )
 
-    # Dynamic attribute access - forwards to Settings model
+class SettingsManager(BaseSettingsManager):
+    """Manage persisted core settings and build effective settings with env precedence."""
+
+    def __init__(
+        self,
+        settings_store: SettingsStore,
+        secrets_store: SecretsStore,
+    ) -> None:
+        super().__init__()
+        self._settings_store = settings_store
+        self._secrets_store = secrets_store
+        self._api_key_cache: dict[str, str] = {}
+        self._secrets_store.validate()
+        self._persisted = self._load_persisted_settings()
+        self._settings = self._build_effective_settings(self._persisted)
 
     def __getattr__(self, name: str) -> Any:
-        """Get a setting value by name."""
+        """Expose effective settings fields as manager attributes."""
+
         if name in Settings.model_fields:
             return getattr(self._settings, name)
-        if name in EnvSettings.model_fields:
-            return getattr(self._env, name)
         raise AttributeError(name)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        """Reject direct writes to managed settings and allow internal attributes."""
-        if name in Settings.model_fields:
+        """Reject direct writes to managed settings fields."""
+
+        if name != "_settings" and name in Settings.model_fields:
             raise AttributeError(name)
         super().__setattr__(name, value)
 
-    # API keys - cached from secrets store/env
+    @staticmethod
+    def _persisted_data(settings: PersistedSettings) -> dict[str, object]:
+        """Convert persisted settings to plain Python data."""
+
+        return settings.model_dump()
+
+    @staticmethod
+    def _persisted_json(settings: PersistedSettings) -> JsonObject:
+        """Convert persisted settings to JSON-safe data."""
+
+        return cast("JsonObject", settings.model_dump(mode="json"))
+
+    def _load_section_data(self) -> JsonObject:
+        """Load and validate the raw core settings section."""
+
+        persisted = self._settings_store.load_section(_CORE_SECTION)
+        unknown_keys = set(persisted) - set(PersistedSettings.model_fields)
+        if unknown_keys:
+            raise SettingsUnknownKeysError(unknown_keys)
+        return persisted
+
+    def _load_persisted_settings(self) -> PersistedSettings:
+        """Load persisted core settings from the shared settings store."""
+
+        data = self._load_section_data()
+        try:
+            return PersistedSettings.model_validate(data)
+        except ValidationError as error:
+            raise SettingsValidationError(error) from error
+
+    def _build_effective_settings(self, persisted: PersistedSettings) -> Settings:
+        """Build effective settings from persisted data and environment."""
+
+        try:
+            return Settings.model_validate(self._persisted_data(persisted))
+        except ValidationError as error:
+            raise SettingsValidationError(error) from error
+
+    @staticmethod
+    def _validate_change_names(changes: dict[str, object]) -> None:
+        """Reject updates for fields that are not persisted core settings."""
+
+        unknown_fields = [name for name in changes if name not in PersistedSettings.model_fields]
+        if unknown_fields:
+            raise AttributeError(unknown_fields[0])
+
+    def _build_updated_persisted_settings(self, changes: dict[str, object]) -> PersistedSettings:
+        """Apply one change batch to persisted settings and validate the result."""
+
+        merged = self._persisted_data(self._persisted)
+        merged.update(changes)
+        try:
+            return PersistedSettings.model_validate(merged)
+        except ValidationError as error:
+            raise SettingsValidationError(error) from error
+
+    def update(self, **changes: object) -> None:
+        if not changes:
+            return
+        self._validate_change_names(changes)
+
+        updated_persisted = self._build_updated_persisted_settings(changes)
+        persisted_changes = self.changed_fields(self._persisted, updated_persisted, tuple(changes))
+        if not persisted_changes:
+            return
+
+        updated_effective = self._build_effective_settings(updated_persisted)
+        effective_changes = self.changed_fields(self._settings, updated_effective, tuple(changes))
+
+        self._persisted = updated_persisted
+        self._settings = updated_effective
+        self._settings_store.save_section(_CORE_SECTION, self._persisted_json(updated_persisted))
+        self._notify(effective_changes)
 
     def get_api_key(self, provider: str) -> str | None:
-        """Get API key for a provider. Loads from secrets store lazily if not cached."""
-        if provider not in self._api_key_cache and (key := self._secrets_store.get_key(provider)):
+        """Return the configured API key for one provider."""
+
+        if provider in self._api_key_cache:
+            return self._api_key_cache[provider]
+
+        if key := os.getenv(provider_api_key_env_var(provider)):
             self._api_key_cache[provider] = key
-            log.debug("api_key_loaded_from_store", provider=provider)
+            return key
+
+        if key := self._secrets_store.get_key(provider):
+            self._api_key_cache[provider] = key
         return self._api_key_cache.get(provider)
 
     def set_api_key(self, provider: str, key: str) -> None:
-        """Set API key for a provider (saves to secrets store)."""
+        """Persist one provider API key and notify subscribers if it changed."""
+
         old = self.get_api_key(provider)
         self._secrets_store.set_key(provider, key)
         self._api_key_cache[provider] = key
         if old == key:
-            # Avoid false-positive service reconfiguration for unchanged keys.
             return
         self._notify((SettingChange(name=f"api_keys.{provider}", old_value=old, new_value=key),))
-        log.info("api_key_updated", provider=provider)

@@ -4,10 +4,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from koda.llm import exceptions as llm_exceptions
-from koda.llm.providers import BERGETAI_MODELS
-from koda.llm.providers.bergetai import BERGETAI_PROVIDER, create_bergetai_llm
-from koda.llm.providers.openai import OPENAI_MODELS, OPENAI_PROVIDER, create_openai_llm
-from koda.llm.registry import ModelRegistry, ProviderRegistry
 from koda.sessions import (
     JsonSessionStore,
     NoActiveSessionError,
@@ -15,7 +11,7 @@ from koda.sessions import (
     SessionNotFoundError,
 )
 from koda.tools import exceptions as tool_exceptions
-from koda_common.settings import SecretsLoadError
+from koda_common.settings import SecretsLoadError, SettingsManager
 from koda_service.exceptions import (
     ServiceAuthenticationError,
     ServiceChatError,
@@ -37,7 +33,8 @@ from koda_service.mappers import (
     map_provider_definition_to_contract_provider_definition,
     map_session_to_session_info,
 )
-from koda_service.protocols import AgentBuilder, KodaService
+from koda_service.protocols import KodaService
+from koda_service.services.in_process.agent import InProcessAgentConfig, build_registries
 from koda_service.types import (
     Message,
     ModelDefinition,
@@ -53,7 +50,6 @@ if TYPE_CHECKING:
     from koda.agents import Agent
     from koda.sessions.store import SessionStore
     from koda.telemetry import Telemetry
-    from koda_common.settings import SettingsManager
     from koda_service.types import SessionInfo
 
 
@@ -72,19 +68,6 @@ def _api_key_error_status(error: SecretsLoadError) -> ServiceStatus:
     return _startup_error_status(startup_error_from_settings_error(error))
 
 
-def build_registries() -> tuple[ModelRegistry, ProviderRegistry]:
-    """Build the default provider and model registries."""
-    model_registry = ModelRegistry()
-    model_registry.register_all(OPENAI_MODELS)
-    model_registry.register_all(BERGETAI_MODELS)
-
-    provider_registry = ProviderRegistry()
-    provider_registry.register(OPENAI_PROVIDER, create_openai_llm)
-    provider_registry.register(BERGETAI_PROVIDER, create_bergetai_llm)
-
-    return model_registry, provider_registry
-
-
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ServiceStatus:
     is_ready: bool = False
@@ -99,14 +82,14 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         settings: SettingsManager,
         sandbox_dir: Path,
         session_store: SessionStore | None = None,
-        agent_builder: AgentBuilder,
+        agent_config: InProcessAgentConfig,
         telemetry: Telemetry | None = None,
     ) -> None:
         """Initialize the in-process service and its owned state."""
         self._settings = settings
         self._sandbox_dir = sandbox_dir
         self._telemetry = telemetry
-        self._agent_builder = agent_builder
+        self._agent_config = agent_config
         self._model_registry, self._provider_registry = build_registries()
         self._session_manager = SessionManager(session_store or JsonSessionStore())
         self._session_manager.create_session()
@@ -192,7 +175,11 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
             return None
 
         try:
-            self._agent = self._agent_builder(self._settings, self._session_manager)
+            self._agent = self._agent_config.build(
+                self._settings,
+                self._session_manager,
+                sandbox_dir=self._sandbox_dir,
+            )
         except StartupConfigurationError as error:
             return _startup_error_status(error)
         except SecretsLoadError as error:

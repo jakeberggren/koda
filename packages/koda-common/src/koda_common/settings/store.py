@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from typing import Any, Protocol
 
 from koda_common.logging.config import get_logger
 from koda_common.paths import config_file_path, secrets_file_path
@@ -9,28 +8,19 @@ from koda_common.settings.errors import (
     SecretsPermissionError,
     SettingsDecodeError,
     SettingsPermissionError,
+    SettingsStructureError,
 )
+from koda_common.settings.protocols import JsonObject, SecretsStore, SettingsStore
 
 log = get_logger(__name__)
-
-
-class SettingsStore(Protocol):
-    def load(self) -> dict[str, Any]:
-        """Load settings from storage. Returns empty dict if no settings are found."""
-        ...
-
-    def save(self, data: dict[str, Any]) -> None:
-        """Persist settings to storage."""
-        ...
 
 
 class JsonFileSettingsStore(SettingsStore):
     def __init__(self, path: Path | None = None):
         self.path = path or config_file_path()
 
-    def load(self) -> dict[str, Any]:
+    def _load_document(self) -> JsonObject:
         if not self.path.exists():
-            log.debug("settings_file_not_found", path=str(self.path))
             return {}
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
@@ -38,34 +28,34 @@ class JsonFileSettingsStore(SettingsStore):
             raise SettingsDecodeError(path=self.path, error=error) from error
         except PermissionError as error:
             raise SettingsPermissionError(path=self.path, error=error) from error
-        log.debug("settings_file_loaded", path=str(self.path))
+        if not isinstance(data, dict):
+            raise SettingsStructureError(
+                path=self.path,
+                message="Top-level settings JSON must be an object",
+            )
         return data
 
-    def save(self, data: dict[str, Any]) -> None:
+    def load_section(self, name: str) -> JsonObject:
+        document = self._load_document()
+        value = document.get(name)
+        if value is None:
+            return {}
+        if not isinstance(value, dict):
+            raise SettingsStructureError(
+                path=self.path,
+                message=f"Settings section '{name}' must be an object",
+            )
+        return value
+
+    def save_section(self, name: str, data: JsonObject) -> None:
+        document = self._load_document()
+        document[name] = data
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            self.path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            self.path.write_text(json.dumps(document, indent=2), encoding="utf-8")
         except PermissionError as error:
             raise SettingsPermissionError(path=self.path, error=error) from error
         log.debug("settings_file_saved", path=str(self.path))
-
-
-class SecretsStore(Protocol):
-    def validate(self) -> None:
-        """Validate that the backing store is readable and correctly configured."""
-        ...
-
-    def get_key(self, key: str) -> str | None:
-        """Retrieve a secret key from the store."""
-        ...
-
-    def set_key(self, key: str, value: str) -> None:
-        """Store a secret key in the store."""
-        ...
-
-    def delete_key(self, key: str) -> None:
-        """Delete a secret key from the store."""
-        ...
 
 
 class JsonFileSecretsStore(SecretsStore):

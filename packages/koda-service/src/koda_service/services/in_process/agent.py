@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from koda_common.settings import SettingsManager
 
 
-def _build_registries() -> tuple[ModelRegistry, ProviderRegistry]:
-    """Build the default model and provider registries."""
+def build_registries() -> tuple[ModelRegistry, ProviderRegistry]:
+    """Build the default provider and model registries."""
     model_registry = ModelRegistry()
     model_registry.register_all(OPENAI_MODELS)
     model_registry.register_all(BERGETAI_MODELS)
@@ -31,7 +31,7 @@ def _build_registries() -> tuple[ModelRegistry, ProviderRegistry]:
     return model_registry, provider_registry
 
 
-def _build_tools(*, sandbox_dir: Path, cwd: Path) -> ToolConfig:
+def build_tools(*, sandbox_dir: Path, cwd: Path) -> ToolConfig:
     """Build the default tool configuration."""
     registry = ToolRegistry()
     registry.register_all(get_builtin_tools())
@@ -44,21 +44,26 @@ def _build_tools(*, sandbox_dir: Path, cwd: Path) -> ToolConfig:
 
 
 @dataclass(frozen=True, slots=True)
-class KodaTuiAgent:
-    """Build the Koda agent used by the TUI."""
+class InProcessAgentConfig:
+    """Configuration for building the in-process Koda agent."""
 
-    sandbox_dir: Path
     cwd: Path
     system_prompt: SystemPrompt = field(default_factory=SystemPrompt)
     prompt_context: PromptContext | None = None
     max_tool_iterations: int = 30
     tools: ToolConfig | None = None
 
-    def __call__(self, settings: SettingsManager, session_manager: SessionManager) -> Agent:
+    def build(
+        self,
+        settings: SettingsManager,
+        session_manager: SessionManager,
+        *,
+        sandbox_dir: Path,
+    ) -> Agent:
         """Create the Koda agent for the current settings and session state."""
-        model_registry, provider_registry = _build_registries()
+        model_registry, provider_registry = build_registries()
         llm = provider_registry.create(settings.provider, settings, model_registry)
-        tools = self.tools or _build_tools(sandbox_dir=self.sandbox_dir, cwd=self.cwd)
+        tools = self.tools or build_tools(sandbox_dir=sandbox_dir, cwd=self.cwd)
         config = AgentConfig(
             system_prompt=self.system_prompt,
             prompt_context=self.prompt_context,

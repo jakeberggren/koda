@@ -1,34 +1,37 @@
 """Tests for SettingsManager.
 
-These tests are intentionally strict:
-- assert call counts (lazy-load + caching)
-- cover failure modes (bad store returns, validation)
-- avoid testing implementation trivia
+These tests focus on the public behavior:
+- persisted core settings live under the ``core`` config section
+- env overrides win for effective values but are not persisted
+- updates notify on effective changes only
 """
 
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
 
-from koda_common.settings import SettingsUnknownKeysError, SettingsValidationError
-from koda_common.settings.manager import SettingChange, SettingsManager
+from koda_common.settings import (
+    SettingChange,
+    SettingsManager,
+    SettingsUnknownKeysError,
+    SettingsValidationError,
+)
 
 from .conftest import SpySecretsStore, SpySettingsStore
 
 
-def test_loads_from_store(secrets_store: SpySecretsStore) -> None:
-    store = SpySettingsStore({"provider": "anthropic", "model": "claude-3"})
+def test_loads_from_core_section(secrets_store: SpySecretsStore) -> None:
+    store = SpySettingsStore({"core": {"provider": "anthropic", "model": "claude-3"}})
     manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
     assert manager.provider == "anthropic"
     assert manager.model == "claude-3"
-    assert store.load_calls == 1
+    assert store.load_calls == ["core"]
 
 
 def test_env_overrides_store_for_provider(
     monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
 ) -> None:
-    store = SpySettingsStore({"provider": "openai", "model": "gpt-4"})
+    store = SpySettingsStore({"core": {"provider": "openai", "model": "gpt-4"}})
     monkeypatch.setenv("KODA_PROVIDER", "anthropic")
 
     manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
@@ -37,20 +40,8 @@ def test_env_overrides_store_for_provider(
     assert manager.model == "gpt-4"
 
 
-def test_env_overrides_store_for_model(
-    monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
-) -> None:
-    store = SpySettingsStore({"provider": "anthropic", "model": "claude-3"})
-    monkeypatch.setenv("KODA_MODEL", "claude-3.5")
-
-    manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
-
-    assert manager.provider == "anthropic"
-    assert manager.model == "claude-3.5"
-
-
 def test_partial_store_merges_with_defaults(secrets_store: SpySecretsStore) -> None:
-    store = SpySettingsStore({"provider": "anthropic"})
+    store = SpySettingsStore({"core": {"provider": "anthropic"}})
     manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
     assert manager.provider == "anthropic"
     assert manager.model is None
@@ -59,7 +50,7 @@ def test_partial_store_merges_with_defaults(secrets_store: SpySecretsStore) -> N
 def test_invalid_store_value_raises_settings_validation_error(
     secrets_store: SpySecretsStore,
 ) -> None:
-    store = SpySettingsStore({"model": 123})
+    store = SpySettingsStore({"core": {"model": 123}})
     with pytest.raises(SettingsValidationError):
         SettingsManager(settings_store=store, secrets_store=secrets_store)
 
@@ -67,7 +58,7 @@ def test_invalid_store_value_raises_settings_validation_error(
 def test_unknown_persisted_setting_raises_settings_unknown_keys_error(
     secrets_store: SpySecretsStore,
 ) -> None:
-    store = SpySettingsStore({"not_a_setting": 123})
+    store = SpySettingsStore({"core": {"not_a_setting": 123}})
 
     with pytest.raises(SettingsUnknownKeysError) as exc_info:
         SettingsManager(settings_store=store, secrets_store=secrets_store)
@@ -83,7 +74,7 @@ def test_initialization_validates_secrets_store(
     assert secrets_store.validate_calls == 1
 
 
-def test_set_persists_and_notifies_single_change(
+def test_set_persists_core_section_and_notifies_single_change(
     manager: SettingsManager, settings_store: SpySettingsStore
 ) -> None:
     changes: list[tuple[SettingChange, ...]] = []
@@ -92,16 +83,16 @@ def test_set_persists_and_notifies_single_change(
     manager.set("provider", "anthropic")
 
     assert manager.provider == "anthropic"
-    assert settings_store.save_calls[-1] == {
-        "provider": "anthropic",
-        "model": None,
-        "thinking": "none",
-        "theme": "dark",
-        "show_scrollbar": True,
-        "queue_inputs": True,
-        "allow_web_search": False,
-        "allow_extended_prompt_retention": False,
-    }
+    assert settings_store.save_calls[-1] == (
+        "core",
+        {
+            "provider": "anthropic",
+            "model": None,
+            "thinking": "none",
+            "allow_web_search": False,
+            "allow_extended_prompt_retention": False,
+        },
+    )
     assert changes == [
         (SettingChange(name="provider", old_value=None, new_value="anthropic"),),
     ]
@@ -121,16 +112,16 @@ def test_update_commits_all_changes_before_notifying(
 
     assert manager.provider == "bergetai"
     assert manager.model == "zai-org/GLM-4.7"
-    assert settings_store.save_calls[-1] == {
-        "provider": "bergetai",
-        "model": "zai-org/GLM-4.7",
-        "thinking": "none",
-        "theme": "dark",
-        "show_scrollbar": True,
-        "queue_inputs": True,
-        "allow_web_search": False,
-        "allow_extended_prompt_retention": False,
-    }
+    assert settings_store.save_calls[-1] == (
+        "core",
+        {
+            "provider": "bergetai",
+            "model": "zai-org/GLM-4.7",
+            "thinking": "none",
+            "allow_web_search": False,
+            "allow_extended_prompt_retention": False,
+        },
+    )
     assert observed == [
         (
             ("bergetai", "zai-org/GLM-4.7"),
@@ -142,13 +133,50 @@ def test_update_commits_all_changes_before_notifying(
     ]
 
 
+def test_env_override_is_not_written_back_on_unrelated_save(
+    monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
+) -> None:
+    monkeypatch.setenv("KODA_PROVIDER", "openai")
+    store = SpySettingsStore({"core": {"provider": "anthropic", "thinking": "none"}})
+    manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+    manager.set("thinking", "high")
+
+    assert manager.provider == "openai"
+    assert store.save_calls[-1] == (
+        "core",
+        {
+            "provider": "anthropic",
+            "model": None,
+            "thinking": "high",
+            "allow_web_search": False,
+            "allow_extended_prompt_retention": False,
+        },
+    )
+
+
+def test_env_override_blocks_effective_change_notifications(
+    monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
+) -> None:
+    monkeypatch.setenv("KODA_PROVIDER", "openai")
+    store = SpySettingsStore({"core": {"provider": "anthropic"}})
+    manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
+    changes: list[tuple[SettingChange, ...]] = []
+    manager.subscribe(changes.append)
+
+    manager.set("provider", "bergetai")
+
+    assert manager.provider == "openai"
+    assert changes == []
+
+
 def test_invalid_update_raises_without_mutating(
     manager: SettingsManager, settings_store: SpySettingsStore
 ) -> None:
-    with pytest.raises(ValidationError):
-        manager.set("theme", "bogus")
+    with pytest.raises(SettingsValidationError):
+        manager.set("provider", 123)
 
-    assert manager.theme == "dark"
+    assert manager.provider is None
     assert settings_store.save_calls == []
 
 

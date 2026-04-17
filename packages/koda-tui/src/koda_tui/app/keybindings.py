@@ -16,10 +16,10 @@ from prompt_toolkit.keys import Keys
 from koda_tui.utils.model_selection import find_model, supported_thinking_options
 
 if TYPE_CHECKING:
-    from koda_common.settings import SettingsManager
     from koda_service import KodaService
     from koda_service.types import ThinkingOptionId
     from koda_tui.app.application import KodaTuiApp
+    from koda_tui.settings import AppSettings
 
 
 def _register_terminal_sequences() -> None:
@@ -79,12 +79,12 @@ def _handle_escape(app: KodaTuiApp) -> None:
 
 def _get_cycle_thinking_options(
     catalog_service: KodaService,
-    settings: SettingsManager,
+    app_settings: AppSettings,
 ) -> list[ThinkingOptionId]:
     active_model = find_model(
-        catalog_service.list_models(settings.provider),
-        provider=settings.provider,
-        model_id=settings.model,
+        catalog_service.list_models(app_settings.core.provider),
+        provider=app_settings.core.provider,
+        model_id=app_settings.core.model,
     )
     return [option.id for option in supported_thinking_options(active_model)]
 
@@ -93,7 +93,7 @@ def _handle_cycle_thinking(app: KodaTuiApp) -> None:
     """Cycle through supported thinking levels."""
     if not app.state.service_status.is_ready:
         return
-    options = _get_cycle_thinking_options(app.service, app.settings)
+    options = _get_cycle_thinking_options(app.service, app.app_settings)
     result = app.cycle_thinking(options)
     if result.ok:
         app.invalidate()

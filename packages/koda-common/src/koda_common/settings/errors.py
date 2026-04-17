@@ -26,6 +26,15 @@ class SettingsDecodeError(SettingsLoadError):
         self.error = error
 
 
+class SettingsStructureError(SettingsLoadError):
+    """Raised when parsed settings JSON has the wrong object structure."""
+
+    def __init__(self, *, path: Path, message: str) -> None:
+        super().__init__(message)
+        self.path = path
+        self.message = message
+
+
 class SettingsPermissionError(SettingsLoadError):
     """Raised when settings storage cannot be accessed."""
 

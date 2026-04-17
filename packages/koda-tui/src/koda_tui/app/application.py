@@ -22,9 +22,10 @@ if TYPE_CHECKING:
 
     from prompt_toolkit.output import Output
 
-    from koda_common.settings import SettingChange, SettingsManager
+    from koda_common.settings import SettingChange
     from koda_service import KodaService
     from koda_service.types import ThinkingOptionId
+    from koda_tui.settings import AppSettings
 
 
 class _KodaApplication(Application):
@@ -46,35 +47,38 @@ class KodaTuiApp:
 
     def __init__(
         self,
-        settings: SettingsManager,
+        app_settings: AppSettings,
         service: KodaService,
         workspace_root: Path,
     ) -> None:
-        self._settings = settings
+        self._app_settings = app_settings
         self._service = service
         self._workspace_root = workspace_root
 
         # Subscribe to settings changes
-        self._unsubscribe = self._settings.subscribe(self._on_settings_changed)
+        self._unsubscribe_settings = self._app_settings.core.subscribe(self._on_settings_changed)
+        self._unsubscribe_tui_settings = self._app_settings.tui.subscribe(
+            self._on_tui_settings_changed
+        )
         self._closed = False
 
         # Initialize state
         service_status = self._service.ready()
         self.state = AppState(
             workspace_root=self._workspace_root,
-            provider_name=self._settings.provider,
-            model_name=self._settings.model,
+            provider_name=self._app_settings.core.provider,
+            model_name=self._app_settings.core.model,
             service_status=service_status,
-            thinking=resolve_thinking_option(None, self._settings.thinking),
+            thinking=resolve_thinking_option(None, self._app_settings.core.thinking),
             context_window=None,
             thinking_supported=False,
-            show_scrollbar=self._settings.show_scrollbar,
-            queue_inputs=self._settings.queue_inputs,
+            show_scrollbar=self._app_settings.tui.show_scrollbar,
+            queue_inputs=self._app_settings.tui.queue_inputs,
         )
 
         # Initialize layout
         self.layout = TUILayout(self.state)
-        self.layout.renderer.set_theme(self._settings.theme)
+        self.layout.renderer.set_theme(self._app_settings.tui.theme)
 
         # Application instance (created on run)
         self._app: Application | None = None
@@ -93,7 +97,7 @@ class KodaTuiApp:
         self._palette_manager = PaletteManager(
             layout=self.layout,
             state=self.state,
-            settings=self._settings,
+            app_settings=self._app_settings,
             service=self._service,
             invalidate=self.invalidate,
             cancel_streaming=self.cancel_streaming,
@@ -110,7 +114,7 @@ class KodaTuiApp:
         app = _KodaApplication(
             layout=self.layout.create_layout(),
             key_bindings=create_keybindings(self),
-            style=get_style(self._settings.theme),
+            style=get_style(self._app_settings.tui.theme),
             full_screen=True,
             mouse_support=True,
             output=synced_output,
@@ -135,21 +139,21 @@ class KodaTuiApp:
     def _apply_service_setting_changes(self, change_names: set[str]) -> bool:
         if not self._has_service_change(change_names):
             return False
-        self._service.update_settings(self._settings)
+        self._service.update_settings(self._app_settings.core)
         self._refresh_service_state()
         return True
 
     def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
         should_invalidate = False
         if "show_scrollbar" in change_names:
-            self.state.show_scrollbar = self._settings.show_scrollbar
+            self.state.show_scrollbar = self._app_settings.tui.show_scrollbar
             should_invalidate = True
         if "queue_inputs" in change_names:
-            self.state.queue_inputs = self._settings.queue_inputs
+            self.state.queue_inputs = self._app_settings.tui.queue_inputs
             should_invalidate = True
         if "theme" in change_names and self._app:
-            self._app.style = get_style(self._settings.theme)
-            self.layout.renderer.set_theme(self._settings.theme)
+            self._app.style = get_style(self._app_settings.tui.theme)
+            self.layout.renderer.set_theme(self._app_settings.tui.theme)
             should_invalidate = True
         return should_invalidate
 
@@ -160,6 +164,12 @@ class KodaTuiApp:
         if self._apply_ui_setting_changes(change_names):
             should_invalidate = True
         if should_invalidate:
+            self.invalidate()
+
+    def _on_tui_settings_changed(self, changes: tuple[SettingChange, ...]) -> None:
+        """Handle committed TUI-only settings changes."""
+        change_names = {change.name for change in changes}
+        if self._apply_ui_setting_changes(change_names):
             self.invalidate()
 
     def _on_exit_timeout(self) -> None:
@@ -188,31 +198,33 @@ class KodaTuiApp:
             self._app.invalidate()
 
     @property
-    def settings(self) -> SettingsManager:
-        return self._settings
+    def app_settings(self) -> AppSettings:
+        return self._app_settings
 
     @property
     def service(self) -> KodaService:
         return self._service
 
     def _refresh_service_state(self) -> None:
-        self.state.provider_name = self._settings.provider
-        self.state.model_name = self._settings.model
+        self.state.provider_name = self._app_settings.core.provider
+        self.state.model_name = self._app_settings.core.model
         self.state.service_status = self._service.ready()
 
         active_model = None
         if (
             self.state.service_status.is_ready
-            and self._settings.provider is not None
-            and self._settings.model is not None
+            and self._app_settings.core.provider is not None
+            and self._app_settings.core.model is not None
         ):
             active_model = find_model(
-                self._service.list_models(self._settings.provider),
-                provider=self._settings.provider,
-                model_id=self._settings.model,
+                self._service.list_models(self._app_settings.core.provider),
+                provider=self._app_settings.core.provider,
+                model_id=self._app_settings.core.model,
             )
 
-        self.state.thinking = resolve_thinking_option(active_model, self._settings.thinking)
+        self.state.thinking = resolve_thinking_option(
+            active_model, self._app_settings.core.thinking
+        )
         self.state.context_window = active_model.context_window if active_model else None
         self.state.thinking_supported = supports_thinking(active_model)
 
@@ -234,7 +246,7 @@ class KodaTuiApp:
         self._stream_processor.cancel_stream()
 
     def cycle_thinking(self, options: list[ThinkingOptionId]):
-        return actions.cycle_thinking(options, self._settings)
+        return actions.cycle_thinking(options, self._app_settings.core)
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""
@@ -250,7 +262,8 @@ class KodaTuiApp:
         if self._closed:
             return
         self._closed = True
-        self._unsubscribe()
+        self._unsubscribe_settings()
+        self._unsubscribe_tui_settings()
 
     async def run(self) -> None:
         """Start the TUI application."""
