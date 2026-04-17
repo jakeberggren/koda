@@ -3,61 +3,35 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from koda_common.logging import get_logger
-from koda_tui import actions
 from koda_tui.ui.palette.commands.command import Command
-from koda_tui.utils.model_selection import find_model, supported_thinking_options
 
 if TYPE_CHECKING:
-    from koda_common.settings import SettingsManager
-    from koda_service import KodaService
-    from koda_service.types import ThinkingOption
-    from koda_tui.ui.palette.palette_manager import PaletteManager
+    from collections.abc import Callable
 
-log = get_logger(__name__)
+    from koda_service.types import ThinkingOption, ThinkingOptionId
 
 
-def _format_label(option: ThinkingOption, settings: SettingsManager) -> str:
+def _format_label(option: ThinkingOption, active_thinking: ThinkingOptionId) -> str:
+    """Format a thinking option label with active status."""
+
     label = option.label
-    if settings.thinking == option.id:
+    if active_thinking == option.id:
         label += " [active]"
     return label
 
 
-def _set_thinking(
-    option: ThinkingOption,
-    settings: SettingsManager,
-    palette_manager: PaletteManager,
-) -> None:
-    result = actions.set_thinking(option.id, settings)
-    if not result.ok:
-        log.warning("cmd_set_thinking_failed", thinking=option.id, error=result.error)
-        return
-    palette_manager.close_all()
-
-
-def _get_supported_thinking_options(
-    catalog_service: KodaService,
-    settings: SettingsManager,
-) -> list[ThinkingOption]:
-    active_model = find_model(
-        catalog_service.list_models(settings.provider),
-        provider=settings.provider,
-        model_id=settings.model,
-    )
-    return supported_thinking_options(active_model)
-
-
 def get_commands(
-    catalog_service: KodaService,
-    settings: SettingsManager,
-    palette_manager: PaletteManager,
+    options: list[ThinkingOption],
+    active_thinking: ThinkingOptionId,
+    on_select: Callable[[ThinkingOptionId], None],
 ) -> list[Command]:
+    """Build commands for the thinking selection palette."""
+
     return [
         Command(
-            label=_format_label(option, settings),
-            handler=partial(_set_thinking, option, settings, palette_manager),
+            label=_format_label(option, active_thinking),
+            handler=partial(on_select, option.id),
             description=option.description or "Select model reasoning effort",
         )
-        for option in _get_supported_thinking_options(catalog_service, settings)
+        for option in options
     ]

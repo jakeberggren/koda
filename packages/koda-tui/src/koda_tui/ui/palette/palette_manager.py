@@ -9,7 +9,6 @@ from prompt_toolkit.layout import Float
 
 from koda_tui.ui.palette.api_key_dialog import ApiKeyDialog
 from koda_tui.ui.palette.command_palette import CommandPalette, PaletteOptions
-from koda_tui.ui.palette.commands.commands import get_commands
 from koda_tui.ui.palette.confirm_dialog import ConfirmDialog
 
 if TYPE_CHECKING:
@@ -18,8 +17,6 @@ if TYPE_CHECKING:
     from prompt_toolkit import Application
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-    from koda_service import KodaService
-    from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
     from koda_tui.ui.layout import TUILayout
     from koda_tui.ui.palette.commands.command import Command
@@ -28,22 +25,16 @@ if TYPE_CHECKING:
 class PaletteManager:
     """Manages a stack of floating overlays (palettes, dialogs)."""
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         layout: TUILayout,
         state: AppState,
-        app_settings: AppSettings,
-        service: KodaService,
         invalidate: Callable[[], None],
-        cancel_streaming: Callable[[], None],
     ) -> None:
         self._app: Application[Any] | None = None
         self._layout = layout
         self._state = state
-        self._app_settings = app_settings
-        self._service = service
         self._invalidate = invalidate
-        self._cancel_streaming = cancel_streaming
         self._stack: list[tuple[Any, Float]] = []
 
     def set_app(self, app: Application[Any]) -> None:
@@ -82,16 +73,6 @@ class PaletteManager:
         self._stack.append((content, float_item))
         self._focus_content(content)
 
-    def _get_default_commands(self) -> list[Command]:
-        """Build the default root command list."""
-        return get_commands(
-            service=self._service,
-            app_settings=self._app_settings,
-            state=self._state,
-            palette_manager=self,
-            cancel_streaming=self._cancel_streaming,
-        )
-
     @staticmethod
     def _get_terminal_size() -> tuple[int, int]:
         """Return terminal width and height using a safe fallback."""
@@ -103,14 +84,6 @@ class PaletteManager:
         width = max(60, min(80, term_width // 2))
         height = max(5, min(20, term_height // 2))
         return width, height
-
-    def toggle(self) -> None:
-        """Toggle command palette visibility."""
-        if self._is_open:
-            self.close_all()
-        else:
-            commands = self._get_default_commands()
-            self.open_palette(commands)
 
     def open_palette(
         self,

@@ -14,6 +14,7 @@ from koda_tui.app.streaming import StreamProcessor
 from koda_tui.state import AppState
 from koda_tui.ui.layout import TUILayout
 from koda_tui.ui.palette import PaletteManager
+from koda_tui.ui.palette.commands.commands import get_commands
 from koda_tui.ui.styles import get_style
 from koda_tui.utils.model_selection import find_model, resolve_thinking_option, supports_thinking
 
@@ -97,10 +98,7 @@ class KodaTuiApp:
         self._palette_manager = PaletteManager(
             layout=self.layout,
             state=self.state,
-            app_settings=self._app_settings,
-            service=self._service,
             invalidate=self.invalidate,
-            cancel_streaming=self.cancel_streaming,
         )
         self._refresh_service_state()
 
@@ -250,7 +248,18 @@ class KodaTuiApp:
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""
-        self._palette_manager.toggle()
+        if self.state.palette_open:
+            self._palette_manager.close_all()
+            return
+
+        commands = get_commands(
+            service=self._service,
+            app_settings=self._app_settings,
+            state=self.state,
+            palette_manager=self._palette_manager,
+            cancel_streaming=self.cancel_streaming,
+        )
+        self._palette_manager.open_palette(commands)
 
     def exit(self) -> None:
         """Exit the application."""
