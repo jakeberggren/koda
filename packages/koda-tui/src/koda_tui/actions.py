@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
-from koda_service.exceptions import ServiceNoActiveSessionError, ServiceSessionNotFoundError
+from koda_service.exceptions import ServiceSessionNotFoundError
 from koda_tui.converters import convert_messages
 from koda_tui.utils.model_selection import normalize_thinking_option, supported_thinking_options
 
@@ -53,12 +53,9 @@ def new_session(
     state: AppState,
 ) -> ActionResult[None]:
     """Create a new session and reset conversation state."""
-    try:
-        service.new_session()
-        state.reset_conversation()
-        return ActionResult(ok=True)
-    except ServiceNoActiveSessionError:
-        return ActionResult(ok=False, error="No active session available")
+    service.new_session()
+    state.reset_conversation()
+    return ActionResult(ok=True)
 
 
 def switch_session(
@@ -88,11 +85,15 @@ def delete_session(
 ) -> ActionResult[DeleteSessionPayload]:
     """Delete a session and clear state if the active session was removed."""
     try:
-        new_active = service.delete_session(session_id)
-        if new_active is None:
-            return ActionResult(ok=True, payload=DeleteSessionPayload(removed_active_session=False))
-        state.reset_conversation()
-        return ActionResult(ok=True, payload=DeleteSessionPayload(removed_active_session=True))
+        active = service.active_session()
+        removed_active = active is not None and active.session_id == session_id
+        service.delete_session(session_id)
+        if removed_active:
+            state.reset_conversation()
+        return ActionResult(
+            ok=True,
+            payload=DeleteSessionPayload(removed_active_session=removed_active),
+        )
     except ServiceSessionNotFoundError:
         return ActionResult(ok=False, error="Session not found")
 

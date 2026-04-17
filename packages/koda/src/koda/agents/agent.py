@@ -91,6 +91,13 @@ class Agent:
 
         logger.info("agent_initialized", llm=type(llm).__name__)
 
+    def _ensure_active_session_id(self) -> UUID:
+        """Return the active session id, creating a session when needed."""
+        session = self._session_manager.active_session
+        if session is not None:
+            return session.session_id
+        return self._session_manager.create_session().session_id
+
     def _append_message(self, session_id: UUID, message: SessionMessage) -> None:
         """Append a message to the session."""
         self._session_manager.append_message(session_id, message)
@@ -265,7 +272,7 @@ class Agent:
             logger.warning("run_called_with_empty_message")
             raise llm_exceptions.EmptyMessageError
 
-        session_id = self._session_manager.active_session.session_id
+        session_id = self._ensure_active_session_id()
         self._append_message(session_id, UserMessage(content=user_text.strip()))
 
         tool_definitions = self.tools.registry.get_definitions() if self.tools else None
@@ -289,7 +296,7 @@ class Agent:
         raise tool_exceptions.MaxIterationsExceededError(self._config.max_tool_iterations)
 
     @property
-    def active_session(self) -> Session:
+    def active_session(self) -> Session | None:
         return self._session_manager.active_session
 
     def new_session(self) -> Session:
@@ -301,6 +308,6 @@ class Agent:
     def switch_session(self, session_id: UUID) -> Session:
         return self._session_manager.switch_session(session_id)
 
-    def delete_session(self, session_id: UUID) -> Session | None:
-        """Delete a session. Returns the new active session if the deleted one was active."""
-        return self._session_manager.delete_session(session_id)
+    def delete_session(self, session_id: UUID) -> None:
+        """Delete a session."""
+        self._session_manager.delete_session(session_id)

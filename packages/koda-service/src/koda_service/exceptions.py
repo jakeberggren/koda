@@ -75,10 +75,6 @@ class ServiceSessionNotFoundError(ServiceSessionError):
     """Raised when a requested session does not exist."""
 
 
-class ServiceNoActiveSessionError(ServiceSessionError):
-    """Raised when no active session is available."""
-
-
 class StartupError(KodaServiceError):
     """Base class for user-fixable startup failures."""
 

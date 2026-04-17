@@ -42,11 +42,11 @@ def open_session_list(
     palette_manager.open_palette(commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
 
 
-def _format_session_label(session: SessionInfo, active_session: SessionInfo) -> str:
+def _format_session_label(session: SessionInfo, active_session: SessionInfo | None) -> str:
     """Format session label with timestamp, message count, and active status."""
     timestamp = session.created_at.strftime("%Y-%m-%d")
     label = f"{session.name}  [{timestamp}] ({session.message_count} messages)"
-    if session.session_id == active_session.session_id:
+    if active_session is not None and session.session_id == active_session.session_id:
         label += " [active]"
     return label
 
