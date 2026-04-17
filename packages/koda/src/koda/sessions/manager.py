@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda.sessions.exceptions import NoActiveSessionError
-
 if TYPE_CHECKING:
     from uuid import UUID
 
@@ -19,10 +17,10 @@ class SessionManager:
         self._active_session_id: UUID | None = None
 
     @property
-    def active_session(self) -> Session:
-        """Get the currently active session."""
+    def active_session(self) -> Session | None:
+        """Get the currently active session, if any."""
         if self._active_session_id is None:
-            raise NoActiveSessionError
+            return None
         return self._store.get_session(self._active_session_id)
 
     def _cleanup_empty_active(self) -> None:
@@ -32,6 +30,7 @@ class SessionManager:
         session = self._store.get_session(self._active_session_id)
         if not session.messages:
             self._store.delete_session(self._active_session_id)
+            self._active_session_id = None
 
     def create_session(self) -> Session:
         """Create a new session and set it as active."""
@@ -64,11 +63,9 @@ class SessionManager:
         """Append a message to a session."""
         return self._store.append_message(session_id, message)
 
-    def delete_session(self, session_id: UUID) -> Session | None:
-        """Delete a session. Returns the new active session if the deleted one was active."""
+    def delete_session(self, session_id: UUID) -> None:
+        """Delete a session. Clears the active session when it is removed."""
         is_active = session_id == self._active_session_id
         self._store.delete_session(session_id)
         if is_active:
             self._active_session_id = None
-            return self.create_session()
-        return None

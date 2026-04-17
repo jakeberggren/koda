@@ -5,12 +5,7 @@ import uuid
 import pytest
 
 from koda.messages import UserMessage
-from koda.sessions import (
-    InMemorySessionStore,
-    NoActiveSessionError,
-    SessionManager,
-    SessionNotFoundError,
-)
+from koda.sessions import InMemorySessionStore, SessionManager, SessionNotFoundError
 
 
 @pytest.fixture
@@ -24,23 +19,26 @@ def _add_message(manager: SessionManager, session_id: uuid.UUID) -> None:
 
 
 class TestSessionManager:
-    def test_active_session_raises_when_none(self, manager: SessionManager) -> None:
-        with pytest.raises(NoActiveSessionError):
-            _ = manager.active_session
+    def test_active_session_returns_none_when_absent(self, manager: SessionManager) -> None:
+        assert manager.active_session is None
 
     def test_create_session_sets_active(self, manager: SessionManager) -> None:
         session = manager.create_session()
+        active = manager.active_session
 
-        assert manager.active_session.session_id == session.session_id
+        assert active is not None
+        assert active.session_id == session.session_id
 
     def test_create_session_updates_active(self, manager: SessionManager) -> None:
         first = manager.create_session()
         _add_message(manager, first.session_id)
 
         second = manager.create_session()
+        active = manager.active_session
 
-        assert manager.active_session.session_id == second.session_id
-        assert manager.active_session.session_id != first.session_id
+        assert active is not None
+        assert active.session_id == second.session_id
+        assert active.session_id != first.session_id
 
     def test_switch_session(self, manager: SessionManager) -> None:
         first = manager.create_session()
@@ -49,23 +47,24 @@ class TestSessionManager:
         _add_message(manager, second.session_id)
 
         result = manager.switch_session(first.session_id)
+        active = manager.active_session
 
         assert result.session_id == first.session_id
-        assert manager.active_session.session_id == first.session_id
+        assert active is not None
+        assert active.session_id == first.session_id
 
     def test_switch_session_not_found(self, manager: SessionManager) -> None:
         with pytest.raises(SessionNotFoundError):
             manager.switch_session(uuid.uuid4())
 
-    def test_delete_active_session_creates_new(self, manager: SessionManager) -> None:
+    def test_delete_active_session_clears_active(self, manager: SessionManager) -> None:
         session = manager.create_session()
         _add_message(manager, session.session_id)
 
-        new_session = manager.delete_session(session.session_id)
+        result = manager.delete_session(session.session_id)
 
-        assert new_session is not None
-        assert new_session.session_id != session.session_id
-        assert manager.active_session.session_id == new_session.session_id
+        assert result is None
+        assert manager.active_session is None
 
     def test_delete_inactive_session(self, manager: SessionManager) -> None:
         first = manager.create_session()
@@ -78,6 +77,14 @@ class TestSessionManager:
         assert result is None
         session_ids = {s.session_id for s in manager.list_sessions()}
         assert first.session_id not in session_ids
+
+    def test_delete_last_session_leaves_no_sessions(self, manager: SessionManager) -> None:
+        session = manager.create_session()
+
+        manager.delete_session(session.session_id)
+
+        assert manager.list_sessions() == []
+        assert manager.active_session is None
 
     def test_list_sessions_delegates(self, manager: SessionManager) -> None:
         first = manager.create_session()

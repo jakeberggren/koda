@@ -42,8 +42,8 @@ class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):
         """List models for currently connected providers."""
         ...
 
-    def active_session(self) -> SessionInfo:
-        """Get the currently active session."""
+    def active_session(self) -> SessionInfo | None:
+        """Get the currently active session, if any."""
         ...
 
     def list_sessions(self) -> list[SessionInfo]:
@@ -58,6 +58,6 @@ class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):
         """Switch to a different session. Returns session info and messages."""
         ...
 
-    def delete_session(self, session_id: UUID) -> SessionInfo | None:
-        """Delete a session. Returns the new active session if the deleted one was active."""
+    def delete_session(self, session_id: UUID) -> None:
+        """Delete a session."""
         ...

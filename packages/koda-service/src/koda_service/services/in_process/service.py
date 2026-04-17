@@ -4,19 +4,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from koda.llm import exceptions as llm_exceptions
-from koda.sessions import (
-    JsonSessionStore,
-    NoActiveSessionError,
-    SessionManager,
-    SessionNotFoundError,
-)
+from koda.sessions import JsonSessionStore, SessionManager, SessionNotFoundError
 from koda.tools import exceptions as tool_exceptions
 from koda_common.settings import SecretsLoadError, SettingsManager
 from koda_service.exceptions import (
     ServiceAuthenticationError,
     ServiceChatError,
     ServiceConnectionError,
-    ServiceNoActiveSessionError,
     ServiceNotReadyError,
     ServiceProviderError,
     ServiceRateLimitError,
@@ -92,7 +86,6 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         self._agent_config = agent_config
         self._model_registry, self._provider_registry = build_registries()
         self._session_manager = SessionManager(session_store or JsonSessionStore())
-        self._session_manager.create_session()
         self._agent: Agent | None = None
 
         if telemetry is not None:
@@ -323,12 +316,12 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
             map_model_definition_to_contract_model_definition(model) for model in selectable_models
         ]
 
-    def active_session(self) -> SessionInfo:
-        """Get the currently active session."""
-        try:
-            return map_session_to_session_info(self._session_manager.active_session)
-        except NoActiveSessionError as error:
-            raise ServiceNoActiveSessionError from error
+    def active_session(self) -> SessionInfo | None:
+        """Get the currently active session, if any."""
+        session = self._session_manager.active_session
+        if session is None:
+            return None
+        return map_session_to_session_info(session)
 
     def list_sessions(self) -> list[SessionInfo]:
         """List available sessions."""
@@ -351,12 +344,9 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
             map_messages_to_contract_messages(session.messages),
         )
 
-    def delete_session(self, session_id: UUID) -> SessionInfo | None:
-        """Delete a session and return the new active session when it changes."""
+    def delete_session(self, session_id: UUID) -> None:
+        """Delete a session."""
         try:
-            session = self._session_manager.delete_session(session_id)
+            self._session_manager.delete_session(session_id)
         except SessionNotFoundError as error:
             raise ServiceSessionNotFoundError from error
-        if session is None:
-            return None
-        return map_session_to_session_info(session)
