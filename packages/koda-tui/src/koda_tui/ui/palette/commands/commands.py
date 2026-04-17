@@ -15,8 +15,8 @@ from koda_tui.ui.palette.commands.command import Command
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_common.settings import SettingsManager
     from koda_service import KodaService
+    from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
 
@@ -31,7 +31,7 @@ def _has_connected_provider(
 
 def get_commands(  # noqa: C901 - palette root assembly is intentionally centralized
     service: KodaService,
-    settings: SettingsManager,
+    app_settings: AppSettings,
     state: AppState,
     palette_manager: PaletteManager,
     cancel_streaming: Callable[[], None],
@@ -41,7 +41,7 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
     def cmd_connect_provider() -> None:
         commands = provider_commands.get_commands(
             catalog_service=service,
-            settings=settings,
+            settings=app_settings.core,
             palette_manager=palette_manager,
         )
         palette_manager.open_palette(commands)
@@ -49,7 +49,7 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
     def cmd_switch_model() -> None:
         commands = model_commands.get_commands(
             catalog_service=service,
-            settings=settings,
+            settings=app_settings.core,
             palette_manager=palette_manager,
         )
         palette_manager.open_palette(commands)
@@ -57,13 +57,13 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
     def cmd_set_thinking() -> None:
         commands = thinking_commands.get_commands(
             catalog_service=service,
-            settings=settings,
+            settings=app_settings.core,
             palette_manager=palette_manager,
         )
         palette_manager.open_palette(commands)
 
     def cmd_toggle_theme() -> None:
-        result = actions.toggle_theme(settings)
+        result = actions.toggle_theme(app_settings.tui)
         if not result.ok:
             log.warning("cmd_toggle_theme_failed", error=result.error)
             # TODO: surface action errors in the palette/status UI.
@@ -71,7 +71,7 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
         palette_manager.close_all()
 
     def cmd_toggle_scrollbar() -> None:
-        result = actions.toggle_scrollbar(settings)
+        result = actions.toggle_scrollbar(app_settings.tui)
         if not result.ok:
             log.warning("cmd_toggle_scrollbar_failed", error=result.error)
             # TODO: surface action errors in the palette/status UI.
@@ -79,7 +79,7 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
         palette_manager.close_all()
 
     def cmd_toggle_queue_inputs() -> None:
-        result = actions.toggle_queue_inputs(settings)
+        result = actions.toggle_queue_inputs(app_settings.tui)
         if not result.ok:
             log.warning("cmd_toggle_queue_inputs_failed", error=result.error)
             # TODO: surface action errors in the palette/status UI.

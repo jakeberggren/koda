@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from prompt_toolkit import Application
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-    from koda_common.settings import SettingsManager
     from koda_service import KodaService
+    from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
     from koda_tui.ui.layout import TUILayout
     from koda_tui.ui.palette.commands.command import Command
@@ -32,7 +32,7 @@ class PaletteManager:
         self,
         layout: TUILayout,
         state: AppState,
-        settings: SettingsManager,
+        app_settings: AppSettings,
         service: KodaService,
         invalidate: Callable[[], None],
         cancel_streaming: Callable[[], None],
@@ -40,7 +40,7 @@ class PaletteManager:
         self._app: Application[Any] | None = None
         self._layout = layout
         self._state = state
-        self._settings = settings
+        self._app_settings = app_settings
         self._service = service
         self._invalidate = invalidate
         self._cancel_streaming = cancel_streaming
@@ -86,7 +86,7 @@ class PaletteManager:
         """Build the default root command list."""
         return get_commands(
             service=self._service,
-            settings=self._settings,
+            app_settings=self._app_settings,
             state=self._state,
             palette_manager=self,
             cancel_streaming=self._cancel_streaming,

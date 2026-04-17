@@ -9,6 +9,7 @@ from koda_common.settings import SettingChange
 from koda_service import ServiceStatus
 from koda_service.types import ModelDefinition, ThinkingOption
 from koda_tui.app.application import KodaTuiApp
+from koda_tui.settings import AppSettings
 from koda_tui.ui.palette.palette_manager import PaletteManager
 
 
@@ -19,14 +20,24 @@ def _make_settings_mock(unsubscribe: Mock) -> Mock:
             "provider",
             "model",
             "thinking",
-            "show_scrollbar",
-            "queue_inputs",
-            "theme",
         ]
     )
     settings.provider = "openai"
     settings.model = "gpt-5.2"
     settings.thinking = "none"
+    settings.subscribe.return_value = unsubscribe
+    return settings
+
+
+def _make_tui_settings_mock(unsubscribe: Mock) -> Mock:
+    settings = Mock(
+        spec=[
+            "subscribe",
+            "show_scrollbar",
+            "queue_inputs",
+            "theme",
+        ]
+    )
     settings.show_scrollbar = True
     settings.queue_inputs = True
     settings.theme = "dark"
@@ -34,9 +45,11 @@ def _make_settings_mock(unsubscribe: Mock) -> Mock:
     return settings
 
 
-def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
-    unsubscribe = Mock()
-    settings = _make_settings_mock(unsubscribe)
+def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
+    unsubscribe_settings = Mock()
+    unsubscribe_tui_settings = Mock()
+    settings = _make_settings_mock(unsubscribe_settings)
+    tui_settings = _make_tui_settings_mock(unsubscribe_tui_settings)
     service = Mock(
         spec=[
             "ready",
@@ -64,22 +77,23 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock]:
     ]
     service.ready.return_value = ServiceStatus(is_ready=True, summary="Ready")
     app = KodaTuiApp(
-        settings=settings,
+        app_settings=AppSettings(core=settings, tui=tui_settings),
         service=service,
         workspace_root=Path("/workspace"),
     )
-    return (app, settings, service, unsubscribe)
+    return (app, settings, tui_settings, service, unsubscribe_settings, unsubscribe_tui_settings)
 
 
 def test_close_is_idempotent() -> None:
-    app, _settings, _service, unsubscribe = _make_app()
+    app, _settings, _tui_settings, _service, unsubscribe, unsubscribe_tui = _make_app()
     app.close()
     app.close()
     unsubscribe.assert_called_once_with()
+    unsubscribe_tui.assert_called_once_with()
 
 
 def test_batched_provider_and_model_changes_update_app_state() -> None:
-    app, settings, service, _unsubscribe = _make_app()
+    app, settings, _tui_settings, service, _unsubscribe, _unsubscribe_tui = _make_app()
     settings.provider = "bergetai"
     settings.model = "zai-org/GLM-4.7"
     service.list_models.return_value = [
@@ -109,7 +123,7 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
 
 @pytest.mark.asyncio
 async def test_run_always_closes(monkeypatch: pytest.MonkeyPatch) -> None:
-    app, _settings, _service, unsubscribe = _make_app()
+    app, _settings, _tui_settings, _service, unsubscribe, unsubscribe_tui = _make_app()
 
     class _FakeApp:
         async def run_async(self) -> None:
@@ -128,3 +142,4 @@ async def test_run_always_closes(monkeypatch: pytest.MonkeyPatch) -> None:
         await app.run()
 
     unsubscribe.assert_called_once_with()
+    unsubscribe_tui.assert_called_once_with()

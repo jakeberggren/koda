@@ -1,25 +1,36 @@
-from typing import Literal
+from __future__ import annotations
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import AliasChoices, AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 type ThinkingOptionId = str
 
 
-class Settings(BaseModel):
-    """User preferences (persisted to JSON)."""
+class Settings(BaseSettings):
+    """Validated shared runtime settings with env precedence over persisted values."""
 
-    model_config = ConfigDict(validate_assignment=True)
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
+    )
 
-    provider: str | None = Field(default=None, description="LLM provider")
-    model: str | None = Field(default=None, description="Model name")
+    provider: str | None = Field(
+        default=None,
+        description="LLM provider",
+        validation_alias=AliasChoices("provider", "KODA_PROVIDER"),
+    )
+    model: str | None = Field(
+        default=None,
+        description="Model name",
+        validation_alias=AliasChoices("model", "KODA_MODEL"),
+    )
     thinking: ThinkingOptionId = Field(
         default="none",
         description="Model thinking effort for supported reasoning models.",
+        validation_alias=AliasChoices("thinking", "KODA_THINKING"),
     )
-    theme: Literal["dark", "light"] = Field(default="dark", description="UI theme")
-    show_scrollbar: bool = Field(default=True, description="Show chat scrollbar")
-    queue_inputs: bool = Field(default=True, description="Queue inputs during streaming")
     allow_web_search: bool = Field(
         default=False,
         description=(
@@ -27,6 +38,7 @@ class Settings(BaseModel):
             "freshness and factual grounding for time-sensitive questions, but can increase "
             "latency and send search queries to external services."
         ),
+        validation_alias=AliasChoices("allow_web_search", "KODA_ALLOW_WEB_SEARCH"),
     )
     allow_extended_prompt_retention: bool = Field(
         default=False,
@@ -36,66 +48,36 @@ class Settings(BaseModel):
             "prompt data beyond ephemeral processing and is not compatible with Zero "
             "Data Retention (ZDR) requirements."
         ),
-    )
-
-
-class EnvSettings(BaseSettings):
-    """Environment variables for settings overrides, API keys, and runtime flags.
-
-    Setting overrides (T | None, None = don't override):
-    - KODA_<field> maps to Settings.<field> (auto-mapped)
-
-    API keys (override stored secrets):
-    - <PROVIDER>_API_KEY -> cached for provider
-
-    Flags (T with default, not persisted):
-    - Runtime behavior flags
-    """
-
-    # Setting overrides (KODA_<field> -> <field>, None = don't override)
-    koda_provider: str | None = Field(default=None, description="LLM provider")
-    koda_model: str | None = Field(default=None, description="Model name")
-    koda_thinking: ThinkingOptionId | None = Field(
-        default=None,
-        description="Model thinking effort for supported reasoning models.",
-    )
-    koda_allow_web_search: bool | None = Field(
-        default=None,
-        description=(
-            "Allow supported models to use web search when available. This may improve "
-            "freshness and factual grounding for time-sensitive questions, but can increase "
-            "latency and send search queries to external services."
+        validation_alias=AliasChoices(
+            "allow_extended_prompt_retention",
+            "KODA_ALLOW_EXTENDED_PROMPT_RETENTION",
         ),
     )
-    koda_allow_extended_prompt_retention: bool | None = Field(
-        default=None,
-        description=(
-            "Allow supported providers to use extended prompt retention to improve cache "
-            "hit rates, reduce token usage, and lower costs. Enabling this may store "
-            "prompt data beyond ephemeral processing and is not compatible with Zero "
-            "Data Retention (ZDR) requirements."
-        ),
-    )
-
-    # API keys (override stored secrets, cached in manager)
-    openai_api_key: SecretStr | None = Field(default=None, description="OpenAI API key")
-    anthropic_api_key: SecretStr | None = Field(default=None, description="Anthropic API key")
-    bergetai_api_key: SecretStr | None = Field(default=None, description="BergetAI API key")
-
-    # Flags
-    koda_service: Literal["in_process"] = Field(
-        default="in_process",
-        description="Koda Service boundary selection for Koda clients",
-    )
-
-    # Telemetry
     langfuse_tracing_enabled: bool = Field(default=True, description="Enable telemetry")
     langfuse_secret_key: SecretStr | None = Field(default=None, description="Langfuse secret key")
     langfuse_public_key: str | None = Field(default=None, description="Langfuse public key")
     langfuse_base_url: AnyHttpUrl | None = Field(default=None, description="Langfuse base URL")
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        del settings_cls
+        return (env_settings, dotenv_settings, init_settings, file_secret_settings)
+
+
+class PersistedSettings(BaseModel):
+    """Persisted subset of shared runtime settings stored in the JSON config."""
+
+    model_config = ConfigDict(validate_assignment=True)
+
+    provider: str | None = None
+    model: str | None = None
+    thinking: ThinkingOptionId = "none"
+    allow_web_search: bool = False
+    allow_extended_prompt_retention: bool = False

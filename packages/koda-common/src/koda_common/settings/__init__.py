@@ -5,33 +5,52 @@ from koda_common.settings.errors import (
     SettingsDecodeError,
     SettingsLoadError,
     SettingsPermissionError,
+    SettingsStructureError,
     SettingsUnknownKeysError,
     SettingsValidationError,
 )
-from koda_common.settings.manager import SettingChange, SettingsManager
-from koda_common.settings.settings import EnvSettings, Settings
+from koda_common.settings.manager import (
+    BaseSettingsManager,
+    SettingsManager,
+)
+from koda_common.settings.protocols import (
+    JsonObject,
+    SecretsStore,
+    SettingChange,
+    SettingsChangeCallback,
+    SettingsChangeSet,
+    SettingsManagerProtocol,
+    SettingsStore,
+)
+from koda_common.settings.settings import PersistedSettings, Settings
 from koda_common.settings.store import (
     JsonFileSecretsStore,
     JsonFileSettingsStore,
-    SecretsStore,
-    SettingsStore,
 )
+from koda_common.settings.utils import provider_api_key_env_var
 
 __all__ = [
-    "EnvSettings",
+    "BaseSettingsManager",
     "JsonFileSecretsStore",
     "JsonFileSettingsStore",
+    "JsonObject",
+    "PersistedSettings",
     "SecretsDecodeError",
     "SecretsLoadError",
     "SecretsPermissionError",
     "SecretsStore",
     "SettingChange",
     "Settings",
+    "SettingsChangeCallback",
+    "SettingsChangeSet",
     "SettingsDecodeError",
     "SettingsLoadError",
     "SettingsManager",
+    "SettingsManagerProtocol",
     "SettingsPermissionError",
     "SettingsStore",
+    "SettingsStructureError",
     "SettingsUnknownKeysError",
     "SettingsValidationError",
+    "provider_api_key_env_var",
 ]
