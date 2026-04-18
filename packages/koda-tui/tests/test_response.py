@@ -58,7 +58,11 @@ class TestResponseLifecycle:
         assert len(state.messages) == expected_messages
         assert state.messages[1].tool_running is True
 
-        lifecycle.complete_tool(call_id="c1", display="ok")
+        lifecycle.complete_tool(
+            call_id="c1",
+            display="ok",
+            content={"stdout": "hello", "stderr": "", "exit_code": 0},
+        )
 
         assert state.active_tools == {}
         assert state.is_thinking is False
@@ -66,6 +70,11 @@ class TestResponseLifecycle:
         assert state.messages[1].tool_running is False
         assert state.messages[1].tool_error is False
         assert state.messages[1].tool_result_display == "ok"
+        assert state.messages[1].tool_result_content == {
+            "stdout": "hello",
+            "stderr": "",
+            "exit_code": 0,
+        }
         assert state.messages[1].tool_error_message is None
 
         lifecycle.end()

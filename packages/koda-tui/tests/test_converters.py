@@ -20,12 +20,18 @@ def _make_tool_result(
     call_id: str = "call_1",
     display: str | None = "result",
     *,
+    content: dict[str, object] | None = None,
     is_error: bool = False,
     error_message: str | None = None,
 ) -> ToolResult:
     return ToolResult(
         call_id=call_id,
-        output=ToolOutput(display=display, is_error=is_error, error_message=error_message),
+        output=ToolOutput(
+            content={} if content is None else content,
+            display=display,
+            is_error=is_error,
+            error_message=error_message,
+        ),
     )
 
 
@@ -112,6 +118,7 @@ class TestConvertMessages:
         assert tool_msg.tool_call == tc
         assert tool_msg.tool_running is False
         assert tool_msg.tool_result_display == "found it"
+        assert tool_msg.tool_result_content == {}
         assert tool_msg.tool_error is False
         assert usage is None
         assert total_usage is None

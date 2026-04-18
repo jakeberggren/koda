@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
+from typing import Any
 
 from koda_service import ServiceStatus
 from koda_service.types import ThinkingOption, ToolCall
@@ -34,6 +35,7 @@ class Message:
     tool_running: bool = False
     tool_error: bool = False
     tool_result_display: str | None = None
+    tool_result_content: dict[str, Any] | None = None
     tool_error_message: str | None = None
 
 
