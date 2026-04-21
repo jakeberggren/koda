@@ -7,22 +7,29 @@ from pathlib import Path
 
 import pytest
 
+from koda.execution.host import HostCommandExecutor
 from koda.tools import (
-    FileCoordinator,
     ToolCall,
     ToolContext,
+    ToolExecutionCoordinator,
     ToolExecutor,
     ToolRegistry,
     get_builtin_tools,
 )
+from koda.tools.builtins.bash import BASH_MAX_OUTPUT_CHARS
 from koda.tools.policy import ToolPolicy
+
+
+class _FakeSettings:
+    bash_execution_sandbox = "host"
 
 
 def _tool_context(sandbox_dir: Path) -> ToolContext:
     return ToolContext(
         cwd=sandbox_dir,
         policy=ToolPolicy.create(sandbox_dir),
-        files=FileCoordinator(),
+        coordinator=ToolExecutionCoordinator(),
+        executor=HostCommandExecutor(_FakeSettings()),
     )
 
 
@@ -1074,6 +1081,52 @@ class TestBashTool:
         assert result.output.is_error is True
         assert result.output.error_message is not None
         assert "timed out" in result.output.error_message
+
+    @bash_required
+    @pytest.mark.asyncio
+    async def test_bash_truncates_large_stdout_and_marks_it(self, sandbox_dir: Path) -> None:
+        """bash tool should truncate large stdout persisted in tool output."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        oversized = BASH_MAX_OUTPUT_CHARS + 100
+        call = ToolCall(
+            tool_name="bash",
+            arguments={"command": f"python -c \"print('x' * {oversized}, end='')\""},
+            call_id="call_bash_large_stdout",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert len(result.output.content["stdout"]) == BASH_MAX_OUTPUT_CHARS
+        assert result.output.content["stdout_truncated"] is True
+        assert result.output.content["stderr_truncated"] is False
+
+    @bash_required
+    @pytest.mark.asyncio
+    async def test_bash_truncates_large_stderr_and_marks_it(self, sandbox_dir: Path) -> None:
+        """bash tool should truncate large stderr persisted in tool output."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        context = _tool_context(sandbox_dir)
+        executor = ToolExecutor(registry)
+
+        oversized = BASH_MAX_OUTPUT_CHARS + 100
+        call = ToolCall(
+            tool_name="bash",
+            arguments={"command": f"python -c \"import sys; sys.stderr.write('y' * {oversized})\""},
+            call_id="call_bash_large_stderr",
+        )
+
+        result = await executor.execute_call(call, context)
+
+        assert result.output.is_error is False
+        assert len(result.output.content["stderr"]) == BASH_MAX_OUTPUT_CHARS
+        assert result.output.content["stderr_truncated"] is True
+        assert result.output.content["stdout_truncated"] is False
 
 
 class TestGrepTool:

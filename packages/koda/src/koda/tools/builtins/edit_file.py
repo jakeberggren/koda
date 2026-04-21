@@ -98,7 +98,7 @@ class EditFileTool:
         if not await target.is_file():
             raise NotAFileError(params.path)
 
-        async with ctx.files.lock_for(resolved_path):
+        async with ctx.coordinator.shared_access(), ctx.coordinator.path_lock(resolved_path):
             decoded = await read_text(resolved_path, params.path, error=EditError)
             updated, replacements_made = self._apply_replacement(decoded.text, params)
 

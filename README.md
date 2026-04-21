@@ -36,6 +36,27 @@ koda
 
 Press Ctrl+C twice to exit the session.
 
+## Command Execution
+
+Koda's built-in `bash` tool runs on the local machine by default. It can also be
+configured to run inside a Docker container by setting:
+
+```bash
+export KODA_BASH_EXECUTION_SANDBOX=docker
+export KODA_BASH_EXECUTION_DOCKER_IMAGE=my-koda-bash:latest
+```
+
+Koda does not bundle a standard Docker image for this. If you want Docker-backed
+execution, provide an image that includes `bash` and the tools you want available
+inside the sandbox.
+
+Docker execution is more isolated than running directly on the host, but it should
+still be treated as reduced-risk local execution rather than a hardened security
+boundary.
+
+The execution details and a complete example Dockerfile live in
+[packages/koda/src/koda/execution/README.md](/Users/jakobberggren/dev/koda/packages/koda/src/koda/execution/README.md).
+
 ## Project Structure
 
 Koda is a uv-managed monorepo with four workspace packages:

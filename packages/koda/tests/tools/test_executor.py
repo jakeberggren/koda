@@ -35,7 +35,7 @@ class LockTrackingTool:
     async def execute(self, params: LockingParams, ctx: ToolContext) -> ToolOutput:
         resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
 
-        async with ctx.files.lock_for(resolved):
+        async with ctx.coordinator.path_lock(resolved):
             active = self._active_by_path.get(resolved, 0) + 1
             self._active_by_path[resolved] = active
             previous_max = self.max_active_by_path.get(resolved, 0)
@@ -46,6 +46,67 @@ class LockTrackingTool:
                 self._active_by_path[resolved] -= 1
 
         return ToolOutput(content={"path": params.path})
+
+
+class CoordinatedParams(BaseModel):
+    """Parameters for a test tool using the execution coordinator."""
+
+    label: str = Field(..., description="Human-readable label for event tracking")
+    delay: float = Field(default=0.01, description="Artificial delay while holding the lock")
+
+
+class SharedAccessTool:
+    """Test tool that uses shared execution access."""
+
+    name = "shared_access_tool"
+    description = "Uses shared execution access"
+    parameters_model = CoordinatedParams
+
+    def __init__(self, timeline: list[str] | None = None) -> None:
+        self.active = 0
+        self.max_active = 0
+        self.events: list[str] = []
+        self.timeline = timeline if timeline is not None else []
+
+    async def execute(self, params: CoordinatedParams, ctx: ToolContext) -> ToolOutput:
+        async with ctx.coordinator.shared_access():
+            self.active += 1
+            self.max_active = max(self.max_active, self.active)
+            self.events.append(f"shared_enter:{params.label}")
+            self.timeline.append(f"shared_enter:{params.label}")
+            try:
+                await asyncio.sleep(params.delay)
+            finally:
+                self.active -= 1
+                self.events.append(f"shared_exit:{params.label}")
+                self.timeline.append(f"shared_exit:{params.label}")
+
+        return ToolOutput(content={"label": params.label})
+
+
+class ExclusiveAccessTool:
+    """Test tool that uses exclusive execution access."""
+
+    name = "exclusive_access_tool"
+    description = "Uses exclusive execution access"
+    parameters_model = CoordinatedParams
+
+    def __init__(self, shared_tool: SharedAccessTool, timeline: list[str] | None = None) -> None:
+        self.shared_tool = shared_tool
+        self.shared_active_on_entry: list[int] = []
+        self.events: list[str] = []
+        self.timeline = timeline if timeline is not None else []
+
+    async def execute(self, params: CoordinatedParams, ctx: ToolContext) -> ToolOutput:
+        async with ctx.coordinator.exclusive_access():
+            self.shared_active_on_entry.append(self.shared_tool.active)
+            self.events.append(f"exclusive_enter:{params.label}")
+            self.timeline.append(f"exclusive_enter:{params.label}")
+            await asyncio.sleep(params.delay)
+            self.events.append(f"exclusive_exit:{params.label}")
+            self.timeline.append(f"exclusive_exit:{params.label}")
+
+        return ToolOutput(content={"label": params.label})
 
 
 class TestExecuteCall:
@@ -219,6 +280,102 @@ class TestExecuteCalls:
         assert all(result.output.is_error is False for result in results)
         resolved = context.policy.resolve_path("shared.txt", cwd=context.cwd)
         assert tool.max_active_by_path[resolved] == 1
+
+    @pytest.mark.asyncio
+    async def test_shared_file_tools_still_run_concurrently_while_shell_waits(
+        self, registry: ToolRegistry, context: ToolContext
+    ) -> None:
+        """Shared file tools can overlap while exclusive shell work waits for them."""
+        timeline: list[str] = []
+        shared_tool = SharedAccessTool(timeline)
+        exclusive_tool = ExclusiveAccessTool(shared_tool, timeline)
+        registry.register(shared_tool)
+        registry.register(exclusive_tool)
+        executor = ToolExecutor(registry)
+
+        calls = [
+            ToolCall(
+                tool_name="shared_access_tool",
+                arguments={"label": "file_a", "delay": 0.03},
+                call_id="call_a",
+            ),
+            ToolCall(
+                tool_name="shared_access_tool",
+                arguments={"label": "file_b", "delay": 0.03},
+                call_id="call_b",
+            ),
+            ToolCall(
+                tool_name="exclusive_access_tool",
+                arguments={"label": "bash", "delay": 0.01},
+                call_id="call_shell",
+            ),
+        ]
+
+        results = await executor.execute_calls(calls, context)
+
+        assert all(result.output.is_error is False for result in results)
+        assert shared_tool.max_active == 2
+        assert exclusive_tool.shared_active_on_entry == [0]
+
+    @pytest.mark.asyncio
+    async def test_waiting_shell_blocks_late_shared_arrivals(
+        self, registry: ToolRegistry, context: ToolContext
+    ) -> None:
+        """A queued exclusive shell call should prevent later shared work from jumping ahead."""
+        timeline: list[str] = []
+        shared_tool = SharedAccessTool(timeline)
+        exclusive_tool = ExclusiveAccessTool(shared_tool, timeline)
+        registry.register(shared_tool)
+        registry.register(exclusive_tool)
+        executor = ToolExecutor(registry)
+
+        first_shared = asyncio.create_task(
+            executor.execute_call(
+                ToolCall(
+                    tool_name="shared_access_tool",
+                    arguments={"label": "first", "delay": 0.03},
+                    call_id="call_first",
+                ),
+                context,
+            )
+        )
+        await asyncio.sleep(0.005)
+
+        waiting_shell = asyncio.create_task(
+            executor.execute_call(
+                ToolCall(
+                    tool_name="exclusive_access_tool",
+                    arguments={"label": "bash", "delay": 0.01},
+                    call_id="call_shell",
+                ),
+                context,
+            )
+        )
+        await asyncio.sleep(0.005)
+
+        late_shared = asyncio.create_task(
+            executor.execute_call(
+                ToolCall(
+                    tool_name="shared_access_tool",
+                    arguments={"label": "late", "delay": 0.01},
+                    call_id="call_late",
+                ),
+                context,
+            )
+        )
+
+        results = await asyncio.gather(first_shared, waiting_shell, late_shared)
+
+        assert all(result.output.is_error is False for result in results)
+        assert exclusive_tool.events == ["exclusive_enter:bash", "exclusive_exit:bash"]
+        assert timeline == [
+            "shared_enter:first",
+            "shared_exit:first",
+            "exclusive_enter:bash",
+            "exclusive_exit:bash",
+            "shared_enter:late",
+            "shared_exit:late",
+        ]
 
     @pytest.mark.asyncio
     async def test_mixed_success_and_error(

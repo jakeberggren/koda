@@ -44,6 +44,7 @@ SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 CURSOR_BLOCK = "\u2588"
 BASH_PREVIEW_LINES = 6
 BASH_PREVIEW_CHARS = 600
+BASH_COMMAND_PREVIEW_CHARS = 120
 
 # Rich standard color number → prompt_toolkit color name.
 # Note: Rich "white" (7) maps to PT "ansigray", Rich "bright_white" (15) to PT "ansiwhite".
@@ -349,14 +350,25 @@ class MessageRenderer:
         if truncated_by_lines or truncated_by_chars:
             total_lines = self._line_count(value)
             marker = f"[truncated, {total_lines} total lines]"
-            preview = f"{marker}\n{preview}" if tail else f"{preview}\n{marker}"
+            preview = f"...\n{marker}\n{preview}" if tail else f"{preview}\n...\n{marker}"
         return preview
+
+    @staticmethod
+    def _inline_preview(value: str, *, max_chars: int) -> str:
+        if not value:
+            return ""
+
+        normalized = " ".join(value.split())
+        if len(normalized) <= max_chars:
+            return normalized
+        return f"{normalized[: max_chars - 1].rstrip()}…"
 
     def _format_bash_args(self, arguments: dict[str, object]) -> str:
         cwd = self._stringify_tool_value(arguments.get("cwd", "."))
         timeout = arguments.get("timeout_seconds", 30)
         command = self._stringify_tool_value(arguments.get("command", ""))
-        return f"command={command} cwd={cwd} timeout={timeout}s"
+        command_preview = self._inline_preview(command, max_chars=BASH_COMMAND_PREVIEW_CHARS)
+        return f"command={command_preview} cwd={cwd} timeout={timeout}s"
 
     def _bash_result_details(self, content: dict[str, Any] | None) -> str | None:
         if not content:
@@ -377,10 +389,12 @@ class MessageRenderer:
         )
 
         blocks = [summary]
-        if stderr:
+        if failed and stderr:
             blocks.append(f"stderr:\n{self._preview_text(stderr)}")
         elif stdout:
             blocks.append(f"stdout:\n{self._preview_text(stdout, tail=not failed)}")
+        elif stderr:
+            blocks.append(f"stderr:\n{self._preview_text(stderr)}")
 
         return "\n  \u2514 ".join(blocks)
 
@@ -390,15 +404,6 @@ class MessageRenderer:
             return False
         exit_code = content.get("exit_code")
         return isinstance(exit_code, int) and exit_code != 0
-
-    @staticmethod
-    def _tool_status_indicator(*, running: bool, error: bool) -> tuple[str, str]:
-        """Return (symbol, style) for the tool call status."""
-        if running:
-            return ("\u25cf ", "yellow")
-        if error:
-            return ("\u2715 ", "red")
-        return ("\u2713 ", "green")
 
     def _render_thinking_markdown(
         self,

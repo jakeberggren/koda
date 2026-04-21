@@ -85,3 +85,10 @@ class SecretsPermissionError(SecretsLoadError):
         super().__init__(str(error))
         self.path = path
         self.error = error
+
+
+class DockerImageRequiredError(ValueError):
+    def __init__(self) -> None:
+        super().__init__(
+            "bash_execution_docker_image must be set when bash_execution_sandbox is 'docker'"
+        )
