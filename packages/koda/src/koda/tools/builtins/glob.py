@@ -46,13 +46,14 @@ class GlobTool:
         resolved_path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
         resolved = AnyioPath(resolved_path)
 
-        if not await resolved.exists():
-            raise exceptions.FileNotFoundError(params.path)
+        async with ctx.coordinator.shared_access():
+            if not await resolved.exists():
+                raise exceptions.FileNotFoundError(params.path)
 
-        if not await resolved.is_dir():
-            raise exceptions.NotADirectoryError(params.path)
+            if not await resolved.is_dir():
+                raise exceptions.NotADirectoryError(params.path)
 
-        matches = await self._collect_matches(resolved, params.pattern)
+            matches = await self._collect_matches(resolved, params.pattern)
 
         total_count: int = len(matches)
         truncated: bool = total_count > params.limit
