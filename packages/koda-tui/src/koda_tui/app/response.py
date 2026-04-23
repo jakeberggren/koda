@@ -96,6 +96,7 @@ class ResponseLifecycle:
         self.complete_tool(
             call_id=event.result.call_id,
             display=event.result.output.display,
+            content=event.result.output.content,
             is_error=event.result.output.is_error,
             error_message=event.result.output.error_message,
         )
@@ -122,6 +123,7 @@ class ResponseLifecycle:
         *,
         call_id: str,
         display: str | None = None,
+        content: dict[str, object] | None = None,
         is_error: bool = False,
         error_message: str | None = None,
     ) -> None:
@@ -137,6 +139,7 @@ class ResponseLifecycle:
                 message.tool_error = is_error
                 message.tool_error_message = error_message
                 message.tool_result_display = display or (error_message if is_error else None)
+                message.tool_result_content = content
                 break
 
         self._state.active_tools.pop(call_id, None)

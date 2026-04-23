@@ -9,7 +9,13 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from koda.tools import FileCoordinator, ToolContext, ToolOutput, ToolRegistry
+from koda.execution.host import HostCommandExecutor
+from koda.tools import (
+    ToolContext,
+    ToolExecutionCoordinator,
+    ToolOutput,
+    ToolRegistry,
+)
 from koda.tools.exceptions import ToolError
 from koda.tools.policy import ToolPolicy
 
@@ -79,6 +85,10 @@ class CrashTool:
 # ==============================================================================
 
 
+class _FakeSettings:
+    bash_execution_sandbox = "host"
+
+
 @pytest.fixture
 def sandbox_dir() -> Generator[Path]:
     """Create a temporary sandbox directory for testing."""
@@ -96,7 +106,12 @@ def policy(sandbox_dir: Path) -> ToolPolicy:
 @pytest.fixture
 def context(sandbox_dir: Path, policy: ToolPolicy) -> ToolContext:
     """Create a ToolContext for testing."""
-    return ToolContext(cwd=sandbox_dir, policy=policy, files=FileCoordinator())
+    return ToolContext(
+        cwd=sandbox_dir,
+        policy=policy,
+        coordinator=ToolExecutionCoordinator(),
+        executor=HostCommandExecutor(_FakeSettings()),
+    )
 
 
 @pytest.fixture

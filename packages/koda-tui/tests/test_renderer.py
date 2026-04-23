@@ -108,6 +108,140 @@ class TestMessageRendererToolCalls:
         content = "".join(t[1] for t in result)
         assert "search" in content
 
+    def test_render_bash_tool_call_shows_command_and_result_preview(
+        self, converter: MessageRenderer
+    ) -> None:
+        """bash tool rendering should show command details and a result preview."""
+        tool_call = ToolCall(
+            tool_name="bash",
+            arguments={
+                "command": "python -m pytest packages/koda/tests/tools -k bash",
+                "cwd": ".",
+                "timeout_seconds": 30,
+            },
+            call_id="call_bash",
+        )
+        result = converter.render_tool_call(
+            tool_call,
+            result_content={
+                "stdout": "collected 7 items\n.......\n7 passed in 0.50s\n",
+                "stderr": "",
+                "exit_code": 0,
+                "command": "python -m pytest packages/koda/tests/tools -k bash",
+                "cwd": ".",
+            },
+        )
+        content = "".join(t[1] for t in result)
+        assert "✓ bash command=python -m pytest packages/koda/tests/tools -k bash cwd=." in content
+        assert "timeout=30s" in content
+        assert "\n  └ succeeded, stdout 3 lines, stderr empty" in content
+        assert "7 passed in 0.50s" in content
+
+    def test_render_bash_nonzero_exit_is_visually_marked_failed(
+        self, converter: MessageRenderer
+    ) -> None:
+        """bash tool rendering should show a failure marker for non-zero exit codes."""
+        tool_call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "exit 1", "cwd": ".", "timeout_seconds": 30},
+            call_id="call_bash_fail",
+        )
+        result = converter.render_tool_call(
+            tool_call,
+            result_content={
+                "stdout": "",
+                "stderr": "boom\n",
+                "exit_code": 1,
+                "command": "exit 1",
+                "cwd": ".",
+            },
+        )
+        content = "".join(t[1] for t in result)
+        assert "✕ bash command=exit 1 cwd=. timeout=30s" in content
+        assert "\n  └ exit 1, stdout 0 lines, stderr 1 lines" in content
+        assert "boom" in content
+
+    def test_render_bash_success_prefers_stdout_over_stderr(
+        self,
+        converter: MessageRenderer,
+    ) -> None:
+        """Successful bash output should preview stdout even when stderr has content."""
+        tool_call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "example", "cwd": ".", "timeout_seconds": 30},
+            call_id="call_bash_stdout",
+        )
+        result = converter.render_tool_call(
+            tool_call,
+            result_content={
+                "stdout": "all good\n",
+                "stderr": "warning\n",
+                "exit_code": 0,
+                "command": "example",
+                "cwd": ".",
+            },
+        )
+        content = "".join(t[1] for t in result)
+        assert "all good" in content
+        assert "warning" not in content
+        assert "\n  └ succeeded, stdout 1 lines, stderr 1 lines" in content
+
+    def test_render_bash_success_prefers_tail_preview(self, converter: MessageRenderer) -> None:
+        """Successful bash output should preview the tail where completion info usually lives."""
+        tool_call = ToolCall(
+            tool_name="bash",
+            arguments={"command": "pytest", "cwd": ".", "timeout_seconds": 30},
+            call_id="call_bash_tail",
+        )
+        stdout = "header\nline2\nline3\nline4\nline5\nline6\n7 passed in 0.50s\n"
+
+        result = converter.render_tool_call(
+            tool_call,
+            result_content={
+                "stdout": stdout,
+                "stderr": "",
+                "exit_code": 0,
+                "command": "pytest",
+                "cwd": ".",
+            },
+        )
+        content = "".join(t[1] for t in result)
+
+        assert "succeeded, stdout 7 lines, stderr empty" in content
+        assert "7 passed in 0.50s" in content
+        assert "header" not in content
+        assert "[truncated, 7 total lines]" in content
+
+    def test_render_bash_multiline_command_is_collapsed_for_header(
+        self, converter: MessageRenderer
+    ) -> None:
+        """Multiline bash commands should render as a compact single-line preview."""
+        tool_call = ToolCall(
+            tool_name="bash",
+            arguments={
+                "command": "set -u\nprintf 'Working directory: '; pwd\nuv run pytest -q\n",
+                "cwd": ".",
+                "timeout_seconds": 300,
+            },
+            call_id="call_bash_multiline",
+        )
+
+        result = converter.render_tool_call(
+            tool_call,
+            result_content={
+                "stdout": "274 passed in 3.10s\n",
+                "stderr": "",
+                "exit_code": 0,
+                "command": "set -u\nprintf 'Working directory: '; pwd\nuv run pytest -q\n",
+                "cwd": ".",
+            },
+        )
+        content = "".join(t[1] for t in result)
+
+        assert "command=set -u printf 'Working directory: '; pwd uv run pytest -q" in content
+        assert "timeout=300s" in content
+        assert "command=set -u\n" not in content
+
 
 class TestMessageRendererStreaming:
     """Tests for streaming content rendering."""

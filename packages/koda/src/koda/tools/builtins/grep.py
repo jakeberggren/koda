@@ -171,26 +171,27 @@ class GrepTool:
         resolved: Path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
         async_path = AnyioPath(resolved)
 
-        if not await async_path.exists():
-            raise exceptions.FileNotFoundError(params.path)
+        async with ctx.coordinator.shared_access():
+            if not await async_path.exists():
+                raise exceptions.FileNotFoundError(params.path)
 
-        cmd = _build_rg_command(_get_rg_path(), params, resolved)
+            cmd = _build_rg_command(_get_rg_path(), params, resolved)
 
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=str(ctx.cwd),
-        )
-
-        try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=RIPGREP_TIMEOUT_SECONDS
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(ctx.cwd),
             )
-        except TimeoutError:
-            proc.kill()
-            await proc.wait()
-            raise RipgrepTimeoutError(RIPGREP_TIMEOUT_SECONDS) from None
+
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(), timeout=RIPGREP_TIMEOUT_SECONDS
+                )
+            except TimeoutError:
+                proc.kill()
+                await proc.wait()
+                raise RipgrepTimeoutError(RIPGREP_TIMEOUT_SECONDS) from None
 
         # returncode 0 = matches found, 1 = no matches, other = error
         returncode = proc.returncode

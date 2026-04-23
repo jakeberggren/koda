@@ -1,9 +1,22 @@
 from __future__ import annotations
 
-from pydantic import AliasChoices, AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr
+from typing import Literal
+
+from pydantic import (
+    AliasChoices,
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
+from koda_common.settings.errors import DockerImageRequiredError
+
 type ThinkingOptionId = str
+type ExecutionSandox = Literal["host", "docker"]
 
 
 class Settings(BaseSettings):
@@ -53,10 +66,33 @@ class Settings(BaseSettings):
             "KODA_ALLOW_EXTENDED_PROMPT_RETENTION",
         ),
     )
+    bash_execution_sandbox: ExecutionSandox = Field(
+        default="host",
+        description="Command execution backend.",
+        validation_alias=AliasChoices("bash_execution_sandbox", "KODA_BASH_EXECUTION_SANDBOX"),
+    )
+    bash_execution_docker_image: str | None = Field(
+        default=None,
+        description=(
+            "Docker image used when bash execution sandbox is set to docker. The image "
+            "should provide bash plus any tooling you want available inside the sandbox, "
+            "for example Python and uv."
+        ),
+        validation_alias=AliasChoices(
+            "bash_execution_docker_image",
+            "KODA_BASH_EXECUTION_DOCKER_IMAGE",
+        ),
+    )
     langfuse_tracing_enabled: bool = Field(default=True, description="Enable telemetry")
     langfuse_secret_key: SecretStr | None = Field(default=None, description="Langfuse secret key")
     langfuse_public_key: str | None = Field(default=None, description="Langfuse public key")
     langfuse_base_url: AnyHttpUrl | None = Field(default=None, description="Langfuse base URL")
+
+    @model_validator(mode="after")
+    def validate_bash_execution_docker_settings(self) -> Settings:
+        if self.bash_execution_sandbox == "docker" and not self.bash_execution_docker_image:
+            raise DockerImageRequiredError
+        return self
 
     @classmethod
     def settings_customise_sources(
@@ -81,3 +117,5 @@ class PersistedSettings(BaseModel):
     thinking: ThinkingOptionId = "none"
     allow_web_search: bool = False
     allow_extended_prompt_retention: bool = False
+    bash_execution_sandbox: ExecutionSandox = "host"
+    bash_execution_docker_image: str | None = None

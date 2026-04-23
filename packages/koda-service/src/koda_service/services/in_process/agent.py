@@ -4,11 +4,18 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from koda.agents import Agent, AgentConfig, PromptContext, SystemPrompt
+from koda.execution import create_command_executor
 from koda.llm import LLMRequestOptions, ModelRegistry, ProviderRegistry
 from koda.llm.providers import BERGETAI_MODELS
 from koda.llm.providers.bergetai import BERGETAI_PROVIDER, create_bergetai_llm
 from koda.llm.providers.openai import OPENAI_MODELS, OPENAI_PROVIDER, create_openai_llm
-from koda.tools import FileCoordinator, ToolConfig, ToolContext, ToolRegistry, get_builtin_tools
+from koda.tools import (
+    ToolConfig,
+    ToolContext,
+    ToolExecutionCoordinator,
+    ToolRegistry,
+    get_builtin_tools,
+)
 from koda.tools.policy import ToolPolicy
 
 if TYPE_CHECKING:
@@ -31,14 +38,15 @@ def build_registries() -> tuple[ModelRegistry, ProviderRegistry]:
     return model_registry, provider_registry
 
 
-def build_tools(*, sandbox_dir: Path, cwd: Path) -> ToolConfig:
+def build_tools(*, sandbox_dir: Path, cwd: Path, settings: SettingsManager) -> ToolConfig:
     """Build the default tool configuration."""
     registry = ToolRegistry()
     registry.register_all(get_builtin_tools())
     context = ToolContext(
         cwd=cwd.resolve(),
         policy=ToolPolicy.create(sandbox_dir=sandbox_dir.resolve()),
-        files=FileCoordinator(),
+        coordinator=ToolExecutionCoordinator(),
+        executor=create_command_executor(settings),
     )
     return ToolConfig(registry=registry, context=context)
 
@@ -63,7 +71,7 @@ class InProcessAgentConfig:
         """Create the Koda agent for the current settings and session state."""
         model_registry, provider_registry = build_registries()
         llm = provider_registry.create(settings.provider, settings, model_registry)
-        tools = self.tools or build_tools(sandbox_dir=sandbox_dir, cwd=self.cwd)
+        tools = self.tools or build_tools(sandbox_dir=sandbox_dir, cwd=self.cwd, settings=settings)
         config = AgentConfig(
             system_prompt=self.system_prompt,
             prompt_context=self.prompt_context,

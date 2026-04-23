@@ -91,6 +91,8 @@ def test_set_persists_core_section_and_notifies_single_change(
             "thinking": "none",
             "allow_web_search": False,
             "allow_extended_prompt_retention": False,
+            "bash_execution_sandbox": "host",
+            "bash_execution_docker_image": None,
         },
     )
     assert changes == [
@@ -120,6 +122,8 @@ def test_update_commits_all_changes_before_notifying(
             "thinking": "none",
             "allow_web_search": False,
             "allow_extended_prompt_retention": False,
+            "bash_execution_sandbox": "host",
+            "bash_execution_docker_image": None,
         },
     )
     assert observed == [
@@ -151,6 +155,8 @@ def test_env_override_is_not_written_back_on_unrelated_save(
             "thinking": "high",
             "allow_web_search": False,
             "allow_extended_prompt_retention": False,
+            "bash_execution_sandbox": "host",
+            "bash_execution_docker_image": None,
         },
     )
 
@@ -168,6 +174,38 @@ def test_env_override_blocks_effective_change_notifications(
 
     assert manager.provider == "openai"
     assert changes == []
+
+
+def test_env_overrides_store_for_bash_execution_sandbox(
+    monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
+) -> None:
+    store = SpySettingsStore({"core": {"bash_execution_sandbox": "host"}})
+    monkeypatch.setenv("KODA_BASH_EXECUTION_SANDBOX", "docker")
+    monkeypatch.setenv("KODA_BASH_EXECUTION_DOCKER_IMAGE", "custom-sandbox:dev")
+
+    manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+    assert manager.bash_execution_sandbox == "docker"
+
+
+def test_env_overrides_store_for_bash_execution_docker_image(
+    monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
+) -> None:
+    store = SpySettingsStore({"core": {"bash_execution_docker_image": "custom-sandbox:base"}})
+    monkeypatch.setenv("KODA_BASH_EXECUTION_DOCKER_IMAGE", "custom-sandbox:dev")
+
+    manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+    assert manager.bash_execution_docker_image == "custom-sandbox:dev"
+
+
+def test_docker_sandbox_requires_bash_execution_docker_image(
+    secrets_store: SpySecretsStore,
+) -> None:
+    store = SpySettingsStore({"core": {"bash_execution_sandbox": "docker"}})
+
+    with pytest.raises(SettingsValidationError):
+        SettingsManager(settings_store=store, secrets_store=secrets_store)
 
 
 def test_invalid_update_raises_without_mutating(

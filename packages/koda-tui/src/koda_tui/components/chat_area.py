@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import json
+from typing import TYPE_CHECKING, Any
 
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.formatted_text import (
@@ -59,6 +60,19 @@ class _LineBuilder:
         return [FormattedText(line) for line in self.lines] or [FormattedText([])]
 
 
+def _freeze_value(value: Any) -> Any:
+    """Convert nested structures into a stable cache-key representation."""
+    if isinstance(value, dict):
+        return tuple((k, _freeze_value(v)) for k, v in sorted(value.items()))
+    if isinstance(value, list | tuple):
+        return tuple(_freeze_value(v) for v in value)
+    try:
+        hash(value)
+    except TypeError:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return value
+
+
 class ChatAreaControl(UIControl):
     """Scrollable chat history control."""
 
@@ -106,6 +120,7 @@ class ChatAreaControl(UIControl):
             message.tool_running,
             message.tool_error,
             message.tool_result_display,
+            _freeze_value(message.tool_result_content),
             message.tool_error_message,
         )
 

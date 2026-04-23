@@ -76,6 +76,7 @@ class TestStreamProcessor:
         assert tool_msg.role == MessageRole.TOOL
         assert tool_msg.tool_running is False
         assert tool_msg.tool_result_display == "file contents"
+        assert tool_msg.tool_result_content == {"data": "file contents"}
         assert second_assistant.role == MessageRole.ASSISTANT
         assert second_assistant.content == "Done!"
 

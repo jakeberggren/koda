@@ -22,7 +22,7 @@ from koda_common.settings.protocols import (
     SettingsManagerProtocol,
     SettingsStore,
 )
-from koda_common.settings.settings import PersistedSettings, Settings
+from koda_common.settings.settings import ExecutionSandox, PersistedSettings, Settings
 from koda_common.settings.store import (
     JsonFileSecretsStore,
     JsonFileSettingsStore,
@@ -31,6 +31,7 @@ from koda_common.settings.utils import provider_api_key_env_var
 
 __all__ = [
     "BaseSettingsManager",
+    "ExecutionSandox",
     "JsonFileSecretsStore",
     "JsonFileSettingsStore",
     "JsonObject",

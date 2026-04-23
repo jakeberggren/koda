@@ -40,18 +40,19 @@ class ListDirectoryTool:
         resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
         directory = AnyioPath(resolved)
 
-        if not await directory.exists():
-            raise exceptions.FileNotFoundError(params.path)
+        async with ctx.coordinator.shared_access():
+            if not await directory.exists():
+                raise exceptions.FileNotFoundError(params.path)
 
-        if not await directory.is_dir():
-            raise exceptions.NotADirectoryError(params.path)
+            if not await directory.is_dir():
+                raise exceptions.NotADirectoryError(params.path)
 
-        try:
-            dir_items = [item async for item in directory.iterdir()]
-        except PermissionError as e:
-            raise exceptions.PermissionError(params.path) from e
-        except OSError as e:
-            raise ListDirectoryError(params.path, cause=e) from e
+            try:
+                dir_items = [item async for item in directory.iterdir()]
+            except PermissionError as e:
+                raise exceptions.PermissionError(params.path) from e
+            except OSError as e:
+                raise ListDirectoryError(params.path, cause=e) from e
 
         items = [
             {

@@ -50,7 +50,7 @@ class WriteFileTool:
         # Validate parent directory is also within sandbox
         ctx.policy.resolve_path(str(resolved.parent), cwd=ctx.cwd)
 
-        async with ctx.files.lock_for(resolved):
+        async with ctx.coordinator.shared_access(), ctx.coordinator.path_lock(resolved):
             await write_text(resolved, params.path, params.content, error=WriteError)
 
         line_count = params.content.count("\n") + (

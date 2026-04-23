@@ -76,6 +76,7 @@ def _apply_tool_result(
     existing = tool_msg_by_call_id.get(message.tool_result.call_id)
     if existing is not None:
         existing.tool_result_display = message.tool_result.output.display
+        existing.tool_result_content = message.tool_result.output.content
         existing.tool_error = message.tool_result.output.is_error
         existing.tool_error_message = message.tool_result.output.error_message
         return
@@ -86,6 +87,7 @@ def _apply_tool_result(
             content=f"Tool: {message.tool_name}",
             tool_error=message.tool_result.output.is_error,
             tool_result_display=message.tool_result.output.display,
+            tool_result_content=message.tool_result.output.content,
             tool_error_message=message.tool_result.output.error_message,
         )
     )

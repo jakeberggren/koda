@@ -47,19 +47,20 @@ class ReadFileTool:
         resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
         target = AnyioPath(resolved)
 
-        if not await target.exists():
-            raise FileNotFoundError(params.path)
+        async with ctx.coordinator.shared_access():
+            if not await target.exists():
+                raise FileNotFoundError(params.path)
 
-        if not await target.is_file():
-            raise NotAFileError(params.path)
+            if not await target.is_file():
+                raise NotAFileError(params.path)
 
-        decoded = await read_text_lines(
-            resolved,
-            params.path,
-            offset=params.offset,
-            limit=params.limit,
-            error=ReadError,
-        )
+            decoded = await read_text_lines(
+                resolved,
+                params.path,
+                offset=params.offset,
+                limit=params.limit,
+                error=ReadError,
+            )
         text_content = decoded.text
         line_count = len(text_content.splitlines())
         noun = "line" if line_count == 1 else "lines"
