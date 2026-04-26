@@ -38,24 +38,38 @@ Press Ctrl+C twice to exit the session.
 
 ## Command Execution
 
-Koda's built-in `bash` tool runs on the local machine by default. It can also be
-configured to run inside a Docker container by setting:
+Koda's built-in `bash` tool runs in `host` mode by default. It also supports:
+
+- `docker` for short-lived containerized execution
+- `seatbelt` for macOS `sandbox-exec` execution
+
+Example configuration:
 
 ```bash
+# Host execution (default)
+export KODA_BASH_EXECUTION_SANDBOX=host
+
+# Docker execution
 export KODA_BASH_EXECUTION_SANDBOX=docker
 export KODA_BASH_EXECUTION_DOCKER_IMAGE=my-koda-bash:latest
+
+# macOS seatbelt execution
+export KODA_BASH_EXECUTION_SANDBOX=seatbelt
 ```
 
-Koda does not bundle a standard Docker image for this. If you want Docker-backed
+Koda does not bundle a standard Docker image. If you want Docker-backed
 execution, provide an image that includes `bash` and the tools you want available
 inside the sandbox.
 
-Docker execution is more isolated than running directly on the host, but it should
-still be treated as reduced-risk local execution rather than a hardened security
-boundary.
+In short:
 
-The execution details and a complete example Dockerfile live in
-[packages/koda/src/koda/execution/README.md](/Users/jakobberggren/dev/koda/packages/koda/src/koda/execution/README.md).
+- `host` is fully trusted local execution
+- `docker` adds useful isolation but is not a hardened security boundary
+- `seatbelt` adds useful macOS restrictions, including blocked network access and
+  write access limited to the workspace plus per-run temporary storage
+
+More execution details live in
+[`packages/koda/src/koda/execution/README.md`](packages/koda/src/koda/execution/README.md).
 
 ## Project Structure
 
