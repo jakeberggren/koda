@@ -3,10 +3,15 @@ from __future__ import annotations
 import asyncio
 import functools
 import shutil
+from typing import TYPE_CHECKING
 
 from koda.execution.exceptions import CommandExecutionError, CommandTimeoutError
 from koda.execution.models import ExecutionResult
+from koda.execution.protocols import CommandExecutor
 from koda.execution.utils import terminate_process_tree
+
+if TYPE_CHECKING:
+    from koda_common.settings import SettingsManager
 
 
 class BashNotFoundError(Exception):
@@ -24,10 +29,10 @@ def _get_bash_path() -> str:
     return bash
 
 
-class HostCommandExecutor:
+class HostCommandExecutor(CommandExecutor):
     """Execute commands directly on the host using bash."""
 
-    def __init__(self, settings: object) -> None:
+    def __init__(self, settings: SettingsManager) -> None:
         self._settings = settings
 
     async def run(
@@ -35,17 +40,15 @@ class HostCommandExecutor:
         *,
         command: str,
         cwd: str,
-        sandbox_dir: str,
+        sandbox_dir: str,  # noqa: ARG002
         timeout_seconds: float,
     ) -> ExecutionResult:
-        del sandbox_dir
         try:
+            bash_path = _get_bash_path()
+            bash_args = ("--noprofile", "--norc", "-c", command)
             proc = await asyncio.create_subprocess_exec(
-                _get_bash_path(),
-                "--noprofile",  # Skip shell startup files for deterministic execution.
-                "--norc",  # Skip interactive rc files such as ~/.bashrc.
-                "-c",  # Execute the provided command string.
-                command,
+                bash_path,
+                *bash_args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd,

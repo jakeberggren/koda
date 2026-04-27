@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from pydantic import BaseModel, Field
@@ -21,6 +21,8 @@ from koda.tools.policy import ToolPolicy
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+
+    from koda_common.settings import SettingsManager
 
 
 # ==============================================================================
@@ -110,7 +112,7 @@ def context(sandbox_dir: Path, policy: ToolPolicy) -> ToolContext:
         cwd=sandbox_dir,
         policy=policy,
         coordinator=ToolExecutionCoordinator(),
-        executor=HostCommandExecutor(_FakeSettings()),
+        executor=HostCommandExecutor(cast("SettingsManager", _FakeSettings())),
     )
 
 

@@ -16,7 +16,7 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 from koda_common.settings.errors import DockerImageRequiredError
 
 type ThinkingOptionId = str
-type ExecutionSandox = Literal["host", "docker"]
+type ExecutionSandox = Literal["host", "docker", "seatbelt"]
 
 
 class Settings(BaseSettings):

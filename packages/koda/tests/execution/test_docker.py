@@ -1,15 +1,23 @@
 import asyncio
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
-from koda.execution.docker import DOCKER_WORKSPACE_DIR, DockerCommandExecutor, DockerSettings
+from koda.execution.docker import (
+    DOCKER_WORKSPACE_DIR,
+    DockerCommandExecutor,
+    DockerNotFoundError,
+)
+from koda.execution.exceptions import CommandExecutionError
+
+if TYPE_CHECKING:
+    from koda_common.settings import SettingsManager
 
 
 class _FakeSettings:
     bash_execution_sandbox = "docker"
-    bash_execution_docker_image = "bash:5.2"
+    bash_execution_docker_image = "sandbox:latest"
 
 
 class TestDockerCommandExecutor:
@@ -36,7 +44,7 @@ class TestDockerCommandExecutor:
         monkeypatch.setattr("koda.execution.docker.os.getgid", lambda: 1000)
         monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_create_subprocess_exec)
 
-        executor = DockerCommandExecutor(cast("DockerSettings", _FakeSettings()))
+        executor = DockerCommandExecutor(cast("SettingsManager", _FakeSettings()))
         await executor.run(
             command="printf test",
             cwd=str(tmp_path),
@@ -62,3 +70,36 @@ class TestDockerCommandExecutor:
         assert "--norc" in args
         assert f"{tmp_path}:{DOCKER_WORKSPACE_DIR}:rw" in args
         assert captured["kwargs"]["start_new_session"] is True
+
+    @pytest.mark.asyncio
+    async def test_run_rejects_cwd_outside_sandbox(self, tmp_path: Path) -> None:
+        executor = DockerCommandExecutor(cast("SettingsManager", _FakeSettings()))
+
+        with pytest.raises(CommandExecutionError, match="within the sandbox directory"):
+            await executor.run(
+                command="printf test",
+                cwd=str(tmp_path.parent),
+                sandbox_dir=str(tmp_path),
+                timeout_seconds=10,
+            )
+
+    @pytest.mark.asyncio
+    async def test_run_wraps_missing_docker_cli(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        def _raise_missing_docker() -> str:
+            raise DockerNotFoundError
+
+        monkeypatch.setattr("koda.execution.docker._get_docker_path", _raise_missing_docker)
+
+        executor = DockerCommandExecutor(cast("SettingsManager", _FakeSettings()))
+
+        with pytest.raises(CommandExecutionError, match="docker not found") as exc_info:
+            await executor.run(
+                command="printf test",
+                cwd=str(tmp_path),
+                sandbox_dir=str(tmp_path),
+                timeout_seconds=10,
+            )
+
+        assert isinstance(exc_info.value.cause, DockerNotFoundError)

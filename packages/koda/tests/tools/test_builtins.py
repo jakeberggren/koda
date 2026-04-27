@@ -1,12 +1,15 @@
 """Integration tests for builtin tools."""
 
+from __future__ import annotations
+
 import os
 import shutil
 import stat
-from pathlib import Path
+from typing import TYPE_CHECKING, Never, cast
 
 import pytest
 
+from koda.execution.exceptions import CommandTimeoutError
 from koda.execution.host import HostCommandExecutor
 from koda.tools import (
     ToolCall,
@@ -19,9 +22,27 @@ from koda.tools import (
 from koda.tools.builtins.bash import BASH_MAX_OUTPUT_CHARS
 from koda.tools.policy import ToolPolicy
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from koda.execution import CommandExecutor
+    from koda_common.settings import SettingsManager
+
 
 class _FakeSettings:
     bash_execution_sandbox = "host"
+
+
+class _TimeoutExecutor:
+    async def run(
+        self,
+        *,
+        command: str,
+        cwd: str,
+        sandbox_dir: str,
+        timeout_seconds: float,
+    ) -> Never:
+        raise CommandTimeoutError(timeout_seconds)
 
 
 def _tool_context(sandbox_dir: Path) -> ToolContext:
@@ -29,7 +50,7 @@ def _tool_context(sandbox_dir: Path) -> ToolContext:
         cwd=sandbox_dir,
         policy=ToolPolicy.create(sandbox_dir),
         coordinator=ToolExecutionCoordinator(),
-        executor=HostCommandExecutor(_FakeSettings()),
+        executor=HostCommandExecutor(cast("SettingsManager", _FakeSettings())),
     )
 
 
@@ -1061,13 +1082,17 @@ class TestBashTool:
         assert result.output.error_message is not None
         assert "missing" in result.output.error_message
 
-    @bash_required
     @pytest.mark.asyncio
     async def test_bash_timeout_returns_tool_error(self, sandbox_dir: Path) -> None:
         """bash tool returns a tool error when execution times out."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = ToolContext(
+            cwd=sandbox_dir,
+            policy=ToolPolicy.create(sandbox_dir),
+            coordinator=ToolExecutionCoordinator(),
+            executor=cast("CommandExecutor", _TimeoutExecutor()),
+        )
         executor = ToolExecutor(registry)
 
         call = ToolCall(

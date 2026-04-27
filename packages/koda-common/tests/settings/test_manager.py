@@ -188,6 +188,17 @@ def test_env_overrides_store_for_bash_execution_sandbox(
     assert manager.bash_execution_sandbox == "docker"
 
 
+def test_env_accepts_seatbelt_bash_execution_sandbox(
+    monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
+) -> None:
+    store = SpySettingsStore({"core": {"bash_execution_sandbox": "host"}})
+    monkeypatch.setenv("KODA_BASH_EXECUTION_SANDBOX", "seatbelt")
+
+    manager = SettingsManager(settings_store=store, secrets_store=secrets_store)
+
+    assert manager.bash_execution_sandbox == "seatbelt"
+
+
 def test_env_overrides_store_for_bash_execution_docker_image(
     monkeypatch: pytest.MonkeyPatch, secrets_store: SpySecretsStore
 ) -> None:
