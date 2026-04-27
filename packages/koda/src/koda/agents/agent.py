@@ -238,31 +238,39 @@ class Agent:
         completed_response: LLMResponseCompleted | None = None
         response_chunks: list[str] = []
         thinking_chunks: list[str] = []
+        iteration_tool_calls: list[ToolCall] = []
 
         async for event in self._process_events(
             stream,
             response_chunks,
             thinking_chunks,
-            pending_tool_calls,
+            iteration_tool_calls,
         ):
             if isinstance(event, LLMResponseCompleted):
                 completed_response = event
             yield event
 
+        # Append assistant message and handle tool calls only after stream completes
         content = "".join(response_chunks)
         thinking_content = "".join(thinking_chunks)
         self._append_assistant_message(
             session_id,
             content=content,
             thinking_content=thinking_content,
-            tool_calls=pending_tool_calls,
+            tool_calls=iteration_tool_calls,
             completed_response=completed_response,
         )
 
-        if pending_tool_calls:
-            logger.info("tool_calls_pending", count=len(pending_tool_calls))
-            async for event in self._handle_tool_calls(session_id, tool_calls=pending_tool_calls):
+        if iteration_tool_calls:
+            logger.info("tool_calls_pending", count=len(iteration_tool_calls))
+            async for event in self._handle_tool_calls(
+                session_id,
+                tool_calls=iteration_tool_calls,
+            ):
                 yield event
+
+        # Update caller's list so the agent loop knows whether to continue
+        pending_tool_calls.extend(iteration_tool_calls)
 
     async def run(self, user_text: str) -> AsyncIterator[LLMEvent]:
         logger.info("agent_run_started")
