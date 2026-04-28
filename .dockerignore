@@ -1,0 +1,7 @@
+# The Docker Sandbox image installs Koda from the published release.
+# Keep the build context small and avoid sending local checkout state.
+*
+
+!docker/
+!docker/sandbox/
+!docker/sandbox/Dockerfile
