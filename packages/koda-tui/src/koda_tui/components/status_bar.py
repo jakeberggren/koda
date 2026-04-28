@@ -19,9 +19,13 @@ class StatusBarControl(UIControl):
     def __init__(self, state: AppState) -> None:
         self._state = state
 
-    def _workspace_path_relative_to_home(self) -> Path:
-        """Return the path relative to the repository root."""
-        return self._state.workspace_root.relative_to(Path.home())
+    def _workspace_path(self) -> str:
+        """Return a compact workspace path for display."""
+        workspace_root = self._state.workspace_root
+        try:
+            return f" ~/{workspace_root.relative_to(Path.home())}"
+        except ValueError:
+            return f" ~/{workspace_root.name}"
 
     def _get_inflight_status(self) -> str:
         if self._state.is_thinking:
@@ -105,7 +109,7 @@ class StatusBarControl(UIControl):
         return fragments, "".join(text_parts)
 
     def _get_left_segments(self) -> list[tuple[list[tuple[str, str]], str]]:
-        path = f" ~/{self._workspace_path_relative_to_home()}"
+        path = self._workspace_path()
         segments: list[tuple[list[tuple[str, str]], str]] = [
             ([("class:status-bar.left", path)], path),
         ]
