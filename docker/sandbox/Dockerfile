@@ -14,6 +14,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 USER agent
+ARG KODA_VERSION=latest
+ENV KODA_VERSION=${KODA_VERSION}
 ENV KODA_BASH_EXECUTION_SANDBOX=host
 ENV KODA_PROVIDER=openai
 ENV OPENAI_API_KEY=proxy-managed
