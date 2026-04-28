@@ -36,6 +36,31 @@ koda
 
 Press Ctrl+C twice to exit the session.
 
+## Docker Sandboxes
+
+Koda can run inside Docker Sandboxes. In this setup, Koda's `host` command
+execution runs inside the sandbox microVM, not on your real host.
+See the [Docker Sandboxes documentation](https://docs.docker.com/ai/sandboxes/)
+for setup details.
+
+Store your OpenAI credential in Docker Sandboxes:
+
+```bash
+sbx secret set -g openai
+```
+
+Then start Koda from the repository you want to work on:
+
+```bash
+sbx run shell . \
+  --branch auto \
+  --template docker.io/jakeberggren/koda-sandbox:latest \
+  -- koda
+```
+
+`--branch auto` creates a Git worktree for the sandbox. This helps avoid
+mounting untracked local files such as `.env` into the sandbox.
+
 ## Command Execution
 
 Koda's built-in `bash` tool runs in `host` mode by default. It also supports:
