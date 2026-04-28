@@ -363,7 +363,7 @@ wheels = [
 
 [[package]]
 name = "koda"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/koda" }
 dependencies = [
     { name = "anyio" },
@@ -388,7 +388,7 @@ requires-dist = [
 
 [[package]]
 name = "koda-common"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/koda-common" }
 dependencies = [
     { name = "pydantic" },
@@ -405,7 +405,7 @@ requires-dist = [
 
 [[package]]
 name = "koda-service"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/koda-service" }
 dependencies = [
     { name = "koda" },
@@ -420,7 +420,7 @@ requires-dist = [
 
 [[package]]
 name = "koda-tui"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "packages/koda-tui" }
 dependencies = [
     { name = "koda-common" },
