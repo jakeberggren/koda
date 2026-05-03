@@ -4,7 +4,6 @@ set -euo pipefail
 REPO_OWNER="jakeberggren"
 REPO_NAME="koda"
 REMOTE="${REMOTE:-origin}"
-DOCKER_IMAGE="${DOCKER_IMAGE:-docker.io/jakeberggren/koda-sandbox}"
 RELEASE_ASSET="${RELEASE_ASSET:-koda-%s-linux-arm64.tar.gz}"
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-1800}"
 WAIT_INTERVAL_SECONDS="${WAIT_INTERVAL_SECONDS:-15}"
@@ -26,11 +25,10 @@ usage() {
   cat <<'EOF'
 Usage:
   ./ship.sh vX.Y.Z
-  ./ship.sh --image-only vX.Y.Z
+  ./ship.sh --wait-only vX.Y.Z
 
 Environment overrides:
   REMOTE=origin
-  DOCKER_IMAGE=docker.io/jakeberggren/koda-sandbox
   RELEASE_ASSET='koda-%s-linux-arm64.tar.gz'
   WAIT_TIMEOUT_SECONDS=1800
   WAIT_INTERVAL_SECONDS=15
@@ -42,9 +40,9 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-IMAGE_ONLY=false
-if [[ "${1:-}" == "--image-only" ]]; then
-  IMAGE_ONLY=true
+WAIT_ONLY=false
+if [[ "${1:-}" == "--wait-only" ]]; then
+  WAIT_ONLY=true
   shift
 fi
 
@@ -58,7 +56,6 @@ VERSION="${VERSION_TAG#v}"
 
 need_cmd git
 need_cmd gh
-need_cmd docker
 
 [[ -z "$(git status --porcelain)" ]] || error "working tree is not clean"
 
@@ -68,7 +65,7 @@ for pyproject in packages/*/pyproject.toml; do
   fi
 done
 
-if [[ "${IMAGE_ONLY}" == false ]]; then
+if [[ "${WAIT_ONLY}" == false ]]; then
   if git rev-parse "${VERSION_TAG}" >/dev/null 2>&1; then
     error "local tag already exists: ${VERSION_TAG}"
   fi
@@ -101,18 +98,5 @@ while true; do
 
   sleep "${WAIT_INTERVAL_SECONDS}"
 done
-
-info "Building Docker Sandbox image"
-docker build \
-  --build-arg "KODA_VERSION=${VERSION_TAG}" \
-  -t "${DOCKER_IMAGE}:${VERSION_TAG}" \
-  -t "${DOCKER_IMAGE}:latest" \
-  -f docker/sandbox/Dockerfile .
-
-info "Pushing ${DOCKER_IMAGE}:${VERSION_TAG}"
-docker push "${DOCKER_IMAGE}:${VERSION_TAG}"
-
-info "Pushing ${DOCKER_IMAGE}:latest"
-docker push "${DOCKER_IMAGE}:latest"
 
 info "Shipped ${VERSION_TAG}"
