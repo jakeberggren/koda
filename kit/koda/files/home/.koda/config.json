@@ -1,0 +1,10 @@
+{
+  "core": {
+    "allow_extended_prompt_retention": false,
+    "allow_web_search": false,
+    "bash_execution_sandbox": "host",
+    "model": "gpt-5.4-mini",
+    "provider": "openai",
+    "thinking": "none"
+  }
+}

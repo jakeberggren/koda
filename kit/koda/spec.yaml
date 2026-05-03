@@ -1,0 +1,45 @@
+schemaVersion: "1"
+kind: agent
+name: koda
+displayName: Koda
+description: Swedish for 'to code'.
+
+agent:
+  image: "docker/sandbox-templates:shell"
+  persistence: persistent
+  entrypoint:
+    run: [koda]
+
+credentials:
+  sources:
+    openai:
+      env:
+        - OPENAI_API_KEY
+    github:
+      env:
+        - GH_TOKEN
+
+environment:
+  proxyManaged:
+    - OPENAI_API_KEY
+    - GH_TOKEN
+
+network:
+  serviceDomains:
+    api.openai.com: openai
+    api.github.com: github
+  serviceAuth:
+    openai:
+      headerName: Authorization
+      valueFormat: "Bearer %s"
+    github:
+      headerName: Authorization
+      valueFormat: "Bearer %s"
+
+commands:
+  install:
+    - command: "curl -fsSL
+        https://raw.githubusercontent.com/jakeberggren/koda/main/install.sh |
+        bash"
+      user: "1000"
+      description: Install Koda.
