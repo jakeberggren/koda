@@ -8,7 +8,7 @@ from prompt_toolkit.layout import UIContent, UIControl
 from koda_tui.state import AppState, ResponsePhase
 
 _DIVIDER = " · "
-_BASE_FOOTER_BINDINGS = [("ctrl+p", "palette")]
+_BASE_FOOTER_BINDINGS = [("ctrl+p/k", "palette")]
 _ELLIPSIS = "..."
 _MIN_PLAIN_SECTION_PADDING = len(_DIVIDER) + 1
 
