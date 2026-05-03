@@ -21,15 +21,66 @@ if TYPE_CHECKING:
     from koda_tui.app.application import KodaTuiApp
     from koda_tui.settings import AppSettings
 
+_CTRL_LETTER_KEYS = {
+    "a": Keys.ControlA,
+    "b": Keys.ControlB,
+    "c": Keys.ControlC,
+    "d": Keys.ControlD,
+    "e": Keys.ControlE,
+    "f": Keys.ControlF,
+    "g": Keys.ControlG,
+    "h": Keys.ControlH,
+    "i": Keys.ControlI,
+    "j": Keys.ControlJ,
+    "k": Keys.ControlK,
+    "l": Keys.ControlL,
+    "m": Keys.ControlM,
+    "n": Keys.ControlN,
+    "o": Keys.ControlO,
+    "p": Keys.ControlP,
+    "q": Keys.ControlQ,
+    "r": Keys.ControlR,
+    "s": Keys.ControlS,
+    "t": Keys.ControlT,
+    "u": Keys.ControlU,
+    "v": Keys.ControlV,
+    "w": Keys.ControlW,
+    "x": Keys.ControlX,
+    "y": Keys.ControlY,
+    "z": Keys.ControlZ,
+}
+
 
 def _register_terminal_sequences() -> None:
-    """Register terminal-specific escape sequences for modified Enter keys."""
+    """Register terminal-specific escape sequences for modified keys."""
+    # Ctrl+letter keys - kitty keyboard protocol / CSI u.
+    for letter, key in _CTRL_LETTER_KEYS.items():
+        ANSI_SEQUENCES[f"\x1b[{ord(letter)};5u"] = key
+
+    # Escape - kitty keyboard protocol / CSI u.
+    ANSI_SEQUENCES["\x1b[27u"] = Keys.Escape
+    ANSI_SEQUENCES["\x1b[27;1u"] = Keys.Escape
+
+    # Word delete / modified Backspace.
+    ANSI_SEQUENCES["\x1b\x7f"] = Keys.ControlW
+    ANSI_SEQUENCES["\x1b\b"] = Keys.ControlW
+    ANSI_SEQUENCES["\x1b[127;3u"] = Keys.ControlW
+    ANSI_SEQUENCES["\x1b[8;3u"] = Keys.ControlW
+    ANSI_SEQUENCES["\x1b[127;5u"] = Keys.ControlW
+    ANSI_SEQUENCES["\x1b[8;5u"] = Keys.ControlW
+
+    # Modified Enter - kitty keyboard protocol / CSI u.
+    ANSI_SEQUENCES["\x1b[13;5u"] = Keys.ControlJ
+    ANSI_SEQUENCES["\x1b[10;5u"] = Keys.ControlJ
+    ANSI_SEQUENCES["\x1b[13;2u"] = Keys.ControlJ
+    ANSI_SEQUENCES["\x1b[10;2u"] = Keys.ControlJ
+
+    # Modified Enter - legacy terminal sequences.
     # Ctrl+Enter (modifier 5) - ghostty
     ANSI_SEQUENCES["\x1b[27;5;13~"] = Keys.ControlJ
     # Shift+Enter (modifier 2) - xterm
     ANSI_SEQUENCES["\x1b[27;2;13~"] = Keys.ControlJ
-    # Shift+Enter - kitty protocol
-    ANSI_SEQUENCES["\x1b[13;2u"] = Keys.ControlJ
+
     # Shift+Enter - ESC+CR (terminals that send literal escape + enter)
     ANSI_SEQUENCES["\x1b\r"] = Keys.ControlJ
 
@@ -145,6 +196,10 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
 
     @kb.add(Keys.ControlP)
     def _toggle_palette(_event: KeyPressEvent) -> None:
+        app.toggle_palette()
+
+    @kb.add(Keys.ControlK)
+    def _toggle_palette_alt(_event: KeyPressEvent) -> None:
         app.toggle_palette()
 
     @kb.add(Keys.ControlT)
