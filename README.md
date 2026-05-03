@@ -11,92 +11,96 @@
 </pre>
 </div>
 
-Lightweight terminal coding assistant that can navigate, understand, and modify codebases.
+Koda is a minimal coding assistant that can navigate, understand, and modify codebases.
+Koda currently runs through `koda-tui`, a purpose-built prompt-toolkit TUI built on top of Koda's
+service layer and core agent runtime.
 
-## Install
+## Installation and Usage
+
+To install Koda locally, run the install script:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jakeberggren/koda/main/install.sh | bash
 ```
 
-## Uninstall
-
-```bash
-rm -f ~/.local/bin/koda
-rm -rf ~/.local/share/koda
-```
-
-## Usage
-
-Start an interactive chat session:
+Then, start an interactive chat session:
 
 ```bash
 koda
 ```
 
-Press Ctrl+C twice to exit the session.
+Koda prompts for provider credentials on first launch.
 
-## Docker Sandboxes
-
-Koda can run inside Docker Sandboxes. In this setup, Koda's `host` command
-execution runs inside the sandbox microVM, not on your real host.
-See the [Docker Sandboxes documentation](https://docs.docker.com/ai/sandboxes/)
-for setup details.
-
-Store your OpenAI credential in Docker Sandboxes:
+Koda can also run as a Docker Sandboxes agent kit. The kit installs Koda inside
+an isolated microVM-based sandbox and launches it with Docker Sandboxes-managed
+credentials and network policy. The current kit uses OpenAI as the default provider.
 
 ```bash
 sbx secret set -g openai
+sbx run --kit "git+https://github.com/jakeberggren/koda.git#ref=main&dir=kit/koda" koda
 ```
 
-Then start Koda from the repository you want to work on:
+This requires Docker Sandboxes, an early-access feature from Docker.
+For setup details, see the [Docker Sandboxes documentation](https://docs.docker.com/ai/sandboxes/).
 
-```bash
-sbx run shell . \
-  --branch auto \
-  --template docker.io/jakeberggren/koda-sandbox:latest \
-  -- koda
-```
+## Agent
 
-`--branch auto` creates a Git worktree for the sandbox. This helps avoid
-mounting untracked local files such as `.env` into the sandbox.
+Koda runs with a small set of built-in tools for reading, searching, editing, and
+executing commands in the current workspace. File-oriented tools are scoped to the
+workspace and respect `.gitignore` patterns.
 
-## Command Execution
+| Tool | Purpose |
+| ---- | ------- |
+| `read_file` | Read file contents with line-based offsets and limits |
+| `write_file` | Create new files |
+| `edit_file` | Apply focused text replacements to existing files |
+| `grep` | Search file contents with ripgrep |
+| `glob` | Find files by glob pattern |
+| `bash` | Run shell commands for tests, builds, linters, git, and inspection |
 
-Koda's built-in `bash` tool runs in `host` mode by default. It also supports:
+### Bash and Command Execution
 
-- `docker` for short-lived containerized execution
-- `seatbelt` for macOS `sandbox-exec` execution
+The built-in `bash` tool supports configurable command execution modes:
 
-Example configuration:
+- `host` - Default, non-sandboxed execution on the local machine. This is
+  intended for trusted environments, such as when Koda itself is already running
+  inside a Docker Sandboxes microVM.
+- `docker` - Runs each command in a short-lived Docker container with the
+  workspace mounted in.
+- `seatbelt` - Runs each command with macOS `sandbox-exec`, blocking network
+  access and limiting writes to the workspace plus temporary storage.
+- `bubblewrap` - Planned Linux sandbox mode. Not yet available.
 
-```bash
-# Host execution (default)
-export KODA_BASH_EXECUTION_SANDBOX=host
+Command execution mode can be configured in `~/.koda/config.json` or with
+environment variables. See the [command execution README](packages/koda/src/koda/execution/README.md)
+for details on execution modes and configuration.
 
-# Docker execution
-export KODA_BASH_EXECUTION_SANDBOX=docker
-export KODA_BASH_EXECUTION_DOCKER_IMAGE=my-koda-bash:latest
+## TUI
 
-# macOS seatbelt execution
-export KODA_BASH_EXECUTION_SANDBOX=seatbelt
-```
+Koda's current user-facing interface is `koda-tui`, a prompt-toolkit based
+full-screen terminal UI for chat, streaming responses, tool output, model
+selection, and session management.
 
-Koda does not bundle a standard Docker image. If you want Docker-backed
-execution, provide an image that includes `bash` and the tools you want available
-inside the sandbox.
+Open the command palette with `Ctrl+P` or `Ctrl+K` to configure providers,
+switch models, manage sessions, and adjust TUI behavior or appearance.
 
-In short:
+### Keyboard Shortcuts
 
-- `host` is fully trusted local execution
-- `docker` adds useful isolation but is not a hardened security boundary
-- `seatbelt` adds useful macOS restrictions, including blocked network access and
-  write access limited to the workspace plus per-run temporary storage
+| Key | Action |
+| --- | ------ |
+| `Enter` | Submit the current message |
+| `Shift+Enter` / `Ctrl+Enter` | Insert a newline |
+| `Ctrl+C` | Cancel streaming, or press twice while idle to exit |
+| `Escape` | Cancel streaming, or clear queued input |
+| `Ctrl+P` / `Ctrl+K` | Open the command palette |
+| `Ctrl+T` | Cycle supported thinking levels |
+| `@` | Open workspace file suggestions |
+| `Up` / `Down` | Navigate multi-line input or file suggestions |
+| `Tab` / `Enter` | Accept the selected file suggestion |
 
-More execution details live in
-[`packages/koda/src/koda/execution/README.md`](packages/koda/src/koda/execution/README.md).
+## Development
 
-## Project Structure
+### Project Structure
 
 Koda is a uv-managed monorepo with four workspace packages:
 
@@ -110,6 +114,7 @@ packages/
 ├── koda/                        # Core agent and runtime primitives
 │   ├── src/koda/
 │   │   ├── agents/              # Agent loop orchestration
+│   │   ├── execution/           # Bash command execution backends
 │   │   ├── llm/                 # Provider adapters, registries, request/response types
 │   │   ├── messages/            # Internal conversation message models
 │   │   ├── sessions/            # Session management and persistence
@@ -134,6 +139,7 @@ packages/
 │   │   ├── components/          # UI widgets and panes
 │   │   ├── rendering/           # Rich rendering helpers
 │   │   ├── ui/                  # Layout, styles, and command palette UI
+│   │   ├── utils/               # TUI helper utilities
 │   │   ├── actions.py           # TUI actions backed by the service layer
 │   │   ├── converters.py        # Service -> TUI message conversion
 │   │   └── state.py             # Shared application state
@@ -147,7 +153,7 @@ packages/
     └── tests/
 ```
 
-## Development Setup
+### Development Setup
 
 Koda uses [Astral's](https://astral.sh/) Python toolchain:
 
@@ -155,11 +161,11 @@ Koda uses [Astral's](https://astral.sh/) Python toolchain:
 - **ruff** — linting and formatting
 - **ty** — type checking
 
-### Prerequisites
+#### Prerequisites
 
 Install uv from the [Astral docs](https://docs.astral.sh/uv/getting-started/installation/).
 
-### Getting Started
+#### Getting Started
 
 ```bash
 # Install dependencies and set up the workspace
@@ -169,5 +175,5 @@ uv sync
 pre-commit install
 ```
 
-Pre-commit hooks run Ruff and Ty checks automatically.
+Pre-commit hooks run Ruff and ty checks automatically.
 Pre-push hooks run package tests plus additional security scanning.
