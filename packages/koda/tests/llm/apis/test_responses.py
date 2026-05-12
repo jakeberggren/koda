@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from openai.types.responses import (
@@ -10,12 +10,16 @@ from openai.types.responses import (
     ResponseOutputItemDoneEvent,
 )
 
-from koda.llm.drivers import ResponsesDriver, ResponsesDriverConfig
-from koda.llm.providers.openai import OpenAIResponseAdapter
+from koda.llm.apis.responses import (
+    OpenAIResponsesAdapter,
+    OpenAIResponsesAPI,
+    OpenAIResponsesAPIConfig,
+    OpenAIResponsesEventAdapter,
+)
 from koda.llm.types import LLMRequest, LLMResponseCompleted, LLMToolCallRequested
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Callable, Sequence
+    from collections.abc import AsyncIterator, Sequence
 
     from openai import AsyncOpenAI
 
@@ -36,17 +40,11 @@ class _FakeResponsesAPI:
 
 
 class _FakeClient:
-    def __init__(self, events: Sequence[object], **_kwargs: object) -> None:
+    def __init__(self, events: Sequence[object]) -> None:
         self.responses = _FakeResponsesAPI(events)
 
 
-def _client_factory(events: Sequence[object]) -> Callable[..., AsyncOpenAI]:
-    return cast("Callable[..., AsyncOpenAI]", lambda **kwargs: _FakeClient(events, **kwargs))
-
-
-def _response_with_tool_call(
-    tool_call: ResponseFunctionToolCall, *, usage: dict[str, object] | None = None
-) -> Response:
+def _response_with_tool_call(tool_call: ResponseFunctionToolCall) -> Response:
     return Response.model_validate(
         {
             "id": "resp_1",
@@ -62,8 +60,19 @@ def _response_with_tool_call(
             "status": "completed",
             "text": {"format": {"type": "text"}},
             "truncation": "disabled",
-            "usage": usage,
+            "usage": None,
         }
+    )
+
+
+def _api(events: Sequence[object]) -> OpenAIResponsesAPI:
+    return OpenAIResponsesAPI(
+        OpenAIResponsesAPIConfig(
+            api_key="test-key", base_url="https://api.openai.com/v1", model="gpt-5.2"
+        ),
+        client=cast("AsyncOpenAI", _FakeClient(events)),
+        adapter=OpenAIResponsesAdapter(),
+        event_adapter=OpenAIResponsesEventAdapter(),
     )
 
 
@@ -97,14 +106,10 @@ async def test_generate_stream_emits_function_tool_call_once() -> None:
             }
         ),
     ]
-    driver = ResponsesDriver(
-        ResponsesDriverConfig(api_key="test-key", model="gpt-5.2"),
-        adapter=OpenAIResponseAdapter(),
-        reasoning_resolver=lambda _thinking: cast("Any", {"effort": "none", "summary": "auto"}),
-        client_factory=_client_factory(events),
-    )
 
-    streamed_events = [event async for event in driver.generate_stream(LLMRequest(messages=[]))]
+    streamed_events = [
+        event async for event in _api(events).generate_stream(LLMRequest(messages=[]))
+    ]
 
     assert len(streamed_events) == _EXPECTED_EVENT_COUNT
     assert isinstance(streamed_events[0], LLMToolCallRequested)

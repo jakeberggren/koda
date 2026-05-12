@@ -138,6 +138,28 @@ class ProviderNotSupportedError(ProviderConfigurationError):
         self.provider_name = provider_name
 
 
+class ProviderSelectionMissingError(ProviderConfigurationError):
+    def __init__(self) -> None:
+        super().__init__("Provider selection is required")
+
+
+class ApiNameEmptyError(ProviderConfigurationError):
+    def __init__(self) -> None:
+        super().__init__("API name cannot be empty")
+
+
+class ApiAlreadyRegisteredError(ProviderConfigurationError):
+    def __init__(self, api_name: str) -> None:
+        super().__init__(f"API '{api_name}' is already registered")
+        self.api_name = api_name
+
+
+class ApiNotSupportedError(ProviderConfigurationError):
+    def __init__(self, api_name: str) -> None:
+        super().__init__(f"API '{api_name}' is not supported")
+        self.api_name = api_name
+
+
 class ModelAlreadyRegisteredError(ModelConfigurationError):
     def __init__(self, model_name: str, provider_name: str) -> None:
         super().__init__(f"Model '{model_name}' for provider {provider_name} is already registered")
@@ -150,3 +172,37 @@ class ModelNotSupportedError(ModelConfigurationError):
         super().__init__(f"Model '{model_id}' for provider {provider_name} is not supported")
         self.model_id = model_id
         self.provider_name = provider_name
+
+
+class ModelSelectionMissingError(ModelConfigurationError):
+    def __init__(self) -> None:
+        super().__init__("Model selection is required")
+
+
+class ModelMaxOutputTokensMissingError(ModelConfigurationError):
+    def __init__(self, model_id: str, provider_name: str) -> None:
+        super().__init__(
+            f"Model '{model_id}' for provider {provider_name} must define max_output_tokens"
+        )
+        self.model_id = model_id
+        self.provider_name = provider_name
+
+
+class ThinkingBudgetTokensNotConfiguredError(LLMConfigurationError):
+    """thinking='enabled' requires budget_tokens to be configured for this model."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "thinking='enabled' requires budget_tokens to be configured for this model"
+        )
+
+
+class ModelThinkingModeNotConfiguredError(ModelConfigurationError):
+    def __init__(self, model_id: str, provider_name: str, thinking_mode: str) -> None:
+        super().__init__(
+            f"Model '{model_id}' for provider {provider_name} references unknown thinking mode "
+            f"'{thinking_mode}'"
+        )
+        self.model_id = model_id
+        self.provider_name = provider_name
+        self.thinking_mode = thinking_mode
