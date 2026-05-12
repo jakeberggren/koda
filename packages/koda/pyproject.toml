@@ -17,6 +17,9 @@ dependencies = [
     "pydantic-settings>=2.14.0,<3",
 ]
 
+[project.entry-points.pyinstaller40]
+hook-dirs = "koda.__pyinstaller:get_hook_dirs"
+
 [build-system]
 requires = ["uv_build>=0.9.13,<0.10.0"]
 build-backend = "uv_build"
