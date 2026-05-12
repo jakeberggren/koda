@@ -50,6 +50,7 @@ def _make_settings() -> Mock:
             "thinking",
             "allow_web_search",
             "allow_extended_prompt_retention",
+            "langfuse_tracing_enabled",
             "get_api_key",
         ]
     )
@@ -58,6 +59,7 @@ def _make_settings() -> Mock:
     settings.thinking = "none"
     settings.allow_web_search = False
     settings.allow_extended_prompt_retention = False
+    settings.langfuse_tracing_enabled = False
     settings.get_api_key.return_value = "test-key"
     return settings
 
@@ -91,8 +93,10 @@ async def test_chat_creates_session_lazily_on_first_message() -> None:
         _settings: Mock,
         session_manager: SessionManager,
         *,
+        llm: _FakeLLM,
         sandbox_dir: Path,
     ) -> Agent:
+        _ = llm
         assert sandbox_dir == Path("/tmp")
         return Agent(
             llm=fake_llm,

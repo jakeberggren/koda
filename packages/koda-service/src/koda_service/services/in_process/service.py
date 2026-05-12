@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from koda.llm import exceptions as llm_exceptions
+from koda.llm.catalog import ModelCatalog
+from koda.llm.factory import LLMFactory
 from koda.sessions import JsonSessionStore, SessionManager, SessionNotFoundError
 from koda.tools import exceptions as tool_exceptions
 from koda_common.settings import SecretsLoadError, SettingsManager
@@ -28,7 +30,6 @@ from koda_service.mappers import (
     map_session_to_session_info,
 )
 from koda_service.protocols import KodaService
-from koda_service.services.in_process.agent import InProcessAgentConfig, build_registries
 from koda_service.types import (
     Message,
     ModelDefinition,
@@ -42,8 +43,10 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from koda.agents import Agent
+    from koda.llm import LLM
     from koda.sessions.store import SessionStore
     from koda.telemetry import Telemetry
+    from koda_service.services.in_process.agent import InProcessAgentConfig
     from koda_service.types import SessionInfo
 
 
@@ -84,7 +87,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         self._sandbox_dir = sandbox_dir
         self._telemetry = telemetry
         self._agent_config = agent_config
-        self._model_registry, self._provider_registry = build_registries()
+        self._llm_factory = LLMFactory(ModelCatalog.from_builtin())
         self._session_manager = SessionManager(session_store or JsonSessionStore())
         self._agent: Agent | None = None
 
@@ -134,8 +137,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
             )
 
         try:
-            self._provider_registry.get(provider)
-            self._model_registry.get(provider, model)
+            self._llm_factory.validate_selection(provider, model)
         except Exception:
             return _not_ready(
                 summary="Selected model unavailable",
@@ -143,6 +145,12 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
             )
 
         return None
+
+    def _create_llm(self) -> LLM:
+        provider = self._settings.provider
+        if provider is None:
+            raise llm_exceptions.ProviderSelectionMissingError
+        return self._llm_factory.create(self._settings)
 
     def _credentials_status(self) -> ServiceStatus | None:
         """Validate credentials for the selected provider."""
@@ -168,9 +176,11 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
             return None
 
         try:
+            llm = self._create_llm()
             self._agent = self._agent_config.build(
                 self._settings,
                 self._session_manager,
+                llm=llm,
                 sandbox_dir=self._sandbox_dir,
             )
         except StartupConfigurationError as error:
@@ -275,7 +285,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
 
     def list_providers(self) -> list[ProviderDefinition]:
         """List available providers."""
-        providers = self._provider_registry.supported()
+        providers = self._llm_factory.list_providers()
         return [
             map_provider_definition_to_contract_provider_definition(provider)
             for provider in providers
@@ -286,31 +296,23 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         try:
             connected_ids = {
                 provider.id
-                for provider in self._provider_registry.supported()
+                for provider in self.list_providers()
                 if self._settings.get_api_key(provider.id)
             }
         except SecretsLoadError:
             return []
 
-        providers = [
-            provider
-            for provider in self._provider_registry.supported()
-            if provider.id in connected_ids
-        ]
-        return [
-            map_provider_definition_to_contract_provider_definition(provider)
-            for provider in providers
-        ]
+        return [provider for provider in self.list_providers() if provider.id in connected_ids]
 
     def list_models(self, provider: str | None = None) -> list[ModelDefinition]:
         """List available models, optionally filtered by provider."""
-        models = self._model_registry.supported(provider)
+        models = self._llm_factory.list_models(provider)
         return [map_model_definition_to_contract_model_definition(model) for model in models]
 
     def list_selectable_models(self) -> list[ModelDefinition]:
         """List models available for currently connected providers."""
         connected_providers = {provider.id for provider in self.list_connected_providers()}
-        models = self._model_registry.supported()
+        models = self._llm_factory.list_models()
         selectable_models = [model for model in models if model.provider in connected_providers]
         return [
             map_model_definition_to_contract_model_definition(model) for model in selectable_models

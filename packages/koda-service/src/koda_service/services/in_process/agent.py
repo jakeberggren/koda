@@ -5,10 +5,7 @@ from typing import TYPE_CHECKING
 
 from koda.agents import Agent, AgentConfig, PromptContext, SystemPrompt
 from koda.execution import create_command_executor
-from koda.llm import LLMRequestOptions, ModelRegistry, ProviderRegistry
-from koda.llm.providers import BERGETAI_MODELS
-from koda.llm.providers.bergetai import BERGETAI_PROVIDER, create_bergetai_llm
-from koda.llm.providers.openai import OPENAI_MODELS, OPENAI_PROVIDER, create_openai_llm
+from koda.llm import LLMRequestOptions
 from koda.tools import (
     ToolConfig,
     ToolContext,
@@ -21,21 +18,9 @@ from koda.tools.policy import ToolPolicy
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from koda.llm import LLM
     from koda.sessions import SessionManager
     from koda_common.settings import SettingsManager
-
-
-def build_registries() -> tuple[ModelRegistry, ProviderRegistry]:
-    """Build the default provider and model registries."""
-    model_registry = ModelRegistry()
-    model_registry.register_all(OPENAI_MODELS)
-    model_registry.register_all(BERGETAI_MODELS)
-
-    provider_registry = ProviderRegistry()
-    provider_registry.register(OPENAI_PROVIDER, create_openai_llm)
-    provider_registry.register(BERGETAI_PROVIDER, create_bergetai_llm)
-
-    return model_registry, provider_registry
 
 
 def build_tools(*, sandbox_dir: Path, cwd: Path, settings: SettingsManager) -> ToolConfig:
@@ -66,11 +51,10 @@ class InProcessAgentConfig:
         settings: SettingsManager,
         session_manager: SessionManager,
         *,
+        llm: LLM,
         sandbox_dir: Path,
     ) -> Agent:
         """Create the Koda agent for the current settings and session state."""
-        model_registry, provider_registry = build_registries()
-        llm = provider_registry.create(settings.provider, settings, model_registry)
         tools = self.tools or build_tools(sandbox_dir=sandbox_dir, cwd=self.cwd, settings=settings)
         config = AgentConfig(
             system_prompt=self.system_prompt,

@@ -1,0 +1,362 @@
+{
+  "providers": {
+    "anthropic": {
+      "api": "anthropic-messages",
+      "base_url": "https://api.anthropic.com",
+      "capabilities": {},
+      "models": [
+        {
+          "context_window": 1000000,
+          "description": "Anthropic's most capable generally available model for complex reasoning and agentic coding",
+          "id": "claude-opus-4-7",
+          "max_output_tokens": 128000,
+          "name": "Claude Opus 4.7",
+          "thinking": {
+            "budget_tokens": {
+              "max_tokens": 128000
+            },
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ]
+          }
+        },
+        {
+          "context_window": 1000000,
+          "description": "The best combination of speed and intelligence of Anthropic's models.",
+          "id": "claude-sonnet-4-6",
+          "max_output_tokens": 64000,
+          "name": "Claude Sonnet 4.6",
+          "thinking": {
+            "budget_tokens": {
+              "max_tokens": 64000
+            },
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "max"
+            ]
+          }
+        },
+        {
+          "context_window": 200000,
+          "description": "The fastest model from Anthropic with near-frontier intelligence",
+          "id": "claude-haiku-4-5",
+          "max_output_tokens": 64000,
+          "name": "Claude Haiku 4.5",
+          "thinking": {
+            "budget_tokens": {
+              "max_tokens": 4096
+            },
+            "modes": [
+              "none",
+              "enabled"
+            ]
+          }
+        }
+      ],
+      "name": "Anthropic",
+      "thinking_modes": {
+        "enabled": {
+          "description": "Use extended thinking with the model's configured token budget.",
+          "label": "On"
+        },
+        "high": {
+          "description": "High capability. For complex reasoning and agentic coding.",
+          "label": "High"
+        },
+        "low": {
+          "description": "Most efficient. Significant token savings with some capability reduction.",
+          "label": "Low"
+        },
+        "max": {
+          "description": "Absolute maximum capability with no constraints on token spending.",
+          "label": "Max"
+        },
+        "medium": {
+          "description": "Balanced approach with moderate token savings.",
+          "label": "Medium"
+        },
+        "none": {
+          "description": "No interleaved thinking. Fastest inference with minimal token usage.",
+          "label": "Off"
+        },
+        "xhigh": {
+          "description": "Extended capability for long-horizon work.",
+          "label": "XHigh"
+        }
+      }
+    },
+    "bergetai": {
+      "api": "openai-completions",
+      "base_url": "https://api.berget.ai/v1",
+      "capabilities": {},
+      "models": [
+        {
+          "context_window": 256000,
+          "id": "google/gemma-4-31B-it",
+          "max_output_tokens": 128000,
+          "name": "Gemma-4-31B-it"
+        },
+        {
+          "context_window": 200000,
+          "id": "zai-org/GLM-4.7-FP8",
+          "max_output_tokens": 128000,
+          "name": "GLM-4.7"
+        },
+        {
+          "context_window": 128000,
+          "id": "openai/gpt-oss-120b",
+          "max_output_tokens": 128000,
+          "name": "gpt-oss-120b"
+        },
+        {
+          "context_window": 128000,
+          "id": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+          "max_output_tokens": 128000,
+          "name": "Mistral-Small-3.2-24B-Instruct-2506"
+        },
+        {
+          "context_window": 128000,
+          "id": "meta-llama/Llama-3.1-8B-Instruct",
+          "max_output_tokens": 128000,
+          "name": "Llama-3.1-8B-Instruct"
+        },
+        {
+          "context_window": 128000,
+          "id": "meta-llama/Llama-3.3-70B-Instruct",
+          "max_output_tokens": 128000,
+          "name": "Llama-3.3-70B-Instruct"
+        }
+      ],
+      "name": "BergetAI",
+      "thinking_modes": {}
+    },
+    "openai": {
+      "api": "openai-responses",
+      "base_url": "https://api.openai.com/v1",
+      "capabilities": {
+        "web_search": true
+      },
+      "models": [
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
+          "context_window": 1000000,
+          "id": "gpt-5.4",
+          "max_output_tokens": 128000,
+          "name": "gpt-5.4",
+          "thinking": {
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          }
+        },
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
+          "context_window": 400000,
+          "id": "gpt-5.4-mini",
+          "max_output_tokens": 128000,
+          "name": "gpt-5.4-mini",
+          "thinking": {
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          }
+        },
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
+          "context_window": 400000,
+          "id": "gpt-5.4-nano",
+          "max_output_tokens": 128000,
+          "name": "gpt-5.4-nano",
+          "thinking": {
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          }
+        },
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
+          "context_window": 400000,
+          "id": "gpt-5.3-codex",
+          "max_output_tokens": 128000,
+          "name": "gpt-5.3-codex",
+          "thinking": {
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          }
+        },
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
+          "context_window": 400000,
+          "id": "gpt-5.2-codex",
+          "max_output_tokens": 128000,
+          "name": "gpt-5.2-codex",
+          "thinking": {
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          }
+        },
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
+          "context_window": 400000,
+          "id": "gpt-5.2",
+          "max_output_tokens": 128000,
+          "name": "gpt-5.2",
+          "thinking": {
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          }
+        },
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
+          "context_window": 400000,
+          "id": "gpt-5.1-codex",
+          "max_output_tokens": 128000,
+          "name": "gpt-5.1-codex",
+          "thinking": {
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
+          "context_window": 400000,
+          "id": "gpt-5.1",
+          "max_output_tokens": 128000,
+          "name": "gpt-5.1",
+          "thinking": {
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
+          "context_window": 400000,
+          "id": "gpt-5",
+          "max_output_tokens": 128000,
+          "name": "gpt-5",
+          "thinking": {
+            "modes": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        {
+          "context_window": 400000,
+          "id": "gpt-5-mini",
+          "max_output_tokens": 128000,
+          "name": "gpt-5-mini",
+          "thinking": {
+            "modes": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        },
+        {
+          "context_window": 400000,
+          "id": "gpt-5-nano",
+          "max_output_tokens": 128000,
+          "name": "gpt-5-nano",
+          "thinking": {
+            "modes": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        }
+      ],
+      "name": "OpenAI",
+      "thinking_modes": {
+        "high": {
+          "description": "High effort for complex tasks.",
+          "label": "High"
+        },
+        "low": {
+          "description": "Low effort for straightforward tasks.",
+          "label": "Low"
+        },
+        "medium": {
+          "description": "Balanced effort for most tasks.",
+          "label": "Medium"
+        },
+        "minimal": {
+          "description": "Minimal effort for very simple tasks.",
+          "label": "Minimal"
+        },
+        "none": {
+          "description": "No interleaved thinking.",
+          "label": "Off"
+        },
+        "xhigh": {
+          "description": "Extra high effort for complex tasks.",
+          "label": "XHigh"
+        }
+      }
+    }
+  }
+}
