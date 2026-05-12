@@ -32,3 +32,8 @@ def log_file_path(app_name: str) -> Path:
 def sessions_dir_path() -> Path:
     """Return the default session storage directory."""
     return koda_home_dir() / "sessions"
+
+
+def model_overrides_file_path() -> Path:
+    """Return the provider overrides file path (~/.koda/models.json)."""
+    return koda_home_dir() / "models.json"

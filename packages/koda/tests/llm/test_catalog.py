@@ -35,7 +35,7 @@ def test_llm_api_registry_validates_api_ids() -> None:
 
 
 def test_builtin_haiku_uses_binary_extended_thinking() -> None:
-    factory = LLMFactory(ModelCatalog.from_builtin())
+    factory = LLMFactory(ModelCatalog.load())
     model_definition = next(
         m for m in factory.list_models("anthropic") if m.id == "claude-haiku-4-5"
     )
@@ -45,7 +45,7 @@ def test_builtin_haiku_uses_binary_extended_thinking() -> None:
 
 
 def test_builtin_bergetai_uses_openai_completions_api() -> None:
-    registry = ModelCatalog.from_builtin()
+    registry = ModelCatalog.load()
     provider = registry.get_provider("bergetai")
     model = registry.get_model("bergetai", "google/gemma-4-31B-it")
 

@@ -24,7 +24,7 @@ def _append_assistant_message(
     tool_msg_by_call_id: dict[str, TUIMessage],
     message: AssistantMessage,
 ) -> None:
-    if message.content or message.thinking_content:
+    if message.content.strip() or message.thinking_content.strip():
         result.append(
             TUIMessage(
                 role=MessageRole.ASSISTANT,

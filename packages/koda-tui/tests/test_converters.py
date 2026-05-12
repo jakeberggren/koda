@@ -202,3 +202,23 @@ class TestConvertMessages:
         assert result == []
         assert usage is None
         assert total_usage is None
+
+    def test_assistant_whitespace_only_content_no_tools(self) -> None:
+        result, usage, total_usage = convert_messages([AssistantMessage(content="\n\n")])
+
+        assert result == []
+        assert usage is None
+        assert total_usage is None
+
+    def test_assistant_whitespace_only_content_with_tool_call(self) -> None:
+        tc = _make_tool_call(call_id="c1", tool_name="search")
+
+        result, usage, total_usage = convert_messages(
+            [AssistantMessage(content="\n\n", tool_calls=[tc])]
+        )
+
+        assert len(result) == 1
+        assert result[0].role == MessageRole.TOOL
+        assert result[0].tool_call == tc
+        assert usage is None
+        assert total_usage is None

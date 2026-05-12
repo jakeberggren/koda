@@ -87,7 +87,7 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         self._sandbox_dir = sandbox_dir
         self._telemetry = telemetry
         self._agent_config = agent_config
-        self._llm_factory = LLMFactory(ModelCatalog.from_builtin())
+        self._llm_factory = LLMFactory(ModelCatalog.load())
         self._session_manager = SessionManager(session_store or JsonSessionStore())
         self._agent: Agent | None = None
 

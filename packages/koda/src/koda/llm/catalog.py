@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from koda.llm import exceptions
 from koda.llm.models import ProvidersConfig
+from koda_common.paths import model_overrides_file_path
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -107,11 +108,12 @@ class ModelCatalog:
         return cls(cls._merge_providers(builtin_config, user_config))
 
     @classmethod
-    def from_builtin(cls) -> ModelCatalog:
-        """Create a catalog from the bundled models.json."""
+    def load(cls) -> ModelCatalog:
+        """Load the catalog from the bundled models.json, merged with user overrides if present."""
         models_config = files("koda.llm").joinpath("models.json")
-        with as_file(models_config) as providers_path:
-            return cls.from_files(providers_path)
+        with as_file(models_config) as builtin_path:
+            user_path = model_overrides_file_path()
+            return cls.from_files(builtin_path, user_path)
 
     def get_provider(self, provider_id: str) -> ProviderConfig:
         """Get a provider by ID."""

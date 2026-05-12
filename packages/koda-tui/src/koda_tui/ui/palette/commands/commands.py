@@ -158,8 +158,10 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
 
     def cmd_switch_model() -> None:
         models = service.list_selectable_models()
+        providers = service.list_providers()
         commands = model_commands.get_commands(
             models=models,
+            providers=providers,
             active_model_id=app_settings.core.model,
             on_select=partial(
                 _select_model,
