@@ -134,6 +134,15 @@ class StatusBarControl(UIControl):
         status = self._get_status()
         status_text = status + " "
         footer_fragments, footer_text = self._get_footer_fragments()
+        warning_text = self._state.warnings[0] if self._state.warnings else ""
+        warning_fragments: list[tuple[str, str]] = []
+        warning_plain = ""
+        if warning_text:
+            warning_fragments = [
+                ("class:status-bar.muted", _DIVIDER),
+                ("class:status-bar.warning", warning_text),
+            ]
+            warning_plain = f"{_DIVIDER}{warning_text}"
         status_style = (
             "class:status-bar.warning"
             if not self._state.service_status.is_ready and not self._state.exit_requested
@@ -142,10 +151,11 @@ class StatusBarControl(UIControl):
         return (
             [
                 *footer_fragments,
+                *warning_fragments,
                 ("class:status-bar.muted", _DIVIDER),
                 (status_style, status_text),
             ],
-            f"{footer_text}{_DIVIDER}{status_text}",
+            f"{footer_text}{warning_plain}{_DIVIDER}{status_text}",
         )
 
     @staticmethod

@@ -50,6 +50,7 @@ class LLMFactory:
             id=model_id,
             name=model.name,
             provider=provider_id,
+            description=model.description,
             context_window=model.context_window,
             max_output_tokens=model.max_output_tokens,
             thinking_options=thinking_options,
@@ -85,7 +86,11 @@ class LLMFactory:
     def list_providers(self) -> list[ProviderDefinition]:
         """List all available providers."""
         return [
-            ProviderDefinition(id=provider_id, name=provider.name)
+            ProviderDefinition(
+                id=provider_id,
+                name=provider.name,
+                description=provider.description,
+            )
             for provider_id, provider in self._catalog.list_providers()
         ]
 

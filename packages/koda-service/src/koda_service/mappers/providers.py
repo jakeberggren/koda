@@ -9,5 +9,6 @@ def map_provider_definition_to_contract_provider_definition(
     return ProviderDefinition(
         id=core_provider.id,
         name=core_provider.name,
+        description=core_provider.description,
         provider_features=core_provider.provider_features,
     )

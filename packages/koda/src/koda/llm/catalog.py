@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
+from dataclasses import dataclass
 from importlib.resources import as_file, files
 from typing import TYPE_CHECKING
+
+from pydantic import ValidationError
 
 from koda.llm import exceptions
 from koda.llm.models import ProvidersConfig
@@ -15,6 +19,14 @@ if TYPE_CHECKING:
         ProviderConfig,
         ProviderModelConfig,
     )
+
+log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class ModelCatalogWarning:
+    summary: str
+    detail: str | None = None
 
 
 def _normalize(value: str) -> str:
@@ -61,6 +73,7 @@ class ModelCatalog:
         return builtin_provider.model_copy(
             update={
                 "name": user_provider.name,
+                "description": user_provider.description or builtin_provider.description,
                 "base_url": user_provider.base_url,
                 "api": user_provider.api,
                 "capabilities": {
@@ -96,19 +109,35 @@ class ModelCatalog:
             )
         return providers
 
+    @staticmethod
+    def _invalid_user_config_warning(path: Path, error: Exception) -> ModelCatalogWarning:
+        """Build a user-facing warning for an invalid user catalog override."""
+        return ModelCatalogWarning(
+            summary="invalid models.json",
+            detail=f"Ignoring {path}: {error}",
+        )
+
     @classmethod
     def from_files(
         cls,
         builtin_path: Path,
         user_path: Path | None = None,
-    ) -> ModelCatalog:
+    ) -> tuple[ModelCatalog, list[ModelCatalogWarning]]:
         """Create a catalog from JSON config files."""
         builtin_config = cls._load_config(builtin_path)
-        user_config = cls._load_config(user_path) if user_path and user_path.exists() else None
-        return cls(cls._merge_providers(builtin_config, user_config))
+        warnings: list[ModelCatalogWarning] = []
+        user_config = None
+        if user_path and user_path.exists():
+            try:
+                user_config = cls._load_config(user_path)
+            except (json.JSONDecodeError, ValidationError, OSError) as error:
+                warning = cls._invalid_user_config_warning(user_path, error)
+                warnings.append(warning)
+                log.warning("llm_user_models_config_invalid path=%s error=%s", user_path, error)
+        return cls(cls._merge_providers(builtin_config, user_config)), warnings
 
     @classmethod
-    def load(cls) -> ModelCatalog:
+    def load(cls) -> tuple[ModelCatalog, list[ModelCatalogWarning]]:
         """Load the catalog from the bundled models.json, merged with user overrides if present."""
         models_config = files("koda.llm").joinpath("models.json")
         with as_file(models_config) as builtin_path:

@@ -87,7 +87,9 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         self._sandbox_dir = sandbox_dir
         self._telemetry = telemetry
         self._agent_config = agent_config
-        self._llm_factory = LLMFactory(ModelCatalog.load())
+        catalog, warnings = ModelCatalog.load()
+        self._warnings = warnings
+        self._llm_factory = LLMFactory(catalog)
         self._session_manager = SessionManager(session_store or JsonSessionStore())
         self._agent: Agent | None = None
 
@@ -308,6 +310,10 @@ class InProcessKodaService(KodaService[StreamEvent, ProviderDefinition, ModelDef
         """List available models, optionally filtered by provider."""
         models = self._llm_factory.list_models(provider)
         return [map_model_definition_to_contract_model_definition(model) for model in models]
+
+    def warnings(self) -> list[str]:
+        """List non-fatal startup/configuration warnings."""
+        return [warning.summary for warning in self._warnings]
 
     def list_selectable_models(self) -> list[ModelDefinition]:
         """List models available for currently connected providers."""

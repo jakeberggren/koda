@@ -10,6 +10,7 @@ def map_model_definition_to_contract_model_definition(
         id=core_model.id,
         name=core_model.name,
         provider=core_model.provider,
+        description=core_model.description,
         context_window=core_model.context_window,
         max_output_tokens=core_model.max_output_tokens,
         thinking_options=[

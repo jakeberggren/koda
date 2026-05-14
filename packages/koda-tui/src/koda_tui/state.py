@@ -79,6 +79,7 @@ class AppState:
 
     workspace_root: Path
     service_status: ServiceStatus = field(default_factory=ServiceStatus)
+    warnings: list[str] = field(default_factory=list)
     messages: list[Message] = field(default_factory=list)
     current_streaming_content: str = ""
     current_thinking_content: str = ""
