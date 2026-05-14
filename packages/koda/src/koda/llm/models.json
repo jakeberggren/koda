@@ -4,6 +4,7 @@
       "api": "anthropic-messages",
       "base_url": "https://api.anthropic.com",
       "capabilities": {},
+      "description": "Thoughtful, capable models optimized for reliability, reasoning, and long-context work.",
       "models": [
         {
           "context_window": 1000000,
@@ -97,7 +98,14 @@
       "api": "openai-completions",
       "base_url": "https://api.berget.ai/v1",
       "capabilities": {},
+      "description": "Swedish AI inference with privacy-focused, sovereign infrastructure.",
       "models": [
+        {
+          "context_window": 256000,
+          "id": "moonshotai/Kimi-K2.6",
+          "max_output_tokens": 32000,
+          "name": "Kimi K2.6"
+        },
         {
           "context_window": 256000,
           "id": "google/gemma-4-31B-it",
@@ -144,12 +152,33 @@
       "capabilities": {
         "web_search": true
       },
+      "description": "Frontier models for powerful reasoning, coding, and general-purpose AI.",
       "models": [
         {
           "capabilities": {
             "extended_prompt_retention": true
           },
+          "context_window": 1050000,
+          "description": "A new class of intelligence for coding and professional work.",
+          "id": "gpt-5.5",
+          "max_output_tokens": 128000,
+          "name": "gpt-5.5",
+          "thinking": {
+            "modes": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ]
+          }
+        },
+        {
+          "capabilities": {
+            "extended_prompt_retention": true
+          },
           "context_window": 1000000,
+          "description": "A more affordable model for coding and professional work.",
           "id": "gpt-5.4",
           "max_output_tokens": 128000,
           "name": "gpt-5.4",
@@ -168,6 +197,7 @@
             "extended_prompt_retention": true
           },
           "context_window": 400000,
+          "description": "OpenAI's strongest mini model yet for coding, computer use, and subagents",
           "id": "gpt-5.4-mini",
           "max_output_tokens": 128000,
           "name": "gpt-5.4-mini",
@@ -186,6 +216,7 @@
             "extended_prompt_retention": true
           },
           "context_window": 400000,
+          "description": "OpenAI's cheapest GPT-5.4-class model for simple high-volume tasks",
           "id": "gpt-5.4-nano",
           "max_output_tokens": 128000,
           "name": "gpt-5.4-nano",
