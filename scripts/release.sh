@@ -4,7 +4,12 @@ set -euo pipefail
 REPO_OWNER="jakeberggren"
 REPO_NAME="koda"
 REMOTE="${REMOTE:-origin}"
-RELEASE_ASSET="${RELEASE_ASSET:-koda-%s-linux-arm64.tar.gz}"
+DEFAULT_RELEASE_ASSETS=(
+  'koda-%s-linux-x86_64.tar.gz'
+  'koda-%s-linux-arm64.tar.gz'
+  'koda-%s-macos-x86_64.tar.gz'
+  'koda-%s-macos-arm64.tar.gz'
+)
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-1800}"
 WAIT_INTERVAL_SECONDS="${WAIT_INTERVAL_SECONDS:-15}"
 
@@ -29,7 +34,7 @@ Usage:
 
 Environment overrides:
   REMOTE=origin
-  RELEASE_ASSET='koda-%s-linux-arm64.tar.gz'
+  RELEASE_ASSET='koda-%s-linux-arm64.tar.gz'  # wait for one asset only
   WAIT_TIMEOUT_SECONDS=1800
   WAIT_INTERVAL_SECONDS=15
 EOF
@@ -81,21 +86,52 @@ if [[ "${WAIT_ONLY}" == false ]]; then
   git push "${REMOTE}" "${VERSION_TAG}"
 fi
 
-ASSET_NAME="$(printf "${RELEASE_ASSET}" "${VERSION_TAG}")"
+if [[ -n "${RELEASE_ASSET:-}" ]]; then
+  RELEASE_ASSETS=("${RELEASE_ASSET}")
+else
+  RELEASE_ASSETS=("${DEFAULT_RELEASE_ASSETS[@]}")
+fi
+
+EXPECTED_ASSET_NAMES=()
+for asset_template in "${RELEASE_ASSETS[@]}"; do
+  EXPECTED_ASSET_NAMES+=("$(printf "${asset_template}" "${VERSION_TAG}")")
+done
+
 DEADLINE=$((SECONDS + WAIT_TIMEOUT_SECONDS))
-info "Waiting for release asset ${ASSET_NAME}"
+info "Waiting for release assets"
 while true; do
-  if gh release view "${VERSION_TAG}" \
+  UPLOADED_ASSET_NAMES=()
+  while IFS= read -r uploaded_asset_name; do
+    UPLOADED_ASSET_NAMES+=("${uploaded_asset_name}")
+  done < <(gh release view "${VERSION_TAG}" \
     --repo "${REPO_OWNER}/${REPO_NAME}" \
     --json assets \
-    --jq '.assets[].name' 2>/dev/null | grep -Fxq "${ASSET_NAME}"; then
+    --jq '.assets[].name' 2>/dev/null)
+
+  missing_asset_names=()
+  for expected_asset_name in "${EXPECTED_ASSET_NAMES[@]}"; do
+    found=false
+    for uploaded_asset_name in "${UPLOADED_ASSET_NAMES[@]}"; do
+      if [[ "${uploaded_asset_name}" == "${expected_asset_name}" ]]; then
+        found=true
+        break
+      fi
+    done
+
+    if [[ "${found}" == false ]]; then
+      missing_asset_names+=("${expected_asset_name}")
+    fi
+  done
+
+  if (( ${#missing_asset_names[@]} == 0 )); then
     break
   fi
 
   if (( SECONDS >= DEADLINE )); then
-    error "timed out waiting for ${ASSET_NAME}"
+    error "timed out waiting for: ${missing_asset_names[*]}"
   fi
 
+  info "Still waiting for: ${missing_asset_names[*]}"
   sleep "${WAIT_INTERVAL_SECONDS}"
 done
 
