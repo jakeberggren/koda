@@ -342,7 +342,10 @@ class CommandPalette:
         )
         padded_label = cmd.label.ljust(max_label_width)
         line: StyleAndTextTuples = []
-        if cmd.status in {CommandStatus.CONNECTED, CommandStatus.CURRENT}:
+        if cmd.status is CommandStatus.CONNECTED:
+            marker_render_style = style if is_selected else marker_style
+            line.append((marker_render_style, "✓ "))
+        elif cmd.status is CommandStatus.CURRENT:
             marker_render_style = style if is_selected else marker_style
             line.append((marker_render_style, "* "))
         elif is_selected:

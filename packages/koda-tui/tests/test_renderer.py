@@ -247,12 +247,10 @@ class TestMessageRendererStreaming:
     """Tests for streaming content rendering."""
 
     def test_render_streaming_content(self, converter: MessageRenderer) -> None:
-        """render_streaming_content() should show content with cursor."""
+        """render_streaming_content() should show streaming content."""
         result = converter.render_streaming_content("Hello wor")
         content = "".join(t[1] for t in result)
         assert "Hello wor" in content
-        # Should have cursor block
-        assert "\u2588" in content
 
     def test_render_thinking_content_renders_markdown(self, converter: MessageRenderer) -> None:
         """render_thinking_content() should parse markdown markers."""

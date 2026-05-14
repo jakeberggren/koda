@@ -126,6 +126,6 @@ def test_palette_renders_connected_command_marker_without_current_label_style() 
     item_rows = [row for row in rows if row.command is not None]
     connected_fragments = item_rows[1].text
 
-    assert connected_fragments[0] == ("class:palette.marker", "* ")
+    assert connected_fragments[0] == ("class:palette.marker", "✓ ")
     assert connected_fragments[1][0] == "class:palette.item"
     assert connected_fragments[1][1].startswith("OpenAI")
