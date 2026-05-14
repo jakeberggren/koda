@@ -38,6 +38,10 @@ class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):
         """List available models, optionally filtered by provider."""
         ...
 
+    def warnings(self) -> list[str]:
+        """List non-fatal startup/configuration warnings."""
+        ...
+
     def list_selectable_models(self) -> list[ModelT]:
         """List models for currently connected providers."""
         ...

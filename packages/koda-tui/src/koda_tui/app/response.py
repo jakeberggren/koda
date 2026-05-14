@@ -147,16 +147,22 @@ class ResponseLifecycle:
 
     def _finalize_content(self) -> None:
         """Save any pending streaming content as an assistant message."""
-        if self._state.current_streaming_content or self._state.current_thinking_content:
-            self._state.messages.append(
-                Message(
-                    role=MessageRole.ASSISTANT,
-                    content=self._state.current_streaming_content,
-                    thinking_content=self._state.current_thinking_content,
-                )
-            )
+        has_content = bool(self._state.current_streaming_content.strip())
+        has_thinking = bool(self._state.current_thinking_content.strip())
+        if not has_content and not has_thinking:
             self._state.current_streaming_content = ""
             self._state.current_thinking_content = ""
+            return
+
+        self._state.messages.append(
+            Message(
+                role=MessageRole.ASSISTANT,
+                content=self._state.current_streaming_content,
+                thinking_content=self._state.current_thinking_content,
+            )
+        )
+        self._state.current_streaming_content = ""
+        self._state.current_thinking_content = ""
 
     def end(self) -> None:
         """End the response cycle."""

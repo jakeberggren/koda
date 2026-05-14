@@ -29,6 +29,7 @@ _SESSION_FOOTER: StyleAndTextTuples = [
     ("class:palette.item", "ctrl-d"),
     ("class:palette.hint", " delete"),
 ]
+_SESSION_LIST_HEADING = "Select New Session"
 
 
 def open_session_list(
@@ -39,7 +40,12 @@ def open_session_list(
 ) -> None:
     """Open the session list palette."""
     commands, shortcuts = get_commands(service, state, palette_manager, cancel_streaming)
-    palette_manager.open_palette(commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
+    palette_manager.open_palette(
+        commands,
+        footer=_SESSION_FOOTER,
+        shortcuts=shortcuts,
+        list_heading=_SESSION_LIST_HEADING,
+    )
 
 
 def _format_session_label(session: SessionInfo, active_session: SessionInfo | None) -> str:
@@ -103,7 +109,13 @@ def _confirm_delete_session(
             palette_manager,
             cancel_streaming,
         )
-        palette_manager.replace_top(2, commands, footer=_SESSION_FOOTER, shortcuts=shortcuts)
+        palette_manager.replace_top(
+            2,
+            commands,
+            footer=_SESSION_FOOTER,
+            shortcuts=shortcuts,
+            list_heading=_SESSION_LIST_HEADING,
+        )
 
     palette_manager.open_confirm(
         message="Delete session?",

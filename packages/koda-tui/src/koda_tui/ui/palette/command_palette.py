@@ -161,6 +161,7 @@ class PaletteOptions:
     height: int = 10
     footer: StyleAndTextTuples | None = None
     shortcuts: dict[str, Callable[[Command | None], None]] | None = None
+    list_heading: str | None = None
 
 
 class CommandPalette:
@@ -182,6 +183,7 @@ class CommandPalette:
         self._height = options.height
         self._footer = options.footer
         self._shortcuts = options.shortcuts or {}
+        self._list_heading = options.list_heading
 
         # Search buffer
         self.search_buffer = Buffer(
@@ -383,10 +385,14 @@ class CommandPalette:
 
     def _build_rows(self) -> list[_PaletteRow]:
         """Build logical rows for the command list in final display order."""
-        if not self._filtered_commands:
-            return [self._empty_row()]
-
         rows: list[_PaletteRow] = []
+        if self._list_heading:
+            rows.append(self._group_row(self._list_heading))
+
+        if not self._filtered_commands:
+            rows.append(self._empty_row())
+            return rows
+
         max_label_width = self._get_max_label_width()
         command_index = 0
 

@@ -179,6 +179,34 @@ class TestResponseLifecycle:
         # Tool message follows
         assert state.messages[2].role == MessageRole.TOOL
 
+    def test_transition_to_tool_discards_whitespace_only_streaming_content(
+        self, state: AppState, lifecycle: ResponseLifecycle
+    ) -> None:
+        """Whitespace-only text before a tool should not create a blank assistant row."""
+        lifecycle.begin("msg")
+        lifecycle.append_content("\n\n")
+        tool = ToolCall(tool_name="search", arguments={}, call_id="c1")
+
+        lifecycle.transition_to_tool(tool)
+
+        assert state.current_streaming_content == ""
+        assert len(state.messages) == 2
+        assert state.messages[1].role == MessageRole.TOOL
+        assert state.messages[1].tool_call == tool
+
+    def test_end_discards_whitespace_only_streaming_content(
+        self, state: AppState, lifecycle: ResponseLifecycle
+    ) -> None:
+        """Whitespace-only final content should not persist as an assistant message."""
+        lifecycle.begin("msg")
+        lifecycle.append_content(" \n\t")
+
+        lifecycle.end()
+
+        assert len(state.messages) == 1
+        assert state.current_streaming_content == ""
+        assert state.response_phase is ResponsePhase.IDLE
+
     def test_transition_to_tool_persists_thinking_content(
         self, state: AppState, lifecycle: ResponseLifecycle
     ) -> None:

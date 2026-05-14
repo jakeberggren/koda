@@ -58,6 +58,7 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
             "list_providers",
             "list_connected_providers",
             "list_selectable_models",
+            "warnings",
             "chat",
             "new_session",
             "switch_session",
@@ -76,6 +77,7 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
         )
     ]
     service.ready.return_value = ServiceStatus(is_ready=True, summary="Ready")
+    service.warnings.return_value = []
     app = KodaTuiApp(
         app_settings=AppSettings(core=settings, tui=tui_settings),
         service=service,

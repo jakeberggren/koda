@@ -207,6 +207,7 @@ class KodaTuiApp:
         self.state.provider_name = self._app_settings.core.provider
         self.state.model_name = self._app_settings.core.model
         self.state.service_status = self._service.ready()
+        self.state.warnings = self._service.warnings()
 
         active_model = None
         if (

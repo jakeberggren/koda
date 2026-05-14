@@ -154,12 +154,15 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
                 palette_manager=palette_manager,
             ),
         )
-        palette_manager.open_palette(commands)
+        palette_manager.open_palette(commands, list_heading="Configure LLM Provider API Key")
 
     def cmd_switch_model() -> None:
         models = service.list_selectable_models()
+        providers = service.list_providers()
         commands = model_commands.get_commands(
             models=models,
+            providers=providers,
+            active_provider_id=app_settings.core.provider,
             active_model_id=app_settings.core.model,
             on_select=partial(
                 _select_model,
@@ -186,7 +189,7 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
                 palette_manager=palette_manager,
             ),
         )
-        palette_manager.open_palette(commands)
+        palette_manager.open_palette(commands, list_heading="Select Model Reasoning Effort")
 
     def cmd_toggle_theme() -> None:
         result = actions.toggle_theme(app_settings.tui)

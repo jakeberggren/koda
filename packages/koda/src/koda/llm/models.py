@@ -16,6 +16,7 @@ class ThinkingOption(BaseModel):
 class ProviderDefinition(BaseModel):
     id: str
     name: str
+    description: str | None = None
     provider_features: dict[str, object] = Field(default_factory=dict)
 
 
@@ -23,6 +24,7 @@ class ModelDefinition(BaseModel):
     id: str
     name: str
     provider: str
+    description: str | None = None
     context_window: int | None = None
     max_output_tokens: int | None = None
     thinking_options: list[ThinkingOption] = Field(default_factory=list)
@@ -56,6 +58,7 @@ class ProviderModelConfig(BaseModel):
 
 class ProviderConfig(BaseModel):
     name: str
+    description: str | None = None
     base_url: str
     api: Literal["anthropic-messages", "openai-responses", "openai-completions"]
     capabilities: dict[str, object] = Field(default_factory=dict)

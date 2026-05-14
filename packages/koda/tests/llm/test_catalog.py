@@ -35,7 +35,8 @@ def test_llm_api_registry_validates_api_ids() -> None:
 
 
 def test_builtin_haiku_uses_binary_extended_thinking() -> None:
-    factory = LLMFactory(ModelCatalog.from_builtin())
+    catalog, _warnings = ModelCatalog.load()
+    factory = LLMFactory(catalog)
     model_definition = next(
         m for m in factory.list_models("anthropic") if m.id == "claude-haiku-4-5"
     )
@@ -45,7 +46,7 @@ def test_builtin_haiku_uses_binary_extended_thinking() -> None:
 
 
 def test_builtin_bergetai_uses_openai_completions_api() -> None:
-    registry = ModelCatalog.from_builtin()
+    registry, _warnings = ModelCatalog.load()
     provider = registry.get_provider("bergetai")
     model = registry.get_model("bergetai", "google/gemma-4-31B-it")
 
@@ -131,7 +132,8 @@ def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> N
         },
     )
 
-    registry = ModelCatalog.from_files(builtin_path, user_path)
+    registry, warnings = ModelCatalog.from_files(builtin_path, user_path)
+    assert warnings == []
 
     provider = registry.get_provider(" OPENAI ")
     assert provider.name == "OpenAI Proxy"
@@ -159,3 +161,28 @@ def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> N
         "High",
     ]
     assert registry.list_models("anthropic")[0][1] == "claude-sonnet-4-6"
+
+
+def test_invalid_user_config_falls_back_to_builtin_with_warning(tmp_path: Path) -> None:
+    builtin_path = tmp_path / "builtin.json"
+    user_path = tmp_path / "user.json"
+    _write_json(
+        builtin_path,
+        {
+            "providers": {
+                "openai": {
+                    "name": "OpenAI",
+                    "base_url": "https://api.openai.com/v1",
+                    "api": "openai-responses",
+                    "models": [{"id": "gpt-5", "name": "GPT-5"}],
+                }
+            }
+        },
+    )
+    user_path.write_text('{"providers": {"openrouter": ', encoding="utf-8")
+
+    registry, warnings = ModelCatalog.from_files(builtin_path, user_path)
+
+    assert registry.get_provider("openai").name == "OpenAI"
+    assert not registry.has_provider("openrouter")
+    assert [warning.summary for warning in warnings] == ["invalid models.json"]

@@ -37,7 +37,7 @@ def get_commands(
         Command(
             label=_format_provider_label(provider, connected_provider_ids),
             handler=partial(on_select, provider),
-            description=f"Configure {_display_name(provider)} API key",
+            description=provider.description or "",
         )
         for provider in providers
     ]
