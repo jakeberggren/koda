@@ -43,6 +43,45 @@ sbx run --kit "git+https://github.com/jakeberggren/koda.git#ref=main&dir=kit/kod
 This requires Docker Sandboxes, an early-access feature from Docker.
 For setup details, see the [Docker Sandboxes documentation](https://docs.docker.com/ai/sandboxes/).
 
+## Models and Providers
+
+Koda ships with a bundled `models.json` model catalog, which defines
+available providers, provider API compatibility, base URLs, model IDs, context
+windows, output limits, capabilities, and thinking modes.
+
+To add custom providers or to override a built-in provider, use
+`~/.koda/models.json`. Provider and model IDs are matched case-insensitively, and
+user-defined entries take precedence when they use the same IDs as built-in
+entries.
+
+Example `~/.koda/models.json` adding OpenRouter as a provider:
+
+```json
+{
+  "providers": {
+    "openrouter": {
+      "name": "OpenRouter",
+      "description": "Unified Interface with access to all major LLMs",
+      "api": "openai-completions",
+      "base_url": "https://openrouter.ai/api/v1",
+      "models": [
+        {
+          "id": "moonshotai/kimi-k2.6",
+          "name": "Kimi K2.6",
+          "context_window": 256000,
+          "max_output_tokens": 32000
+        }
+      ]
+    }
+  }
+}
+```
+
+The `api` field must be one of Koda's supported provider adapters:
+`openai-responses`, `openai-completions`, or `anthropic-messages`. Configure
+credentials through the TUI provider setup flow or with the provider-specific
+environment variable, such as `OPENROUTER_API_KEY` for the example above.
+
 ## Agent
 
 Koda runs with a small set of built-in tools for reading, searching, editing, and
