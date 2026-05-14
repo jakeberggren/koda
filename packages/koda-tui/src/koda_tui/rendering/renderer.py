@@ -41,7 +41,6 @@ _THEME_COLORS = {
 }
 
 SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
-CURSOR_BLOCK = "\u2588"
 BASH_PREVIEW_LINES = 6
 BASH_PREVIEW_CHARS = 600
 BASH_COMMAND_PREVIEW_CHARS = 120
@@ -396,7 +395,7 @@ class MessageRenderer:
         elif stderr:
             blocks.append(f"stderr:\n{self._preview_text(stderr)}")
 
-        return "\n  \u2514 ".join(blocks)
+        return "\n  └ ".join(blocks)
 
     @staticmethod
     def _bash_command_failed(content: dict[str, Any] | None) -> bool:
@@ -517,10 +516,10 @@ class MessageRenderer:
     def _tool_status_indicator(*, running: bool, error: bool) -> tuple[str, str]:
         """Return (symbol, style) for the tool call status."""
         if running:
-            return ("\u25cf ", "yellow")
+            return ("● ", "yellow")
         if error:
-            return ("\u2715 ", "red")
-        return ("\u2713 ", "green")
+            return ("✕ ", "red")
+        return ("✓ ", "green")
 
     def _build_tool_call_text(
         self,
@@ -599,13 +598,13 @@ class MessageRenderer:
         return self.convert(text)
 
     def render_streaming_content(self, content: str) -> FormattedText:
-        """Render currently streaming content with cursor inside a panel."""
-        md = self._markdown_cls(content + CURSOR_BLOCK)
+        """Render currently streaming content inside a panel."""
+        md = self._markdown_cls(content)
         return self.convert(md)
 
     def render_thinking_content(self, content: str) -> FormattedText:
         """Render currently streaming thinking content."""
-        return self._render_thinking_markdown(content + CURSOR_BLOCK)
+        return self._render_thinking_markdown(content)
 
     def render_thinking_spinner(self, text: str = "Working... (esc to interrupt)") -> FormattedText:
         """Render an animated thinking spinner."""
