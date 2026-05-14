@@ -7,7 +7,7 @@ from prompt_toolkit.keys import Keys
 
 from koda_common.logging import get_logger
 from koda_tui import actions
-from koda_tui.ui.palette.commands.command import Command
+from koda_tui.ui.palette.commands.command import Command, CommandStatus
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -48,13 +48,10 @@ def open_session_list(
     )
 
 
-def _format_session_label(session: SessionInfo, active_session: SessionInfo | None) -> str:
-    """Format session label with timestamp, message count, and active status."""
+def _format_session_label(session: SessionInfo) -> str:
+    """Format session label with timestamp and message count."""
     timestamp = session.created_at.strftime("%Y-%m-%d")
-    label = f"{session.name}  [{timestamp}] ({session.message_count} messages)"
-    if active_session is not None and session.session_id == active_session.session_id:
-        label += " [active]"
-    return label
+    return f"{session.name}  [{timestamp}] ({session.message_count} messages)"
 
 
 def _switch_session(
@@ -135,8 +132,13 @@ def get_commands(  # noqa: C901
 
     command_sessions: list[tuple[Command, SessionInfo]] = []
     for session in sessions:
+        status = (
+            CommandStatus.CURRENT
+            if active is not None and session.session_id == active.session_id
+            else None
+        )
         cmd = Command(
-            label=_format_session_label(session, active),
+            label=_format_session_label(session),
             handler=partial(
                 _switch_session,
                 session,
@@ -145,6 +147,7 @@ def get_commands(  # noqa: C901
                 palette_manager,
                 cancel_streaming,
             ),
+            status=status,
         )
         command_sessions.append((cmd, session))
 

@@ -29,6 +29,8 @@ if TYPE_CHECKING:
 
     from koda_tui.ui.palette.commands import Command
 
+from koda_tui.ui.palette.commands.command import CommandStatus
+
 
 class PaletteListControl(UIControl):
     """Scrollable command list control used inside the command palette."""
@@ -332,9 +334,22 @@ class CommandPalette:
         """Build a formatted row for a single command."""
         style = "class:palette.selected" if is_selected else "class:palette.item"
         dim_style = "class:palette.selected" if is_selected else "class:palette.dim"
-        prefix = "- " if is_selected else "  "
+        marker_style = "class:palette.marker"
+        current_style = (
+            "class:palette.current"
+            if cmd.status is CommandStatus.CURRENT and not is_selected
+            else style
+        )
         padded_label = cmd.label.ljust(max_label_width)
-        line: StyleAndTextTuples = [(style, f"{prefix}{padded_label}")]
+        line: StyleAndTextTuples = []
+        if cmd.status in {CommandStatus.CONNECTED, CommandStatus.CURRENT}:
+            marker_render_style = style if is_selected else marker_style
+            line.append((marker_render_style, "* "))
+        elif is_selected:
+            line.append((style, "- "))
+        else:
+            line.append((style, "  "))
+        line.append((current_style, padded_label))
         if cmd.description:
             line.append((dim_style, f"  {cmd.description}"))
         return _PaletteRow(kind="item", text=FormattedText(line), command=cmd)
