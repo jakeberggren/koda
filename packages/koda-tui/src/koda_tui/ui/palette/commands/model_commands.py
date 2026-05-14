@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from koda_tui.ui.palette.commands.command import Command
+from koda_tui.ui.palette.commands.command import Command, CommandStatus
 
 _MAX_MODEL_LABEL_LENGTH = 24
 _ELLIPSIS = "..."
@@ -25,21 +25,6 @@ def _truncate_label(label: str, max_length: int) -> str:
     return label[: max_length - len(_ELLIPSIS)] + _ELLIPSIS
 
 
-def _format_model_label(
-    model: ModelDefinition,
-    active_provider_id: str | None,
-    active_model_id: str | None,
-) -> str:
-    """Format model label with active status."""
-
-    suffix = (
-        " [active]" if active_provider_id == model.provider and active_model_id == model.id else ""
-    )
-    max_name_length = max(_MAX_MODEL_LABEL_LENGTH - len(suffix), 0)
-    label = _truncate_label(model.name, max_name_length)
-    return label + suffix
-
-
 def get_commands(
     models: list[ModelDefinition],
     providers: list[ProviderDefinition],
@@ -53,10 +38,15 @@ def get_commands(
 
     return [
         Command(
-            label=_format_model_label(model, active_provider_id, active_model_id),
+            label=_truncate_label(model.name, _MAX_MODEL_LABEL_LENGTH),
             handler=partial(on_select, model),
             description=model.description or "",
             group=provider_names[model.provider],
+            status=(
+                CommandStatus.CURRENT
+                if active_provider_id == model.provider and active_model_id == model.id
+                else None
+            ),
         )
         for model in models
     ]

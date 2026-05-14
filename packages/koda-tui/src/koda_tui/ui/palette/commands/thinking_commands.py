@@ -3,21 +3,12 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from koda_tui.ui.palette.commands.command import Command
+from koda_tui.ui.palette.commands.command import Command, CommandStatus
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from koda_service.types import ThinkingOption, ThinkingOptionId
-
-
-def _format_label(option: ThinkingOption, active_thinking: ThinkingOptionId) -> str:
-    """Format a thinking option label with active status."""
-
-    label = option.label
-    if active_thinking == option.id:
-        label += " [active]"
-    return label
 
 
 def get_commands(
@@ -29,9 +20,10 @@ def get_commands(
 
     return [
         Command(
-            label=_format_label(option, active_thinking),
+            label=option.label,
             handler=partial(on_select, option.id),
             description=option.description or "Select model reasoning effort",
+            status=CommandStatus.CURRENT if active_thinking == option.id else None,
         )
         for option in options
     ]
