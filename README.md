@@ -104,9 +104,7 @@ The built-in `bash` tool supports configurable command execution modes:
 - `host` - Default, non-sandboxed execution on the local machine. This is
   intended for trusted environments, such as when Koda itself is already running
   inside a Docker Sandboxes microVM.
-- `docker` - Runs each command in a short-lived Docker container with the
-  workspace mounted in.
-- `seatbelt` - Runs each command with macOS `sandbox-exec`, blocking network
+- `seatbelt` - Runs each command with macOS `sandbox-exec`, allowing network
   access and limiting writes to the workspace plus temporary storage.
 - `bubblewrap` - Planned Linux sandbox mode. Not yet available.
 

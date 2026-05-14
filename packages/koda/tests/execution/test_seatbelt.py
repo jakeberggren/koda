@@ -1,9 +1,11 @@
 import asyncio
+import http.server
 import os
 import platform
 import shlex
 import shutil
 import subprocess
+import threading
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -110,7 +112,7 @@ class TestSeatbeltCommandExecutor:
         assert captured["kwargs"]["env"]["HOME"] == captured["kwargs"]["env"]["TMPDIR"]
         assert captured["kwargs"]["env"]["XDG_CACHE_HOME"] == captured["kwargs"]["env"]["TMPDIR"]
         profile = args[2]
-        assert "(deny network*)" in profile
+        assert "(allow network*)" in profile
         assert _CONFIGD_RULE in profile
         assert "(allow file-read*)" in profile
         assert f'(subpath "{tmp_path}")' in profile
@@ -245,15 +247,33 @@ class TestSeatbeltCommandExecutor:
         not _sandbox_exec_usable() or shutil.which("curl") is None,
         reason="sandbox-exec must be usable and curl installed",
     )
-    async def test_run_blocks_network_access(self, tmp_path: Path) -> None:
+    async def test_run_allows_network_access(self, tmp_path: Path) -> None:
         executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
-        project_root = Path.cwd()
 
-        result = await executor.run(
-            command="curl -I https://example.com",
-            cwd=str(project_root),
-            sandbox_dir=str(project_root),
-            timeout_seconds=30,
-        )
+        class _Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"seatbelt-network-ok")
 
-        assert result.exit_code != 0
+            def log_message(self, format: str, *args: object) -> None:
+                del format, args
+
+        server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+
+        try:
+            host, port = cast("tuple[str, int]", server.server_address)
+            result = await executor.run(
+                command=f"curl --fail --silent http://{host}:{port}",
+                cwd=str(tmp_path),
+                sandbox_dir=str(tmp_path),
+                timeout_seconds=5,
+            )
+        finally:
+            server.shutdown()
+            server.server_close()
+
+        assert result.stdout == "seatbelt-network-ok"
+        assert result.exit_code == 0

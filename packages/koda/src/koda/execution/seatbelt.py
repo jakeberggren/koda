@@ -103,7 +103,7 @@ class SeatbeltCommandExecutor(CommandExecutor):
                         "(version 1)",
                         '(import "system.sb")',
                         "(deny default)",
-                        "(deny network*)",
+                        "(allow network*)",
                         "(allow process-fork)",
                         "(allow signal (target self))",
                         "(allow sysctl-read)",
