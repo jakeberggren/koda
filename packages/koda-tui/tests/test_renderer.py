@@ -252,6 +252,14 @@ class TestMessageRendererStreaming:
         content = "".join(t[1] for t in result)
         assert "Hello wor" in content
 
+    def test_render_thinking_spinner_has_no_trailing_newline(
+        self, converter: MessageRenderer
+    ) -> None:
+        """render_thinking_spinner() should not emit a trailing newline."""
+        result = list(converter.render_thinking_spinner())
+        assert result
+        assert result[-1][1] != "\n"
+
     def test_render_thinking_content_renders_markdown(self, converter: MessageRenderer) -> None:
         """render_thinking_content() should parse markdown markers."""
         result = converter.render_thinking_content("**Exploring the meaning of 42**")

@@ -1,6 +1,8 @@
 """Layout composition for Koda TUI."""
 
+from prompt_toolkit.filters import Condition
 from prompt_toolkit.layout import (
+    ConditionalContainer,
     FloatContainer,
     HSplit,
     Layout,
@@ -14,12 +16,14 @@ from koda_tui.components import (
     FileSuggestions,
     InputArea,
     QueuedInputs,
+    ResponseIndicatorControl,
     StatusBarControl,
 )
 from koda_tui.rendering import MessageRenderer
 from koda_tui.state import AppState
 
 SEPARATOR_HEIGHT = 1
+RESPONSE_INDICATOR_HEIGHT = 2
 STATUS_BAR_HEIGHT = 1
 
 
@@ -32,6 +36,7 @@ class TUILayout:
 
         # Initialize components
         self.chat_area = ChatAreaControl(state, self.renderer)
+        self.response_indicator = ResponseIndicatorControl(state, self.renderer)
         self.queued_inputs = QueuedInputs(state)
         self.input_area = InputArea(state)
         self.file_suggestions = FileSuggestions(self.input_area)
@@ -43,6 +48,14 @@ class TUILayout:
             content=self.chat_area,
             style="class:chat-area",
             right_margins=[ChatScrollbarMargin(self.chat_area, self._state)],
+        )
+        response_indicator = ConditionalContainer(
+            content=Window(
+                content=self.response_indicator,
+                height=RESPONSE_INDICATOR_HEIGHT,
+                style="class:status-bar",
+            ),
+            filter=Condition(lambda: self._state.is_streaming),
         )
         separator = Window(
             height=SEPARATOR_HEIGHT,
@@ -64,6 +77,7 @@ class TUILayout:
                 [
                     Box(chat_area, padding=0, padding_left=1, padding_top=1),
                     separator,
+                    response_indicator,
                     queued_inputs,
                     file_suggestions,
                     input,  # Dynamic height 1-10 lines

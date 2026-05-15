@@ -191,13 +191,6 @@ class ChatAreaControl(UIControl):
                 self._state.current_streaming_content
             )
             all_lines.extend(self._split_into_lines(fragment, width))
-        elif self._state.is_streaming:
-            all_lines.extend(
-                self._split_into_lines(
-                    self._renderer.render_thinking_spinner(),
-                    width,
-                )
-            )
 
         return all_lines or [FormattedText([])]
 

@@ -245,6 +245,18 @@ class MessageRenderer:
         self._colors = _THEME_COLORS.get(theme, _THEME_COLORS["dark"])
         self._markdown_cls = _create_themed_markdown(self._colors["code_theme"])
 
+    @staticmethod
+    def _trim_leading_newline_fragments(fragments: list[tuple[str, str]]) -> None:
+        """Trim leading newline-only fragments in place."""
+        while fragments and fragments[0][1] == "\n":
+            fragments.pop(0)
+
+    @staticmethod
+    def _trim_trailing_newline_fragments(fragments: list[tuple[str, str]]) -> None:
+        """Trim trailing newline-only fragments in place."""
+        while fragments and fragments[-1][1] == "\n":
+            fragments.pop()
+
     def convert(self, renderable) -> FormattedText:
         """Convert Rich renderable directly to prompt_toolkit FormattedText."""
         console = Console(width=self._width, force_terminal=True, no_color=False)
@@ -259,9 +271,9 @@ class MessageRenderer:
                 if not seg.control and seg.text
             )
 
-        # Strip leading newlines (Rich Markdown may emit them)
-        while result and result[0][1] == "\n":
-            result.pop(0)
+        # Strip incidental line breaks emitted by Rich renderables.
+        self._trim_leading_newline_fragments(result)
+        self._trim_trailing_newline_fragments(result)
 
         return FormattedText(result)
 
@@ -610,7 +622,7 @@ class MessageRenderer:
         """Render an animated thinking spinner."""
         frame_index = int(time.time() * 10) % len(SPINNER_FRAMES)
         frame = SPINNER_FRAMES[frame_index]
-
+        # koda was here
         rich_text = Text()
         rich_text.append(f"{frame} ", style="cyan")
         rich_text.append(text, style="dim italic")
