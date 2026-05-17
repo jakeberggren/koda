@@ -59,8 +59,30 @@ def _subpath_rule_lines(*paths: Path) -> list[str]:
     return [f'    (subpath "{_escape_profile_path(path)}")' for path in sorted(subpaths)]
 
 
+def _readable_runtime_paths(
+    *,
+    sandbox_dir: Path,
+    temp_dir: Path,
+    home_dir: Path,
+) -> tuple[Path, ...]:
+    return (
+        Path("/System"),
+        Path("/dev/null"),
+        Path("/usr"),
+        Path("/bin"),
+        Path("/Library"),
+        Path("/etc"),
+        Path("/opt/homebrew"),
+        Path("/private/etc"),
+        Path("/usr/local"),
+        sandbox_dir,
+        temp_dir,
+        home_dir,
+    )
+
+
 class SeatbeltCommandExecutor(CommandExecutor):
-    """Execute commands in a macOS sandbox with broad reads and scoped writes."""
+    """Execute commands in a macOS sandbox with scoped reads and writes."""
 
     def __init__(self, settings: SettingsManager) -> None:
         self._settings = settings
@@ -68,7 +90,6 @@ class SeatbeltCommandExecutor(CommandExecutor):
     @staticmethod
     def _execution_env(temp_dir: Path) -> dict[str, str]:
         env = dict(os.environ)
-        env["HOME"] = str(temp_dir)
         env["TEMP"] = str(temp_dir)
         env["TMP"] = str(temp_dir)
         env["TMPDIR"] = str(temp_dir)
@@ -76,6 +97,7 @@ class SeatbeltCommandExecutor(CommandExecutor):
         # would normally write under ~/.cache keep working under seatbelt's
         # restricted write policy.
         env["XDG_CACHE_HOME"] = str(temp_dir)
+        env["XDG_STATE_HOME"] = str(temp_dir)
         return env
 
     async def run(
@@ -98,6 +120,24 @@ class SeatbeltCommandExecutor(CommandExecutor):
             with tempfile.TemporaryDirectory(prefix="koda-seatbelt-") as temp_dir_name:
                 # Give the sandbox one ephemeral writable area for temp files and caches.
                 temp_dir = Path(temp_dir_name)
+                env = self._execution_env(temp_dir)
+                home_dir = Path(env["HOME"])
+
+                readable_paths = _readable_runtime_paths(
+                    sandbox_dir=resolved_sandbox_dir,
+                    temp_dir=temp_dir,
+                    home_dir=home_dir,
+                )
+
+                read_rule_lines = _subpath_rule_lines(*readable_paths)
+                read_metadata_rule = ["(allow file-read-metadata", *read_rule_lines, ")"]
+                read_data_rule = ["(allow file-read-data", *read_rule_lines, ")"]
+                write_rule = [
+                    "(allow file-write*",
+                    *_subpath_rule_lines(resolved_sandbox_dir, temp_dir),
+                    ")",
+                ]
+
                 profile = "\n".join(
                     [
                         "(version 1)",
@@ -109,14 +149,16 @@ class SeatbeltCommandExecutor(CommandExecutor):
                         "(allow sysctl-read)",
                         # Allow macOS SystemConfiguration lookups for tool compatibility.
                         '(allow mach-lookup (global-name "com.apple.SystemConfiguration.configd"))',
-                        "(allow file-read*)",
+                        # Allow developer CLIs to use Keychain-backed credentials.
+                        '(allow mach-lookup (global-name "com.apple.SecurityServer"))',
+                        *read_metadata_rule,
+                        *read_data_rule,
                         "(allow file-map-executable process-exec)",
                         # Restrict writes to the workspace and this run's scratch dir.
-                        "(allow file-write*",
-                        *_subpath_rule_lines(resolved_sandbox_dir, temp_dir),
-                        ")",
+                        *write_rule,
                     ]
                 )
+
                 sandbox_exec_path = _get_sandbox_exec_path()
                 bash_path = shutil.which("bash") or "bash"
                 bash_args = ("--noprofile", "--norc", "-c", command)
@@ -128,7 +170,7 @@ class SeatbeltCommandExecutor(CommandExecutor):
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=str(resolved_cwd),
-                    env=self._execution_env(temp_dir),
+                    env=env,
                     start_new_session=True,
                 )
 

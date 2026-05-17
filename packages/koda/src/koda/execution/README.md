@@ -40,11 +40,18 @@ expectations:
 - the host must provide `sandbox-exec`
 - Koda runs `bash --noprofile --norc -c <command>` inside the sandbox
 - network access is allowed
-- filesystem reads are broadly allowed
+- filesystem reads are allowed from common macOS system and toolchain locations,
+  the configured workspace, the temporary scratch directory, and the user's home
+  directory
 - filesystem writes are restricted to the configured workspace and a fresh
   temporary scratch directory for that command
-- `HOME`, `TMP`, `TEMP`, `TMPDIR`, and `XDG_CACHE_HOME` are redirected into that
-  scratch directory so common tools can still write temp files and caches
+- `HOME` is preserved so developer tools can read existing user configuration,
+  while `TMP`, `TEMP`, `TMPDIR`, `XDG_CACHE_HOME`, and `XDG_STATE_HOME` are
+  redirected into the scratch directory so common tools can still write temp
+  files, caches, and state
+- macOS SystemConfiguration and Security Server lookups are allowed, and
+  `/dev/null` is available, so networked developer tools can use normal resolver
+  behavior, subprocess plumbing, and Keychain-backed credentials
 - the command starts with working directory set somewhere under the configured
   workspace
 
@@ -65,9 +72,11 @@ restricted local executor while preserving normal networked developer workflows.
 as fully trusted execution.
 
 `seatbelt` execution adds meaningful restrictions for macOS workflows. Koda runs
-commands under `sandbox-exec`, allows network access and broad reads, and limits
-writes to the workspace plus a per-run scratch directory.
+commands under `sandbox-exec`, allows network access, allows reads from system
+and user developer locations, and limits writes to the workspace plus a per-run
+scratch directory.
 
 `seatbelt` should not be treated as a hardened security boundary for fully
-untrusted or adversarial code. It allows network access and broad filesystem
-reads outside the workspace.
+untrusted or adversarial code. It allows network access and can read user
+configuration and credentials available under the user's home directory or
+through the allowed macOS Security Server path.

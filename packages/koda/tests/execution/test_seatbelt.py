@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from koda_common.settings import SettingsManager
 
 _CONFIGD_RULE = '(allow mach-lookup (global-name "com.apple.SystemConfiguration.configd"))'
+_SECURITYSERVER_RULE = '(allow mach-lookup (global-name "com.apple.SecurityServer"))'
 
 
 @lru_cache(maxsize=1)
@@ -109,13 +110,22 @@ class TestSeatbeltCommandExecutor:
         assert captured["kwargs"]["start_new_session"] is True
         assert captured["kwargs"]["env"]["TMP"] == captured["kwargs"]["env"]["TMPDIR"]
         assert captured["kwargs"]["env"]["TEMP"] == captured["kwargs"]["env"]["TMPDIR"]
-        assert captured["kwargs"]["env"]["HOME"] == captured["kwargs"]["env"]["TMPDIR"]
+        assert captured["kwargs"]["env"]["HOME"] == os.environ["HOME"]
         assert captured["kwargs"]["env"]["XDG_CACHE_HOME"] == captured["kwargs"]["env"]["TMPDIR"]
+        assert captured["kwargs"]["env"]["XDG_STATE_HOME"] == captured["kwargs"]["env"]["TMPDIR"]
         profile = args[2]
         assert "(allow network*)" in profile
         assert _CONFIGD_RULE in profile
-        assert "(allow file-read*)" in profile
+        assert _SECURITYSERVER_RULE in profile
+        assert "com.apple.securityd" not in profile
+        assert "com.apple.securityd.xpc" not in profile
+        assert "(allow file-read*)" not in profile
+        assert "(allow file-read-metadata" in profile
+        assert "(allow file-read-data" in profile
         assert f'(subpath "{tmp_path}")' in profile
+        assert f'(subpath "{os.environ["HOME"]}")' in profile
+        assert '(subpath "/dev/null")' in profile
+        assert '(literal "/dev/null")' not in profile
         assert '(subpath "/tmp")' not in profile
         assert '(subpath "/private/tmp")' not in profile
 
@@ -197,23 +207,34 @@ class TestSeatbeltCommandExecutor:
         not _sandbox_exec_usable(),
         reason="sandbox-exec is unavailable or unusable in this environment",
     )
-    async def test_run_allows_workspace_and_outside_reads(self, tmp_path: Path) -> None:
+    async def test_run_allows_workspace_and_home_reads_but_blocks_other_reads(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
         executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        fake_home = tmp_path.parent / f"{tmp_path.name}-home"
+        fake_home.mkdir()
+        home_file = fake_home / "host-config.txt"
         inside_file = tmp_path / "inside.txt"
         outside_file = tmp_path.parent / f"{tmp_path.name}-outside.txt"
+        monkeypatch.setenv("HOME", str(fake_home))
+        home_file.write_text("home\n")
         inside_file.write_text("inside\n")
         outside_file.write_text("outside\n")
 
         result = await executor.run(
-            command=(f"cat {shlex.quote(str(inside_file))}; cat {shlex.quote(str(outside_file))}"),
+            command=(
+                f"cat {shlex.quote(str(inside_file))}; "
+                f"cat {shlex.quote(str(home_file))}; "
+                f"cat {shlex.quote(str(outside_file))}"
+            ),
             cwd=str(tmp_path),
             sandbox_dir=str(tmp_path),
             timeout_seconds=5,
         )
 
-        assert result.stdout == "inside\noutside\n"
-        assert result.stderr == ""
-        assert result.exit_code == 0
+        assert result.stdout == "inside\nhome\n"
+        assert "Operation not permitted" in result.stderr
+        assert result.exit_code != 0
 
     @pytest.mark.asyncio
     @pytest.mark.skipif(
@@ -275,5 +296,5 @@ class TestSeatbeltCommandExecutor:
             server.shutdown()
             server.server_close()
 
-        assert result.stdout == "seatbelt-network-ok"
+        assert result.stdout == "seatbelt-network-ok", result.stderr
         assert result.exit_code == 0
