@@ -131,6 +131,6 @@ case ":${PATH}:" in
     printf '\n'
     info "${BIN_DIR} is not on your PATH"
     printf 'Add this to your shell profile:\n'
-    printf '  export PATH="%s:$PATH"\n' "${BIN_DIR}"
+    printf '  export PATH="%s:%s"\n' "${BIN_DIR}" "\$PATH"
     ;;
 esac

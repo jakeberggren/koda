@@ -29,8 +29,9 @@ need_cmd() {
 usage() {
   cat <<'EOF'
 Usage:
-  ./ship.sh vX.Y.Z
-  ./ship.sh --wait-only vX.Y.Z
+  ./scripts/release.sh vX.Y.Z
+  ./scripts/release.sh --dry-run vX.Y.Z
+  ./scripts/release.sh --wait-only vX.Y.Z
 
 Environment overrides:
   REMOTE=origin
@@ -46,9 +47,25 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 WAIT_ONLY=false
-if [[ "${1:-}" == "--wait-only" ]]; then
-  WAIT_ONLY=true
+DRY_RUN=false
+while [[ "${1:-}" == --* ]]; do
+  case "$1" in
+    --dry-run)
+      DRY_RUN=true
+      ;;
+    --wait-only)
+      WAIT_ONLY=true
+      ;;
+    *)
+      usage
+      error "unknown option: $1"
+      ;;
+  esac
   shift
+done
+
+if [[ "${WAIT_ONLY}" == true && "${DRY_RUN}" == true ]]; then
+  error "--dry-run cannot be combined with --wait-only"
 fi
 
 VERSION_TAG="${1:-}"
@@ -62,15 +79,15 @@ VERSION="${VERSION_TAG#v}"
 need_cmd git
 need_cmd gh
 
-[[ -z "$(git status --porcelain)" ]] || error "working tree is not clean"
-
-for pyproject in packages/*/pyproject.toml; do
-  if ! grep -q "^version = \"${VERSION}\"$" "${pyproject}"; then
-    error "${pyproject} does not have version ${VERSION}"
-  fi
-done
-
 if [[ "${WAIT_ONLY}" == false ]]; then
+  [[ -z "$(git status --porcelain)" ]] || error "working tree is not clean"
+
+  for pyproject in packages/*/pyproject.toml; do
+    if ! grep -q "^version = \"${VERSION}\"$" "${pyproject}"; then
+      error "${pyproject} does not have version ${VERSION}"
+    fi
+  done
+
   if git rev-parse "${VERSION_TAG}" >/dev/null 2>&1; then
     error "local tag already exists: ${VERSION_TAG}"
   fi
@@ -79,11 +96,13 @@ if [[ "${WAIT_ONLY}" == false ]]; then
     error "remote tag already exists: ${VERSION_TAG}"
   fi
 
-  info "Creating tag ${VERSION_TAG}"
-  git tag "${VERSION_TAG}"
+  if [[ "${DRY_RUN}" == false ]]; then
+    info "Creating tag ${VERSION_TAG}"
+    git tag "${VERSION_TAG}"
 
-  info "Pushing tag ${VERSION_TAG}"
-  git push "${REMOTE}" "${VERSION_TAG}"
+    info "Pushing tag ${VERSION_TAG}"
+    git push "${REMOTE}" "${VERSION_TAG}"
+  fi
 fi
 
 if [[ -n "${RELEASE_ASSET:-}" ]]; then
@@ -94,8 +113,18 @@ fi
 
 EXPECTED_ASSET_NAMES=()
 for asset_template in "${RELEASE_ASSETS[@]}"; do
-  EXPECTED_ASSET_NAMES+=("$(printf "${asset_template}" "${VERSION_TAG}")")
+  EXPECTED_ASSET_NAMES+=("${asset_template//%s/${VERSION_TAG}}")
 done
+
+if [[ "${DRY_RUN}" == true ]]; then
+  info "Dry run passed for ${VERSION_TAG}"
+  printf 'Would create and push tag: %s\n' "${VERSION_TAG}"
+  printf 'Would wait for release assets:\n'
+  for expected_asset_name in "${EXPECTED_ASSET_NAMES[@]}"; do
+    printf '  %s\n' "${expected_asset_name}"
+  done
+  exit 0
+fi
 
 DEADLINE=$((SECONDS + WAIT_TIMEOUT_SECONDS))
 info "Waiting for release assets"
@@ -111,12 +140,14 @@ while true; do
   missing_asset_names=()
   for expected_asset_name in "${EXPECTED_ASSET_NAMES[@]}"; do
     found=false
-    for uploaded_asset_name in "${UPLOADED_ASSET_NAMES[@]}"; do
-      if [[ "${uploaded_asset_name}" == "${expected_asset_name}" ]]; then
-        found=true
-        break
-      fi
-    done
+    if (( ${#UPLOADED_ASSET_NAMES[@]} > 0 )); then
+      for uploaded_asset_name in "${UPLOADED_ASSET_NAMES[@]}"; do
+        if [[ "${uploaded_asset_name}" == "${expected_asset_name}" ]]; then
+          found=true
+          break
+        fi
+      done
+    fi
 
     if [[ "${found}" == false ]]; then
       missing_asset_names+=("${expected_asset_name}")
