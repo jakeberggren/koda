@@ -1,5 +1,6 @@
-from koda.agents.agent import Agent, AgentConfig, AgentConfigError
-from koda.agents.prompts import (
+from koda.agent.agent import Agent, AgentConfig
+from koda.agent.errors import AgentConfigError
+from koda.agent.prompts import (
     PromptContext,
     PromptRenderError,
     PromptSection,

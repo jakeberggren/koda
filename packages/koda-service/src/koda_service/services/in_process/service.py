@@ -42,7 +42,7 @@ if TYPE_CHECKING:
     from pathlib import Path
     from uuid import UUID
 
-    from koda.agents import Agent
+    from koda.agent import Agent
     from koda.llm import LLM
     from koda.sessions.store import SessionStore
     from koda.telemetry import Telemetry

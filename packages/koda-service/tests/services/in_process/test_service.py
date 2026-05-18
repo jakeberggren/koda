@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 from pydantic import BaseModel
 
-from koda.agents.agent import Agent, AgentConfig
+from koda.agent import Agent, AgentConfig
 from koda.llm.types import LLMEvent, LLMRequest, LLMResponse
 from koda.messages import AssistantMessage
 from koda.sessions import InMemorySessionStore, SessionManager

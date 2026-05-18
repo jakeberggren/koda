@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from koda.agents import Agent, AgentConfig, PromptContext, SystemPrompt
+from koda.agent import Agent, AgentConfig, PromptContext, SystemPrompt
 from koda.execution import create_command_executor
 from koda.llm import LLMRequestOptions
 from koda.tools import (

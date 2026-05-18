@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from koda.agents.prompts import (
+from koda.agent.prompts import (
     BEHAVIOR_PROMPT,
     ENVIRONMENT_PROMPT,
     IDENTITY_PROMPT,
