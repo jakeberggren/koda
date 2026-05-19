@@ -5,9 +5,9 @@ from unittest.mock import Mock
 
 import pytest
 
+from koda.llm import ModelDefinition, ThinkingOption
 from koda_common.settings import SettingChange
-from koda_service import ServiceStatus
-from koda_service.types import ModelDefinition, ThinkingOption
+from koda_service import ServiceDiagnostics, ServiceStatus, ServiceStatusCode
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.settings import AppSettings
 from koda_tui.ui.palette.palette_manager import PaletteManager
@@ -53,14 +53,15 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
     service = Mock(
         spec=[
             "ready",
+            "status",
             "update_settings",
             "list_models",
             "list_providers",
-            "list_connected_providers",
-            "list_selectable_models",
-            "warnings",
+            "list_configured_providers",
+            "list_configured_models",
+            "diagnostics",
             "chat",
-            "new_session",
+            "create_session",
             "switch_session",
             "delete_session",
             "list_sessions",
@@ -76,8 +77,8 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
             thinking_options=[ThinkingOption(id="none", label="None")],
         )
     ]
-    service.ready.return_value = ServiceStatus(is_ready=True, summary="Ready")
-    service.warnings.return_value = []
+    service.status.return_value = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
+    service.diagnostics.return_value = ServiceDiagnostics(startup_warnings=[])
     app = KodaTuiApp(
         app_settings=AppSettings(core=settings, tui=tui_settings),
         service=service,

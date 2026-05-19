@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 from typing import TYPE_CHECKING
 
+from koda_service import ChatRequest
 from koda_service.exceptions import ServiceChatError
 from koda_tui.app.response import ResponseLifecycle
 
@@ -58,7 +59,7 @@ class StreamProcessor:
         self._invalidate()
 
     async def _process_stream(self, message: str, service: KodaService) -> None:
-        async for event in service.chat(message):
+        async for event in service.chat(ChatRequest(message=message)):
             self._lifecycle.apply_event(event)
             self._invalidate()
 

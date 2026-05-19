@@ -2,18 +2,24 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_service.types import (
-    ProviderToolStarted,
-    ResponseCompleted,
-    StreamEvent,
-    TextDelta,
-    ThinkingDelta,
-    ToolCallRequested,
+from koda.agent import (
+    AgentEvent,
+    AgentIterationStarted,
+    AgentResponseCompleted,
+    AgentTextDelta,
+    AgentThinkingDelta,
+    AgentToolCallRequested,
+    AgentToolCompleted,
+    AgentToolResultReady,
+    AgentToolStarted,
+    AgentTurnCompleted,
+    AgentTurnStarted,
 )
-from koda_tui.state import AppState, Message, MessageRole, ResponsePhase, TokenUsage, sum_usage
+from koda.sessions import sum_usage
+from koda_tui.state import AppState, Message, MessageRole, ResponsePhase
 
 if TYPE_CHECKING:
-    from koda_service.types import ToolCall
+    from koda.tools import ToolCall
 
 
 class ResponseLifecycle:
@@ -32,20 +38,10 @@ class ResponseLifecycle:
         self._state.current_thinking_content = ""
         self._state.response_phase = ResponsePhase.WORKING
 
-    def set_usage(self, event: ResponseCompleted) -> None:
+    def set_usage(self, event: AgentResponseCompleted) -> None:
         """Accumulate token usage from each completed provider response."""
-        response_usage = (
-            TokenUsage(
-                input_tokens=event.usage.input_tokens,
-                output_tokens=event.usage.output_tokens,
-                cached_tokens=event.usage.cached_tokens,
-                total_tokens=event.usage.total_tokens,
-            )
-            if event.usage is not None
-            else None
-        )
-        self._state.usage = response_usage
-        self._state.total_usage = sum_usage(self._state.total_usage, response_usage)
+        self._state.usage = event.message.usage
+        self._state.total_usage = sum_usage(self._state.total_usage, event.message.usage)
 
     def append_content(self, text: str) -> None:
         """Append text to current streaming content."""
@@ -79,27 +75,30 @@ class ResponseLifecycle:
             )
         )
 
-    def apply_event(self, event: StreamEvent) -> None:
+    def apply_event(self, event: AgentEvent) -> None:  # noqa: C901 - allow complex
         """Apply a streamed service event to the current response state."""
-        if isinstance(event, TextDelta):
+        if isinstance(event, AgentTextDelta):
             self.append_content(event.text)
             return
-        if isinstance(event, ThinkingDelta):
+        if isinstance(event, AgentThinkingDelta):
             self.append_thinking(event.text)
             return
-        if isinstance(event, ResponseCompleted):
+        if isinstance(event, AgentResponseCompleted):
             self.set_usage(event)
             return
-        if isinstance(event, ToolCallRequested | ProviderToolStarted):
+        if isinstance(event, AgentTurnStarted | AgentIterationStarted | AgentTurnCompleted):
+            return
+        if isinstance(event, AgentToolCallRequested | AgentToolStarted):
             self.transition_to_tool(event.call)
             return
-        self.complete_tool(
-            call_id=event.result.call_id,
-            display=event.result.output.display,
-            content=event.result.output.content,
-            is_error=event.result.output.is_error,
-            error_message=event.result.output.error_message,
-        )
+        if isinstance(event, AgentToolResultReady | AgentToolCompleted):
+            self.complete_tool(
+                call_id=event.result.call_id,
+                display=event.result.output.display,
+                content=event.result.output.content,
+                is_error=event.result.output.is_error,
+                error_message=event.result.output.error_message,
+            )
 
     def _set_phase_after_tool_completion(self) -> None:
         """Update phase after a tool completes based on remaining in-flight state."""

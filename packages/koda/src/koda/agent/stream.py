@@ -8,7 +8,6 @@ from koda.llm.types import (
     LLMTextDelta,
     LLMThinkingDelta,
     LLMToolCallRequested,
-    LLMToolCallResult,
     LLMToolCompleted,
     LLMToolStarted,
 )
@@ -57,7 +56,7 @@ class AgentStreamAccumulator:
         if isinstance(event, LLMToolCallRequested):
             self.tool_calls.append(event.call)
             return [event]
-        if isinstance(event, (LLMToolStarted, LLMToolCompleted, LLMToolCallResult)):
+        if isinstance(event, (LLMToolStarted, LLMToolCompleted)):
             return [event]
         if isinstance(event, LLMResponseCompleted):
             self.completed_response = event

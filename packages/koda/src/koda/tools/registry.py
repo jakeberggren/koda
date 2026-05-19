@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from koda.tools import exceptions
 from koda.tools.base import Tool, ToolDefinition
+from koda.tools.decorators import get_builtin_tools
 
 
 class ToolRegistry:
@@ -7,6 +10,12 @@ class ToolRegistry:
 
     def __init__(self) -> None:
         self._tools: dict[str, Tool] = {}
+
+    @classmethod
+    def builtins(cls) -> ToolRegistry:
+        registry = cls()
+        registry.register_all(get_builtin_tools())
+        return registry
 
     def register(self, tool: Tool) -> None:
         """Register a tool in the registry."""

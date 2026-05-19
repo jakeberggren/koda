@@ -1,6 +1,5 @@
 import json
 import re
-import time
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
@@ -14,7 +13,7 @@ from rich.style import Style
 from rich.syntax import Syntax
 from rich.text import Text
 
-from koda_service.types import ToolCall
+from koda.tools import ToolCall
 from koda_tui.state import Message, MessageRole
 
 Theme = Literal["dark", "light"]
@@ -40,7 +39,6 @@ _THEME_COLORS = {
     },
 }
 
-SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 BASH_PREVIEW_LINES = 6
 BASH_PREVIEW_CHARS = 600
 BASH_COMMAND_PREVIEW_CHARS = 120
@@ -425,7 +423,7 @@ class MessageRenderer:
         fragment = self.convert(self._markdown_cls(content, style=Style(dim=True, italic=True)))
         if not add_spacing:
             return fragment
-        return self._combine_formatted_text(fragment, FormattedText([("", "\n")]))
+        return self._combine_formatted_text(fragment, FormattedText([("", "\n\n")]))
 
     def _render_assistant_message(self, message: Message) -> FormattedText:
         fragments: list[FormattedText] = []
@@ -617,13 +615,3 @@ class MessageRenderer:
     def render_thinking_content(self, content: str) -> FormattedText:
         """Render currently streaming thinking content."""
         return self._render_thinking_markdown(content)
-
-    def render_thinking_spinner(self, text: str = "Working... (esc to interrupt)") -> FormattedText:
-        """Render an animated thinking spinner."""
-        frame_index = int(time.time() * 10) % len(SPINNER_FRAMES)
-        frame = SPINNER_FRAMES[frame_index]
-        # koda was here
-        rich_text = Text()
-        rich_text.append(f"{frame} ", style="cyan")
-        rich_text.append(text, style="dim italic")
-        return self.convert(rich_text)

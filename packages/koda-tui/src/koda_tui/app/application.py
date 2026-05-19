@@ -23,9 +23,9 @@ if TYPE_CHECKING:
 
     from prompt_toolkit.output import Output
 
+    from koda.llm import ThinkingOptionId
     from koda_common.settings import SettingChange
     from koda_service import KodaService
-    from koda_service.types import ThinkingOptionId
     from koda_tui.settings import AppSettings
 
 
@@ -64,12 +64,11 @@ class KodaTuiApp:
         self._closed = False
 
         # Initialize state
-        service_status = self._service.ready()
         self.state = AppState(
             workspace_root=self._workspace_root,
             provider_name=self._app_settings.core.provider,
             model_name=self._app_settings.core.model,
-            service_status=service_status,
+            service_status=self._service.status(),
             thinking=resolve_thinking_option(None, self._app_settings.core.thinking),
             context_window=None,
             thinking_supported=False,
@@ -206,8 +205,8 @@ class KodaTuiApp:
     def _refresh_service_state(self) -> None:
         self.state.provider_name = self._app_settings.core.provider
         self.state.model_name = self._app_settings.core.model
-        self.state.service_status = self._service.ready()
-        self.state.warnings = self._service.warnings()
+        self.state.service_status = self._service.status()
+        self.state.warnings = self._service.diagnostics().startup_warnings
 
         active_model = None
         if (

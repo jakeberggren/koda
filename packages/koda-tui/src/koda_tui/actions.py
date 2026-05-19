@@ -10,8 +10,8 @@ from koda_tui.utils.model_selection import normalize_thinking_option, supported_
 if TYPE_CHECKING:
     from uuid import UUID
 
+    from koda.llm import ModelDefinition, ThinkingOptionId
     from koda_service import KodaService
-    from koda_service.types import ModelDefinition, ThinkingOptionId
     from koda_tui.state import AppState
 
 
@@ -53,7 +53,7 @@ def new_session(
     state: AppState,
 ) -> ActionResult[None]:
     """Create a new session and reset conversation state."""
-    service.new_session()
+    service.create_session()
     state.reset_conversation()
     return ActionResult(ok=True)
 
@@ -65,9 +65,11 @@ def switch_session(
 ) -> ActionResult[None]:
     """Switch to a session and sync conversation state."""
     try:
-        _, messages = service.switch_session(session_id)
+        session = service.switch_session(session_id)
         state.reset_conversation()
-        state.messages, state.usage, state.total_usage = convert_messages(messages)
+        state.messages = convert_messages(session.messages)
+        state.usage = session.usage
+        state.total_usage = session.total_usage
         return ActionResult(ok=True)
     except ServiceSessionNotFoundError:
         return ActionResult(ok=False, error="Session not found")

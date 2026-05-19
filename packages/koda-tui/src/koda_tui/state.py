@@ -3,8 +3,10 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any
 
-from koda_service import ServiceStatus
-from koda_service.types import ThinkingOption, ToolCall
+from koda.llm import ThinkingOption
+from koda.messages import TokenUsage
+from koda.tools import ToolCall
+from koda_service import ServiceStatus, ServiceStatusCode
 
 
 class MessageRole(Enum):
@@ -40,45 +42,13 @@ class Message:
 
 
 @dataclass
-class TokenUsage:
-    input_tokens: int | None = None
-    output_tokens: int | None = None
-    cached_tokens: int | None = None
-    total_tokens: int | None = None
-
-    def context_window_percentage(self, context_window: int | None) -> int | None:
-        if context_window is None or context_window <= 0 or self.input_tokens is None:
-            return None
-        return round((self.input_tokens / context_window) * 100)
-
-
-def _sum_usage_value(current: int | None, delta: int | None) -> int | None:
-    if current is None:
-        return delta
-    if delta is None:
-        return current
-    return current + delta
-
-
-def sum_usage(current: TokenUsage | None, delta: TokenUsage | None) -> TokenUsage | None:
-    if current is None:
-        return delta
-    if delta is None:
-        return current
-    return TokenUsage(
-        input_tokens=_sum_usage_value(current.input_tokens, delta.input_tokens),
-        output_tokens=_sum_usage_value(current.output_tokens, delta.output_tokens),
-        cached_tokens=_sum_usage_value(current.cached_tokens, delta.cached_tokens),
-        total_tokens=_sum_usage_value(current.total_tokens, delta.total_tokens),
-    )
-
-
-@dataclass
 class AppState:
     """Shared application state as single source of truth for the UI."""
 
     workspace_root: Path
-    service_status: ServiceStatus = field(default_factory=ServiceStatus)
+    service_status: ServiceStatus = field(
+        default_factory=lambda: ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
+    )
     warnings: list[str] = field(default_factory=list)
     messages: list[Message] = field(default_factory=list)
     current_streaming_content: str = ""

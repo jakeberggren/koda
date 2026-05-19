@@ -3,18 +3,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Sequence
+    from collections.abc import AsyncIterator
     from uuid import UUID
 
+    from koda.sessions import Session
     from koda_common.settings import SettingsManager
-    from koda_service.services.in_process.service import ServiceStatus
-    from koda_service.types import SessionInfo
+    from koda_service.models import ChatRequest, ServiceDiagnostics, ServiceStatus
 
 
 class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):
     """Composite service boundary used by Koda clients."""
 
-    def ready(self) -> ServiceStatus:
+    def status(self) -> ServiceStatus:
         """Return the service status for the current configuration."""
         ...
 
@@ -22,7 +22,7 @@ class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):
         """Update the service settings."""
         ...
 
-    def chat(self, message: str) -> AsyncIterator[EventT]:
+    def chat(self, request: ChatRequest) -> AsyncIterator[EventT]:
         """Send a message and stream response events."""
         ...
 
@@ -30,7 +30,7 @@ class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):
         """List available providers."""
         ...
 
-    def list_connected_providers(self) -> list[ProviderT]:
+    def list_configured_providers(self) -> list[ProviderT]:
         """List configured providers that currently have credentials."""
         ...
 
@@ -38,28 +38,28 @@ class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):
         """List available models, optionally filtered by provider."""
         ...
 
-    def warnings(self) -> list[str]:
-        """List non-fatal startup/configuration warnings."""
+    def diagnostics(self) -> ServiceDiagnostics:
+        """Return non-blocking service diagnostics."""
         ...
 
-    def list_selectable_models(self) -> list[ModelT]:
-        """List models for currently connected providers."""
+    def list_configured_models(self) -> list[ModelT]:
+        """List models whose providers currently have configured credentials."""
         ...
 
-    def active_session(self) -> SessionInfo | None:
+    def active_session(self) -> Session | None:
         """Get the currently active session, if any."""
         ...
 
-    def list_sessions(self) -> list[SessionInfo]:
+    def list_sessions(self) -> list[Session]:
         """List available sessions."""
         ...
 
-    def new_session(self) -> SessionInfo:
+    def create_session(self) -> Session:
         """Create a new session."""
         ...
 
-    def switch_session(self, session_id: UUID) -> tuple[SessionInfo, Sequence[MessageT]]:
-        """Switch to a different session. Returns session info and messages."""
+    def switch_session(self, session_id: UUID) -> Session:
+        """Switch to a different session."""
         ...
 
     def delete_session(self, session_id: UUID) -> None:

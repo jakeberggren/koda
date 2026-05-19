@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from koda_service.types import ModelDefinition, ProviderDefinition, ThinkingOption
+from koda.llm import ModelDefinition, ProviderDefinition, ThinkingOption
 from koda_tui.ui.palette.command_palette import CommandPalette, PaletteOptions
 from koda_tui.ui.palette.commands import model_commands, provider_commands, thinking_commands
 from koda_tui.ui.palette.commands.command import Command, CommandStatus

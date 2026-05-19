@@ -87,12 +87,6 @@ class LLMToolCallRequested:
 
 
 @dataclass(frozen=True, slots=True)
-class LLMToolCallResult:
-    tool_name: str
-    result: ToolResult
-
-
-@dataclass(frozen=True, slots=True)
 class LLMToolStarted:
     call: ToolCall
 
@@ -112,7 +106,6 @@ LLMEvent = (
     LLMTextDelta
     | LLMThinkingDelta
     | LLMToolCallRequested
-    | LLMToolCallResult
     | LLMToolStarted
     | LLMToolCompleted
     | LLMResponseCompleted

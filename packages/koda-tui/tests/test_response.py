@@ -1,4 +1,6 @@
-from koda_service.types import AssistantMessage, ResponseCompleted, TokenUsage, ToolCall
+from koda.agent import AgentResponseCompleted, AgentToolCompleted, AgentToolResultReady
+from koda.messages import AssistantMessage, TokenUsage
+from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda_tui.app.response import ResponseLifecycle
 from koda_tui.state import AppState, MessageRole, ResponsePhase
 
@@ -111,6 +113,30 @@ class TestResponseLifecycle:
         lifecycle.end()
         assert state.active_tools == {}
         assert state.response_phase is ResponsePhase.IDLE
+
+    def test_result_ready_updates_tool_before_ordered_completion(
+        self, state: AppState, lifecycle: ResponseLifecycle
+    ) -> None:
+        """Progress result events should mark tools done before persisted completion events."""
+        tool_a = ToolCall(tool_name="read_file", arguments={}, call_id="a")
+        tool_b = ToolCall(tool_name="grep", arguments={}, call_id="b")
+        result_b = ToolResult(call_id="b", output=ToolOutput(display="matched"))
+
+        lifecycle.begin("msg")
+        lifecycle.transition_to_tool(tool_a)
+        lifecycle.transition_to_tool(tool_b)
+
+        lifecycle.apply_event(AgentToolResultReady(tool_name="grep", result=result_b))
+
+        assert state.active_tools == {"a": tool_a}
+        assert state.messages[1].tool_running is True
+        assert state.messages[2].tool_running is False
+        assert state.messages[2].tool_result_display == "matched"
+
+        lifecycle.apply_event(AgentToolCompleted(tool_name="grep", result=result_b))
+
+        assert state.active_tools == {"a": tool_a}
+        assert state.messages[2].tool_result_display == "matched"
 
     def test_end_completes_active_tools(
         self, state: AppState, lifecycle: ResponseLifecycle
@@ -270,17 +296,19 @@ class TestResponseLifecycle:
     def test_response_completed_persists_usage(
         self, state: AppState, lifecycle: ResponseLifecycle
     ) -> None:
-        """ResponseCompleted should persist latest usage for the status bar."""
+        """AgentResponseCompleted should persist latest usage for the status bar."""
         lifecycle.begin("msg")
 
         lifecycle.apply_event(
-            ResponseCompleted(
-                output=AssistantMessage(content="done"),
-                usage=TokenUsage(
-                    input_tokens=2_000,
-                    output_tokens=500,
-                    cached_tokens=100,
-                    total_tokens=2_500,
+            AgentResponseCompleted(
+                message=AssistantMessage(
+                    content="done",
+                    usage=TokenUsage(
+                        input_tokens=2_000,
+                        output_tokens=500,
+                        cached_tokens=100,
+                        total_tokens=2_500,
+                    ),
                 ),
             )
         )
@@ -299,14 +327,14 @@ class TestResponseLifecycle:
     def test_end_persists_buffered_content_even_after_response_completed(
         self, state: AppState, lifecycle: ResponseLifecycle
     ) -> None:
-        """ResponseCompleted should not replace the buffered assistant content path."""
+        """AgentResponseCompleted should not replace the buffered assistant content path."""
         lifecycle.begin("msg")
         lifecycle.append_thinking("partial thinking")
         lifecycle.append_content("partial content")
 
         lifecycle.apply_event(
-            ResponseCompleted(
-                output=AssistantMessage(
+            AgentResponseCompleted(
+                message=AssistantMessage(
                     content="final content",
                     thinking_content="final thinking",
                 )

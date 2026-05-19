@@ -215,6 +215,14 @@ class TestExecuteCall:
 class TestExecuteCalls:
     """Tests for parallel tool execution."""
 
+    @staticmethod
+    async def _collect_results(
+        executor: ToolExecutor,
+        calls: list[ToolCall],
+        context: ToolContext,
+    ) -> list[ToolResult]:
+        return [result async for _, result in executor.execute_calls(calls, context)]
+
     @pytest.mark.asyncio
     async def test_multiple_calls_preserve_call_ids(
         self, registry: ToolRegistry, context: ToolContext
@@ -229,7 +237,7 @@ class TestExecuteCalls:
             ToolCall(tool_name="simple_tool", arguments={"name": "C"}, call_id="call_c"),
         ]
 
-        results = await executor.execute_calls(calls, context)
+        results = await self._collect_results(executor, calls, context)
 
         assert len(results) == len(calls)
         call_ids = {r.call_id for r in results}
@@ -237,7 +245,7 @@ class TestExecuteCalls:
 
     @pytest.mark.asyncio
     async def test_parallel_execution(self, registry: ToolRegistry, context: ToolContext) -> None:
-        """Tool calls execute in parallel via asyncio.gather."""
+        """Tool calls execute in parallel."""
         registry.register(SimpleTool())
         executor = ToolExecutor(registry)
 
@@ -246,11 +254,12 @@ class TestExecuteCalls:
             for i in range(10)
         ]
 
-        results = await executor.execute_calls(calls, context)
+        results = await self._collect_results(executor, calls, context)
 
         assert len(results) == len(calls)
-        for i, result in enumerate(results):
-            assert result.call_id == f"call_{i}"
+        call_ids = {result.call_id for result in results}
+        assert call_ids == {f"call_{i}" for i in range(10)}
+        for result in results:
             assert result.output.is_error is False
 
     @pytest.mark.asyncio
@@ -275,7 +284,7 @@ class TestExecuteCalls:
             ),
         ]
 
-        results = await executor.execute_calls(calls, context)
+        results = await self._collect_results(executor, calls, context)
 
         assert all(result.output.is_error is False for result in results)
         resolved = context.policy.resolve_path("shared.txt", cwd=context.cwd)
@@ -311,7 +320,7 @@ class TestExecuteCalls:
             ),
         ]
 
-        results = await executor.execute_calls(calls, context)
+        results = await self._collect_results(executor, calls, context)
 
         assert all(result.output.is_error is False for result in results)
         assert shared_tool.max_active == 2
@@ -391,7 +400,7 @@ class TestExecuteCalls:
             ToolCall(tool_name="error_tool", arguments={"name": "fail"}, call_id="call_fail"),
         ]
 
-        results = await executor.execute_calls(calls, context)
+        results = await self._collect_results(executor, calls, context)
 
         assert len(results) == len(calls)
 

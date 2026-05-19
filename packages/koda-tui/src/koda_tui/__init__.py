@@ -15,9 +15,9 @@ from koda_common.settings import (
     SettingsManager,
     SettingsStore,
 )
-from koda_service import InProcessAgentConfig
-from koda_service.exceptions import StartupError, startup_error_from_settings_error
-from koda_service.services.in_process import InProcessKodaService
+from koda_service import LocalRuntimeConfig
+from koda_service.exceptions import StartupError
+from koda_service.services.local import LocalKodaService
 from koda_tui.app import KodaTuiApp
 from koda_tui.settings import AppSettings, TuiSettingsManager
 from koda_tui.state import AppState
@@ -36,16 +36,15 @@ def build_app(
     settings_store: SettingsStore,
     secrets_store: SecretsStore,
     telemetry: Telemetry,
-    agent_config: InProcessAgentConfig,
+    runtime_config: LocalRuntimeConfig,
 ) -> KodaTuiApp:
     core_settings = SettingsManager(settings_store=settings_store, secrets_store=secrets_store)
     tui_settings = TuiSettingsManager(settings_store=settings_store)
     app_settings = AppSettings(core=core_settings, tui=tui_settings)
-    service = InProcessKodaService(
+    service = LocalKodaService(
         settings=core_settings,
-        sandbox_dir=workspace_root,
+        runtime=runtime_config,
         telemetry=telemetry,
-        agent_config=agent_config,
     )
     return KodaTuiApp(
         app_settings=app_settings,
@@ -66,11 +65,17 @@ def main() -> None:
             settings_store=JsonFileSettingsStore(),
             secrets_store=JsonFileSecretsStore(),
             telemetry=LangfuseTelemetry(),
-            agent_config=InProcessAgentConfig(cwd=workspace_root),
+            runtime_config=LocalRuntimeConfig(
+                cwd=workspace_root,
+                sandbox_dir=workspace_root,
+            ),
         )
         asyncio.run(app.run())
-    except (SecretsLoadError, SettingsLoadError) as error:
-        _report_startup_error(startup_error_from_settings_error(error), logger)
+    except SecretsLoadError as error:
+        _report_startup_error(StartupError.from_secrets_load_error(error), logger)
+        sys.exit(1)
+    except SettingsLoadError as error:
+        _report_startup_error(StartupError.from_settings_load_error(error), logger)
         sys.exit(1)
     except StartupError as error:
         _report_startup_error(error, logger)
