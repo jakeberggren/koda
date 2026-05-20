@@ -17,8 +17,8 @@ from koda_tui.utils.model_selection import find_model, supported_thinking_option
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from koda.llm import ModelDefinition, ProviderDefinition, ThinkingOptionId
     from koda_service import KodaService
-    from koda_service.types import ModelDefinition, ProviderDefinition, ThinkingOptionId
     from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
@@ -29,7 +29,7 @@ log = get_logger(__name__)
 def _has_connected_provider(
     service: KodaService,
 ) -> bool:
-    return bool(service.list_connected_providers())
+    return bool(service.list_configured_providers())
 
 
 def _select_model(
@@ -39,7 +39,7 @@ def _select_model(
     app_settings: AppSettings,
     palette_manager: PaletteManager,
 ) -> None:
-    current_models = service.list_selectable_models()
+    current_models = service.list_configured_models()
     current_model = find_model(
         current_models,
         provider=app_settings.core.provider,
@@ -143,7 +143,7 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
 
     def cmd_connect_provider() -> None:
         providers = service.list_providers()
-        connected_provider_ids = {provider.id for provider in service.list_connected_providers()}
+        connected_provider_ids = {provider.id for provider in service.list_configured_providers()}
         commands = provider_commands.get_commands(
             providers=providers,
             connected_provider_ids=connected_provider_ids,
@@ -157,7 +157,7 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
         palette_manager.open_palette(commands, list_heading="Configure LLM Provider API Key")
 
     def cmd_switch_model() -> None:
-        models = service.list_selectable_models()
+        models = service.list_configured_models()
         providers = service.list_providers()
         commands = model_commands.get_commands(
             models=models,

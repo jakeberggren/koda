@@ -70,13 +70,7 @@ def _default_sections() -> tuple[PromptSection, ...]:
 
 @dataclass(frozen=True, slots=True)
 class SystemPrompt:
-    """Composable immutable system prompt.
-
-    Prompt behavior comes from ordered sections, not hard-coded top-level fields.
-    That keeps the core model stable as new prompt features are added.
-
-    `override` bypasses normal section rendering entirely and is returned as-is.
-    """
+    """Composable immutable system prompt."""
 
     sections: tuple[PromptSection, ...] = field(default_factory=_default_sections)
     override: str | None = None
@@ -114,28 +108,7 @@ def _render_section(section: PromptSection, context: PromptContext | None) -> st
 
 
 def render_prompt(prompt: SystemPrompt, context: PromptContext | None = None) -> str | None:
-    """Render a system prompt into its final string form.
-
-    Returns the prompt override when one is set. Otherwise, renders each section,
-    drops sections whose normalized content is empty, and joins the remaining
-    section texts with blank lines. Returns ``None`` when no section produces
-    content.
-
-    Args:
-        prompt: The prompt definition to render.
-        context: Optional values used to fill template variables in templated
-            sections.
-
-    Returns:
-        The fully rendered prompt string, or ``None`` if the prompt renders to no
-        content.
-
-    Raises:
-        PromptContextRequiredError: If a section is marked as templated but no
-            ``context`` is provided.
-        PromptVariableMissingError: If a templated section references a variable
-            that is not available in ``context``.
-    """
+    """Render a system prompt into its final string form."""
 
     if prompt.override is not None:
         return prompt.override

@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
+    from koda.sessions import Session
     from koda_service import KodaService
-    from koda_service.types import SessionInfo
     from koda_tui.actions import ActionResult, DeleteSessionPayload
     from koda_tui.state import AppState
     from koda_tui.ui.palette.palette_manager import PaletteManager
@@ -48,14 +48,14 @@ def open_session_list(
     )
 
 
-def _format_session_label(session: SessionInfo) -> str:
+def _format_session_label(session: Session) -> str:
     """Format session label with timestamp and message count."""
     timestamp = session.created_at.strftime("%Y-%m-%d")
-    return f"{session.name}  [{timestamp}] ({session.message_count} messages)"
+    return f"{session.display_name}  [{timestamp}] ({session.message_count} messages)"
 
 
 def _switch_session(
-    session: SessionInfo,
+    session: Session,
     service: KodaService,
     state: AppState,
     palette_manager: PaletteManager,
@@ -76,7 +76,7 @@ def _switch_session(
 
 
 def _confirm_delete_session(
-    session: SessionInfo,
+    session: Session,
     service: KodaService,
     state: AppState,
     palette_manager: PaletteManager,
@@ -130,7 +130,7 @@ def get_commands(  # noqa: C901
     sessions = service.list_sessions()
     active = service.active_session()
 
-    command_sessions: list[tuple[Command, SessionInfo]] = []
+    command_sessions: list[tuple[Command, Session]] = []
     for session in sessions:
         status = (
             CommandStatus.CURRENT

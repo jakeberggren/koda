@@ -12,7 +12,7 @@ from koda_common.settings.errors import (
     SettingsUnknownKeysError,
 )
 from koda_common.settings.store import JsonObject, SecretsStore
-from koda_service import InProcessAgentConfig
+from koda_service import LocalRuntimeConfig
 from koda_service.exceptions import StartupConfigurationError
 from koda_tui import _report_startup_error, build_app, main
 
@@ -105,7 +105,7 @@ def test_build_app_raises_settings_error_from_store(tmp_path: Path) -> None:
             settings_store=_FakeSettingsStore(error=error),
             secrets_store=_FakeSecretsStore(),
             telemetry=_TelemetryStub(),
-            agent_config=InProcessAgentConfig(cwd=tmp_path),
+            runtime_config=LocalRuntimeConfig(cwd=tmp_path, sandbox_dir=tmp_path),
         )
 
     assert exc_info.value is error
@@ -123,7 +123,7 @@ def test_build_app_raises_secrets_error_from_store(tmp_path: Path) -> None:
             settings_store=_FakeSettingsStore(),
             secrets_store=_FakeSecretsStore(error=error),
             telemetry=_TelemetryStub(),
-            agent_config=InProcessAgentConfig(cwd=tmp_path),
+            runtime_config=LocalRuntimeConfig(cwd=tmp_path, sandbox_dir=tmp_path),
         )
 
     assert exc_info.value is error
@@ -138,7 +138,7 @@ def test_build_app_creates_application_with_injected_dependencies(tmp_path: Path
         settings_store=_FakeSettingsStore(),
         secrets_store=secrets_store,
         telemetry=telemetry,
-        agent_config=InProcessAgentConfig(cwd=tmp_path),
+        runtime_config=LocalRuntimeConfig(cwd=tmp_path, sandbox_dir=tmp_path),
     )
 
     assert app.app_settings is not None

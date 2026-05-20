@@ -4,12 +4,11 @@ from koda_service.models import (
     ServiceStatus,
     ServiceStatusCode,
 )
-from koda_service.protocols import KodaService
-from koda_service.services.local import LocalKodaService, LocalRuntimeConfig
+from koda_service.services.local.config import LocalRuntimeConfig
+from koda_service.services.local.service import LocalKodaService
 
 __all__ = [
     "ChatRequest",
-    "KodaService",
     "LocalKodaService",
     "LocalRuntimeConfig",
     "ServiceDiagnostics",

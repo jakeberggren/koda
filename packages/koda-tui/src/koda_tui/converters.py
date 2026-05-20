@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_service.types import (
+from koda.messages import (
     AssistantMessage,
     Message,
     ToolMessage,
     UserMessage,
 )
 from koda_tui.state import Message as TUIMessage
-from koda_tui.state import MessageRole, TokenUsage, sum_usage
+from koda_tui.state import MessageRole
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -44,30 +44,6 @@ def _append_assistant_message(
         tool_msg_by_call_id[tool_call.call_id] = tool_message
 
 
-def _map_usage(message: AssistantMessage) -> TokenUsage | None:
-    usage = message.usage
-    if usage is None:
-        return None
-    return TokenUsage(
-        input_tokens=usage.input_tokens,
-        output_tokens=usage.output_tokens,
-        cached_tokens=usage.cached_tokens,
-        total_tokens=usage.total_tokens,
-    )
-
-
-def _append_usage(
-    message: AssistantMessage,
-    total_usage: TokenUsage | None,
-    latest_usage: TokenUsage | None,
-) -> tuple[TokenUsage | None, TokenUsage | None]:
-    mapped_usage = _map_usage(message)
-    total_usage = sum_usage(total_usage, mapped_usage)
-    if mapped_usage is not None:
-        latest_usage = mapped_usage
-    return total_usage, latest_usage
-
-
 def _apply_tool_result(
     result: list[TUIMessage],
     tool_msg_by_call_id: dict[str, TUIMessage],
@@ -95,20 +71,17 @@ def _apply_tool_result(
 
 def convert_messages(
     messages: Sequence[Message],
-) -> tuple[list[TUIMessage], TokenUsage | None, TokenUsage | None]:
-    """Convert service messages and restore latest and total usage."""
+) -> list[TUIMessage]:
+    """Convert core messages into TUI display messages."""
     result: list[TUIMessage] = []
     tool_msg_by_call_id: dict[str, TUIMessage] = {}
-    usage: TokenUsage | None = None
-    total_usage: TokenUsage | None = None
 
     for message in messages:
         if isinstance(message, UserMessage):
             _append_user_message(result, message)
         elif isinstance(message, AssistantMessage):
             _append_assistant_message(result, tool_msg_by_call_id, message)
-            total_usage, usage = _append_usage(message, total_usage, usage)
         elif isinstance(message, ToolMessage):
             _apply_tool_result(result, tool_msg_by_call_id, message)
 
-    return result, usage, total_usage
+    return result

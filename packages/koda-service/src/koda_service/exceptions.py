@@ -2,6 +2,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda.llm.exceptions import (
+    LLMAPIError,
+    LLMAuthenticationError,
+    LLMConnectionError,
+    LLMError,
+    LLMRateLimitError,
+)
+from koda.tools.exceptions import MaxIterationsExceededError
 from koda_common.settings import (
     SecretsDecodeError,
     SecretsLoadError,
@@ -19,16 +27,14 @@ if TYPE_CHECKING:
 
     from pydantic import ValidationError
 
+    from koda.tools.exceptions import ToolError
+
 
 class KodaServiceError(Exception):
     """Base class for all koda-service errors."""
 
 
-class ServiceError(KodaServiceError):
-    """Base class for service operation errors."""
-
-
-class ServiceChatError(ServiceError):
+class ServiceChatError(KodaServiceError):
     """Base class for user-facing chat failures surfaced by the service."""
 
     def __init__(
@@ -43,6 +49,61 @@ class ServiceChatError(ServiceError):
         self.detail = detail
         self.message = message or detail or summary
 
+    @classmethod
+    def from_llm_error(cls, error: LLMError) -> ServiceChatError:
+        """Convert a core LLM error into a user-facing service chat error."""
+        if isinstance(error, LLMAuthenticationError):
+            return ServiceAuthenticationError(
+                summary="Authentication failed.",
+                detail=f"{error.message}\n\nPlease check your API key and try again.",
+                message=error.message,
+            )
+        if isinstance(error, LLMRateLimitError):
+            return ServiceRateLimitError(
+                summary="Rate limit exceeded.",
+                detail=f"{error.message}\n\nPlease check your plan and billing details.",
+                message=error.message,
+            )
+        if isinstance(error, LLMConnectionError):
+            return ServiceConnectionError(
+                summary="Connection error.",
+                detail=f"{error.message}\n\nPlease check your internet connection and try again.",
+                message=error.message,
+            )
+        if isinstance(error, LLMAPIError):
+            return ServiceProviderError(
+                summary="Provider error.",
+                detail=error.message,
+                message=error.message,
+            )
+
+        message = str(error)
+        return ServiceProviderError(
+            summary="Request failed.",
+            detail=message,
+            message=message,
+        )
+
+    @classmethod
+    def from_tool_error(cls, error: ToolError) -> ServiceChatError:
+        """Convert a core tool error into a user-facing service chat error."""
+        message = str(error)
+        if isinstance(error, MaxIterationsExceededError):
+            return ServiceToolError(
+                summary="Tool iteration limit reached.",
+                detail=(
+                    f"The assistant reached the configured limit of "
+                    f"{error.max_iterations} tool iterations before finishing."
+                ),
+                message=message,
+            )
+
+        return ServiceToolError(
+            summary="Tool execution failed.",
+            detail=message,
+            message=message,
+        )
+
 
 class ServiceNotReadyError(ServiceChatError):
     """Raised when a runtime-backed operation is attempted before the service is ready."""
@@ -51,7 +112,7 @@ class ServiceNotReadyError(ServiceChatError):
         super().__init__(summary=summary, detail=detail)
 
 
-class ServiceSessionError(ServiceError):
+class ServiceSessionError(KodaServiceError):
     """Base class for session-related service errors."""
 
 
@@ -71,6 +132,10 @@ class ServiceProviderError(ServiceChatError):
     """Raised for provider-side chat failures that do not need finer UI handling."""
 
 
+class ServiceToolError(ServiceChatError):
+    """Raised for local tool or agent tool-loop failures."""
+
+
 class ServiceSessionNotFoundError(ServiceSessionError):
     """Raised when a requested session does not exist."""
 
@@ -88,6 +153,34 @@ class StartupError(KodaServiceError):
             return self.summary
         details = "\n".join(f"- {detail}" for detail in self.details)
         return f"{self.summary}\n{details}"
+
+    @classmethod
+    def from_settings_load_error(cls, error: SettingsLoadError) -> StartupError:
+        """Convert settings storage errors into user-fixable startup errors."""
+        if isinstance(error, SettingsValidationError):
+            return StartupConfigurationError.from_validation_error(error.error)
+        if isinstance(error, (SettingsUnknownKeysError, SettingsStructureError)):
+            return StartupConfigurationError.from_runtime_error(error)
+        if isinstance(error, SettingsPermissionError):
+            return StartupEnvironmentError.from_permission_error(error.error)
+        if isinstance(error, SettingsDecodeError):
+            return StartupConfigurationError.from_json_decode_error(
+                path=str(error.path),
+                error=error.error,
+            )
+        raise TypeError
+
+    @classmethod
+    def from_secrets_load_error(cls, error: SecretsLoadError) -> StartupError:
+        """Convert secrets storage errors into user-fixable startup errors."""
+        if isinstance(error, SecretsPermissionError):
+            return StartupEnvironmentError.from_permission_error(error.error)
+        if isinstance(error, SecretsDecodeError):
+            return StartupConfigurationError.from_json_decode_error(
+                path=str(error.path),
+                error=error.error,
+            )
+        raise TypeError
 
 
 class StartupConfigurationError(StartupError):
@@ -127,22 +220,3 @@ class StartupEnvironmentError(StartupError):
             "Koda could not access required local files",
             details=(str(error),),
         )
-
-
-def startup_error_from_settings_error(  # noqa: C901
-    error: SettingsLoadError | SecretsLoadError,
-) -> StartupError:
-    if isinstance(error, SettingsValidationError):
-        return StartupConfigurationError.from_validation_error(error.error)
-    if isinstance(error, SettingsUnknownKeysError):
-        return StartupConfigurationError.from_runtime_error(error)
-    if isinstance(error, SettingsStructureError):
-        return StartupConfigurationError.from_runtime_error(error)
-    if isinstance(error, (SettingsPermissionError, SecretsPermissionError)):
-        return StartupEnvironmentError.from_permission_error(error.error)
-    if isinstance(error, (SettingsDecodeError, SecretsDecodeError)):
-        return StartupConfigurationError.from_json_decode_error(
-            path=str(error.path),
-            error=error.error,
-        )
-    raise TypeError

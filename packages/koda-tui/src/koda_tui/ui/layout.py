@@ -36,7 +36,7 @@ class TUILayout:
 
         # Initialize components
         self.chat_area = ChatAreaControl(state, self.renderer)
-        self.response_indicator = ResponseIndicatorControl(state, self.renderer)
+        self.response_indicator = ResponseIndicatorControl(state)
         self.queued_inputs = QueuedInputs(state)
         self.input_area = InputArea(state)
         self.file_suggestions = FileSuggestions(self.input_area)

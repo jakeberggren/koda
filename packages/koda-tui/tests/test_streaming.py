@@ -4,15 +4,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from koda.agent import AgentTextDelta, AgentToolCallRequested, AgentToolCompleted
+from koda.tools import ToolCall, ToolOutput, ToolResult
+from koda_service import ChatRequest
 from koda_service.exceptions import ServiceConnectionError, ServiceRateLimitError
-from koda_service.types import (
-    TextDelta,
-    ToolCall,
-    ToolCallRequested,
-    ToolCallResult,
-    ToolOutput,
-    ToolResult,
-)
 from koda_tui.app.streaming import StreamProcessor
 from koda_tui.state import AppState, MessageRole
 
@@ -31,9 +26,9 @@ class TestStreamProcessor:
         """Streaming text should append to messages."""
         client = AsyncMock()
 
-        async def mock_chat(_msg: str) -> AsyncIterator:
-            yield TextDelta(text="Hello ")
-            yield TextDelta(text="world")
+        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+            yield AgentTextDelta(text="Hello ")
+            yield AgentTextDelta(text="world")
 
         client.chat = mock_chat
 
@@ -52,17 +47,17 @@ class TestStreamProcessor:
         client = AsyncMock()
         tool = ToolCall(tool_name="read_file", arguments={"path": "/tmp"}, call_id="c1")
 
-        async def mock_chat(_msg: str) -> AsyncIterator:
-            yield TextDelta(text="Let me check...")
-            yield ToolCallRequested(call=tool)
-            yield ToolCallResult(
+        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+            yield AgentTextDelta(text="Let me check...")
+            yield AgentToolCallRequested(call=tool)
+            yield AgentToolCompleted(
                 tool_name="read_file",
                 result=ToolResult(
                     call_id="c1",
                     output=ToolOutput(content={"data": "file contents"}, display="file contents"),
                 ),
             )
-            yield TextDelta(text="Done!")
+            yield AgentTextDelta(text="Done!")
 
         client.chat = mock_chat
 
@@ -86,9 +81,9 @@ class TestStreamProcessor:
         client = AsyncMock()
         tool = ToolCall(tool_name="read_file", arguments={"path": "/bad"}, call_id="c1")
 
-        async def mock_chat(_msg: str) -> AsyncIterator:
-            yield ToolCallRequested(call=tool)
-            yield ToolCallResult(
+        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+            yield AgentToolCallRequested(call=tool)
+            yield AgentToolCompleted(
                 tool_name="read_file",
                 result=ToolResult(
                     call_id="c1",
@@ -116,8 +111,8 @@ class TestStreamProcessor:
         """Rate limit failures should show a user-friendly inline message."""
         client = AsyncMock()
 
-        async def mock_chat(_msg: str) -> AsyncIterator:
-            yield TextDelta(text="Starting...")
+        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+            yield AgentTextDelta(text="Starting...")
             raise ServiceRateLimitError(
                 summary="Rate limit exceeded.",
                 detail=(
@@ -143,7 +138,7 @@ class TestStreamProcessor:
         """Unexpected exceptions should escape local handling."""
         client = AsyncMock()
 
-        async def mock_chat(_msg: str) -> AsyncIterator:
+        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
             raise ValueError("Something went wrong")
             yield  # Make it a generator
 
@@ -159,7 +154,7 @@ class TestStreamProcessor:
         """Connection failures should show recovery guidance."""
         client = AsyncMock()
 
-        async def mock_chat(_msg: str) -> AsyncIterator:
+        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
             raise ServiceConnectionError(
                 summary="Connection error.",
                 detail=(
@@ -184,12 +179,12 @@ class TestStreamProcessor:
         """Cancelling stream should stop processing."""
         client = AsyncMock()
 
-        async def mock_chat(_msg: str) -> AsyncIterator:
-            yield TextDelta(text="Start")
+        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+            yield AgentTextDelta(text="Start")
             # Simulate long-running stream that gets cancelled
 
             await asyncio.sleep(10)
-            yield TextDelta(text="Never reached")
+            yield AgentTextDelta(text="Never reached")
 
         client.chat = mock_chat
 

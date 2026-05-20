@@ -6,16 +6,10 @@ from typing import cast
 from unittest.mock import Mock
 from uuid import uuid4
 
+from koda.llm import ModelDefinition, ThinkingOption, ThinkingOptionId
+from koda.messages import AssistantMessage, TokenUsage, UserMessage
+from koda.sessions import Session
 from koda_service.exceptions import ServiceSessionNotFoundError
-from koda_service.types import (
-    AssistantMessage,
-    ModelDefinition,
-    SessionInfo,
-    ThinkingOption,
-    ThinkingOptionId,
-    UserMessage,
-)
-from koda_service.types.messages import TokenUsage
 from koda_tui.actions import (
     cycle_thinking,
     delete_session,
@@ -31,11 +25,10 @@ from koda_tui.actions import (
 from koda_tui.state import AppState, Message, MessageRole
 
 
-def _session_info() -> SessionInfo:
-    return SessionInfo(
+def _session() -> Session:
+    return Session(
         session_id=uuid4(),
         name="Session",
-        message_count=0,
         created_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
@@ -54,14 +47,14 @@ def _state_with_conversation() -> AppState:
 
 def test_new_session_success_resets_state() -> None:
     state = _state_with_conversation()
-    service = Mock(spec=["new_session"])
-    service.new_session.return_value = _session_info()
+    service = Mock(spec=["create_session"])
+    service.create_session.return_value = _session()
 
     result = new_session(service, state)
 
     assert result.ok is True
     assert result.error is None
-    service.new_session.assert_called_once_with()
+    service.create_session.assert_called_once_with()
     assert state.messages == []
     assert state.current_streaming_content == ""
     assert state.is_streaming is False
@@ -70,7 +63,7 @@ def test_new_session_success_resets_state() -> None:
 def test_switch_session_success_converts_messages() -> None:
     state = _state_with_conversation()
     service = Mock(spec=["switch_session"])
-    service.switch_session.return_value = (_session_info(), [UserMessage(content="hello")])
+    service.switch_session.return_value = Session(messages=[UserMessage(content="hello")])
     session_id = uuid4()
 
     result = switch_session(session_id, service, state)
@@ -85,9 +78,8 @@ def test_switch_session_success_converts_messages() -> None:
 def test_switch_session_restores_usage_from_last_assistant_message() -> None:
     state = _state_with_conversation()
     service = Mock(spec=["switch_session"])
-    service.switch_session.return_value = (
-        _session_info(),
-        [
+    service.switch_session.return_value = Session(
+        messages=[
             UserMessage(content="hello"),
             AssistantMessage(
                 content="done",
@@ -126,7 +118,7 @@ def test_switch_session_not_found_returns_error() -> None:
 
 def test_delete_session_active_removed_resets_state() -> None:
     state = _state_with_conversation()
-    active = _session_info()
+    active = _session()
     service = Mock(spec=["active_session", "delete_session"])
     service.active_session.return_value = active
     session_id = active.session_id
@@ -144,7 +136,7 @@ def test_delete_session_active_removed_resets_state() -> None:
 def test_delete_session_non_active_keeps_state() -> None:
     state = _state_with_conversation()
     service = Mock(spec=["active_session", "delete_session"])
-    service.active_session.return_value = _session_info()
+    service.active_session.return_value = _session()
     session_id = uuid4()
 
     result = delete_session(session_id, service, state)
@@ -158,7 +150,7 @@ def test_delete_session_non_active_keeps_state() -> None:
 def test_delete_session_not_found_returns_error() -> None:
     state = _state_with_conversation()
     service = Mock(spec=["active_session", "delete_session"])
-    service.active_session.return_value = _session_info()
+    service.active_session.return_value = _session()
     service.delete_session.side_effect = ServiceSessionNotFoundError
 
     result = delete_session(uuid4(), service, state)

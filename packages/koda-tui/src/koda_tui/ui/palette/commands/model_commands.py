@@ -12,7 +12,7 @@ _ELLIPSIS = "..."
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_service.types import ModelDefinition, ProviderDefinition
+    from koda.llm import ModelDefinition, ProviderDefinition
 
 
 def _truncate_label(label: str, max_length: int) -> str:

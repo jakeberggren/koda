@@ -16,8 +16,8 @@ from prompt_toolkit.keys import Keys
 from koda_tui.utils.model_selection import find_model, supported_thinking_options
 
 if TYPE_CHECKING:
+    from koda.llm import ThinkingOptionId
     from koda_service import KodaService
-    from koda_service.types import ThinkingOptionId
     from koda_tui.app.application import KodaTuiApp
     from koda_tui.settings import AppSettings
 

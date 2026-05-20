@@ -12,6 +12,8 @@ from koda_common.logging import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from koda.tools.context import ToolContext
     from koda.tools.registry import ToolRegistry
 
@@ -21,11 +23,6 @@ class ToolExecutor:
 
     def __init__(self, tool_registry: ToolRegistry) -> None:
         self.tool_registry = tool_registry
-
-    async def execute_calls(self, tool_calls: list[ToolCall], ctx: ToolContext) -> list[ToolResult]:
-        return await asyncio.gather(
-            *[self.execute_call(call, ctx) for call in tool_calls],
-        )
 
     async def execute_call(self, tool_call: ToolCall, ctx: ToolContext) -> ToolResult:
         tool = self.tool_registry.get(tool_call.tool_name)
@@ -57,3 +54,20 @@ class ToolExecutor:
             )
         logger.info("tool_executed", tool_name=tool_call.tool_name, is_error=output.is_error)
         return ToolResult(output=output, call_id=tool_call.call_id)
+
+    async def execute_calls(
+        self,
+        tool_calls: list[ToolCall],
+        ctx: ToolContext,
+    ) -> AsyncIterator[tuple[ToolCall, ToolResult]]:
+        tasks = {asyncio.create_task(self.execute_call(call, ctx)): call for call in tool_calls}
+        pending = set(tasks)
+
+        try:
+            while pending:
+                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                for task in done:
+                    yield tasks[task], task.result()
+        finally:
+            for task in pending:
+                task.cancel()

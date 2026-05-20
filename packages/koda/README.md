@@ -72,4 +72,4 @@ The package re-exports its main building blocks from the following modules:
 - `koda.messages` for internal message models
 - `koda.tools` for the tool framework and built-in tool registration helpers
 - `koda.telemetry` for telemetry interfaces and Langfuse integration
-- `koda.agents` for the core `Agent` implementation
+- `koda.agent` for the core `Agent` implementation

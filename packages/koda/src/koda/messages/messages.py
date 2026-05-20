@@ -25,6 +25,12 @@ class TokenUsage:
     cached_tokens: int | None = None
     total_tokens: int | None = None
 
+    def context_window_percentage(self, context_window: int | None) -> int | None:
+        """Return input token usage as a percentage of a context window."""
+        if context_window is None or context_window <= 0 or self.input_tokens is None:
+            return None
+        return round((self.input_tokens / context_window) * 100)
+
 
 class UserMessage(Message):
     role: Literal[MessageRole.USER] = Field(default=MessageRole.USER, frozen=True)

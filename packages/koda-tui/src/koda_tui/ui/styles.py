@@ -18,6 +18,7 @@ TUI_DARK_STYLE = Style.from_dict(
         "status-bar.muted": "fg:ansibrightblack",
         "status-bar.keybinding": "fg:ansiwhite",
         "status-bar.thinking": "fg:ansiyellow",
+        "status-bar.spinner": "fg:ansicyan",
         # Scrollbar
         "scrollbar.track": "fg:ansibrightblack",
         "scrollbar.thumb": "fg:ansiwhite",
@@ -72,6 +73,7 @@ TUI_LIGHT_STYLE = Style.from_dict(
         "status-bar.muted": "fg:ansibrightblack",
         "status-bar.keybinding": "fg:ansiblack",
         "status-bar.thinking": "fg:ansiyellow",
+        "status-bar.spinner": "fg:ansicyan",
         # Scrollbar
         "scrollbar.track": "fg:ansigray",
         "scrollbar.thumb": "fg:ansibrightblack",

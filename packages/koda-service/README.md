@@ -11,17 +11,15 @@
 </pre>
 </div>
 
-`koda-service` is the service boundary around the Koda core. It defines the public protocol
-consumed by clients such as `koda-tui`, owns the DTOs that cross that boundary, and ships the
-in-process service implementation used by the app today.
+`koda-service` is the application service boundary around the Koda core. It defines the
+public protocol consumed by clients such as `koda-tui` and ships the local service
+implementation used by the app today.
 
 ## Responsibilities
 
 - Define the public `KodaService` protocol and shared `ServiceStatus`.
-- Define service-boundary DTOs in `koda_service.types`.
-- Map Koda core models, messages, sessions, tools, and stream events into service DTOs.
 - Validate runtime readiness for provider credentials, model selection, and agent creation.
-- Provide the in-process implementation for chat, catalogs, and session management.
+- Provide the local implementation for chat, catalogs, and session management.
 
 ## Package Structure
 
@@ -29,14 +27,14 @@ in-process service implementation used by the app today.
 packages/koda-service/
 ├── src/koda_service/
 │   ├── __init__.py                  # Public package exports
-│   ├── protocols.py                 # KodaService protocol and AgentBuilder type
+│   ├── protocols.py                 # KodaService protocol
 │   ├── exceptions.py                # Service/runtime and startup-style errors
-│   ├── types/                       # Service-boundary DTOs
-│   ├── mappers/                     # Core -> service mapping helpers
 │   └── services/
-│       └── in_process/
-│           ├── __init__.py          # In-process service exports
-│           └── service.py           # InProcessKodaService and readiness logic
+│       └── local/
+│           ├── __init__.py          # Local service exports
+│           ├── config.py            # LocalRuntimeConfig
+│           ├── runtime.py           # Agent dependency creation/cache
+│           └── service.py           # LocalKodaService and readiness logic
 └── tests/
 ```
 
@@ -44,10 +42,9 @@ packages/koda-service/
 
 For consumers, the intended imports are:
 
-- `koda_service` for `KodaService`, `AgentBuilder`, and `ServiceStatus`
-- `koda_service.types` for service-boundary DTOs
+- `koda_service` for `KodaService`, `ChatRequest`, `LocalKodaService`, `LocalRuntimeConfig`, `ServiceDiagnostics`, and `ServiceStatus`
 - `koda_service.exceptions` for service-layer and user-fixable startup errors
-- `koda_service.services.in_process` for `InProcessKodaService`
+- `koda_service.services.local` for `LocalKodaService`
 
-Most clients should depend on the protocol and DTOs. Import the concrete in-process
-implementation only when you want the bundled runtime.
+Most clients should depend on the protocol. Import the concrete local implementation only
+when you want the bundled runtime.

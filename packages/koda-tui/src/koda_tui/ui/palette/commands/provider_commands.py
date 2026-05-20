@@ -8,7 +8,7 @@ from koda_tui.ui.palette.commands.command import Command, CommandStatus
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_service.types import ProviderDefinition
+    from koda.llm import ProviderDefinition
 
 
 def get_commands(

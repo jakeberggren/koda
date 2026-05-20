@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from koda.messages import AssistantMessage, ToolMessage, UserMessage
+from koda.messages import AssistantMessage, TokenUsage, ToolMessage, UserMessage
 from koda.sessions import (
     InMemorySessionStore,
     JsonSessionStore,
@@ -108,6 +108,65 @@ class TestInMemorySessionStore:
 
         with pytest.raises(SessionNotFoundError):
             store.append_message(uuid.uuid4(), UserMessage(content="hello"))
+
+
+class TestSessionUsage:
+    def test_usage_returns_latest_assistant_usage(self) -> None:
+        first_usage = TokenUsage(input_tokens=10, output_tokens=2, total_tokens=12)
+        latest_usage = TokenUsage(input_tokens=20, output_tokens=4, total_tokens=24)
+        session = Session(
+            messages=[
+                AssistantMessage(content="one", usage=first_usage),
+                UserMessage(content="next"),
+                AssistantMessage(content="two"),
+                AssistantMessage(content="three", usage=latest_usage),
+            ]
+        )
+
+        assert session.usage == latest_usage
+
+    def test_usage_returns_none_without_assistant_usage(self) -> None:
+        session = Session(
+            messages=[
+                UserMessage(content="hello"),
+                AssistantMessage(content="hi"),
+            ]
+        )
+
+        assert session.usage is None
+        assert session.total_usage is None
+
+    def test_total_usage_sums_assistant_usage(self) -> None:
+        session = Session(
+            messages=[
+                AssistantMessage(
+                    content="one",
+                    usage=TokenUsage(
+                        input_tokens=10,
+                        output_tokens=2,
+                        cached_tokens=1,
+                        total_tokens=12,
+                    ),
+                ),
+                UserMessage(content="next"),
+                AssistantMessage(
+                    content="two",
+                    usage=TokenUsage(
+                        input_tokens=20,
+                        output_tokens=4,
+                        cached_tokens=None,
+                        total_tokens=24,
+                    ),
+                ),
+            ]
+        )
+
+        assert session.total_usage == TokenUsage(
+            input_tokens=30,
+            output_tokens=6,
+            cached_tokens=1,
+            total_tokens=36,
+        )
 
 
 class TestJsonSessionStore:

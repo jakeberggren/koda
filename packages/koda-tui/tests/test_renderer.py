@@ -1,6 +1,6 @@
 from rich.text import Text
 
-from koda_service.types import ToolCall
+from koda.tools import ToolCall
 from koda_tui.rendering import MessageRenderer
 from koda_tui.state import Message, MessageRole
 
@@ -53,6 +53,8 @@ class TestMessageRendererMessages:
         content = "".join(t[1] for t in result)
         assert "Comparing options" in content
         assert "I can help" in content
+        lines = [line.rstrip() for line in content.splitlines()]
+        assert lines[:3] == ["Comparing options", "", "I can help"]
 
     def test_render_assistant_thinking_renders_markdown(self, converter: MessageRenderer) -> None:
         """thinking content should be rendered through markdown, not as literal markers."""
@@ -251,14 +253,6 @@ class TestMessageRendererStreaming:
         result = converter.render_streaming_content("Hello wor")
         content = "".join(t[1] for t in result)
         assert "Hello wor" in content
-
-    def test_render_thinking_spinner_has_no_trailing_newline(
-        self, converter: MessageRenderer
-    ) -> None:
-        """render_thinking_spinner() should not emit a trailing newline."""
-        result = list(converter.render_thinking_spinner())
-        assert result
-        assert result[-1][1] != "\n"
 
     def test_render_thinking_content_renders_markdown(self, converter: MessageRenderer) -> None:
         """render_thinking_content() should parse markdown markers."""
