@@ -12,6 +12,12 @@ agent:
 
 credentials:
   sources:
+    anthropic:
+      env:
+        - ANTHROPIC_API_KEY
+    bergetai:
+      env:
+        - BERGETAI_API_KEY
     openai:
       env:
         - OPENAI_API_KEY
@@ -20,15 +26,27 @@ credentials:
         - GH_TOKEN
 
 environment:
+  variables:
+    KODA_CREDENTIAL_MODE: proxy-managed
   proxyManaged:
+    - ANTHROPIC_API_KEY
+    - BERGETAI_API_KEY
     - OPENAI_API_KEY
     - GH_TOKEN
 
 network:
   serviceDomains:
+    api.anthropic.com: anthropic
+    api.berget.ai: bergetai
     api.openai.com: openai
     api.github.com: github
   serviceAuth:
+    anthropic:
+      headerName: x-api-key
+      valueFormat: "%s"
+    bergetai:
+      headerName: Authorization
+      valueFormat: "Bearer %s"
     openai:
       headerName: Authorization
       valueFormat: "Bearer %s"

@@ -1,11 +1,11 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum, auto
 
 
-class CommandStatus(Enum):
-    CONNECTED = auto()
-    CURRENT = auto()
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CommandMarker:
+    marker: str
+    label_style: str | None = None
 
 
 @dataclass
@@ -16,4 +16,4 @@ class Command:
     handler: Callable[[], None]
     description: str = ""
     group: str | None = None
-    status: CommandStatus | None = None
+    marker: CommandMarker | None = None

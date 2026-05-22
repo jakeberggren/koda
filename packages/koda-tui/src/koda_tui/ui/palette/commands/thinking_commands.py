@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from koda_tui.ui.palette.commands.command import Command, CommandStatus
+from koda_tui.ui.palette.commands.command import Command, CommandMarker
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -23,7 +23,9 @@ def get_commands(
             label=option.label,
             handler=partial(on_select, option.id),
             description=option.description or "Select model reasoning effort",
-            status=CommandStatus.CURRENT if active_thinking == option.id else None,
+            marker=CommandMarker(marker="*", label_style="class:palette.current")
+            if active_thinking == option.id
+            else None,
         )
         for option in options
     ]

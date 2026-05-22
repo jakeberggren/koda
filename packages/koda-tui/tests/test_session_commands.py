@@ -32,7 +32,7 @@ def test_get_commands_handles_no_active_session(state: AppState) -> None:
 
     assert len(commands) == 1
     assert commands[0].label == "Existing session  [2026-01-01] (2 messages)"
-    assert commands[0].status is None
+    assert commands[0].marker is None
     assert shortcuts
 
 

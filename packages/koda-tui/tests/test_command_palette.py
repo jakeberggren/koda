@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from koda.llm import ModelDefinition, ProviderDefinition, ThinkingOption
-from koda_tui.ui.palette.command_palette import CommandPalette, PaletteOptions
+from koda_tui.ui.palette.command_palette import CommandPalette, PaletteFooterControl, PaletteOptions
 from koda_tui.ui.palette.commands import model_commands, provider_commands, thinking_commands
-from koda_tui.ui.palette.commands.command import Command, CommandStatus
+from koda_tui.ui.palette.commands.command import Command, CommandMarker
 
 
 def _provider(provider_id: str, name: str) -> ProviderDefinition:
@@ -34,8 +34,24 @@ def test_provider_commands_mark_connected_providers_connected() -> None:
         on_select=lambda _provider: None,
     )
 
-    assert [cmd.status for cmd in commands] == [CommandStatus.CONNECTED, None]
+    assert [cmd.marker for cmd in commands] == [
+        CommandMarker(marker="✓"),
+        None,
+    ]
     assert [cmd.label for cmd in commands] == ["OpenAI", "Anthropic"]
+
+
+def test_provider_commands_do_not_mark_proxy_managed_providers() -> None:
+    providers = [_provider("openai", "OpenAI"), _provider("anthropic", "Anthropic")]
+
+    commands = provider_commands.get_commands(
+        providers=providers,
+        connected_provider_ids={"openai"},
+        on_select=lambda _provider: None,
+        proxy_managed=True,
+    )
+
+    assert [cmd.marker for cmd in commands] == [None, None]
 
 
 def test_model_commands_mark_active_model_current() -> None:
@@ -53,7 +69,10 @@ def test_model_commands_mark_active_model_current() -> None:
         on_select=lambda _model: None,
     )
 
-    assert [cmd.status for cmd in commands] == [CommandStatus.CURRENT, None]
+    assert [cmd.marker for cmd in commands] == [
+        CommandMarker(marker="*", label_style="class:palette.current"),
+        None,
+    ]
     assert [cmd.label for cmd in commands] == ["GPT-5", "GPT-4.1"]
 
 
@@ -66,12 +85,19 @@ def test_thinking_commands_mark_active_option_current() -> None:
         on_select=lambda _option_id: None,
     )
 
-    assert [cmd.status for cmd in commands] == [None, CommandStatus.CURRENT]
+    assert [cmd.marker for cmd in commands] == [
+        None,
+        CommandMarker(marker="*", label_style="class:palette.current"),
+    ]
     assert [cmd.label for cmd in commands] == ["Low", "High"]
 
 
 def test_palette_renders_star_prefix_for_current_command() -> None:
-    current = Command(label="OpenAI", handler=lambda: None, status=CommandStatus.CURRENT)
+    current = Command(
+        label="OpenAI",
+        handler=lambda: None,
+        marker=CommandMarker(marker="*", label_style="class:palette.current"),
+    )
     other = Command(label="Anthropic", handler=lambda: None)
     palette = CommandPalette(
         commands=[current, other],
@@ -93,7 +119,11 @@ def test_palette_renders_star_prefix_for_current_command() -> None:
 
 def test_palette_renders_star_in_selection_column_for_current_unselected_command() -> None:
     first = Command(label="Anthropic", handler=lambda: None)
-    current = Command(label="OpenAI", handler=lambda: None, status=CommandStatus.CURRENT)
+    current = Command(
+        label="OpenAI",
+        handler=lambda: None,
+        marker=CommandMarker(marker="*", label_style="class:palette.current"),
+    )
     palette = CommandPalette(
         commands=[first, current],
         on_close=lambda: None,
@@ -113,7 +143,11 @@ def test_palette_renders_star_in_selection_column_for_current_unselected_command
 
 def test_palette_renders_connected_command_marker_without_current_label_style() -> None:
     first = Command(label="Anthropic", handler=lambda: None)
-    connected = Command(label="OpenAI", handler=lambda: None, status=CommandStatus.CONNECTED)
+    connected = Command(
+        label="OpenAI",
+        handler=lambda: None,
+        marker=CommandMarker(marker="✓"),
+    )
     palette = CommandPalette(
         commands=[first, connected],
         on_close=lambda: None,
@@ -129,3 +163,13 @@ def test_palette_renders_connected_command_marker_without_current_label_style() 
     assert connected_fragments[0] == ("class:palette.marker", "✓ ")
     assert connected_fragments[1][0] == "class:palette.item"
     assert connected_fragments[1][1].startswith("OpenAI")
+
+
+def test_palette_footer_wraps_to_available_width() -> None:
+    footer = PaletteFooterControl([("fg:ansiyellow", "Proxy-managed credentials need setup")])
+
+    content = footer.create_content(width=24, height=10)
+
+    assert content.line_count == 2
+    assert content.get_line(0) == [("fg:ansiyellow", "Proxy-managed")]
+    assert content.get_line(1) == [("fg:ansiyellow", "credentials need setup")]

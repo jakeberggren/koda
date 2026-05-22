@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from textwrap import wrap
+from typing import TYPE_CHECKING, override
 
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.data_structures import Point
@@ -26,10 +27,9 @@ if TYPE_CHECKING:
 
     from prompt_toolkit.formatted_text import StyleAndTextTuples
     from prompt_toolkit.key_binding import KeyPressEvent
+    from prompt_toolkit.layout.containers import GetLinePrefixCallable
 
     from koda_tui.ui.palette.commands import Command
-
-from koda_tui.ui.palette.commands.command import CommandStatus
 
 
 class PaletteListControl(UIControl):
@@ -145,6 +145,48 @@ class PaletteListControl(UIControl):
             line_count=len(visible_rows),
             cursor_position=Point(x=0, y=cursor_y),
         )
+
+
+class PaletteFooterControl(UIControl):
+    """Width-aware wrapped footer text for the command palette."""
+
+    def __init__(self, text: StyleAndTextTuples) -> None:
+        self._text = text
+
+    def _footer_width(self) -> int:
+        return sum(len(fragment[1]) for fragment in self._text)
+
+    def _wrapped_lines(self, width: int) -> list[StyleAndTextTuples]:
+        if not self._text:
+            return [[("", "")]]
+        if self._footer_width() <= width:
+            return [self._text]
+        if len(self._text) > 1:
+            return [self._text]
+
+        style, text, *_ = self._text[0]
+        lines = wrap(text, width=max(1, width), break_long_words=False) or [""]
+        return [[(style, line)] for line in lines]
+
+    @override
+    def preferred_height(
+        self,
+        width: int,
+        max_available_height: int,
+        wrap_lines: bool,
+        get_line_prefix: GetLinePrefixCallable | None,
+    ) -> int | None:
+        return min(max_available_height, len(self._wrapped_lines(width)))
+
+    def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002
+        lines = self._wrapped_lines(width)
+
+        def get_line(i: int) -> FormattedText:
+            if 0 <= i < len(lines):
+                return FormattedText(lines[i])
+            return FormattedText([])
+
+        return UIContent(get_line=get_line, line_count=len(lines))
 
 
 @dataclass(frozen=True, slots=True)
@@ -336,18 +378,15 @@ class CommandPalette:
         dim_style = "class:palette.selected" if is_selected else "class:palette.dim"
         marker_style = "class:palette.marker"
         current_style = (
-            "class:palette.current"
-            if cmd.status is CommandStatus.CURRENT and not is_selected
+            cmd.marker.label_style
+            if cmd.marker is not None and cmd.marker.label_style is not None and not is_selected
             else style
         )
         padded_label = cmd.label.ljust(max_label_width)
         line: StyleAndTextTuples = []
-        if cmd.status is CommandStatus.CONNECTED:
+        if cmd.marker is not None:
             marker_render_style = style if is_selected else marker_style
-            line.append((marker_render_style, "✓ "))
-        elif cmd.status is CommandStatus.CURRENT:
-            marker_render_style = style if is_selected else marker_style
-            line.append((marker_render_style, "* "))
+            line.append((marker_render_style, f"{cmd.marker.marker} "))
         elif is_selected:
             line.append((style, "- "))
         else:
@@ -481,8 +520,7 @@ class CommandPalette:
         children = [title_row, separator, search_row, separator, command_list]
         if self._footer:
             footer_row = Window(
-                content=FormattedTextControl(text=self._footer),
-                height=1,
+                content=PaletteFooterControl(self._footer),
                 dont_extend_height=True,
                 align=WindowAlign.LEFT,
             )

@@ -84,6 +84,7 @@ def clean_test_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "KODA_THINKING",
         "KODA_ALLOW_WEB_SEARCH",
         "KODA_ALLOW_EXTENDED_PROMPT_RETENTION",
+        "KODA_CREDENTIAL_MODE",
         "KODA_BASH_EXECUTION_SANDBOX",
         "LANGFUSE_TRACING_ENABLED",
         "LANGFUSE_SECRET_KEY",
