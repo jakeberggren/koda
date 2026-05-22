@@ -1,0 +1,46 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "commitMessagePrefix": "chore(deps):",
+  "enabledManagers": [
+    "pep621",
+    "github-actions",
+    "pre-commit"
+  ],
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "lockFileMaintenance": {
+    "automerge": true,
+    "enabled": true,
+    "schedule": [
+      "before 9am on monday"
+    ]
+  },
+  "packageRules": [
+    {
+      "commitMessagePrefix": "chore(dev-deps):",
+      "groupName": "dev dependencies",
+      "matchDepTypes": [
+        "dependency-groups"
+      ]
+    },
+    {
+      "automerge": true,
+      "matchUpdateTypes": [
+        "patch"
+      ]
+    }
+  ],
+  "pep621": {
+    "fileMatch": [
+      "(^|/)pyproject\\.toml$"
+    ]
+  },
+  "schedule": [
+    "before 9am on monday"
+  ]
+}
