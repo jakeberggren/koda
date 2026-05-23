@@ -69,14 +69,15 @@ def _make_settings() -> Mock:
 
 def _make_service(
     *,
+    cwd: Path = Path("/tmp"),
     session_store: InMemorySessionStore | None = None,
     llm: _FakeLLM | None = None,
 ) -> LocalKodaService:
     return LocalKodaService(
         settings=_make_settings(),
         runtime=LocalRuntimeConfig(
-            cwd=Path("/tmp"),
-            sandbox_dir=Path("/tmp"),
+            cwd=cwd,
+            sandbox_dir=cwd,
             llm=llm,
         ),
         session_store=session_store or InMemorySessionStore(),
@@ -126,3 +127,41 @@ async def test_chat_can_target_existing_session() -> None:
 
     assert len(events) == 3
     assert service.active_session() == session
+
+
+@pytest.mark.asyncio
+async def test_workspace_context_is_snapshotted_for_active_session(tmp_path: Path) -> None:
+    fake_llm = _FakeLLM()
+    (tmp_path / "AGENTS.md").write_text("First instructions.", encoding="utf-8")
+    service = _make_service(cwd=tmp_path, llm=fake_llm)
+
+    _ = [event async for event in service.chat(ChatRequest(message="hello"))]
+    assert fake_llm.last_request is not None
+    assert fake_llm.last_request.instructions is not None
+    assert "First instructions." in fake_llm.last_request.instructions
+
+    (tmp_path / "AGENTS.md").write_text("Second instructions.", encoding="utf-8")
+
+    _ = [event async for event in service.chat(ChatRequest(message="again"))]
+    assert fake_llm.last_request is not None
+    assert fake_llm.last_request.instructions is not None
+    assert "First instructions." in fake_llm.last_request.instructions
+    assert "Second instructions." not in fake_llm.last_request.instructions
+
+
+@pytest.mark.asyncio
+async def test_workspace_context_reloads_for_new_session(tmp_path: Path) -> None:
+    fake_llm = _FakeLLM()
+    (tmp_path / "AGENTS.md").write_text("First instructions.", encoding="utf-8")
+    service = _make_service(cwd=tmp_path, llm=fake_llm)
+
+    _ = [event async for event in service.chat(ChatRequest(message="hello"))]
+
+    (tmp_path / "AGENTS.md").write_text("Second instructions.", encoding="utf-8")
+    service.create_session()
+
+    _ = [event async for event in service.chat(ChatRequest(message="new session"))]
+    assert fake_llm.last_request is not None
+    assert fake_llm.last_request.instructions is not None
+    assert "Second instructions." in fake_llm.last_request.instructions
+    assert "First instructions." not in fake_llm.last_request.instructions

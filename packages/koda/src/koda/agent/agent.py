@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 from koda.agent.errors import AgentConfigError
@@ -71,7 +71,11 @@ class Agent:
         context_manager: ContextManager | None = None,
     ) -> None:
         self.llm = llm
-        self.config = config
+        self.config = (
+            replace(config, system_prompt=context_manager.build_system_prompt(config.system_prompt))
+            if context_manager is not None
+            else config
+        )
         self.session_manager = session_manager or SessionManager(InMemorySessionStore())
         self.tools = tools
         self.runner = AgentRunner(
@@ -79,7 +83,6 @@ class Agent:
             config=self.config,
             session_manager=self.session_manager,
             tools=self.tools,
-            context_manager=context_manager,
         )
 
         logger.info("agent_initialized", llm=type(llm).__name__)

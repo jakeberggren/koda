@@ -9,6 +9,29 @@ from koda_common.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _resolve_existing(path: Path) -> Path | None:
+    try:
+        return path.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+
+
+def _resolve_within_root(path: Path, root: Path) -> Path | None:
+    resolved = _resolve_existing(path)
+    root_resolved = _resolve_existing(root)
+    if resolved is None or root_resolved is None:
+        return None
+    if resolved.is_relative_to(root_resolved):
+        return resolved
+    logger.warning(
+        "context_file_outside_root",
+        path=str(path),
+        resolved=str(resolved),
+        root=str(root),
+    )
+    return None
+
+
 class ContextSource(Protocol):
     """Source of project-specific context content."""
 
@@ -23,15 +46,33 @@ class FileContextSource(ContextSource):
 
     If the file does not exist, returns None. If the file exists but is empty
     or contains only whitespace, returns None.
+
+    When ``trusted_root`` is provided, the resolved path must stay under the resolved
+    root. This prevents symlinks and path-traversal from escaping the trusted
+    workspace boundary.
     """
 
     path: Path
+    trusted_root: Path | None = None
+
+    def _resolved_path(self) -> Path | None:
+        resolved = (
+            _resolve_existing(self.path)
+            if self.trusted_root is None
+            else _resolve_within_root(self.path, self.trusted_root)
+        )
+        if resolved is None:
+            return None
+        if not resolved.is_file():
+            return None
+        return resolved
 
     def read(self) -> str | None:
-        if not self.path.is_file():
+        path = self._resolved_path()
+        if path is None:
             return None
         try:
-            content = self.path.read_text(encoding="utf-8").strip()
+            content = path.read_text(encoding="utf-8").strip()
         except OSError as error:
             logger.warning("context_file_read_failed", path=str(self.path), error=str(error))
             return None
@@ -41,7 +82,7 @@ class FileContextSource(ContextSource):
 
 
 @dataclass(frozen=True, slots=True)
-class ProjectFileDiscoverySource(ContextSource):
+class ProjectFileContextSource(ContextSource):
     """Discover and read known project context files from a directory.
 
     Reads files in the order specified by ``filenames`` and concatenates
@@ -57,7 +98,7 @@ class ProjectFileDiscoverySource(ContextSource):
         parts: list[str] = []
         for filename in self.filenames:
             path = self.root / filename
-            source = FileContextSource(path)
+            source = FileContextSource(path, trusted_root=self.root)
             content = source.read()
             if content is not None:
                 parts.append(content)

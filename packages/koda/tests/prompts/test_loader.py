@@ -100,3 +100,70 @@ class TestSystemPromptLoader:
 
         assert prompt.content == "Custom."
         assert prompt.source == tmp_path / "CUSTOM.md"
+
+    def test_load_for_workspace_rejects_symlink_outside(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        outside = tmp_path / "outside"
+        workspace.mkdir()
+        outside.mkdir()
+
+        secret = outside / "secret.txt"
+        secret.write_text("leaked", encoding="utf-8")
+
+        link = workspace / "SYSTEM.md"
+        link.symlink_to(secret)
+
+        loader = SystemPromptLoader.for_workspace(workspace)
+        prompt = loader.load()
+
+        assert prompt.content == DEFAULT_SYSTEM_PROMPT
+        assert prompt.source is None
+
+    def test_load_for_workspace_allows_symlink_inside(self, tmp_path: Path) -> None:
+        real = tmp_path / "real.md"
+        real.write_text("ok", encoding="utf-8")
+
+        link = tmp_path / "SYSTEM.md"
+        link.symlink_to(real)
+
+        loader = SystemPromptLoader.for_workspace(tmp_path)
+        prompt = loader.load()
+
+        assert prompt.content == "ok"
+        assert prompt.source == tmp_path / "SYSTEM.md"
+
+    def test_load_sandbox_matches_equivalent_workspace_path(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        outside = tmp_path / "outside"
+        workspace.mkdir()
+        outside.mkdir()
+        secret = outside / "secret.txt"
+        secret.write_text("leaked", encoding="utf-8")
+        (workspace / "SYSTEM.md").symlink_to(secret)
+
+        loader = SystemPromptLoader(
+            search_paths=[workspace / "."],
+            sandbox_root=workspace,
+        )
+        prompt = loader.load()
+
+        assert prompt.content == DEFAULT_SYSTEM_PROMPT
+        assert prompt.source is None
+
+    def test_load_without_sandbox_follows_symlink(self, tmp_path: Path) -> None:
+        workspace = tmp_path / "workspace"
+        outside = tmp_path / "outside"
+        workspace.mkdir()
+        outside.mkdir()
+
+        secret = outside / "secret.txt"
+        secret.write_text("leaked", encoding="utf-8")
+
+        link = workspace / "SYSTEM.md"
+        link.symlink_to(secret)
+
+        loader = SystemPromptLoader(search_paths=[workspace])
+        prompt = loader.load()
+
+        assert prompt.content == "leaked"
+        assert prompt.source == workspace / "SYSTEM.md"

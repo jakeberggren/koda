@@ -27,10 +27,12 @@ class LocalRuntime:
         settings: SettingsManager,
         config: LocalRuntimeConfig,
         session_manager: SessionManager,
+        context_manager: ContextManager,
     ) -> None:
         self.settings = settings
         self.config = config
         self.session_manager = session_manager
+        self.context_manager = context_manager
         catalog, warnings = ModelCatalog.load()
         self.warnings = warnings
         self.llm_factory = LLMFactory(catalog)
@@ -74,13 +76,12 @@ class LocalRuntime:
             system_prompt=system_prompt,
             max_tool_iterations=self.config.max_tool_iterations,
         )
-        context_manager = ContextManager.from_workspace(self.config.cwd)
         return Agent(
             llm=llm,
             config=agent_config,
-            session_manager=self.session_manager,
             tools=self.create_tools(),
-            context_manager=context_manager,
+            session_manager=self.session_manager,
+            context_manager=ContextManager.from_workspace(self.config.cwd),
         )
 
     def get_agent(self) -> Agent:

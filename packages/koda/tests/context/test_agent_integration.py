@@ -18,7 +18,7 @@ class TestAgentContextIntegration:
         llm.generate_stream = AsyncMock()
         return llm
 
-    def test_agent_without_context_manager_uses_base_prompt(self, mock_llm: MagicMock) -> None:
+    def test_agent_without_project_context_uses_base_prompt(self, mock_llm: MagicMock) -> None:
         config = AgentConfig()
         agent = Agent(llm=mock_llm, config=config)
         instructions = agent.runner.resolve_instructions()
@@ -60,3 +60,24 @@ class TestAgentContextIntegration:
         instructions = agent.runner.resolve_instructions()
 
         assert instructions == base_instructions
+
+    def test_agent_context_manager_is_snapshotted_at_construction(
+        self,
+        mock_llm: MagicMock,
+        tmp_path: Path,
+    ) -> None:
+        path = tmp_path / "AGENTS.md"
+        path.write_text("Initial instructions.", encoding="utf-8")
+
+        agent = Agent(
+            llm=mock_llm,
+            config=AgentConfig(),
+            context_manager=ContextManager.from_workspace(tmp_path),
+        )
+        path.write_text("Changed instructions.", encoding="utf-8")
+
+        instructions = agent.runner.resolve_instructions()
+
+        assert instructions is not None
+        assert "Initial instructions." in instructions
+        assert "Changed instructions." not in instructions

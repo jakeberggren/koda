@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda.agent import AgentEvent
+from koda.context import ContextManager
 from koda.llm import ModelDefinition, ProviderDefinition
 from koda.llm import exceptions as llm_exceptions
 from koda.messages import Message
@@ -46,6 +47,7 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
             settings=settings,
             config=runtime,
             session_manager=self.session_manager,
+            context_manager=ContextManager.from_workspace(runtime.cwd),
         )
         self.availability = LocalAvailability(settings=settings, runtime=self.runtime)
 
@@ -68,9 +70,9 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
         if not status.is_ready:  # require ready status for chat
             raise ServiceNotReadyError(summary=status.summary, detail=status.detail)
 
-        agent = self.runtime.get_agent()
         if request.session_id is not None:
             self.switch_session(request.session_id)
+        agent = self.runtime.get_agent()
 
         try:
             async for event in agent.run(request.message):
@@ -121,14 +123,19 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
 
     def create_session(self) -> Session:
         """Create a new session."""
-        return self.session_manager.create_session()
+        session = self.session_manager.create_session()
+        self.runtime.invalidate()
+        return session
 
     def switch_session(self, session_id: UUID) -> Session:
         """Switch to a session."""
         try:
-            return self.session_manager.switch_session(session_id)
+            session = self.session_manager.switch_session(session_id)
         except SessionNotFoundError as e:
             raise ServiceSessionNotFoundError from e
+        else:
+            self.runtime.invalidate()
+            return session
 
     def delete_session(self, session_id: UUID) -> None:
         """Delete a session."""

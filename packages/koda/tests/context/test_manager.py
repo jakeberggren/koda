@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from koda.context.manager import ContextManager
-from koda.context.sources import FileContextSource, ProjectFileDiscoverySource
+from koda.context.sources import FileContextSource, ProjectFileContextSource
 from koda.prompts import DEFAULT_SYSTEM_PROMPT, SystemPrompt
 
 
@@ -51,7 +51,7 @@ class TestContextManager:
         manager = ContextManager.from_workspace(tmp_path)
 
         assert len(manager.sources) == 1
-        assert isinstance(manager.sources[0], ProjectFileDiscoverySource)
+        assert isinstance(manager.sources[0], ProjectFileContextSource)
 
     def test_from_workspace_custom_filenames(self, tmp_path: Path) -> None:
         (tmp_path / "RULES.md").write_text("Custom.", encoding="utf-8")

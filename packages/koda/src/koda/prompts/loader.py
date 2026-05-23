@@ -4,35 +4,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from koda.context.sources import FileContextSource
+from koda.prompts.prompt import SystemPrompt
 from koda_common.paths import koda_home_dir
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
-
-DEFAULT_SYSTEM_PROMPT: str = (
-    "You are Koda, an expert coding assistant built to help the user "
-    "navigate, understand, and modify codebases.\n\n"
-    "You are running in an execution environment with session state and tool support.\n\n"
-    "Be clear, practical, and concise. "
-    "Prefer concrete next steps and implementation details when helpful.\n\n"
-    "When working with code, preserve the user's intent, avoid unnecessary changes, "
-    "and call out important assumptions or risks."
-)
-
-
-@dataclass(frozen=True, slots=True)
-class SystemPrompt:
-    """A system prompt with provenance for UI display."""
-
-    content: str = DEFAULT_SYSTEM_PROMPT
-    source: Path | None = None
-    """Path the prompt was loaded from, or ``None`` for the built-in default."""
-
-    def render(self) -> str | None:
-        """Render into the final string form."""
-        normalized = self.content.strip()
-        return normalized or None
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,22 +19,44 @@ class SystemPromptLoader:
     Searches ``search_paths`` in order for ``SYSTEM.md``. The first non-empty
     file found replaces the default prompt entirely. If no file is found, the
     built-in default is returned.
+
+    When ``sandbox_root`` is set, files discovered under that path are confined
+    to it (symlinks and path traversal outside the root are rejected). Other
+    search paths are read without restriction.
     """
 
     search_paths: Sequence[Path]
     filename: str = "SYSTEM.md"
+    sandbox_root: Path | None = None
+
+    def _root_for_directory(self, directory: Path) -> Path | None:
+        if self.sandbox_root is None:
+            return None
+        try:
+            directory_resolved = directory.resolve(strict=True)
+            sandbox_resolved = self.sandbox_root.resolve(strict=True)
+        except (OSError, RuntimeError):
+            return None
+        if directory_resolved == sandbox_resolved or directory_resolved.is_relative_to(
+            sandbox_resolved
+        ):
+            return sandbox_resolved
+        return None
 
     @classmethod
     def for_workspace(cls, workspace_root: Path) -> SystemPromptLoader:
         """Create a loader that searches the workspace then ``~/.koda``."""
-        return cls(search_paths=[workspace_root, koda_home_dir()])
+        return cls(
+            search_paths=[workspace_root, koda_home_dir()],
+            sandbox_root=workspace_root,
+        )
 
     def load(self) -> SystemPrompt:
         """Return the loaded system prompt."""
 
         for directory in self.search_paths:
             path = directory / self.filename
-            source = FileContextSource(path)
+            source = FileContextSource(path, trusted_root=self._root_for_directory(directory))
             content = source.read()
             if content is not None:
                 return SystemPrompt(content=content, source=path)
