@@ -29,8 +29,8 @@ need_cmd() {
 usage() {
   cat <<'EOF'
 Usage:
-  ./scripts/release.sh [--dry-run] (--patch | --minor | --major)
-  ./scripts/release.sh [--dry-run] vX.Y.Z
+  ./scripts/release.sh [--preview] (--patch | --minor | --major)
+  ./scripts/release.sh [--preview] vX.Y.Z
   ./scripts/release.sh --wait-only vX.Y.Z
 
 Version selection (mutually exclusive):
@@ -40,7 +40,7 @@ Version selection (mutually exclusive):
   vX.Y.Z       Use explicit version instead of auto-bumping
 
 Other flags:
-  --dry-run    Validate and preview, do not create tag or release
+  --preview    Validate and preview, do not create tag or release
   --wait-only  Skip bumping, only wait for release assets
 
 Environment overrides:
@@ -57,13 +57,13 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 WAIT_ONLY=false
-DRY_RUN=false
+PREVIEW=false
 BUMP_TYPE=""
 
 while [[ "${1:-}" == --* ]]; do
   case "$1" in
-    --dry-run)
-      DRY_RUN=true
+    --preview)
+      PREVIEW=true
       ;;
     --wait-only)
       WAIT_ONLY=true
@@ -85,8 +85,8 @@ while [[ "${1:-}" == --* ]]; do
   shift
 done
 
-if [[ "${WAIT_ONLY}" == true && "${DRY_RUN}" == true ]]; then
-  error "--dry-run cannot be combined with --wait-only"
+if [[ "${WAIT_ONLY}" == true && "${PREVIEW}" == true ]]; then
+  error "--preview cannot be combined with --wait-only"
 fi
 
 if [[ "${WAIT_ONLY}" == true ]]; then
@@ -181,7 +181,7 @@ if new <= current:
 
   [[ -z "$(git status --porcelain)" ]] || error "working tree is not clean"
 
-  if [[ "${DRY_RUN}" == true ]]; then
+  if [[ "${PREVIEW}" == true ]]; then
     info "Previewing version bump to ${VERSION_TAG}"
     uv run bump-my-version bump --dry-run --no-commit --no-tag "${BUMP_ARGS[@]}"
 
@@ -216,8 +216,8 @@ for asset_template in "${RELEASE_ASSETS[@]}"; do
   EXPECTED_ASSET_NAMES+=("${asset_template//%s/${VERSION_TAG}}")
 done
 
-if [[ "${DRY_RUN}" == true ]]; then
-  info "Dry run passed for ${VERSION_TAG}"
+if [[ "${PREVIEW}" == true ]]; then
+  info "Preview passed for ${VERSION_TAG}"
   printf 'Current version: %s\n' "${CURRENT_VERSION}"
   printf 'Would bump to: %s\n' "${VERSION}"
   printf 'Previewed: uv run bump-my-version bump --dry-run --no-commit --no-tag %s\n' "${BUMP_ARGS[*]}"
