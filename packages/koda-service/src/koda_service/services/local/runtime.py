@@ -77,7 +77,6 @@ class LocalRuntime:
         agent_config = AgentConfig.from_settings(
             self.settings,
             system_prompt=self.load_system_prompt(),
-            max_tool_iterations=self.config.max_tool_iterations,
         )
         return Agent(
             llm=llm,

@@ -9,7 +9,6 @@ from koda.llm.exceptions import (
     LLMError,
     LLMRateLimitError,
 )
-from koda.tools.exceptions import MaxIterationsExceededError
 from koda_common.settings import (
     SecretsDecodeError,
     SecretsLoadError,
@@ -88,16 +87,6 @@ class ServiceChatError(KodaServiceError):
     def from_tool_error(cls, error: ToolError) -> ServiceChatError:
         """Convert a core tool error into a user-facing service chat error."""
         message = str(error)
-        if isinstance(error, MaxIterationsExceededError):
-            return ServiceToolError(
-                summary="Tool iteration limit reached.",
-                detail=(
-                    f"The assistant reached the configured limit of "
-                    f"{error.max_iterations} tool iterations before finishing."
-                ),
-                message=message,
-            )
-
         return ServiceToolError(
             summary="Tool execution failed.",
             detail=message,
