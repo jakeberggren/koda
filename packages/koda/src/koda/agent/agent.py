@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 from koda.agent.errors import AgentConfigError
-from koda.agent.prompts import PromptContext, SystemPrompt, render_prompt
 from koda.agent.runner import AgentRunner
 from koda.llm import LLMRequestOptions
+from koda.prompts import SystemPrompt
 from koda.sessions import InMemorySessionStore, SessionManager
 from koda_common.logging import get_logger
 
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from koda.agent.events import AgentEvent
+    from koda.context.manager import ContextManager
     from koda.llm import LLM
     from koda.tools import ToolConfig
     from koda_common.settings import SettingsManager
@@ -25,7 +26,6 @@ logger = get_logger(__name__)
 class AgentConfig:
     """Static agent configuration."""
 
-    prompt_context: PromptContext | None = None
     system_prompt: SystemPrompt = field(default_factory=SystemPrompt)
     request_options: LLMRequestOptions = field(default_factory=LLMRequestOptions)
     max_tool_iterations: int = 30
@@ -38,7 +38,7 @@ class AgentConfig:
                 expected="an integer greater than or equal to 1",
             )
 
-        render_prompt(self.system_prompt, self.prompt_context)
+        self.system_prompt.render()
 
     @classmethod
     def from_settings(
@@ -46,12 +46,10 @@ class AgentConfig:
         settings: SettingsManager,
         *,
         system_prompt: SystemPrompt | None = None,
-        prompt_context: PromptContext | None = None,
         max_tool_iterations: int = 30,
     ) -> AgentConfig:
         return cls(
             system_prompt=system_prompt or SystemPrompt(),
-            prompt_context=prompt_context,
             request_options=LLMRequestOptions(
                 thinking=settings.thinking,
                 web_search=settings.allow_web_search,
@@ -68,22 +66,22 @@ class Agent:
         self,
         llm: LLM,
         config: AgentConfig,
-        session_manager: SessionManager | None = None,
         tools: ToolConfig | None = None,
+        session_manager: SessionManager | None = None,
+        context_manager: ContextManager | None = None,
     ) -> None:
         self.llm = llm
-        self.config = config
+        self.config = (
+            replace(config, system_prompt=context_manager.build_system_prompt(config.system_prompt))
+            if context_manager is not None
+            else config
+        )
         self.session_manager = session_manager or SessionManager(InMemorySessionStore())
         self.tools = tools
-        self.instructions = render_prompt(
-            self.config.system_prompt,
-            self.config.prompt_context,
-        )
         self.runner = AgentRunner(
             llm=self.llm,
             config=self.config,
             session_manager=self.session_manager,
-            instructions=self.instructions,
             tools=self.tools,
         )
 

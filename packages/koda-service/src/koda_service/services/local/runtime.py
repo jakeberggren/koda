@@ -7,9 +7,11 @@ from koda.execution import create_command_executor
 from koda.llm import exceptions as llm_exceptions
 from koda.llm.catalog import ModelCatalog
 from koda.llm.factory import LLMFactory
+from koda.prompts import SystemPrompt, SystemPromptLoader
 from koda.tools import ToolConfig
 
 if TYPE_CHECKING:
+    from koda.context.manager import ContextManager
     from koda.llm import LLM
     from koda.sessions import SessionManager
     from koda_common.settings import SettingsManager
@@ -25,10 +27,12 @@ class LocalRuntime:
         settings: SettingsManager,
         config: LocalRuntimeConfig,
         session_manager: SessionManager,
+        context_manager: ContextManager,
     ) -> None:
         self.settings = settings
         self.config = config
         self.session_manager = session_manager
+        self.context_manager = context_manager
         catalog, warnings = ModelCatalog.load()
         self.warnings = warnings
         self.llm_factory = LLMFactory(catalog)
@@ -61,19 +65,26 @@ class LocalRuntime:
             executor=create_command_executor(self.settings),
         )
 
+    def load_system_prompt(self) -> SystemPrompt:
+        """Resolve system prompt precedence for this runtime."""
+        loaded_prompt = SystemPromptLoader.for_workspace(self.config.cwd).load()
+        if loaded_prompt.source is not None:
+            return loaded_prompt
+        return self.config.system_prompt
+
     def create_agent(self, llm: LLM) -> Agent:
         """Create an Agent wired to the current settings and session manager."""
         agent_config = AgentConfig.from_settings(
             self.settings,
-            system_prompt=self.config.system_prompt,
-            prompt_context=self.config.prompt_context,
+            system_prompt=self.load_system_prompt(),
             max_tool_iterations=self.config.max_tool_iterations,
         )
         return Agent(
             llm=llm,
             config=agent_config,
-            session_manager=self.session_manager,
             tools=self.create_tools(),
+            session_manager=self.session_manager,
+            context_manager=self.context_manager,
         )
 
     def get_agent(self) -> Agent:

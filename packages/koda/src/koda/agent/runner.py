@@ -105,14 +105,12 @@ class AgentRunner:
         llm: LLM,
         config: AgentConfig,
         session_manager: SessionManager,
-        instructions: str | None,
         tools: ToolConfig | None = None,
     ) -> None:
         """Create a runner for one stateful agent conversation."""
         self.llm = llm
         self.config = config
         self.session_manager = session_manager
-        self.instructions = instructions
         self.tools = tools
         self.tool_runner = ToolRunner(session_manager=session_manager, tools=tools)
 
@@ -147,6 +145,10 @@ class AgentRunner:
         self.session_manager.append_message(session_id, assistant_message)
         return assistant_message
 
+    def resolve_instructions(self) -> str | None:
+        """Render the configured system prompt."""
+        return self.config.system_prompt.render()
+
     def _build_request(
         self,
         session_id: UUID,
@@ -154,9 +156,10 @@ class AgentRunner:
     ) -> LLMRequest:
         """Build the model request for the current session state."""
         session = self.session_manager.get_session(session_id)
+        instructions = self.resolve_instructions()
         return LLMRequest(
             messages=session.messages,
-            instructions=self.instructions,
+            instructions=instructions,
             tools=tool_definitions,
             options=self.config.request_options,
         )

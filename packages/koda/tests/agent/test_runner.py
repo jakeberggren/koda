@@ -194,7 +194,6 @@ async def test_runner_maps_provider_hosted_tool_events() -> None:
         llm=HostedToolLLM(call=call, result=result),
         config=AgentConfig(),
         session_manager=session_manager,
-        instructions=None,
     )
 
     events = [event async for event in runner.run("search")]
