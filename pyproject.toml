@@ -14,7 +14,7 @@ dev = [
 members = ["packages/*"]
 
 [tool.bumpversion]
-current_version = "0.3.1"
+current_version = "0.3.2"
 commit = true
 tag = true
 message = "release: bump version to {new_version}"
@@ -22,16 +22,7 @@ tag_name = "v{new_version}"
 tag_message = "Release v{new_version}"
 
 [[tool.bumpversion.files]]
-filename = "packages/koda/pyproject.toml"
-
-[[tool.bumpversion.files]]
-filename = "packages/koda-common/pyproject.toml"
-
-[[tool.bumpversion.files]]
-filename = "packages/koda-service/pyproject.toml"
-
-[[tool.bumpversion.files]]
-filename = "packages/koda-tui/pyproject.toml"
+glob = "packages/*/pyproject.toml"
 
 [tool.ruff]
 line-length = 100

@@ -31,7 +31,7 @@ usage() {
 Usage:
   ./scripts/release.sh [--dry-run] (--patch | --minor | --major)
   ./scripts/release.sh [--dry-run] vX.Y.Z
-  ./scripts/release.sh --wait-only [vX.Y.Z]
+  ./scripts/release.sh --wait-only vX.Y.Z
 
 Version selection (mutually exclusive):
   --patch      Bump patch version (e.g. 0.3.1 → 0.3.2)
@@ -89,29 +89,39 @@ if [[ "${WAIT_ONLY}" == true && "${DRY_RUN}" == true ]]; then
   error "--dry-run cannot be combined with --wait-only"
 fi
 
-need_cmd git
-need_cmd gh
-need_cmd uv
-
-# Read current version from bump-my-version config
-CURRENT_VERSION=$(uv run bump-my-version show current_version 2>/dev/null) || {
-  error "could not read current version from bump-my-version config"
-}
-[[ -n "${CURRENT_VERSION}" ]] || error "current version is empty"
-
-# Determine target version and bump-my-version part
-if [[ -n "${1:-}" ]]; then
-  VERSION_TAG="${1}"
+if [[ "${WAIT_ONLY}" == true ]]; then
+  [[ -z "${BUMP_TYPE}" ]] || error "--wait-only cannot be combined with --${BUMP_TYPE}"
+  VERSION_TAG="${1:-}"
+  [[ -n "${VERSION_TAG}" ]] || error "--wait-only requires a tag like vX.Y.Z"
   [[ "${VERSION_TAG}" == v* ]] || error "version must be a tag like vX.Y.Z"
-  VERSION="${VERSION_TAG#v}"
+  shift || true
+  [[ -z "${1:-}" ]] || error "unexpected extra argument: $1"
 
-  if [[ -n "${BUMP_TYPE}" ]]; then
-    error "cannot combine explicit version (${VERSION_TAG}) with --${BUMP_TYPE}"
-  fi
+  need_cmd gh
+else
+  need_cmd git
+  need_cmd gh
+  need_cmd uv
 
-  # For explicit versions, we still need a part for bump-my-version.
-  # Pick the part that changed, or default to 'patch'.
-  BUMP_TYPE=$(python3 -c "
+  # Read current version from bump-my-version config
+  CURRENT_VERSION=$(uv run bump-my-version show current_version 2>/dev/null) || {
+    error "could not read current version from bump-my-version config"
+  }
+  [[ -n "${CURRENT_VERSION}" ]] || error "current version is empty"
+
+  # Determine target version and bump-my-version part
+  if [[ -n "${1:-}" ]]; then
+    VERSION_TAG="${1}"
+    [[ "${VERSION_TAG}" == v* ]] || error "version must be a tag like vX.Y.Z"
+    VERSION="${VERSION_TAG#v}"
+
+    if [[ -n "${BUMP_TYPE}" ]]; then
+      error "cannot combine explicit version (${VERSION_TAG}) with --${BUMP_TYPE}"
+    fi
+
+    # For explicit versions, we still need a part for bump-my-version.
+    # Pick the part that changed, or default to 'patch'.
+    BUMP_TYPE=$(python3 -c "
 def parse(v):
     return tuple(int(x) for x in v.split('.'))
 c = parse('${CURRENT_VERSION}')
@@ -124,10 +134,10 @@ else:
     print('patch')
 ")
 
-  BUMP_ARGS=("${BUMP_TYPE}" "--new-version" "${VERSION}")
-elif [[ -n "${BUMP_TYPE}" ]]; then
-  BUMP_ARGS=("${BUMP_TYPE}")
-  VERSION=$(python3 -c "
+    BUMP_ARGS=("${BUMP_TYPE}" "--new-version" "${VERSION}")
+  elif [[ -n "${BUMP_TYPE}" ]]; then
+    BUMP_ARGS=("${BUMP_TYPE}")
+    VERSION=$(python3 -c "
 def parse(v):
     return tuple(int(x) for x in v.split('.'))
 current = parse('${CURRENT_VERSION}')
@@ -144,14 +154,14 @@ elif bump == 'major':
     parts[2] = 0
 print('.'.join(str(x) for x in parts))
 ")
-  VERSION_TAG="v${VERSION}"
-else
-  usage
-  exit 1
-fi
+    VERSION_TAG="v${VERSION}"
+  else
+    usage
+    exit 1
+  fi
 
-# Validate new version is greater than current
-python3 -c "
+  # Validate new version is greater than current
+  python3 -c "
 def parse(v):
     return tuple(int(x) for x in v.split('.'))
 current = parse('${CURRENT_VERSION}')
@@ -161,7 +171,6 @@ if new <= current:
     __import__('sys').exit(1)
 " || error "version validation failed"
 
-if [[ "${WAIT_ONLY}" == false ]]; then
   [[ -z "$(git status --porcelain)" ]] || error "working tree is not clean"
 
   if git rev-parse "${VERSION_TAG}" >/dev/null 2>&1; then
@@ -174,7 +183,15 @@ if [[ "${WAIT_ONLY}" == false ]]; then
 
   if [[ "${DRY_RUN}" == false ]]; then
     info "Bumping version to ${VERSION_TAG} with bump-my-version"
-    uv run bump-my-version bump "${BUMP_ARGS[@]}"
+    uv run bump-my-version bump --no-commit --no-tag "${BUMP_ARGS[@]}"
+
+    info "Refreshing uv.lock"
+    uv lock
+
+    info "Creating release commit and tag ${VERSION_TAG}"
+    git add pyproject.toml packages/*/pyproject.toml uv.lock
+    git commit -m "release: bump version to ${VERSION}"
+    git tag -a "${VERSION_TAG}" -m "Release ${VERSION_TAG}"
 
     info "Pushing commit and tag ${VERSION_TAG}"
     git push "${REMOTE}" HEAD
@@ -197,7 +214,9 @@ if [[ "${DRY_RUN}" == true ]]; then
   info "Dry run passed for ${VERSION_TAG}"
   printf 'Current version: %s\n' "${CURRENT_VERSION}"
   printf 'Would bump to: %s\n' "${VERSION}"
-  printf 'Would run: uv run bump-my-version bump %s\n' "${BUMP_ARGS[*]}"
+  printf 'Would run: uv run bump-my-version bump --no-commit --no-tag %s\n' "${BUMP_ARGS[*]}"
+  printf 'Would run: uv lock\n'
+  printf 'Would create commit: release: bump version to %s\n' "${VERSION}"
   printf 'Would push tag: %s\n' "${VERSION_TAG}"
   printf 'Would wait for release assets:\n'
   for expected_asset_name in "${EXPECTED_ASSET_NAMES[@]}"; do
