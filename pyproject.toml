@@ -1,5 +1,6 @@
 [dependency-groups]
 dev = [
+    "bump-my-version>=1.3.0",
     "pre-commit~=4.6.0",
     "pyinstaller~=6.20.0",
     "pytest~=9.0.1",
@@ -11,6 +12,26 @@ dev = [
 
 [tool.uv.workspace]
 members = ["packages/*"]
+
+[tool.bumpversion]
+current_version = "0.3.1"
+commit = true
+tag = true
+message = "release: bump version to {new_version}"
+tag_name = "v{new_version}"
+tag_message = "Release v{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "packages/koda/pyproject.toml"
+
+[[tool.bumpversion.files]]
+filename = "packages/koda-common/pyproject.toml"
+
+[[tool.bumpversion.files]]
+filename = "packages/koda-service/pyproject.toml"
+
+[[tool.bumpversion.files]]
+filename = "packages/koda-tui/pyproject.toml"
 
 [tool.ruff]
 line-length = 100
