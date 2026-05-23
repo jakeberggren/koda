@@ -129,17 +129,25 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
 
     def switch_session(self, session_id: UUID) -> Session:
         """Switch to a session."""
+        active = self.session_manager.active_session
+        active_session_id = active.session_id if active is not None else None
         try:
             session = self.session_manager.switch_session(session_id)
         except SessionNotFoundError as e:
             raise ServiceSessionNotFoundError from e
         else:
-            self.runtime.invalidate()
+            if session.session_id != active_session_id:
+                self.runtime.invalidate()
             return session
 
     def delete_session(self, session_id: UUID) -> None:
         """Delete a session."""
+        active = self.session_manager.active_session
+        removing_active = active is not None and active.session_id == session_id
         try:
             self.session_manager.delete_session(session_id)
         except SessionNotFoundError as e:
             raise ServiceSessionNotFoundError from e
+        else:
+            if removing_active:
+                self.runtime.invalidate()

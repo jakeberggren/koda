@@ -70,15 +70,6 @@ class TestSystemPromptLoader:
         assert prompt.content == DEFAULT_SYSTEM_PROMPT
         assert prompt.source is None
 
-    def test_load_prefers_workspace_over_home(self, tmp_path: Path) -> None:
-        (tmp_path / "SYSTEM.md").write_text("Workspace wins.", encoding="utf-8")
-        loader = SystemPromptLoader(search_paths=[tmp_path, tmp_path])
-
-        prompt = loader.load()
-
-        assert prompt.content == "Workspace wins."
-        assert prompt.source == tmp_path / "SYSTEM.md"
-
     def test_load_searches_in_order(self, tmp_path: Path) -> None:
         first = tmp_path / "first"
         second = tmp_path / "second"
