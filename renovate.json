@@ -36,8 +36,8 @@
     }
   ],
   "pep621": {
-    "fileMatch": [
-      "(^|/)pyproject\\.toml$"
+    "managerFilePatterns": [
+      "/(^|/)pyproject\\.toml$/"
     ]
   },
   "schedule": [
