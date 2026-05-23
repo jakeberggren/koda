@@ -171,8 +171,6 @@ if new <= current:
     __import__('sys').exit(1)
 " || error "version validation failed"
 
-  [[ -z "$(git status --porcelain)" ]] || error "working tree is not clean"
-
   if git rev-parse "${VERSION_TAG}" >/dev/null 2>&1; then
     error "local tag already exists: ${VERSION_TAG}"
   fi
@@ -181,7 +179,15 @@ if new <= current:
     error "remote tag already exists: ${VERSION_TAG}"
   fi
 
-  if [[ "${DRY_RUN}" == false ]]; then
+  [[ -z "$(git status --porcelain)" ]] || error "working tree is not clean"
+
+  if [[ "${DRY_RUN}" == true ]]; then
+    info "Previewing version bump to ${VERSION_TAG}"
+    uv run bump-my-version bump --dry-run --no-commit --no-tag "${BUMP_ARGS[@]}"
+
+    info "Checking uv.lock"
+    uv lock --check
+  else
     info "Bumping version to ${VERSION_TAG} with bump-my-version"
     uv run bump-my-version bump --no-commit --no-tag "${BUMP_ARGS[@]}"
 
@@ -214,8 +220,8 @@ if [[ "${DRY_RUN}" == true ]]; then
   info "Dry run passed for ${VERSION_TAG}"
   printf 'Current version: %s\n' "${CURRENT_VERSION}"
   printf 'Would bump to: %s\n' "${VERSION}"
-  printf 'Would run: uv run bump-my-version bump --no-commit --no-tag %s\n' "${BUMP_ARGS[*]}"
-  printf 'Would run: uv lock\n'
+  printf 'Previewed: uv run bump-my-version bump --dry-run --no-commit --no-tag %s\n' "${BUMP_ARGS[*]}"
+  printf 'Checked: uv lock --check\n'
   printf 'Would create commit: release: bump version to %s\n' "${VERSION}"
   printf 'Would push tag: %s\n' "${VERSION_TAG}"
   printf 'Would wait for release assets:\n'
