@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda.agent import Agent, AgentConfig
+from koda.context.manager import ContextManager
 from koda.execution import create_command_executor
 from koda.llm import exceptions as llm_exceptions
 from koda.llm.catalog import ModelCatalog
 from koda.llm.factory import LLMFactory
+from koda.prompts import SystemPrompt, SystemPromptLoader
 from koda.tools import ToolConfig
 
 if TYPE_CHECKING:
@@ -63,17 +65,22 @@ class LocalRuntime:
 
     def create_agent(self, llm: LLM) -> Agent:
         """Create an Agent wired to the current settings and session manager."""
+        system_prompt = self.config.system_prompt
+        if system_prompt == SystemPrompt():
+            system_prompt = SystemPromptLoader.for_workspace(self.config.cwd).load()
+
         agent_config = AgentConfig.from_settings(
             self.settings,
-            system_prompt=self.config.system_prompt,
-            prompt_context=self.config.prompt_context,
+            system_prompt=system_prompt,
             max_tool_iterations=self.config.max_tool_iterations,
         )
+        context_manager = ContextManager.from_workspace(self.config.cwd)
         return Agent(
             llm=llm,
             config=agent_config,
             session_manager=self.session_manager,
             tools=self.create_tools(),
+            context_manager=context_manager,
         )
 
     def get_agent(self) -> Agent:

@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from koda.agent.agent import AgentConfig
+    from koda.context.manager import ContextManager
     from koda.sessions import SessionManager
     from koda.tools import ToolConfig, ToolDefinition
 
@@ -105,15 +106,15 @@ class AgentRunner:
         llm: LLM,
         config: AgentConfig,
         session_manager: SessionManager,
-        instructions: str | None,
         tools: ToolConfig | None = None,
+        context_manager: ContextManager | None = None,
     ) -> None:
         """Create a runner for one stateful agent conversation."""
         self.llm = llm
         self.config = config
         self.session_manager = session_manager
-        self.instructions = instructions
         self.tools = tools
+        self.context_manager = context_manager
         self.tool_runner = ToolRunner(session_manager=session_manager, tools=tools)
 
     def _ensure_active_session_id(self) -> UUID:
@@ -147,6 +148,13 @@ class AgentRunner:
         self.session_manager.append_message(session_id, assistant_message)
         return assistant_message
 
+    def resolve_instructions(self) -> str | None:
+        """Render the system prompt, re-reading context sources if needed."""
+        system_prompt = self.config.system_prompt
+        if self.context_manager is not None:
+            system_prompt = self.context_manager.build_system_prompt(system_prompt)
+        return system_prompt.render()
+
     def _build_request(
         self,
         session_id: UUID,
@@ -154,9 +162,10 @@ class AgentRunner:
     ) -> LLMRequest:
         """Build the model request for the current session state."""
         session = self.session_manager.get_session(session_id)
+        instructions = self.resolve_instructions()
         return LLMRequest(
             messages=session.messages,
-            instructions=self.instructions,
+            instructions=instructions,
             tools=tool_definitions,
             options=self.config.request_options,
         )
