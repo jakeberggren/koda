@@ -1,6 +1,6 @@
 [project]
 name = "koda-service"
-version = "0.3.2"
+version = "0.4.0"
 description = "Service boundary and runtime orchestration for the Koda core."
 readme = "README.md"
 
