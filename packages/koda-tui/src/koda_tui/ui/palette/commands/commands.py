@@ -12,6 +12,8 @@ from koda_tui.ui.palette.commands import (
     thinking_commands,
 )
 from koda_tui.ui.palette.commands.command import Command
+from koda_tui.ui.palette.commands.model_commands import PROXY_MANAGED_MODEL_FOOTER
+from koda_tui.ui.palette.commands.provider_commands import PROXY_MANAGED_PROVIDER_FOOTER
 from koda_tui.utils.model_selection import find_model, supported_thinking_options
 
 if TYPE_CHECKING:
@@ -142,21 +144,34 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
     """Get the root palette commands."""
 
     def cmd_connect_provider() -> None:
+        proxy_managed = app_settings.core.credential_mode == "proxy-managed"
         providers = service.list_providers()
         connected_provider_ids = {provider.id for provider in service.list_configured_providers()}
         commands = provider_commands.get_commands(
             providers=providers,
             connected_provider_ids=connected_provider_ids,
-            on_select=partial(
-                _open_api_key_dialog,
-                service=service,
-                app_settings=app_settings,
-                palette_manager=palette_manager,
+            on_select=(
+                (lambda *_args: None)  # no-op: proxy-managed credentials are handled externally
+                if proxy_managed
+                else partial(
+                    _open_api_key_dialog,
+                    service=service,
+                    app_settings=app_settings,
+                    palette_manager=palette_manager,
+                )
             ),
+            proxy_managed=proxy_managed,
         )
-        palette_manager.open_palette(commands, list_heading="Configure LLM Provider API Key")
+        palette_manager.open_palette(
+            commands,
+            list_heading=(
+                "Available Providers" if proxy_managed else "Configure LLM Provider API Key"
+            ),
+            footer=PROXY_MANAGED_PROVIDER_FOOTER if proxy_managed else None,
+        )
 
     def cmd_switch_model() -> None:
+        proxy_managed = app_settings.core.credential_mode == "proxy-managed"
         models = service.list_configured_models()
         providers = service.list_providers()
         commands = model_commands.get_commands(
@@ -171,7 +186,10 @@ def get_commands(  # noqa: C901 - palette root assembly is intentionally central
                 palette_manager=palette_manager,
             ),
         )
-        palette_manager.open_palette(commands)
+        palette_manager.open_palette(
+            commands,
+            footer=PROXY_MANAGED_MODEL_FOOTER if proxy_managed else None,
+        )
 
     def cmd_set_thinking() -> None:
         active_model = find_model(

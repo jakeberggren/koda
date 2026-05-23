@@ -7,7 +7,7 @@ from prompt_toolkit.keys import Keys
 
 from koda_common.logging import get_logger
 from koda_tui import actions
-from koda_tui.ui.palette.commands.command import Command, CommandStatus
+from koda_tui.ui.palette.commands.command import Command, CommandMarker
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -130,26 +130,28 @@ def get_commands(  # noqa: C901
     sessions = service.list_sessions()
     active = service.active_session()
 
-    command_sessions: list[tuple[Command, Session]] = []
-    for session in sessions:
-        status = (
-            CommandStatus.CURRENT
-            if active is not None and session.session_id == active.session_id
-            else None
-        )
-        cmd = Command(
-            label=_format_session_label(session),
-            handler=partial(
-                _switch_session,
-                session,
-                service,
-                state,
-                palette_manager,
-                cancel_streaming,
+    command_sessions = [
+        (
+            Command(
+                label=_format_session_label(session),
+                handler=partial(
+                    _switch_session,
+                    session,
+                    service,
+                    state,
+                    palette_manager,
+                    cancel_streaming,
+                ),
+                marker=(
+                    CommandMarker(marker="*", label_style="class:palette.current")
+                    if active is not None and session.session_id == active.session_id
+                    else None
+                ),
             ),
-            status=status,
+            session,
         )
-        command_sessions.append((cmd, session))
+        for session in sessions
+    ]
 
     commands = [cmd for cmd, _ in command_sessions]
 

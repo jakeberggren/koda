@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import partial
 from typing import TYPE_CHECKING
 
-from koda_tui.ui.palette.commands.command import Command, CommandStatus
+from koda_tui.ui.palette.commands.command import Command, CommandMarker
 
 _MAX_MODEL_LABEL_LENGTH = 24
 _ELLIPSIS = "..."
@@ -12,7 +12,17 @@ _ELLIPSIS = "..."
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from prompt_toolkit.formatted_text import StyleAndTextTuples
+
     from koda.llm import ModelDefinition, ProviderDefinition
+
+
+PROXY_MANAGED_MODEL_FOOTER: StyleAndTextTuples = [
+    (
+        "fg:ansiyellow",
+        "Proxy-managed credentials: model access is verified on request.",
+    )
+]
 
 
 def _truncate_label(label: str, max_length: int) -> str:
@@ -42,8 +52,8 @@ def get_commands(
             handler=partial(on_select, model),
             description=model.description or "",
             group=provider_names[model.provider],
-            status=(
-                CommandStatus.CURRENT
+            marker=(
+                CommandMarker(marker="*", label_style="class:palette.current")
                 if active_provider_id == model.provider and active_model_id == model.id
                 else None
             ),

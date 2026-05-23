@@ -14,6 +14,7 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, Settings
 
 type ThinkingOptionId = str
 type ExecutionSandox = Literal["host", "seatbelt"]
+type CredentialMode = Literal["local", "proxy-managed"]
 
 
 class Settings(BaseSettings):
@@ -62,6 +63,16 @@ class Settings(BaseSettings):
             "allow_extended_prompt_retention",
             "KODA_ALLOW_EXTENDED_PROMPT_RETENTION",
         ),
+    )
+    credential_mode: CredentialMode = Field(
+        default="local",
+        description=(
+            "Runtime credential source for provider API keys. "
+            "Use 'proxy-managed' when credentials are injected by the host environment "
+            "and cannot be verified directly by Koda, for example in a Docker Sandboxes "
+            "managed sandbox."
+        ),
+        validation_alias=AliasChoices("credential_mode", "KODA_CREDENTIAL_MODE"),
     )
     bash_execution_sandbox: ExecutionSandox = Field(
         default="host",
