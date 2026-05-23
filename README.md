@@ -119,6 +119,20 @@ Command execution mode can be configured in `~/.koda/config.json` or with
 environment variables. See the [command execution README](packages/koda/src/koda/execution/README.md)
 for details on execution modes and configuration.
 
+### Project Context and System Prompt Customization
+
+Koda supports two ways to customize the system prompt for a workspace.
+
+**Project context** — place an `AGENTS.md` or `CLAUDE.md` file in the workspace
+root. Their contents are appended to the base system prompt, so the agent
+respects your project conventions. If no context files are present, the base
+prompt is used unchanged.
+
+**Full override** — place a `SYSTEM.md` file in the workspace root (or in
+`~/.koda/`). The first file found replaces the default system prompt entirely.
+Workspace files take precedence over the user-level file.
+`AGENTS.md` and `CLAUDE.md` are still appended on top of a custom `SYSTEM.md`.
+
 ## TUI
 
 Koda's current user-facing interface is `koda-tui`, a prompt-toolkit based
