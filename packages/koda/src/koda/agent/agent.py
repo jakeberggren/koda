@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
-from koda.agent.errors import AgentConfigError
 from koda.agent.runner import AgentRunner
 from koda.llm import LLMRequestOptions
 from koda.prompts import SystemPrompt
@@ -28,17 +27,6 @@ class AgentConfig:
 
     system_prompt: SystemPrompt = field(default_factory=SystemPrompt)
     request_options: LLMRequestOptions = field(default_factory=LLMRequestOptions)
-    max_tool_iterations: int = 30
-
-    def __post_init__(self) -> None:
-        if self.max_tool_iterations < 1:
-            raise AgentConfigError(
-                field_name="max_tool_iterations",
-                value=self.max_tool_iterations,
-                expected="an integer greater than or equal to 1",
-            )
-
-        self.system_prompt.render()
 
     @classmethod
     def from_settings(
@@ -46,16 +34,15 @@ class AgentConfig:
         settings: SettingsManager,
         *,
         system_prompt: SystemPrompt | None = None,
-        max_tool_iterations: int = 30,
     ) -> AgentConfig:
+        request_options = LLMRequestOptions(
+            thinking=settings.thinking,
+            web_search=settings.allow_web_search,
+            extended_prompt_retention=settings.allow_extended_prompt_retention,
+        )
         return cls(
             system_prompt=system_prompt or SystemPrompt(),
-            request_options=LLMRequestOptions(
-                thinking=settings.thinking,
-                web_search=settings.allow_web_search,
-                extended_prompt_retention=settings.allow_extended_prompt_retention,
-            ),
-            max_tool_iterations=max_tool_iterations,
+            request_options=request_options,
         )
 
 

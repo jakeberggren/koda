@@ -61,14 +61,6 @@ class PathDeniedError(ToolError):
         super().__init__(f"Access denied: '{path}' - {reason}")
 
 
-class MaxIterationsExceededError(ToolError):
-    """Maximum tool call iterations exceeded."""
-
-    def __init__(self, max_iterations: int) -> None:
-        self.max_iterations = max_iterations
-        super().__init__(f"Maximum tool iterations ({max_iterations}) exceeded")
-
-
 class ToolAlreadyRegisteredError(ToolError):
     """Tool is already registered."""
 

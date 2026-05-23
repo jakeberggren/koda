@@ -19,6 +19,5 @@ class LocalRuntimeConfig:
     cwd: Path
     sandbox_dir: Path
     system_prompt: SystemPrompt = field(default_factory=SystemPrompt)
-    max_tool_iterations: int = 30
     tools: ToolConfig | None = None
     llm: LLM | None = None

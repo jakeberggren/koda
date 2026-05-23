@@ -28,7 +28,6 @@ from koda.llm.types import (
 )
 from koda.messages import AssistantMessage, ToolMessage, UserMessage
 from koda.tools import ToolCall, ToolOutput, ToolResult
-from koda.tools import exceptions as tool_exceptions
 from koda.tools.executor import ToolExecutor
 from koda_common.logging import get_logger
 
@@ -198,7 +197,9 @@ class AgentRunner:
         self.session_manager.append_message(session_id, UserMessage(content=user_text))
         tool_definitions = self._get_tool_definitions()
 
-        for iteration in range(1, self.config.max_tool_iterations + 1):
+        iteration = 0
+        while True:
+            iteration += 1
             logger.info("agent_loop_iteration", iteration=iteration)
             yield AgentIterationStarted(session_id=session_id, iteration=iteration)
 
@@ -228,6 +229,3 @@ class AgentRunner:
                 tool_calls=accumulator.tool_calls,
             ):
                 yield event
-
-        logger.error("max_iterations_exceeded", max_iterations=self.config.max_tool_iterations)
-        raise tool_exceptions.MaxIterationsExceededError(self.config.max_tool_iterations)
