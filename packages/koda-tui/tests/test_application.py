@@ -10,7 +10,6 @@ from koda_common.settings import SettingChange
 from koda_service import ServiceDiagnostics, ServiceStatus, ServiceStatusCode
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.settings import AppSettings
-from koda_tui.ui.palette.palette_manager import PaletteManager
 
 
 def _make_settings_mock(unsubscribe: Mock) -> Mock:
@@ -135,11 +134,7 @@ async def test_run_always_closes(monkeypatch: pytest.MonkeyPatch) -> None:
     def _fake_create_application() -> _FakeApp:
         return _FakeApp()
 
-    def _ignore_set_app(_self: PaletteManager, _app: object) -> None:
-        return None
-
     monkeypatch.setattr(app, "_create_application", _fake_create_application)
-    monkeypatch.setattr(PaletteManager, "set_app", _ignore_set_app)
 
     with pytest.raises(RuntimeError):
         await app.run()

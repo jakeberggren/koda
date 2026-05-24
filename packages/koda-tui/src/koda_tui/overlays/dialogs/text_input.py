@@ -1,7 +1,8 @@
-"""API key input dialog component."""
+"""Generic text input dialog overlay."""
 
 from __future__ import annotations
 
+import shutil
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.buffer import Buffer
@@ -15,62 +16,73 @@ from prompt_toolkit.layout import (
     Window,
     WindowAlign,
 )
-from prompt_toolkit.layout.processors import PasswordProcessor
+from prompt_toolkit.layout.processors import PasswordProcessor, Processor
 from prompt_toolkit.widgets import Box, Frame
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from prompt_toolkit.key_binding import KeyPressEvent
+    from prompt_toolkit.layout import AnyContainer
 
 
-class ApiKeyDialog:
-    """Dialog for entering an API key with masked input."""
+def _calculate_dialog_width() -> int:
+    """Return text input dialog width based on the current terminal size."""
+    term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
+    return max(40, min(60, term_width // 2))
+
+
+class TextInputDialog:
+    """Dialog for single-line text input with optional masking."""
 
     def __init__(
         self,
-        provider: str,
+        title: str,
         on_submit: Callable[[str], None],
         on_cancel: Callable[[], None],
+        *,
+        mask_input: bool = False,
+        width: int | None = None,
     ) -> None:
-        self.provider = provider
-        self.on_submit = on_submit
-        self.on_cancel = on_cancel
+        self._title = title
+        self._on_submit = on_submit
+        self._on_cancel = on_cancel
+        self._mask_input = mask_input
+        self.preferred_width = width if width is not None else _calculate_dialog_width()
 
-        # Input buffer for API key
         self.input_buffer = Buffer()
-
-        # Key bindings
         self._kb = self._create_keybindings()
-
-        # Build container
         self._container = self._build_container()
 
+    def __pt_container__(self) -> AnyContainer:
+        return self._container
+
+    @property
+    def focus_target(self) -> Buffer:
+        """Return the prompt_toolkit target to focus when opened."""
+        return self.input_buffer
+
     def _create_keybindings(self) -> KeyBindings:
-        """Create key bindings for dialog."""
         kb = KeyBindings()
-
-        @kb.add(Keys.Escape, eager=True)
-        def _cancel(_event: KeyPressEvent) -> None:
-            self.on_cancel()
-
-        @kb.add(Keys.Enter)
-        def _submit(_event: KeyPressEvent) -> None:
-            key = self.input_buffer.text.strip()
-            if key:
-                self.on_submit(key)
-
+        kb.add(Keys.Escape, eager=True)(self._on_escape)
+        kb.add(Keys.Enter)(self._on_enter)
         return kb
 
+    def _on_escape(self, _event: KeyPressEvent) -> None:
+        self._on_cancel()
+
+    def _on_enter(self, _event: KeyPressEvent) -> None:
+        text = self.input_buffer.text.strip()
+        if text:
+            self._on_submit(text)
+
     def _build_container(self) -> Frame:
-        """Build the dialog UI container."""
         title_text = Window(
             content=FormattedTextControl(
-                text=[("class:dialog.title", f"Enter {self.provider} API Key")]
+                text=[("class:dialog.title", self._title)],
             ),
             height=1,
             dont_extend_height=True,
-            dont_extend_width=False,
             style="class:dialog.box",
         )
 
@@ -85,15 +97,14 @@ class ApiKeyDialog:
         )
 
         title_row = VSplit([title_text, esc_hint], style="class:dialog.box")
-
         separator = Window(height=1, style="class:dialog.box")
 
-        # Input with prompt
+        processors: list[Processor] = [PasswordProcessor()] if self._mask_input else []
         input_row = Window(
             content=BufferControl(
                 buffer=self.input_buffer,
                 key_bindings=self._kb,
-                input_processors=[PasswordProcessor()],
+                input_processors=processors,
             ),
             height=1,
             dont_extend_height=True,
@@ -101,17 +112,12 @@ class ApiKeyDialog:
         )
 
         body = HSplit([title_row, separator, input_row])
-
         box = Box(
             body,
             padding_left=2,
             padding_right=2,
             padding_top=1,
-            padding_bottom=2,
+            padding_bottom=1,
             style="class:dialog.box",
         )
         return Frame(body=box, style="class:dialog.frame")
-
-    def __pt_container__(self) -> Frame:
-        """Return the container for prompt_toolkit."""
-        return self._container

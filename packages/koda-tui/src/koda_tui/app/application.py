@@ -11,11 +11,10 @@ from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.output import SynchronizedOutput
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
+from koda_tui.layout import TUILayout
+from koda_tui.palette.palette import Palette
 from koda_tui.state import AppState
-from koda_tui.ui.layout import TUILayout
-from koda_tui.ui.palette import PaletteManager
-from koda_tui.ui.palette.commands.commands import get_commands
-from koda_tui.ui.styles import get_style
+from koda_tui.styles import get_style
 from koda_tui.utils.model_selection import find_model, resolve_thinking_option, supports_thinking
 
 if TYPE_CHECKING:
@@ -81,7 +80,7 @@ class KodaTuiApp:
         self.layout.renderer.set_theme(self._app_settings.tui.theme)
 
         # Application instance (created on run)
-        self._app: Application | None = None
+        self._app: Application[None] | None = None
         self._exit_reset_handle: asyncio.TimerHandle | None = None
 
         self._message_queue = MessageQueue(
@@ -94,14 +93,10 @@ class KodaTuiApp:
             state=self.state,
             invalidate=self.invalidate,
         )
-        self._palette_manager = PaletteManager(
-            layout=self.layout,
-            state=self.state,
-            invalidate=self.invalidate,
-        )
+        self.palette = Palette(self)
         self._refresh_service_state()
 
-    def _create_application(self) -> Application:
+    def _create_application(self) -> Application[None]:
         """Create the prompt_toolkit Application."""
         # Wrap output in synchronized update sequences (DEC mode 2026).
         # The terminal buffers all writes between begin/end markers and
@@ -248,18 +243,7 @@ class KodaTuiApp:
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""
-        if self.state.palette_open:
-            self._palette_manager.close_all()
-            return
-
-        commands = get_commands(
-            service=self._service,
-            app_settings=self._app_settings,
-            state=self.state,
-            palette_manager=self._palette_manager,
-            cancel_streaming=self.cancel_streaming,
-        )
-        self._palette_manager.open_palette(commands)
+        self.palette.toggle()
 
     def exit(self) -> None:
         """Exit the application."""
@@ -277,7 +261,13 @@ class KodaTuiApp:
     async def run(self) -> None:
         """Start the TUI application."""
         self._app = self._create_application()
-        self._palette_manager.set_app(self._app)
+        root_container = self.layout.root_container
+        if root_container is None:
+            self.layout.create_layout()
+            root_container = self.layout.root_container
+        if root_container is None:
+            raise RuntimeError
+        self.palette.attach(self._app, root_container)
         try:
             await self._app.run_async()
         finally:

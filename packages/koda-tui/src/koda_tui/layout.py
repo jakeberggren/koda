@@ -41,6 +41,7 @@ class TUILayout:
         self.input_area = InputArea(state)
         self.file_suggestions = FileSuggestions(self.input_area)
         self.status_bar = StatusBarControl(state)
+        self.root_container: FloatContainer | None = None
 
     def create_layout(self) -> Layout:
         """Create the full-screen layout."""
@@ -72,7 +73,7 @@ class TUILayout:
         )
 
         # Main layout body. Wrapped in FloatContainer for command palette support
-        self.root_container = FloatContainer(
+        root_container = FloatContainer(
             content=HSplit(
                 [
                     Box(chat_area, padding=0, padding_left=1, padding_top=1),
@@ -87,8 +88,9 @@ class TUILayout:
             ),
             floats=[],  # Floats added dynamically for palette
         )
+        self.root_container = root_container
 
         return Layout(
-            container=self.root_container,
+            container=root_container,
             focused_element=self.input_area.buffer,
         )
