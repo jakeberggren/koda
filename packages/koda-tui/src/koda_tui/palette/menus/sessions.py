@@ -37,11 +37,15 @@ class SessionMenu:
 
     def items(self) -> list[ListItem]:
         """Build session selection items."""
+        active = self._service.active_session()
+        active_id = active.session_id if active is not None else None
         return [
             ListItem(
                 id=f"switch_session:{session.session_id}",
                 label=_format_session_label(session),
                 data=session,
+                marker="*" if session.session_id == active_id else None,
+                marker_style="class:palette.current" if session.session_id == active_id else None,
             )
             for session in self._service.list_sessions()
         ]
@@ -92,6 +96,8 @@ class SessionMenu:
         if not result.ok:
             log.warning("delete_session_failed", session_id=str(session.session_id))
             return
+        if result.payload and result.payload.removed_active_session:
+            self._palette.cancel_streaming()
         self._palette.close_all_overlays()
 
 
