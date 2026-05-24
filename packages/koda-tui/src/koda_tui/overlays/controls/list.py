@@ -27,10 +27,6 @@ class ListControl(UIControl):
         self._rows: list[Row] = []
         self._item_row_indices: list[int] = []
 
-    def reset_scroll(self) -> None:
-        """Reset the list scroll position to the top."""
-        self._scroll_offset = 0
-
     def refresh(self) -> None:
         """Re-render rows from current state."""
         self._rows = self._renderer.render(self._state)
