@@ -44,7 +44,6 @@ class RenderOptions:
     item_style: str = "class:palette.item"
     dim_style: str = "class:palette.dim"
     marker_style: str = "class:palette.marker"
-    empty_style: str = "class:palette.empty"
     group_style: str = "class:palette.group"
 
 

@@ -41,10 +41,6 @@ class ListState:
         return self._filtered_items
 
     @property
-    def has_items(self) -> bool:
-        return bool(self._filtered_items)
-
-    @property
     def selected_item(self) -> ListItem | None:
         """Return the selected item in visual display order."""
         display_items = self.display_items
