@@ -102,6 +102,19 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
         """List available models, optionally filtered by provider."""
         return self.runtime.llm_factory.list_models(provider)
 
+    def get_model(self, provider: str | None, model_id: str | None) -> ModelDefinition | None:
+        """Return a model by provider/model id, or None if unavailable."""
+        if provider is None or model_id is None:
+            return None
+        return next(
+            (
+                model
+                for model in self.runtime.llm_factory.list_models(provider)
+                if model.id == model_id
+            ),
+            None,
+        )
+
     def diagnostics(self) -> ServiceDiagnostics:
         """Return non-blocking service diagnostics."""
         warnings = [warning.summary for warning in self.runtime.warnings]

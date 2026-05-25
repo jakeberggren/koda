@@ -114,10 +114,9 @@ class StatusBarControl(UIControl):
             ([("class:status-bar.left", path)], path),
         ]
 
-        provider_name = self._state.provider_name
-        model_name = self._state.model_name
-        if provider_name and model_name:
-            provider_model = f"{provider_name}{_DIVIDER}{model_name}"
+        active_model = self._state.active_model
+        if active_model is not None:
+            provider_model = f"{active_model.provider}{_DIVIDER}{active_model.name}"
             segments.append(([("class:status-bar.left", provider_model)], provider_model))
 
         if self._state.thinking.id != "none":

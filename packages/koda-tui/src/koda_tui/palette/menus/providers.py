@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_common.logging import get_logger
-from koda_tui import actions
 from koda_tui.palette.items import ListItem
+from koda_tui.palette.menus.models import apply_model_selection
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -14,8 +13,6 @@ if TYPE_CHECKING:
     from koda.llm import ProviderDefinition
     from koda_tui.palette.palette import Palette
 
-
-log = get_logger(__name__)
 
 _TITLE = "Connect Provider"
 _LIST_HEADING = "Configure LLM Provider API Key"
@@ -72,13 +69,10 @@ class ProviderMenu:
             return
         models = self._service.list_models(provider.id)
         if models:
-            actions.select_model(None, models[0], self._settings.core)
+            apply_model_selection(models[0], current_model=None, settings=self._settings.core)
 
     def _submit_api_key(self, provider: ProviderDefinition, key: str) -> None:
-        result = actions.set_provider_api_key(provider.id, key, self._settings.core)
-        if not result.ok:
-            log.warning("set_api_key_failed", provider=provider.id, error=result.error)
-            return
+        self._settings.core.set_api_key(provider.id, key)
         self._auto_select_first_model(provider)
         self._palette.close_all_overlays()
 

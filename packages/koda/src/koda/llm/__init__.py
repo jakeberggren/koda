@@ -10,9 +10,7 @@ from koda.llm.models import (
     ProviderThinkingConfig,
     ProviderThinkingModeConfig,
     ThinkingOption,
-    ThinkingOptionDescription,
     ThinkingOptionId,
-    ThinkingOptionLabel,
 )
 from koda.llm.protocols import LLM
 from koda.llm.types import (
@@ -43,7 +41,5 @@ __all__ = [
     "ProvidersConfig",
     "ThinkingMode",
     "ThinkingOption",
-    "ThinkingOptionDescription",
     "ThinkingOptionId",
-    "ThinkingOptionLabel",
 ]

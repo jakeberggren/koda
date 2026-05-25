@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 from prompt_toolkit import Application
 from prompt_toolkit.application.current import get_app_session
 
-from koda_tui import actions
+from koda.llm import ThinkingOption
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.output import SynchronizedOutput
 from koda_tui.app.queue import MessageQueue
@@ -15,14 +15,12 @@ from koda_tui.layout import TUILayout
 from koda_tui.palette.palette import Palette
 from koda_tui.state import AppState
 from koda_tui.styles import get_style
-from koda_tui.utils.model_selection import find_model, resolve_thinking_option, supports_thinking
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from prompt_toolkit.output import Output
 
-    from koda.llm import ThinkingOptionId
     from koda_common.settings import SettingChange
     from koda_service import KodaService
     from koda_tui.settings import AppSettings
@@ -65,10 +63,9 @@ class KodaTuiApp:
         # Initialize state
         self.state = AppState(
             workspace_root=self._workspace_root,
-            provider_name=self._app_settings.core.provider,
-            model_name=self._app_settings.core.model,
+            provider_id=self._app_settings.core.provider,
             service_status=self._service.status(),
-            thinking=resolve_thinking_option(None, self._app_settings.core.thinking),
+            thinking=ThinkingOption.none(),
             context_window=None,
             thinking_supported=False,
             show_scrollbar=self._app_settings.tui.show_scrollbar,
@@ -198,28 +195,35 @@ class KodaTuiApp:
         return self._service
 
     def _refresh_service_state(self) -> None:
-        self.state.provider_name = self._app_settings.core.provider
-        self.state.model_name = self._app_settings.core.model
+        self.state.provider_id = self._app_settings.core.provider
         self.state.service_status = self._service.status()
         self.state.warnings = self._service.diagnostics().startup_warnings
+        self.state.configured_providers = self._service.list_configured_providers()
 
-        active_model = None
+        self.state.active_model = None
         if (
             self.state.service_status.is_ready
             and self._app_settings.core.provider is not None
             and self._app_settings.core.model is not None
         ):
-            active_model = find_model(
-                self._service.list_models(self._app_settings.core.provider),
-                provider=self._app_settings.core.provider,
-                model_id=self._app_settings.core.model,
+            self.state.active_model = self._service.get_model(
+                self._app_settings.core.provider,
+                self._app_settings.core.model,
             )
 
-        self.state.thinking = resolve_thinking_option(
-            active_model, self._app_settings.core.thinking
+        self.state.thinking = (
+            self.state.active_model.resolve_thinking_option(self._app_settings.core.thinking)
+            if self.state.active_model is not None
+            else ThinkingOption.none()
         )
-        self.state.context_window = active_model.context_window if active_model else None
-        self.state.thinking_supported = supports_thinking(active_model)
+        self.state.context_window = (
+            self.state.active_model.context_window if self.state.active_model else None
+        )
+        self.state.thinking_supported = (
+            self.state.active_model.supports_thinking
+            if self.state.active_model is not None
+            else False
+        )
 
     def enqueue_message(self, text: str, *, cancel_current: bool = False) -> None:
         """Queue a message to be sent after the current stream completes."""
@@ -237,9 +241,6 @@ class KodaTuiApp:
     def cancel_streaming(self) -> None:
         """Cancel the current streaming operation."""
         self._stream_processor.cancel_stream()
-
-    def cycle_thinking(self, options: list[ThinkingOptionId]):
-        return actions.cycle_thinking(options, self._app_settings.core)
 
     def toggle_palette(self) -> None:
         """Toggle command palette visibility."""

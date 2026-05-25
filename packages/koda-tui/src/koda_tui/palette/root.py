@@ -7,15 +7,13 @@ from typing import TYPE_CHECKING
 from koda_tui.palette.items import ListItem
 
 if TYPE_CHECKING:
-    from koda_service import KodaService
     from koda_tui.state import AppState
 
 
 class RootMenu:
     """Root palette menu."""
 
-    def __init__(self, service: KodaService, state: AppState) -> None:
-        self._service = service
+    def __init__(self, state: AppState) -> None:
         self._state = state
 
     def _agent_items(self) -> list[ListItem]:
@@ -77,7 +75,7 @@ class RootMenu:
             ),
         ]
 
-        if self._service.list_configured_providers():
+        if self._state.configured_providers:
             items.insert(
                 1,
                 ListItem(

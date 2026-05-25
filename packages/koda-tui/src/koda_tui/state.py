@@ -3,7 +3,7 @@ from enum import Enum, auto
 from pathlib import Path
 from typing import Any
 
-from koda.llm import ThinkingOption
+from koda.llm import ModelDefinition, ProviderDefinition, ThinkingOption
 from koda.messages import TokenUsage
 from koda.tools import ToolCall
 from koda_service import ServiceStatus, ServiceStatusCode
@@ -58,11 +58,10 @@ class AppState:
     response_phase: ResponsePhase = ResponsePhase.IDLE
     active_tools: dict[str, ToolCall] = field(default_factory=dict)
     pending_inputs: list[str] = field(default_factory=list)
-    model_name: str | None = None
-    provider_name: str | None = None
-    thinking: ThinkingOption = field(
-        default_factory=lambda: ThinkingOption(id="none", label="none")
-    )
+    active_model: ModelDefinition | None = None
+    configured_providers: list[ProviderDefinition] = field(default_factory=list)
+    provider_id: str | None = None
+    thinking: ThinkingOption = field(default_factory=ThinkingOption.none)
     context_window: int | None = None
     usage: TokenUsage | None = None
     total_usage: TokenUsage | None = None

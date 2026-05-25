@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
-from koda_tui import actions
 from koda_tui.palette.menus.models import ModelMenu
 from koda_tui.palette.menus.providers import ProviderMenu
 from koda_tui.palette.menus.sessions import SessionMenu
@@ -28,7 +27,7 @@ class PaletteController:
     def __init__(self, app: Palette) -> None:
         self._app = app
         self._settings = app.app_settings
-        self.root = RootMenu(app.service, app.state)
+        self.root = RootMenu(app.state)
         self.providers = ProviderMenu(app)
         self.models = ModelMenu(app)
         self.thinking = ThinkingMenu(app)
@@ -48,21 +47,15 @@ class PaletteController:
                 log.warning("unknown_palette_item", base_id=base_id, param=param)
 
     def _toggle_theme(self) -> None:
-        result = actions.toggle_theme(self._settings.tui)
-        if not result.ok:
-            log.warning("toggle_theme_failed", error=result.error)
+        self._settings.tui.set("theme", "light" if self._settings.tui.theme == "dark" else "dark")
         self._app.close_all_overlays()
 
     def _toggle_scrollbar(self) -> None:
-        result = actions.toggle_scrollbar(self._settings.tui)
-        if not result.ok:
-            log.warning("toggle_scrollbar_failed", error=result.error)
+        self._settings.tui.set("show_scrollbar", not self._settings.tui.show_scrollbar)
         self._app.close_all_overlays()
 
     def _toggle_queue_inputs(self) -> None:
-        result = actions.toggle_queue_inputs(self._settings.tui)
-        if not result.ok:
-            log.warning("toggle_queue_inputs_failed", error=result.error)
+        self._settings.tui.set("queue_inputs", not self._settings.tui.queue_inputs)
         self._app.close_all_overlays()
 
     def root_items(self) -> list[ListItem]:

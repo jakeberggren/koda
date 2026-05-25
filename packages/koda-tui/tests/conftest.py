@@ -17,8 +17,7 @@ def converter() -> MessageRenderer:
 def state() -> AppState:
     """An AppState for testing."""
     return AppState(
-        provider_name="test",
-        model_name="test-model",
+        provider_id="test",
         workspace_root=Path("/workspace"),
     )
 

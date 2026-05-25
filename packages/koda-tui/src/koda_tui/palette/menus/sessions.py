@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
-from koda_tui import actions
+from koda_service.exceptions import ServiceSessionNotFoundError
+from koda_tui.converters import convert_messages
 from koda_tui.palette.items import ListItem
 
 if TYPE_CHECKING:
@@ -66,18 +67,22 @@ class SessionMenu:
     def new(self) -> None:
         """Create and switch to a new session."""
         self._palette.cancel_streaming()
-        result = actions.new_session(self._service, self._state)
-        if not result.ok:
-            log.warning("new_session_failed", error=result.error)
+        self._service.create_session()
+        self._state.reset_conversation()
         self._palette.close_all_overlays()
 
     def switch(self, session: Session) -> None:
         """Switch to an existing session."""
         self._palette.cancel_streaming()
-        result = actions.switch_session(session.session_id, self._service, self._state)
-        if not result.ok:
+        try:
+            switched = self._service.switch_session(session.session_id)
+        except ServiceSessionNotFoundError:
             log.warning("switch_session_failed", session_id=str(session.session_id))
             return
+        self._state.reset_conversation()
+        self._state.messages = convert_messages(switched.messages)
+        self._state.usage = switched.usage
+        self._state.total_usage = switched.total_usage
         self._palette.close_all_overlays()
 
     def confirm_delete(self, item: ListItem | None) -> None:
@@ -92,12 +97,19 @@ class SessionMenu:
 
     def delete(self, session: Session) -> None:
         """Delete a session."""
-        result = actions.delete_session(session.session_id, self._service, self._state)
-        if not result.ok:
+        active = self._service.active_session()
+        removed_active = active is not None and active.session_id == session.session_id
+        if removed_active:
+            self._palette.cancel_streaming()
+
+        try:
+            self._service.delete_session(session.session_id)
+        except ServiceSessionNotFoundError:
             log.warning("delete_session_failed", session_id=str(session.session_id))
             return
-        if result.payload and result.payload.removed_active_session:
-            self._palette.cancel_streaming()
+
+        if removed_active:
+            self._state.reset_conversation()
         self._palette.close_all_overlays()
 
 
