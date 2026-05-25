@@ -47,16 +47,22 @@ For more information, see [kit/README.md](kit/README.md).
 
 ## Models and Providers
 
-Koda ships with a bundled `models.json` model catalog, which defines
-available providers, provider API compatibility, base URLs, model IDs, context
-windows, output limits, capabilities, and thinking modes.
+Koda ships with a bundled `models.json` model catalog and uses your own provider API keys.
 
-To add custom providers or to override a built-in provider, use
-`~/.koda/models.json`. Provider and model IDs are matched case-insensitively, and
-user-defined entries take precedence when they use the same IDs as built-in
-entries.
+Built-in providers:
 
-Example `~/.koda/models.json` adding OpenRouter as a provider:
+| Provider | API adapter |
+| -------- | ----------- |
+| Anthropic | `anthropic-messages` |
+| BergetAI | `openai-completions` |
+| OpenAI | `openai-responses` |
+
+Note that the bundled catalog will grow over time with more providers and models to come shortly.
+
+Koda also supports custom providers or model overrides via `~/.koda/models.json` as long as they support
+one of kodas supported api adapters: `openai-responses`, `openai-completions`, or `anthropic-messages`.
+
+Example adding OpenRouter as a provider:
 
 ```json
 {
@@ -79,9 +85,10 @@ Example `~/.koda/models.json` adding OpenRouter as a provider:
 }
 ```
 
-The `api` field must be one of Koda's supported provider adapters:
-`openai-responses`, `openai-completions`, or `anthropic-messages`. Configure
-credentials through the TUI provider setup flow or with the provider-specific
+Provider and model IDs are matched case-insensitively, and user-defined entries take
+precedence when they use the same IDs as built-in entries.
+
+Credentials can be configured through the TUI provider setup flow or with the provider-specific
 environment variable, such as `OPENROUTER_API_KEY` for the example above.
 
 When running through the Docker Sandboxes kit, provider credentials are
@@ -163,53 +170,9 @@ switch models, manage sessions, and adjust TUI behavior or appearance.
 Koda is a uv-managed monorepo with four workspace packages:
 
 - **koda** — Core agent/runtime library: agent loop, LLM abstractions, sessions, telemetry, and tools
-- **koda-service** — Service boundary and in-process runtime used by clients
+- **koda-service** — Service boundary and runtime used by clients
 - **koda-tui** — Interactive terminal UI built on top of the service layer
 - **koda-common** — Shared settings, logging, and path utilities
-
-```text
-packages/
-├── koda/                        # Core agent and runtime primitives
-│   ├── src/koda/
-│   │   ├── agents/              # Agent loop orchestration
-│   │   ├── execution/           # Bash command execution backends
-│   │   ├── llm/                 # Provider adapters, registries, request/response types
-│   │   ├── messages/            # Internal conversation message models
-│   │   ├── sessions/            # Session management and persistence
-│   │   ├── telemetry/           # Langfuse integration
-│   │   └── tools/               # Tool framework + built-in filesystem tools
-│   └── tests/
-│
-├── koda-service/                # Service boundary used by clients
-│   ├── src/koda_service/
-│   │   ├── protocols.py         # Public KodaService protocol
-│   │   ├── exceptions.py        # Service/runtime and startup-style errors
-│   │   ├── mappers/             # Core -> service DTO mapping
-│   │   ├── services/            # In-process service implementation
-│   │   └── types/               # Service-boundary DTOs
-│   └── tests/
-│
-├── koda-tui/                    # Terminal user interface
-│   ├── src/koda_tui/
-│   │   ├── __init__.py          # CLI entrypoint and app bootstrap
-│   │   ├── agent.py             # TUI-specific agent builder and tool wiring
-│   │   ├── app/                 # Application loop, streaming, output coordination
-│   │   ├── components/          # UI widgets and panes
-│   │   ├── rendering/           # Rich rendering helpers
-│   │   ├── ui/                  # Layout, styles, and command palette UI
-│   │   ├── utils/               # TUI helper utilities
-│   │   ├── actions.py           # TUI actions backed by the service layer
-│   │   ├── converters.py        # Service -> TUI message conversion
-│   │   └── state.py             # Shared application state
-│   └── tests/
-│
-└── koda-common/                 # Shared utilities
-    ├── src/koda_common/
-    │   ├── logging/             # Logging configuration
-    │   ├── settings/            # Settings management + secret storage
-    │   └── paths.py             # Shared filesystem paths
-    └── tests/
-```
 
 ### Development Setup
 
