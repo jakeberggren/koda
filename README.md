@@ -60,7 +60,7 @@ Built-in providers:
 Note that the bundled catalog will grow over time with more providers and models to come shortly.
 
 Koda also supports custom providers or model overrides via `~/.koda/models.json` as long as they support
-one of kodas supported api adapters: `openai-responses`, `openai-completions`, or `anthropic-messages`.
+one of Koda's supported API adapters: `openai-responses`, `openai-completions`, or `anthropic-messages`.
 
 Example adding OpenRouter as a provider:
 
