@@ -38,6 +38,10 @@ class KodaService[EventT, ProviderT, ModelT, MessageT](Protocol):
         """List available models, optionally filtered by provider."""
         ...
 
+    def get_model(self, provider: str | None, model_id: str | None) -> ModelT | None:
+        """Return a model by provider/model id, or None if unavailable."""
+        ...
+
     def diagnostics(self) -> ServiceDiagnostics:
         """Return non-blocking service diagnostics."""
         ...

@@ -4,17 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_common.logging import get_logger
-from koda_tui import actions
 from koda_tui.palette.items import ListItem
-from koda_tui.utils.model_selection import find_model, supported_thinking_options
 
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
     from koda_tui.palette.palette import Palette
 
-
-log = get_logger(__name__)
 
 _TITLE = "Set Thinking Level"
 _LIST_HEADING = "Select Model Reasoning Effort"
@@ -25,17 +20,14 @@ class ThinkingMenu:
 
     def __init__(self, palette: Palette) -> None:
         self._palette = palette
-        self._service = palette.service
         self._settings = palette.app_settings
+        self._state = palette.state
 
     def items(self) -> list[ListItem]:
         """Build thinking level selection items."""
-        active_model = find_model(
-            self._service.list_models(self._settings.core.provider),
-            provider=self._settings.core.provider,
-            model_id=self._settings.core.model,
-        )
-        options = supported_thinking_options(active_model)
+        if self._state.active_model is None:
+            return []
+        options = self._state.active_model.effective_thinking_options
 
         return [
             ListItem(
@@ -57,8 +49,5 @@ class ThinkingMenu:
 
     def select(self, thinking: ThinkingOptionId) -> None:
         """Handle thinking level selection."""
-        result = actions.set_thinking(thinking, self._settings.core)
-        if not result.ok:
-            log.warning("set_thinking_failed", thinking=thinking, error=result.error)
-            return
+        self._settings.core.set("thinking", thinking)
         self._palette.close_all_overlays()

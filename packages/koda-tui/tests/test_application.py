@@ -58,6 +58,7 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
             "list_providers",
             "list_configured_providers",
             "list_configured_models",
+            "get_model",
             "diagnostics",
             "chat",
             "create_session",
@@ -67,15 +68,13 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
             "active_session",
         ]
     )
-    service.list_models.return_value = [
-        ModelDefinition(
-            id="gpt-5.2",
-            name="GPT 5.2",
-            provider="openai",
-            context_window=400_000,
-            thinking_options=[ThinkingOption(id="none", label="None")],
-        )
-    ]
+    service.get_model.return_value = ModelDefinition(
+        id="gpt-5.2",
+        name="GPT 5.2",
+        provider="openai",
+        context_window=400_000,
+        thinking_options=[ThinkingOption(id="none", label="None")],
+    )
     service.status.return_value = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
     service.diagnostics.return_value = ServiceDiagnostics(startup_warnings=[])
     app = KodaTuiApp(
@@ -98,15 +97,13 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
     app, settings, _tui_settings, service, _unsubscribe, _unsubscribe_tui = _make_app()
     settings.provider = "bergetai"
     settings.model = "zai-org/GLM-4.7"
-    service.list_models.return_value = [
-        ModelDefinition(
-            id="zai-org/GLM-4.7",
-            name="GLM-4.7",
-            provider="bergetai",
-            context_window=128_000,
-            thinking_options=[],
-        )
-    ]
+    service.get_model.return_value = ModelDefinition(
+        id="zai-org/GLM-4.7",
+        name="GLM-4.7",
+        provider="bergetai",
+        context_window=128_000,
+        thinking_options=[],
+    )
     on_settings_changed = settings.subscribe.call_args.args[0]
 
     on_settings_changed(
@@ -117,9 +114,8 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
     )
 
     service.update_settings.assert_called_once_with(settings)
-    service.list_models.assert_called_with("bergetai")
-    assert app.state.provider_name == "bergetai"
-    assert app.state.model_name == "zai-org/GLM-4.7"
+    service.get_model.assert_called_with("bergetai", "zai-org/GLM-4.7")
+    assert app.state.provider_id == "bergetai"
     assert app.state.context_window == 128_000
 
 

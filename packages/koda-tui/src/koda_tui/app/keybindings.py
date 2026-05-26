@@ -13,13 +13,9 @@ from prompt_toolkit.key_binding import (
 )
 from prompt_toolkit.keys import Keys
 
-from koda_tui.utils.model_selection import find_model, supported_thinking_options
-
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
-    from koda_service import KodaService
     from koda_tui.app.application import KodaTuiApp
-    from koda_tui.settings import AppSettings
 
 _CTRL_LETTER_KEYS = {
     "a": Keys.ControlA,
@@ -128,26 +124,26 @@ def _handle_escape(app: KodaTuiApp) -> None:
         app.cancel_streaming()
 
 
-def _get_cycle_thinking_options(
-    catalog_service: KodaService,
-    app_settings: AppSettings,
-) -> list[ThinkingOptionId]:
-    active_model = find_model(
-        catalog_service.list_models(app_settings.core.provider),
-        provider=app_settings.core.provider,
-        model_id=app_settings.core.model,
-    )
-    return [option.id for option in supported_thinking_options(active_model)]
+def _get_cycle_thinking_options(app: KodaTuiApp) -> list[ThinkingOptionId]:
+    if app.state.active_model is None:
+        return []
+    options = app.state.active_model.effective_thinking_options
+    return [option.id for option in options]
 
 
 def _handle_cycle_thinking(app: KodaTuiApp) -> None:
     """Cycle through supported thinking levels."""
     if not app.state.service_status.is_ready:
         return
-    options = _get_cycle_thinking_options(app.service, app.app_settings)
-    result = app.cycle_thinking(options)
-    if result.ok:
-        app.invalidate()
+    options = _get_cycle_thinking_options(app)
+    if not options:
+        return
+    try:
+        current_index = options.index(app.app_settings.core.thinking)
+    except ValueError:
+        current_index = -1
+    app.app_settings.core.set("thinking", options[(current_index + 1) % len(options)])
+    app.invalidate()
 
 
 def _file_discovery_open(app: KodaTuiApp) -> Condition:
