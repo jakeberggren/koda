@@ -25,6 +25,7 @@ from openai.types.chat.chat_completion_user_message_param import ChatCompletionU
 from pydantic import BaseModel
 
 from koda.llm import exceptions
+from koda.llm.apis.credentials import resolve_api_key_credential
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponse,
@@ -387,8 +388,8 @@ class OpenAICompletionsAPI(LLM):
     def from_context(cls, context: LLMApiContext) -> OpenAICompletionsAPI:
         """Create a Chat Completions API from a resolved model-catalog context."""
         config = OpenAICompletionsAPIConfig(
-            api_key=context.require_api_key(),
-            base_url=context.provider.base_url,
+            api_key=resolve_api_key_credential(context),
+            base_url=context.connection.base_url,
             model=context.model.id,
         )
         client_factory = resolve_openai_client(context.settings)

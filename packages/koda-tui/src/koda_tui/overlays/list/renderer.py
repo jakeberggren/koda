@@ -82,8 +82,8 @@ class ListRenderer:
 
         line.append((label_style, padded_label))
 
-        if item.description:
-            line.append((dim_style, f"  {item.description}"))
+        if item.detail:
+            line.append((dim_style, f"  {item.detail}"))
 
         return Row(kind=RowKind.ITEM, text=FormattedText(line), item=item)
 

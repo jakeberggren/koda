@@ -1,4 +1,4 @@
-"""Width-aware wrapped footer text for overlays."""
+"""Width-aware wrapped formatted text control."""
 
 from __future__ import annotations
 
@@ -13,19 +13,19 @@ if TYPE_CHECKING:
     from prompt_toolkit.layout.containers import GetLinePrefixCallable
 
 
-class FooterControl(UIControl):
-    """Width-aware wrapped footer text for overlays."""
+class WrappedTextControl(UIControl):
+    """UI control that wraps a single formatted text fragment by word."""
 
     def __init__(self, text: StyleAndTextTuples) -> None:
         self._text = text
 
-    def _footer_width(self) -> int:
+    def _text_width(self) -> int:
         return sum(len(fragment[1]) for fragment in self._text)
 
     def _wrapped_lines(self, width: int) -> list[StyleAndTextTuples]:
         if not self._text:
             return [[("", "")]]
-        if self._footer_width() <= width:
+        if self._text_width() <= width:
             return [self._text]
         if len(self._text) > 1:
             return [self._text]

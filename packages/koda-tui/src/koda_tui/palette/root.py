@@ -23,7 +23,7 @@ class RootMenu:
                 ListItem(
                     id="set_thinking",
                     label="Set Thinking Level",
-                    description="Select model reasoning effort",
+                    detail="Select model reasoning effort",
                     group="Agent",
                 )
             )
@@ -35,13 +35,13 @@ class RootMenu:
             ListItem(
                 id="new_session",
                 label="New Session",
-                description="Start a new conversation",
+                detail="Start a new conversation",
                 group="Sessions",
             ),
             ListItem(
                 id="list_sessions",
                 label="List Sessions",
-                description="Switch between sessions",
+                detail="Switch between sessions",
                 group="Sessions",
             ),
         ]
@@ -52,25 +52,25 @@ class RootMenu:
             ListItem(
                 id="connect_provider",
                 label="Connect Provider",
-                description="Configure LLM provider API keys",
+                detail="Configure LLM provider API keys",
                 group="Agent",
             ),
             ListItem(
                 id="toggle_theme",
                 label="Toggle Theme",
-                description="Switch between dark and light mode",
+                detail="Switch between dark and light mode",
                 group="Appearance",
             ),
             ListItem(
                 id="toggle_scrollbar",
                 label="Toggle Scrollbar",
-                description="Show or hide the chat scrollbar",
+                detail="Show or hide the chat scrollbar",
                 group="Appearance",
             ),
             ListItem(
                 id="toggle_queue_inputs",
                 label="Toggle Queue Inputs",
-                description="Queue or cancel on input during streaming",
+                detail="Queue or cancel on input during streaming",
                 group="System",
             ),
         ]
@@ -81,7 +81,7 @@ class RootMenu:
                 ListItem(
                     id="switch_model",
                     label="Switch Model",
-                    description="Select a different model",
+                    detail="Select a different model",
                     group="Agent",
                 ),
             )

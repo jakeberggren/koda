@@ -16,6 +16,7 @@ from koda_common.settings import (
     SettingsUnknownKeysError,
     SettingsValidationError,
 )
+from koda_common.settings.credentials import ApiKeyCredential
 
 from .conftest import SpySecretsStore, SpySettingsStore
 
@@ -242,7 +243,7 @@ def test_multiple_subscribers_all_called(manager: SettingsManager) -> None:
     assert c2 == expected
 
 
-def test_get_api_key_from_env_is_cached_and_does_not_hit_secrets_store(
+def test_get_credential_from_env_is_cached_and_does_not_hit_secrets_store(
     monkeypatch: pytest.MonkeyPatch,
     settings_store: SpySettingsStore,
     secrets_store: SpySecretsStore,
@@ -251,47 +252,50 @@ def test_get_api_key_from_env_is_cached_and_does_not_hit_secrets_store(
 
     manager = SettingsManager(settings_store=settings_store, secrets_store=secrets_store)
 
-    assert manager.get_api_key("openai") == "sk-env"
+    assert manager.get_credential("openai") == ApiKeyCredential(type="api_key", value="sk-env")
     assert secrets_store.get_calls == []
 
 
-def test_get_api_key_lazy_loads_and_caches(settings_store: SpySettingsStore) -> None:
-    secrets = SpySecretsStore({"openai": "sk-stored"})
+def test_get_credential_lazy_loads_and_caches(settings_store: SpySettingsStore) -> None:
+    credential = ApiKeyCredential(type="api_key", value="sk-stored")
+    secrets = SpySecretsStore({"openai": credential})
     manager = SettingsManager(settings_store=settings_store, secrets_store=secrets)
 
-    assert manager.get_api_key("openai") == "sk-stored"
-    assert manager.get_api_key("openai") == "sk-stored"
+    assert manager.get_credential("openai") == credential
+    assert manager.get_credential("openai") == credential
 
     assert secrets.get_calls == ["openai"]
 
 
-def test_set_api_key_writes_secrets_store_and_notifies(
+def test_set_credential_writes_secrets_store_and_notifies(
     manager: SettingsManager, secrets_store: SpySecretsStore
 ) -> None:
     changes: list[tuple[SettingChange, ...]] = []
     manager.subscribe(changes.append)
+    credential = ApiKeyCredential(type="api_key", value="sk-new")
 
-    manager.set_api_key("openai", "sk-new")
+    manager.set_credential("openai", credential)
 
-    assert secrets_store.set_calls == [("openai", "sk-new")]
-    assert manager.get_api_key("openai") == "sk-new"
+    assert secrets_store.set_calls == [("openai", credential)]
+    assert manager.get_credential("openai") == credential
     assert changes == [
-        (SettingChange(name="api_keys.openai", old_value=None, new_value="sk-new"),),
+        (SettingChange(name="credentials.openai", old_value=None, new_value=credential),),
     ]
 
 
-def test_set_api_key_same_cached_value_does_not_notify(
+def test_set_credential_same_cached_value_does_not_notify(
     settings_store: SpySettingsStore,
     secrets_store: SpySecretsStore,
 ) -> None:
-    secrets_store.keys["openai"] = "sk-existing"
+    credential = ApiKeyCredential(type="api_key", value="sk-existing")
+    secrets_store.credentials["openai"] = credential
     manager = SettingsManager(settings_store=settings_store, secrets_store=secrets_store)
     changes: list[tuple[SettingChange, ...]] = []
     manager.subscribe(changes.append)
 
-    assert manager.get_api_key("openai") == "sk-existing"
+    assert manager.get_credential("openai") == credential
 
-    manager.set_api_key("openai", "sk-existing")
+    manager.set_credential("openai", credential)
 
     assert changes == []
-    assert secrets_store.set_calls == [("openai", "sk-existing")]
+    assert secrets_store.set_calls == [("openai", credential)]

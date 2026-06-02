@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from koda.llm.exceptions import LLMConfigurationError
 from koda_common.settings import SecretsLoadError
+from koda_common.settings.credentials import ApiKeyCredential, ProviderCredential
 from koda_service.exceptions import (
     StartupConfigurationError,
     StartupEnvironmentError,
@@ -23,10 +24,16 @@ class LocalAvailability:
         self.settings = settings
         self.runtime = runtime
 
-    def _get_api_key(self, provider: str) -> tuple[str | None, ServiceStatus | None]:
-        """Read the provider API key or return a status error."""
+    @staticmethod
+    def _connection_key(provider_id: str, connection_id: str) -> str:
+        return f"{provider_id}:{connection_id}"
+
+    def _get_credential(
+        self, credential_key: str
+    ) -> tuple[ProviderCredential | None, ServiceStatus | None]:
+        """Read a provider connection credential or return a status error."""
         try:
-            return self.settings.get_api_key(provider), None
+            return self.settings.get_credential(credential_key), None
         except SecretsLoadError as e:
             status = ServiceStatus.from_startup_error(StartupError.from_secrets_load_error(e))
             return None, status
@@ -37,7 +44,10 @@ class LocalAvailability:
             provider_ids = {
                 provider.id
                 for provider in self.runtime.llm_factory.list_providers()
-                if self.settings.get_api_key(provider.id)
+                if any(
+                    self.settings.get_credential(self._connection_key(provider.id, connection.id))
+                    for connection in provider.connections
+                )
             }
         except SecretsLoadError as e:
             status = ServiceStatus.from_startup_error(StartupError.from_secrets_load_error(e))
@@ -47,7 +57,7 @@ class LocalAvailability:
             return set(), ServiceStatus(
                 code=ServiceStatusCode.PROVIDER_SETUP_REQUIRED,
                 summary="Provider setup required",
-                detail="Connect a provider API key in settings to continue.",
+                detail="Connect provider credentials in settings to continue.",
             )
 
         return provider_ids, None
@@ -67,7 +77,7 @@ class LocalAvailability:
             return ServiceStatus(
                 code=ServiceStatusCode.PROVIDER_NOT_CONNECTED,
                 summary=f"Connect {provider} to continue",
-                detail="The selected provider does not have an API key configured.",
+                detail="The selected provider does not have credentials configured.",
             )
 
         try:
@@ -81,30 +91,62 @@ class LocalAvailability:
 
         return None
 
-    def credentials_status(self) -> ServiceStatus | None:
-        """Validate credentials for the selected provider."""
-        provider = self.settings.provider
-        if provider is None:
-            return ServiceStatus(
-                code=ServiceStatusCode.MODEL_SELECTION_REQUIRED,
-                summary="Model selection required",
-                detail="Select a model in settings to continue.",
-            )
+    @staticmethod
+    def _model_selection_required_status() -> ServiceStatus:
+        return ServiceStatus(
+            code=ServiceStatusCode.MODEL_SELECTION_REQUIRED,
+            summary="Model selection required",
+            detail="Select a model in settings to continue.",
+        )
 
-        api_key, status = self._get_api_key(provider)
-        if status is not None:
-            return status
-        if api_key is None:
+    @staticmethod
+    def _model_unavailable_status() -> ServiceStatus:
+        return ServiceStatus(
+            code=ServiceStatusCode.MODEL_UNAVAILABLE,
+            summary="Selected model unavailable",
+            detail="Choose a different model in settings.",
+        )
+
+    @staticmethod
+    def _credential_status(
+        credential: ProviderCredential | None,
+        *,
+        provider_id: str,
+        connection_id: str,
+    ) -> ServiceStatus | None:
+        if credential is None:
             return ServiceStatus(
                 code=ServiceStatusCode.API_KEY_NOT_CONFIGURED,
-                summary=f"{provider} API key not configured",
+                summary=f"{provider_id} {connection_id} credentials not configured",
             )
-        if not api_key.strip():
+        if isinstance(credential, ApiKeyCredential) and not credential.value.strip():
             return ServiceStatus(
                 code=ServiceStatusCode.API_KEY_EMPTY,
-                summary=f"{provider} API key cannot be empty",
+                summary=f"{provider_id} {connection_id} API key cannot be empty",
             )
         return None
+
+    def credentials_status(self) -> ServiceStatus | None:
+        """Validate credentials for the selected provider/model route."""
+        provider = self.settings.provider
+        model = self.settings.model
+        if provider is None or model is None:
+            return self._model_selection_required_status()
+
+        try:
+            route = self.runtime.llm_factory.resolve_route(provider, model)
+        except LLMConfigurationError:
+            return self._model_unavailable_status()
+
+        credential_key = self._connection_key(route.provider_id, route.connection_id)
+        credential, status = self._get_credential(credential_key)
+        if status is not None:
+            return status
+        return self._credential_status(
+            credential,
+            provider_id=route.provider_id,
+            connection_id=route.connection_id,
+        )
 
     def agent_status(self) -> ServiceStatus | None:
         """Build the cached agent if needed and return any blocking status."""

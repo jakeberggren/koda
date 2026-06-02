@@ -125,7 +125,7 @@ class ModelMenu:
         return ListItem(
             id=f"select_model:{model.id}",
             label=_truncate_label(model.name, 24),
-            description=model.description or "",
+            detail=model.detail or "",
             group=provider_name,
             marker="*" if is_active else None,
             marker_style="class:palette.current" if is_active else None,

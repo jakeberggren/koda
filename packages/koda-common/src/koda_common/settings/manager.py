@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ValidationError
 
+from koda_common.settings.credentials import ApiKeyCredential, ProviderCredential
 from koda_common.settings.errors import SettingsUnknownKeysError, SettingsValidationError
 from koda_common.settings.protocols import (
     SettingChange,
@@ -97,7 +98,7 @@ class SettingsManager(BaseSettingsManager):
         super().__init__()
         self._settings_store = settings_store
         self._secrets_store = secrets_store
-        self._api_key_cache: dict[str, str] = {}
+        self._credential_cache: dict[str, ProviderCredential] = {}
         self._secrets_store.validate()
         self._persisted = self._load_persisted_settings()
         self._settings = self._build_effective_settings(self._persisted)
@@ -190,26 +191,42 @@ class SettingsManager(BaseSettingsManager):
         self._settings_store.save_section(_CORE_SECTION, self._persisted_json(updated_persisted))
         self._notify(effective_changes)
 
-    def get_api_key(self, provider: str) -> str | None:
-        """Return the configured API key for one provider."""
+    @property
+    def credentials(self) -> dict[str, ProviderCredential]:
+        """Return cached credentials keyed by provider or provider connection id."""
+        return dict(self._credential_cache)
 
-        if provider in self._api_key_cache:
-            return self._api_key_cache[provider]
+    def get_credential(self, provider: str) -> ProviderCredential | None:
+        """Return the configured credential for one provider or provider connection."""
+
+        if provider in self._credential_cache:
+            return self._credential_cache[provider]
 
         if key := os.getenv(provider_api_key_env_var(provider)):
-            self._api_key_cache[provider] = key
-            return key
+            credential = ApiKeyCredential(type="api_key", value=key)
+            self._credential_cache[provider] = credential
+            return credential
 
-        if key := self._secrets_store.get_key(provider):
-            self._api_key_cache[provider] = key
-        return self._api_key_cache.get(provider)
+        if credential := self._secrets_store.get_credential(provider):
+            self._credential_cache[provider] = credential
+            return credential
 
-    def set_api_key(self, provider: str, key: str) -> None:
-        """Persist one provider API key and notify subscribers if it changed."""
+        return None
 
-        old = self.get_api_key(provider)
-        self._secrets_store.set_key(provider, key)
-        self._api_key_cache[provider] = key
-        if old == key:
+    def set_credential(self, provider: str, credential: ProviderCredential) -> None:
+        """Persist one provider credential and notify subscribers if it changed."""
+
+        old = self.get_credential(provider)
+        self._secrets_store.set_credential(provider, credential)
+        self._credential_cache[provider] = credential
+        if old == credential:
             return
-        self._notify((SettingChange(name=f"api_keys.{provider}", old_value=old, new_value=key),))
+        self._notify(
+            (
+                SettingChange(
+                    name=f"credentials.{provider}",
+                    old_value=old,
+                    new_value=credential,
+                ),
+            )
+        )

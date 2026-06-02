@@ -1,8 +1,12 @@
 from koda.llm.catalog import ModelCatalog
 from koda.llm.factory import LLMFactory
 from koda.llm.models import (
+    AuthMethod,
     ModelDefinition,
+    ProviderApi,
     ProviderConfig,
+    ProviderConnectionConfig,
+    ProviderConnectionDefinition,
     ProviderDefinition,
     ProviderModelConfig,
     ProvidersConfig,
@@ -24,6 +28,7 @@ from koda.llm.types import (
 
 __all__ = [
     "LLM",
+    "AuthMethod",
     "LLMEvent",
     "LLMFactory",
     "LLMRequest",
@@ -32,7 +37,10 @@ __all__ = [
     "LLMResponse",
     "ModelCatalog",
     "ModelDefinition",
+    "ProviderApi",
     "ProviderConfig",
+    "ProviderConnectionConfig",
+    "ProviderConnectionDefinition",
     "ProviderDefinition",
     "ProviderModelConfig",
     "ProviderThinkingBudgetConfig",

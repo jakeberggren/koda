@@ -30,6 +30,7 @@ from openai.types.responses.response_input_param import FunctionCallOutput, Resp
 from pydantic import BaseModel
 
 from koda.llm import exceptions
+from koda.llm.apis.credentials import resolve_api_key_credential
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponse,
@@ -77,8 +78,12 @@ class OpenAIResponsesAPIConfig:
     api_key: str
     base_url: str
     model: str
+    backend: str = "openai-responses"
     web_search: bool = False
     extended_prompt_retention: bool = False
+    prompt_cache_retention_supported: bool = True
+    truncation_supported: bool = True
+    store: bool | Omit = omit
 
 
 class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Omit, Response]):
@@ -172,6 +177,8 @@ class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Om
         return [self._to_provider_tool_definition(tool) for tool in tools]
 
     def _extract_tool_calls(self, response: Response) -> list[ToolCall]:
+        if response.output is None:
+            return []
         return [
             ToolCall(
                 tool_name=output.name,
@@ -197,7 +204,7 @@ class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Om
     def to_llm_response(self, response: Response) -> LLMResponse[AssistantMessage]:
         return LLMResponse(
             output=AssistantMessage(
-                content=response.output_text or "",
+                content=response.output_text if response.output is not None else "",
                 tool_calls=self._extract_tool_calls(response),
             ),
             usage=self._adapt_usage(response),
@@ -286,10 +293,14 @@ class OpenAIResponsesAPI(LLM):
     @classmethod
     def from_context(cls, context: LLMApiContext) -> OpenAIResponsesAPI:
         """Create an OpenAI Responses API from a resolved model-catalog context."""
-        capabilities = context.provider.capabilities | context.model.capabilities
+        capabilities = (
+            context.provider.capabilities
+            | context.connection.capabilities
+            | context.model.capabilities
+        )
         config = OpenAIResponsesAPIConfig(
-            api_key=context.require_api_key(),
-            base_url=context.provider.base_url,
+            api_key=resolve_api_key_credential(context),
+            base_url=context.connection.base_url,
             model=context.model.id,
             web_search=bool(capabilities.get("web_search", False)),
             extended_prompt_retention=bool(capabilities.get("extended_prompt_retention", False)),
@@ -312,10 +323,13 @@ class OpenAIResponsesAPI(LLM):
         )
         return replace(request, options=resolved_options)
 
-    @staticmethod
     def _resolve_prompt_cache_retention(
-        *, extended_prompt_retention: bool
+        self,
+        *,
+        extended_prompt_retention: bool,
     ) -> Literal["24h"] | Omit:
+        if not self.config.prompt_cache_retention_supported:
+            return omit
         return _or_omit("24h" if extended_prompt_retention else None)
 
     def _resolve_tools(self, request: LLMRequest) -> list[ToolParam] | Omit:
@@ -326,6 +340,11 @@ class OpenAIResponsesAPI(LLM):
         if isinstance(adapted_tools, Omit):
             return [web_search_tool]
         return [*adapted_tools, web_search_tool]
+
+    def _resolve_truncation(self, request: LLMRequest) -> Literal["auto", "disabled"] | Omit:
+        if not self.config.truncation_supported:
+            return omit
+        return _or_omit(request.options.truncation)
 
     async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
         resolved_request = self._apply_model_features(request)
@@ -341,14 +360,15 @@ class OpenAIResponsesAPI(LLM):
                     extended_prompt_retention=resolved_request.options.extended_prompt_retention
                 ),
                 reasoning=_resolve_reasoning(resolved_request.options.thinking),
+                store=self.config.store,
                 temperature=_or_omit(resolved_request.options.temperature),
                 tools=self._resolve_tools(resolved_request),
                 top_logprobs=_or_omit(resolved_request.options.top_logprobs),
                 top_p=_or_omit(resolved_request.options.top_p),
-                truncation=_or_omit(resolved_request.options.truncation),
+                truncation=self._resolve_truncation(resolved_request),
             )
         except OpenAIError as error:
-            raise_llm_error_from_openai(error, backend="openai-responses")
+            raise_llm_error_from_openai(error, backend=self.config.backend)
         return self.adapter.to_llm_response(response)
 
     async def generate_stream(self, request: LLMRequest) -> AsyncIterator[LLMEvent]:
@@ -365,12 +385,13 @@ class OpenAIResponsesAPI(LLM):
                     extended_prompt_retention=resolved_request.options.extended_prompt_retention
                 ),
                 reasoning=_resolve_reasoning(resolved_request.options.thinking),
+                store=self.config.store,
                 stream=True,
                 temperature=_or_omit(resolved_request.options.temperature),
                 tools=self._resolve_tools(resolved_request),
                 top_logprobs=_or_omit(resolved_request.options.top_logprobs),
                 top_p=_or_omit(resolved_request.options.top_p),
-                truncation=_or_omit(resolved_request.options.truncation),
+                truncation=self._resolve_truncation(resolved_request),
             )
             async for event in stream:
                 if isinstance(event, ResponseCompletedEvent):
@@ -381,7 +402,7 @@ class OpenAIResponsesAPI(LLM):
                 for processed_event in self.event_adapter.to_llm_events(event):
                     yield processed_event
         except OpenAIError as error:
-            raise_llm_error_from_openai(error, backend="openai-responses")
+            raise_llm_error_from_openai(error, backend=self.config.backend)
 
     async def generate_structured[T: BaseModel](
         self,

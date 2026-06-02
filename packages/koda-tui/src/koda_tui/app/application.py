@@ -123,7 +123,7 @@ class KodaTuiApp:
                 "allow_extended_prompt_retention",
             }
             & change_names
-        ) or any(name.startswith("api_keys.") for name in change_names)
+        ) or any(name.startswith("credentials.") for name in change_names)
 
     def _apply_service_setting_changes(self, change_names: set[str]) -> bool:
         if not self._has_service_change(change_names):

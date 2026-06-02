@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
+
+if TYPE_CHECKING:
+    from koda_common.settings.credentials import ProviderCredential
 
 type JsonScalar = str | int | float | bool | None
 """Primitive JSON value supported by the settings file."""
@@ -77,14 +80,14 @@ class SecretsStore(Protocol):
         """Validate that the backing store is readable and correctly configured."""
         ...
 
-    def get_key(self, key: str) -> str | None:
-        """Retrieve a secret by key."""
+    def get_credential(self, provider: str) -> ProviderCredential | None:
+        """Retrieve credentials from a provider"""
         ...
 
-    def set_key(self, key: str, value: str) -> None:
-        """Persist a secret value."""
+    def set_credential(self, provider: str, credential: ProviderCredential) -> None:
+        """Set credentials for a provider"""
         ...
 
-    def delete_key(self, key: str) -> None:
-        """Delete a persisted secret if it exists."""
+    def delete_credential(self, provider: str) -> None:
+        """Delete persisted credentials if exists."""
         ...

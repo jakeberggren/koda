@@ -13,6 +13,7 @@ import pytest
 from koda_common.settings import SecretsStore, Settings, SettingsManager, SettingsStore
 
 if TYPE_CHECKING:
+    from koda_common.settings.credentials import ProviderCredential
     from koda_common.settings.store import JsonObject
 
 
@@ -43,28 +44,28 @@ class SpySettingsStore(SettingsStore):
 class SpySecretsStore(SecretsStore):
     """In-memory secrets store that tracks calls."""
 
-    initial_keys: dict[str, str] | None = None
-    keys: dict[str, str] = field(default_factory=dict)
+    initial_credentials: dict[str, ProviderCredential] | None = None
+    credentials: dict[str, ProviderCredential] = field(default_factory=dict)
     get_calls: list[str] = field(default_factory=list)
-    set_calls: list[tuple[str, str]] = field(default_factory=list)
+    set_calls: list[tuple[str, ProviderCredential]] = field(default_factory=list)
     validate_calls: int = 0
 
     def __post_init__(self) -> None:
-        self.keys = dict(self.initial_keys or {})
+        self.credentials = dict(self.initial_credentials or {})
 
     def validate(self) -> None:
         self.validate_calls += 1
 
-    def get_key(self, key: str) -> str | None:
-        self.get_calls.append(key)
-        return self.keys.get(key)
+    def get_credential(self, provider: str) -> ProviderCredential | None:
+        self.get_calls.append(provider)
+        return self.credentials.get(provider)
 
-    def set_key(self, key: str, value: str) -> None:
-        self.set_calls.append((key, value))
-        self.keys[key] = value
+    def set_credential(self, provider: str, credential: ProviderCredential) -> None:
+        self.set_calls.append((provider, credential))
+        self.credentials[provider] = credential
 
-    def delete_key(self, key: str) -> None:
-        self.keys.pop(key, None)
+    def delete_credential(self, provider: str) -> None:
+        self.credentials.pop(provider, None)
 
 
 @pytest.fixture(autouse=True)

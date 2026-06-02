@@ -12,7 +12,7 @@ class ListItem:
 
     id: str
     label: str
-    description: str = ""
+    detail: str = ""
     group: str | None = None
     marker: str | None = None
     marker_style: str | None = None

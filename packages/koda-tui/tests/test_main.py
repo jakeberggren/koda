@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
     from structlog.stdlib import BoundLogger
 
+    from koda_common.settings.credentials import ProviderCredential
+
 
 class _LoggerStub:
     def error(self, _event: str, **_kwargs: object) -> None:
@@ -52,13 +54,13 @@ class _FakeSecretsStore(SecretsStore):
         if self._error is not None:
             raise self._error
 
-    def get_key(self, key: str) -> str | None:
+    def get_credential(self, provider: str) -> ProviderCredential | None:
         return None
 
-    def set_key(self, key: str, value: str) -> None:
+    def set_credential(self, provider: str, credential: ProviderCredential) -> None:
         return
 
-    def delete_key(self, key: str) -> None:
+    def delete_credential(self, provider: str) -> None:
         return
 
 

@@ -50,9 +50,35 @@ def test_builtin_bergetai_uses_openai_completions_api() -> None:
     provider = registry.get_provider("bergetai")
     model = registry.get_model("bergetai", "google/gemma-4-31B-it")
 
-    assert provider.api == "openai-completions"
-    assert provider.base_url == "https://api.berget.ai/v1"
+    connection = provider.connections["api-key"]
+    assert connection.auth == "api-key"
+    assert connection.api == "openai-completions"
+    assert connection.base_url == "https://api.berget.ai/v1"
     assert model.max_output_tokens == 128000
+
+
+def test_builtin_openai_declares_api_key_and_oauth_connections() -> None:
+    catalog, _warnings = ModelCatalog.load()
+    factory = LLMFactory(catalog)
+    openai_models = factory.list_models("openai")
+    openai_provider = catalog.get_provider("openai")
+    oauth_connection = openai_provider.connections["oauth"]
+
+    assert oauth_connection.auth == "oauth"
+    assert oauth_connection.api == "openai-codex-responses"
+    assert oauth_connection.base_url == "https://chatgpt.com/backend-api/codex"
+    assert catalog.model_connection_ids("openai", "gpt-5.5") == ["api-key", "oauth"]
+    assert catalog.resolve_route("openai", "gpt-5.5").connection_id == "oauth"
+    assert [model.id for model in openai_models][:5] == [
+        "gpt-5.5",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.4-nano",
+        "gpt-5.3-codex",
+    ]
+    models_by_id = {model.id: model for model in openai_models}
+    assert models_by_id["gpt-5.5"].routes == ["api-key", "oauth"]
+    assert models_by_id["gpt-5.4-nano"].routes == ["api-key"]
 
 
 def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> None:
@@ -64,13 +90,18 @@ def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> N
             "providers": {
                 "OpenAI": {
                     "name": "OpenAI",
-                    "base_url": "https://api.openai.com/v1",
-                    "api": "openai-responses",
+                    "connections": {
+                        "api-key": {
+                            "auth": "api-key",
+                            "api": "openai-responses",
+                            "base_url": "https://api.openai.com/v1",
+                            "models": [
+                                {"id": "gpt-5.4", "name": "GPT 5.4", "context_window": 1000},
+                                {"id": "gpt-5.4-mini", "name": "GPT 5.4 mini"},
+                            ],
+                        }
+                    },
                     "capabilities": {"web_search": True, "reasoning": False},
-                    "models": [
-                        {"id": "gpt-5.4", "name": "GPT 5.4", "context_window": 1000},
-                        {"id": "gpt-5.4-mini", "name": "GPT 5.4 mini"},
-                    ],
                 }
             }
         },
@@ -81,8 +112,29 @@ def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> N
             "providers": {
                 "openai": {
                     "name": "OpenAI Proxy",
-                    "base_url": "https://proxy.example/v1",
-                    "api": "openai-responses",
+                    "connections": {
+                        "api-key": {
+                            "auth": "api-key",
+                            "api": "openai-responses",
+                            "base_url": "https://proxy.example/v1",
+                            "models": [
+                                {
+                                    "id": "GPT-5.4",
+                                    "name": "Custom GPT 5.4",
+                                    "max_output_tokens": 2000,
+                                    "thinking": {
+                                        "modes": [
+                                            "none",
+                                            "low",
+                                            "medium",
+                                            "high",
+                                        ],
+                                    },
+                                },
+                                {"id": "gpt-5.4-nano", "name": "GPT 5.4 nano"},
+                            ],
+                        }
+                    },
                     "capabilities": {"reasoning": True},
                     "thinking_modes": {
                         "none": {"label": "Off", "description": ""},
@@ -90,43 +142,32 @@ def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> N
                         "medium": {"label": "Medium", "description": ""},
                         "high": {"label": "High", "description": ""},
                     },
-                    "models": [
-                        {
-                            "id": "GPT-5.4",
-                            "name": "Custom GPT 5.4",
-                            "max_output_tokens": 2000,
-                            "thinking": {
-                                "modes": [
-                                    "none",
-                                    "low",
-                                    "medium",
-                                    "high",
-                                ],
-                            },
-                        },
-                        {"id": "gpt-5.4-nano", "name": "GPT 5.4 nano"},
-                    ],
                 },
                 "anthropic": {
                     "name": "Anthropic",
-                    "base_url": "https://api.anthropic.com",
-                    "api": "anthropic-messages",
+                    "connections": {
+                        "api-key": {
+                            "auth": "api-key",
+                            "api": "anthropic-messages",
+                            "base_url": "https://api.anthropic.com",
+                            "models": [
+                                {
+                                    "id": "claude-sonnet-4-6",
+                                    "name": "Claude Sonnet 4.6",
+                                    "thinking": {
+                                        "modes": [
+                                            "none",
+                                            "high",
+                                        ],
+                                    },
+                                }
+                            ],
+                        }
+                    },
                     "thinking_modes": {
                         "none": {"label": "Off", "description": ""},
                         "high": {"label": "High", "description": ""},
                     },
-                    "models": [
-                        {
-                            "id": "claude-sonnet-4-6",
-                            "name": "Claude Sonnet 4.6",
-                            "thinking": {
-                                "modes": [
-                                    "none",
-                                    "high",
-                                ],
-                            },
-                        }
-                    ],
                 },
             }
         },
@@ -137,11 +178,10 @@ def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> N
 
     provider = registry.get_provider(" OPENAI ")
     assert provider.name == "OpenAI Proxy"
-    assert provider.base_url == "https://proxy.example/v1"
-    assert provider.capabilities == {"web_search": True, "reasoning": True}
-    assert [model.id for model in provider.models] == [
+    assert provider.connections["api-key"].base_url == "https://proxy.example/v1"
+    assert provider.capabilities == {"reasoning": True}
+    assert [model.id for model in provider.connections["api-key"].models] == [
         "GPT-5.4",
-        "gpt-5.4-mini",
         "gpt-5.4-nano",
     ]
     model = registry.get_model("openai", " gpt-5.4 ")
@@ -154,6 +194,8 @@ def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> N
     ]
     factory = LLMFactory(registry)
     model_definition = next(m for m in factory.list_models("openai") if m.id == "gpt-5.4")
+    provider_definition = next(p for p in factory.list_providers() if p.id == "openai")
+    assert provider_definition.auth == "api-key"
     assert [option.label for option in model_definition.thinking_options] == [
         "Off",
         "Low",
@@ -172,8 +214,13 @@ def test_invalid_user_config_falls_back_to_builtin_with_warning(tmp_path: Path) 
             "providers": {
                 "openai": {
                     "name": "OpenAI",
-                    "base_url": "https://api.openai.com/v1",
-                    "api": "openai-responses",
+                    "connections": {
+                        "api-key": {
+                            "auth": "api-key",
+                            "api": "openai-responses",
+                            "base_url": "https://api.openai.com/v1",
+                        }
+                    },
                     "models": [{"id": "gpt-5", "name": "GPT-5"}],
                 }
             }

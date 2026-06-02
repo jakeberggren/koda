@@ -10,6 +10,7 @@ from koda.llm.types import LLMEvent, LLMRequest, LLMResponse
 from koda.messages import AssistantMessage
 from koda.prompts import SystemPrompt
 from koda.sessions import InMemorySessionStore
+from koda_common.settings.credentials import ApiKeyCredential
 from koda_service import ChatRequest, ServiceStatusCode
 from koda_service.services.local import LocalKodaService, LocalRuntimeConfig
 
@@ -54,7 +55,8 @@ def _make_settings() -> Mock:
             "allow_extended_prompt_retention",
             "langfuse_tracing_enabled",
             "bash_execution_sandbox",
-            "get_api_key",
+            "credentials",
+            "get_credential",
         ]
     )
     settings.provider = "openai"
@@ -64,7 +66,9 @@ def _make_settings() -> Mock:
     settings.allow_extended_prompt_retention = False
     settings.langfuse_tracing_enabled = False
     settings.bash_execution_sandbox = "none"
-    settings.get_api_key.return_value = "test-key"
+    credential = ApiKeyCredential(type="api_key", value="test-key")
+    settings.credentials = {"openai:api-key": credential}
+    settings.get_credential.return_value = credential
     return settings
 
 

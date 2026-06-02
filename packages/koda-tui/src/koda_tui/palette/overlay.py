@@ -18,8 +18,8 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.widgets import Box, Frame
 
-from koda_tui.overlays.controls.footer import FooterControl
 from koda_tui.overlays.controls.list import ListControl
+from koda_tui.overlays.controls.wrapped import WrappedTextControl
 from koda_tui.overlays.list.renderer import ListRenderer, RenderOptions
 from koda_tui.overlays.list.state import ListState
 
@@ -187,7 +187,7 @@ class PaletteOverlay:
 
         if footer:
             footer_row = Window(
-                content=FooterControl(footer),
+                content=WrappedTextControl(footer),
                 dont_extend_height=True,
                 align=WindowAlign.LEFT,
             )

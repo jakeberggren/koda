@@ -1,11 +1,13 @@
-"""Generic text input dialog overlay."""
+"""Choice dialog overlay."""
 
 from __future__ import annotations
 
 import shutil
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import (
@@ -16,7 +18,6 @@ from prompt_toolkit.layout import (
     Window,
     WindowAlign,
 )
-from prompt_toolkit.layout.processors import PasswordProcessor, Processor
 from prompt_toolkit.widgets import Box, Frame
 
 if TYPE_CHECKING:
@@ -27,27 +28,39 @@ if TYPE_CHECKING:
 
 
 def _calculate_dialog_width() -> int:
-    """Return text input dialog width based on the current terminal size."""
+    """Return choice dialog width based on the current terminal size."""
     term_width = shutil.get_terminal_size(fallback=(80, 24)).columns
-    return max(40, min(60, term_width // 2))
+    return max(48, min(72, term_width // 2))
 
 
-class TextInputDialog:
-    """Dialog for single-line text input with optional masking."""
+@dataclass(frozen=True, slots=True)
+class DialogChoice:
+    label: str
+    on_select: Callable[[], None]
+
+
+class EmptyChoiceDialogError(ValueError):
+    def __init__(self) -> None:
+        super().__init__("ChoiceDialog requires at least one choice")
+
+
+class ChoiceDialog:
+    """Dialog for selecting one of a small number of choices."""
 
     def __init__(
         self,
-        title: str,
-        on_submit: Callable[[str], None],
+        message: str,
+        choices: list[DialogChoice],
         on_cancel: Callable[[], None],
         *,
-        mask_input: bool = False,
         width: int | None = None,
     ) -> None:
-        self._title = title
-        self._on_submit = on_submit
+        if not choices:
+            raise EmptyChoiceDialogError
+        self._message = message
+        self._choices = choices
         self._on_cancel = on_cancel
-        self._mask_input = mask_input
+        self._selected = 0
         self.preferred_width = width if width is not None else _calculate_dialog_width()
 
         self.input_buffer = Buffer()
@@ -62,24 +75,42 @@ class TextInputDialog:
         """Return the prompt_toolkit target to focus when opened."""
         return self.input_buffer
 
-    def _create_keybindings(self) -> KeyBindings:
-        kb = KeyBindings()
-        kb.add(Keys.Escape, eager=True)(self._on_escape)
-        kb.add(Keys.Enter)(self._on_enter)
-        return kb
-
     def _on_escape(self, _event: KeyPressEvent) -> None:
         self._on_cancel()
 
     def _on_enter(self, _event: KeyPressEvent) -> None:
-        text = self.input_buffer.text.strip()
-        if text:
-            self._on_submit(text)
+        self._choices[self._selected].on_select()
+
+    def _on_previous(self, _event: KeyPressEvent) -> None:
+        self._selected = (self._selected - 1) % len(self._choices)
+
+    def _on_next(self, _event: KeyPressEvent) -> None:
+        self._selected = (self._selected + 1) % len(self._choices)
+
+    def _create_keybindings(self) -> KeyBindings:
+        kb = KeyBindings()
+        kb.add(Keys.Escape, eager=True)(self._on_escape)
+        kb.add(Keys.Enter)(self._on_enter)
+        kb.add(Keys.Left)(self._on_previous)
+        kb.add(Keys.Right)(self._on_next)
+        kb.add(Keys.Up)(self._on_previous)
+        kb.add(Keys.Down)(self._on_next)
+        kb.add("tab")(self._on_next)
+        return kb
+
+    def _choice_text(self) -> FormattedText:
+        result: list[tuple[str, str]] = []
+        for index, choice in enumerate(self._choices):
+            if index:
+                result.append(("class:dialog.box", "  "))
+            style = "class:dialog.selected" if index == self._selected else "class:dialog.button"
+            result.append((style, f" {choice.label} "))
+        return FormattedText(result)
 
     def _build_container(self) -> Frame:
         title_text = Window(
             content=FormattedTextControl(
-                text=[("class:dialog.title", self._title)],
+                text=[("class:dialog.title", self._message)],
             ),
             height=1,
             dont_extend_height=True,
@@ -98,20 +129,25 @@ class TextInputDialog:
 
         title_row = VSplit([title_text, esc_hint], style="class:dialog.box")
         separator = Window(height=1, style="class:dialog.box")
-
-        processors: list[Processor] = [PasswordProcessor()] if self._mask_input else []
-        input_row = Window(
-            content=BufferControl(
-                buffer=self.input_buffer,
-                key_bindings=self._kb,
-                input_processors=processors,
-            ),
+        choices = Window(
+            content=FormattedTextControl(text=self._choice_text),
             height=1,
             dont_extend_height=True,
+            align=WindowAlign.CENTER,
             style="class:dialog.box",
         )
 
-        body = HSplit([title_row, separator, input_row])
+        # Hidden buffer for focus (keybindings need a focused BufferControl).
+        focus_buffer = Window(
+            content=BufferControl(
+                buffer=self.input_buffer,
+                key_bindings=self._kb,
+            ),
+            height=0,
+            dont_extend_height=True,
+        )
+
+        body = HSplit([title_row, separator, choices, focus_buffer])
         box = Box(
             body,
             padding_left=2,

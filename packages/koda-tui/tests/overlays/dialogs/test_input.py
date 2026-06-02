@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from koda_tui.overlays.dialogs.text_input import TextInputDialog
+from koda_tui.overlays.dialogs.input import TextInputDialog
 
 
 @pytest.fixture

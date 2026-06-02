@@ -4,7 +4,12 @@ from typing import TYPE_CHECKING
 
 from koda.llm import exceptions
 from koda.llm.apis import LLMApiContext, LLMApiRegistry
-from koda.llm.models import ModelDefinition, ProviderDefinition, ThinkingOption
+from koda.llm.models import (
+    ModelDefinition,
+    ProviderConnectionDefinition,
+    ProviderDefinition,
+    ThinkingOption,
+)
 
 if TYPE_CHECKING:
     from koda.llm.catalog import ModelCatalog
@@ -24,8 +29,8 @@ class LLMFactory:
         self._catalog = catalog
         self._api_registry = api_registry or LLMApiRegistry.default()
 
-    @staticmethod
     def _model_config_to_definition(
+        self,
         provider_id: str,
         model_id: str,
         *,
@@ -46,13 +51,17 @@ class LLMFactory:
                 )
             )
 
+        connection_ids = self._catalog.model_connection_ids(provider_id, model_id)
+        detail = model.detail
+
         return ModelDefinition(
             id=model_id,
             name=model.name,
             provider=provider_id,
-            description=model.description,
+            detail=detail,
             context_window=model.context_window,
             max_output_tokens=model.max_output_tokens,
+            routes=connection_ids,
             thinking_options=thinking_options,
             model_features=model.capabilities,
         )
@@ -62,6 +71,20 @@ class LLMFactory:
         self._catalog.get_provider(provider_id)
         self._catalog.get_model(provider_id, model_id)
 
+    def resolve_route(
+        self,
+        provider_id: str,
+        model_id: str,
+        *,
+        credential_ids: set[str] | None = None,
+    ):
+        """Resolve a provider/model selection to a concrete provider connection."""
+        return self._catalog.resolve_route(
+            provider_id,
+            model_id,
+            credential_ids=credential_ids,
+        )
+
     def create(self, settings: SettingsManager) -> LLM:
         """Create an LLM instance from settings."""
         if settings.provider is None:
@@ -69,16 +92,19 @@ class LLMFactory:
         if settings.model is None:
             raise exceptions.ModelSelectionMissingError
 
-        provider_id = settings.provider
-        model_id = settings.model
-        provider = self._catalog.get_provider(provider_id)
-        model = self._catalog.get_model(provider_id, model_id)
-        api = self._api_registry.get(provider.api)
+        route = self._catalog.resolve_route(
+            settings.provider,
+            settings.model,
+            credential_ids=set(settings.credentials),
+        )
+        api = self._api_registry.get(route.connection.api)
         return api(
             LLMApiContext(
-                provider_id=provider_id,
-                provider=provider,
-                model=model,
+                provider_id=route.provider_id,
+                provider=route.provider,
+                connection_id=route.connection_id,
+                connection=route.connection,
+                model=route.model,
                 settings=settings,
             )
         )
@@ -90,6 +116,16 @@ class LLMFactory:
                 id=provider_id,
                 name=provider.name,
                 description=provider.description,
+                auth=next(iter(provider.connections.values())).auth,
+                connections=[
+                    ProviderConnectionDefinition(
+                        id=connection_id,
+                        label=connection.label,
+                        description=connection.description,
+                        auth=connection.auth,
+                    )
+                    for connection_id, connection in provider.connections.items()
+                ],
             )
             for provider_id, provider in self._catalog.list_providers()
         ]

@@ -32,6 +32,7 @@ from anthropic.types import (
 from pydantic import BaseModel
 
 from koda.llm import exceptions
+from koda.llm.apis.credentials import resolve_api_key_credential
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
     LLMResponse,
@@ -239,6 +240,16 @@ def _thinking_budget_tokens(model: ProviderModelConfig) -> int | None:
     return thinking.budget_tokens.max_tokens if thinking.budget_tokens else None
 
 
+def _max_output_tokens(context: LLMApiContext) -> int:
+    max_output_tokens = context.model.max_output_tokens
+    if max_output_tokens is None:
+        raise exceptions.ModelMaxOutputTokensMissingError(
+            context.model.id,
+            context.provider_id,
+        )
+    return max_output_tokens
+
+
 class AnthropicMessagesEventAdapter:
     """Convert Anthropic streaming events into Koda LLM stream events."""
 
@@ -298,10 +309,10 @@ class AnthropicMessagesAPI(LLM):
     def from_context(cls, context: LLMApiContext) -> AnthropicMessagesAPI:
         """Create an Anthropic Messages API from a resolved model-catalog context."""
         config = AnthropicMessagesAPIConfig(
-            api_key=context.require_api_key(),
-            base_url=context.provider.base_url,
+            api_key=resolve_api_key_credential(context),
+            base_url=context.connection.base_url,
             model=context.model.id,
-            max_output_tokens=context.require_max_output_tokens(),
+            max_output_tokens=_max_output_tokens(context),
             thinking_budget_tokens=_thinking_budget_tokens(context.model),
         )
         return cls(

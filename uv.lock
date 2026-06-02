@@ -453,6 +453,7 @@ source = { editable = "packages/koda" }
 dependencies = [
     { name = "anthropic" },
     { name = "anyio" },
+    { name = "httpx" },
     { name = "koda-common" },
     { name = "langfuse" },
     { name = "openai" },
@@ -465,6 +466,7 @@ dependencies = [
 requires-dist = [
     { name = "anthropic", specifier = ">=0.100.0,<1" },
     { name = "anyio", specifier = ">=4.12.0,<5" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "koda-common", editable = "packages/koda-common" },
     { name = "langfuse", specifier = ">=4.5.1,<5" },
     { name = "openai", specifier = ">=2.29.0,<3" },
