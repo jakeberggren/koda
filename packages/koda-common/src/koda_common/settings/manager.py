@@ -87,6 +87,13 @@ class BaseSettingsManager(SettingsManagerProtocol, ABC):
 _CORE_SECTION = "core"
 
 
+def _api_key_env_var_for_credential_key(provider: str) -> str | None:
+    provider_id, separator, connection_id = provider.partition(":")
+    if separator and connection_id != "api-key":
+        return None
+    return provider_api_key_env_var(provider_id)
+
+
 class SettingsManager(BaseSettingsManager):
     """Manage persisted core settings and build effective settings with env precedence."""
 
@@ -202,7 +209,8 @@ class SettingsManager(BaseSettingsManager):
         if provider in self._credential_cache:
             return self._credential_cache[provider]
 
-        if key := os.getenv(provider_api_key_env_var(provider)):
+        env_var = _api_key_env_var_for_credential_key(provider)
+        if env_var is not None and (key := os.getenv(env_var)):
             credential = ApiKeyCredential(type="api_key", value=key)
             self._credential_cache[provider] = credential
             return credential

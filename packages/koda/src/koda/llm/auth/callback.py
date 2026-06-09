@@ -54,7 +54,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         """Validate the callback request and write the result to the server queue."""
         url = urlparse(self.path)
-        log.info("oauth_callback_request_received", path=url.path, query=url.query[:100])
+        log.info("oauth_callback_request_received", path=url.path)
 
         if url.path != self.server.callback_path:
             log.info(
@@ -83,7 +83,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
             self.server.result.put(OAuthCallbackCodeMissingError())
             return
 
-        log.info("oauth_callback_success", code_prefix=code[:8] if code else None)
+        log.info("oauth_callback_success")
         self._send_text(200, "Authentication complete. You can close this window.")
         self.server.result.put(code)
 
@@ -172,5 +172,5 @@ class OAuthCallbackListener:
         if isinstance(value, OAuthCallbackError):
             log.warning("oauth_callback_server_result_exception", error=repr(value))
             raise value
-        log.info("oauth_callback_server_returning_code", code_prefix=value[:8] if value else None)
+        log.info("oauth_callback_server_returning_code")
         return value

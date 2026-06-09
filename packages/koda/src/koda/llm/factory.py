@@ -71,6 +71,23 @@ class LLMFactory:
         self._catalog.get_provider(provider_id)
         self._catalog.get_model(provider_id, model_id)
 
+    def _configured_credential_ids(
+        self,
+        settings: SettingsManager,
+        provider_id: str,
+        model_id: str,
+    ) -> set[str]:
+        normalized_provider_id = provider_id.strip().lower()
+        provider = self._catalog.get_provider(normalized_provider_id)
+        credential_ids: set[str] = set()
+        for connection_id in self._catalog.model_connection_ids(normalized_provider_id, model_id):
+            credential_key = f"{normalized_provider_id}:{connection_id}"
+            credential = settings.get_credential(credential_key)
+            connection = provider.connections[connection_id]
+            if credential is not None and credential.auth_type == connection.auth:
+                credential_ids.add(credential_key)
+        return credential_ids
+
     def resolve_route(
         self,
         provider_id: str,
@@ -95,7 +112,11 @@ class LLMFactory:
         route = self._catalog.resolve_route(
             settings.provider,
             settings.model,
-            credential_ids=set(settings.credentials),
+            credential_ids=self._configured_credential_ids(
+                settings,
+                settings.provider,
+                settings.model,
+            ),
         )
         api = self._api_registry.get(route.connection.api)
         return api(

@@ -256,6 +256,23 @@ def test_get_credential_from_env_is_cached_and_does_not_hit_secrets_store(
     assert secrets_store.get_calls == []
 
 
+def test_get_connection_api_key_credential_from_provider_env(
+    monkeypatch: pytest.MonkeyPatch,
+    settings_store: SpySettingsStore,
+    secrets_store: SpySecretsStore,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-env")
+
+    manager = SettingsManager(settings_store=settings_store, secrets_store=secrets_store)
+
+    assert manager.get_credential("openai:api-key") == ApiKeyCredential(
+        type="api_key",
+        value="sk-env",
+    )
+    assert manager.get_credential("openai:oauth") is None
+    assert secrets_store.get_calls == ["openai:oauth"]
+
+
 def test_get_credential_lazy_loads_and_caches(settings_store: SpySettingsStore) -> None:
     credential = ApiKeyCredential(type="api_key", value="sk-stored")
     secrets = SpySecretsStore({"openai": credential})

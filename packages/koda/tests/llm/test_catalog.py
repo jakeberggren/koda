@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import pytest
 
@@ -9,6 +9,7 @@ from koda.llm.apis import LLMApiFactory
 from koda.llm.apis.registry import LLMApiRegistry
 from koda.llm.catalog import ModelCatalog
 from koda.llm.factory import LLMFactory
+from koda_common.settings.credentials import ProviderCredential
 
 
 def _write_json(path: Path, data: object) -> None:
@@ -17,6 +18,27 @@ def _write_json(path: Path, data: object) -> None:
 
 def _api_factory() -> LLMApiFactory:
     return cast("LLMApiFactory", lambda _context: None)
+
+
+def _context_api_factory(contexts: list[Any]) -> LLMApiFactory:
+    def factory(context: Any) -> object:
+        contexts.append(context)
+        return object()
+
+    return cast("LLMApiFactory", factory)
+
+
+class _FakeSettings:
+    provider = "openai"
+    model = "gpt-5.5"
+
+    def __init__(self, credentials: dict[str, ProviderCredential]) -> None:
+        self._credentials = credentials
+        self.requested_credentials: list[str] = []
+
+    def get_credential(self, provider: str) -> ProviderCredential | None:
+        self.requested_credentials.append(provider)
+        return self._credentials.get(provider)
 
 
 def test_llm_api_registry_validates_api_ids() -> None:

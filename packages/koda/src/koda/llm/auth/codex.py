@@ -9,14 +9,16 @@ from contextlib import suppress
 from dataclasses import dataclass
 from threading import Event
 from time import time
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, ValidationError
 
 from koda.llm.auth.callback import OAuthCallbackListener
 from koda.llm.auth.exceptions import (
     OAuthCallbackCancelledError,
+    OAuthCallbackCodeMissingError,
     OAuthCallbackStateError,
     OpenAICodexAccountMissingError,
     OpenAICodexTokenError,
@@ -45,12 +47,25 @@ JWT_PART_COUNT = 3
 MANUAL_CODE_PROMPT = "Paste the full localhost callback URL from your browser here after login."
 
 
+class CodexTokenResponsePayload(BaseModel):
+    """Validated OpenAI Codex OAuth token endpoint response."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    access_token: Annotated[StrictStr, Field(min_length=1)]
+    refresh_token: Annotated[StrictStr, Field(min_length=1)]
+    id_token: Annotated[StrictStr, Field(min_length=1)]
+    expires_at: StrictInt | None = None
+    expires_in: StrictInt | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class AuthorizationFlow:
     """State needed to complete an OAuth authorization-code flow."""
 
     url: str
     state: str
+    nonce: str
     code_verifier: str
 
     @staticmethod
@@ -63,6 +78,7 @@ class AuthorizationFlow:
         """Create an OpenAI Codex OAuth authorization URL with PKCE enabled."""
 
         state = secrets.token_urlsafe(24)
+        nonce = secrets.token_urlsafe(24)
         code_verifier = secrets.token_urlsafe(64)
         query = urlencode(
             {
@@ -71,6 +87,7 @@ class AuthorizationFlow:
                 "redirect_uri": REDIRECT_URI,
                 "scope": SCOPE,
                 "state": state,
+                "nonce": nonce,
                 "code_challenge": cls._code_challenge(code_verifier),
                 "code_challenge_method": "S256",
                 "id_token_add_organizations": "true",
@@ -81,93 +98,46 @@ class AuthorizationFlow:
         return cls(
             url=f"{AUTHORIZE_URL}?{query}",
             state=state,
+            nonce=nonce,
             code_verifier=code_verifier,
         )
 
     def extract_authorization_code(self, value: str) -> str:
-        """Extract an OAuth authorization code from a callback URL or raw pasted code."""
+        """Extract an OAuth authorization code from a pasted callback URL."""
 
-        text = value.strip()
-        parsed = urlparse(text)
-        if parsed.query:
-            params = parse_qs(parsed.query)
-            state = params.get("state", [None])[0]
-            if state != self.state:
-                raise OAuthCallbackStateError
-            code = params.get("code", [None])[0]
-            if code:
-                return code
-        return text
+        parsed = urlparse(value.strip())
+        params = parse_qs(parsed.query)
+        state = params.get("state", [None])[0]
+        if state != self.state:
+            raise OAuthCallbackStateError
+        code = params.get("code", [None])[0]
+        if not code:
+            raise OAuthCallbackCodeMissingError
+        return code
 
 
 class CodexOAuthTokenClient(OAuthTokenClient):
     """HTTP client for OpenAI Codex OAuth token operations."""
 
     @staticmethod
-    def _required_token_string(
-        data: dict[str, object],
-        key: str,
-        *,
-        operation: str,
-    ) -> str:
-        value = data.get(key)
-        if not isinstance(value, str) or not value:
-            raise OpenAICodexTokenError(operation, f"response missing string field: {key}")
-        return value
-
-    @staticmethod
-    def _optional_token_int(
-        data: dict[str, object],
-        key: str,
-        *,
-        operation: str,
-    ) -> int | None:
-        value = data.get(key)
-        if value is None:
-            return None
-        if isinstance(value, bool) or not isinstance(value, int | str):
-            raise OpenAICodexTokenError(operation, f"response field was not an integer: {key}")
-        try:
-            return int(value)
-        except ValueError as error:
-            raise OpenAICodexTokenError(
-                operation,
-                f"response field was not an integer: {key}",
-            ) from error
-
-    @classmethod
-    def _parse_token_response(
-        cls,
-        response: httpx.Response,
-        *,
-        operation: str,
-    ) -> OAuthTokenResponse:
+    def _parse_token_response(response: httpx.Response, *, operation: str) -> OAuthTokenResponse:
         if response.is_error:
-            raise OpenAICodexTokenError(
-                operation,
-                f"HTTP {response.status_code}: {response.text}",
-            )
+            raise OpenAICodexTokenError(operation, f"HTTP {response.status_code}: {response.text}")
         try:
             data = response.json()
         except ValueError as error:
             raise OpenAICodexTokenError(operation, "response was not valid JSON") from error
-        if not isinstance(data, dict):
-            raise OpenAICodexTokenError(operation, "response JSON was not an object")
+        try:
+            token = CodexTokenResponsePayload.model_validate(data)
+        except ValidationError as error:
+            raise OpenAICodexTokenError(operation, "response JSON was invalid") from error
 
-        token = {str(key): value for key, value in data.items()}
         return OAuthTokenResponse(
-            access_token=cls._required_token_string(
-                token,
-                "access_token",
-                operation=operation,
-            ),
-            refresh_token=cls._required_token_string(
-                token,
-                "refresh_token",
-                operation=operation,
-            ),
-            expires_at=cls._optional_token_int(token, "expires_at", operation=operation),
-            expires_in=cls._optional_token_int(token, "expires_in", operation=operation),
+            access_token=token.access_token,
+            refresh_token=token.refresh_token,
+            id_token=token.id_token,
+            expires_at=token.expires_at,
+            expires_in=token.expires_in,
         )
 
     async def _post_token(
@@ -223,10 +193,16 @@ def _decode_jwt_payload(token: str) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def extract_account_id(access_token: str) -> str | None:
-    """Return the ChatGPT account id embedded in an OpenAI Codex access token."""
+def _validate_id_token_nonce(id_token: str, expected_nonce: str) -> None:
+    payload = _decode_jwt_payload(id_token)
+    if payload is None or payload.get("nonce") != expected_nonce:
+        raise OpenAICodexTokenError("credential", "id_token nonce mismatch")
 
-    payload = _decode_jwt_payload(access_token)
+
+def extract_account_id(token: str) -> str | None:
+    """Return the ChatGPT account id embedded in an OpenAI Codex token."""
+
+    payload = _decode_jwt_payload(token)
     auth_claim = payload.get(JWT_CLAIM_PATH) if payload else None
     if not isinstance(auth_claim, dict):
         return None
@@ -239,11 +215,7 @@ class OpenAICodexProviderAuth:
 
     id = "openai:oauth"
 
-    def __init__(
-        self,
-        *,
-        token_client: OAuthTokenClient,
-    ) -> None:
+    def __init__(self, *, token_client: OAuthTokenClient) -> None:
         self._token_client = token_client
 
     @staticmethod
@@ -258,7 +230,7 @@ class OpenAICodexProviderAuth:
     def _credential_from_token(cls, token: OAuthTokenResponse) -> OAuthCredential:
         """Convert an OpenAI Codex OAuth token response into persisted credentials."""
 
-        account_id = extract_account_id(token.access_token)
+        account_id = extract_account_id(token.id_token)
         log.info(
             "codex_oauth_credential_created",
             account_id=account_id,
@@ -278,6 +250,7 @@ class OpenAICodexProviderAuth:
         self,
         code: str,
         code_verifier: str,
+        expected_nonce: str,
     ) -> OAuthCredential:
         """Exchange an authorization code for OpenAI Codex OAuth credentials."""
 
@@ -289,6 +262,7 @@ class OpenAICodexProviderAuth:
             has_expires_at=token.expires_at is not None,
             has_expires_in=token.expires_in is not None,
         )
+        _validate_id_token_nonce(token.id_token, expected_nonce)
         return self._credential_from_token(token)
 
     async def _authorization_code_from_callback_or_prompt(
@@ -339,8 +313,8 @@ class OpenAICodexProviderAuth:
         log.info("codex_oauth_auth_url_generated", state=flow.state[:8] + "...")
         callbacks.on_auth_url(flow.url)
         code = await self._authorization_code_from_callback_or_prompt(flow, callbacks)
-        log.info("codex_oauth_callback_received", code_prefix=code[:8] if code else None)
-        return await self._exchange_authorization_code(code, flow.code_verifier)
+        log.info("codex_oauth_callback_received")
+        return await self._exchange_authorization_code(code, flow.code_verifier, flow.nonce)
 
     async def refresh(self, credential: OAuthCredential) -> OAuthCredential:
         """Refresh an existing OpenAI Codex OAuth credential."""

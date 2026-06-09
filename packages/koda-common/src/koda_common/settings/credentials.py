@@ -7,6 +7,10 @@ class ApiKeyCredential(BaseModel):
     type: Literal["api_key"]
     value: str
 
+    @property
+    def auth_type(self) -> str:
+        return "api-key"
+
 
 class OAuthCredential(BaseModel):
     type: Literal["oauth"]
@@ -14,6 +18,10 @@ class OAuthCredential(BaseModel):
     refresh_token: str
     expires_at: str
     metadata: dict[str, str] = Field(default_factory=dict)
+
+    @property
+    def auth_type(self) -> str:
+        return "oauth"
 
 
 ProviderCredential = Annotated[ApiKeyCredential | OAuthCredential, Field(discriminator="type")]

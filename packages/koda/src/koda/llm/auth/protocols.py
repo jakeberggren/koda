@@ -11,6 +11,7 @@ class OAuthTokenResponse:
 
     access_token: str
     refresh_token: str
+    id_token: str
     expires_at: int | None = None
     expires_in: int | None = None
 
