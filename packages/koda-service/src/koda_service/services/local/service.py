@@ -72,7 +72,7 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
 
         if request.session_id is not None:
             self.switch_session(request.session_id)
-        agent = self.runtime.get_agent()
+        agent = await self.runtime.get_agent()
 
         try:
             async for event in agent.run(request.message):

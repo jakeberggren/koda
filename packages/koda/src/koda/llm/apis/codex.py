@@ -27,9 +27,9 @@ class OpenAICodexResponsesAPI(OpenAIResponsesAPI):
     """Concrete LLM implementation backed by ChatGPT Codex Responses."""
 
     @classmethod
-    def from_context(cls, context: LLMApiContext) -> OpenAICodexResponsesAPI:
+    async def from_context(cls, context: LLMApiContext) -> OpenAICodexResponsesAPI:
         """Create a Codex Responses API from a resolved model-catalog context."""
-        credential = resolve_oauth_credential(context)
+        credential = await resolve_oauth_credential(context)
         account_id = credential.metadata.get(CODEX_ACCOUNT_ID_METADATA_KEY)
         if not account_id:
             raise exceptions.OAuthAccountIdMissingError(context.provider_id)

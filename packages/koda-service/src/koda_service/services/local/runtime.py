@@ -47,13 +47,13 @@ class LocalRuntime:
         """Clear the cached Agent so it is rebuilt on the next request."""
         self.agent = None
 
-    def create_llm(self) -> LLM:
+    async def create_llm(self) -> LLM:
         """Create the selected LLM, or return an injected test/runtime LLM."""
         if self.config.llm is not None:
             return self.config.llm
         if self.settings.provider is None:
             raise llm_exceptions.ProviderSelectionMissingError
-        return self.llm_factory.create(self.settings)
+        return await self.llm_factory.create(self.settings)
 
     def create_tools(self) -> ToolConfig:
         """Create the configured tool bundle for local command execution."""
@@ -86,8 +86,8 @@ class LocalRuntime:
             context_manager=self.context_manager,
         )
 
-    def get_agent(self) -> Agent:
+    async def get_agent(self) -> Agent:
         """Return the cached Agent, creating it on first use."""
         if self.agent is None:
-            self.agent = self.create_agent(self.create_llm())
+            self.agent = self.create_agent(await self.create_llm())
         return self.agent

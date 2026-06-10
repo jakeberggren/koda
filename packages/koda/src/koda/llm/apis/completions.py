@@ -385,7 +385,7 @@ class OpenAICompletionsAPI(LLM):
         self.event_adapter = event_adapter
 
     @classmethod
-    def from_context(cls, context: LLMApiContext) -> OpenAICompletionsAPI:
+    async def from_context(cls, context: LLMApiContext) -> OpenAICompletionsAPI:
         """Create a Chat Completions API from a resolved model-catalog context."""
         config = OpenAICompletionsAPIConfig(
             api_key=resolve_api_key_credential(context),

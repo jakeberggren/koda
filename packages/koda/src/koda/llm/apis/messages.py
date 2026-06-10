@@ -306,7 +306,7 @@ class AnthropicMessagesAPI(LLM):
         self.event_adapter = event_adapter
 
     @classmethod
-    def from_context(cls, context: LLMApiContext) -> AnthropicMessagesAPI:
+    async def from_context(cls, context: LLMApiContext) -> AnthropicMessagesAPI:
         """Create an Anthropic Messages API from a resolved model-catalog context."""
         config = AnthropicMessagesAPIConfig(
             api_key=resolve_api_key_credential(context),

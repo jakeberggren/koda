@@ -291,7 +291,7 @@ class OpenAIResponsesAPI(LLM):
         self.event_adapter = event_adapter
 
     @classmethod
-    def from_context(cls, context: LLMApiContext) -> OpenAIResponsesAPI:
+    async def from_context(cls, context: LLMApiContext) -> OpenAIResponsesAPI:
         """Create an OpenAI Responses API from a resolved model-catalog context."""
         capabilities = (
             context.provider.capabilities

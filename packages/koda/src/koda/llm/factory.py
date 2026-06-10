@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from koda.llm import exceptions
 from koda.llm.apis import LLMApiContext, LLMApiRegistry
+from koda.llm.auth.registry import ProviderAuthRegistry
 from koda.llm.models import (
     ModelDefinition,
     ProviderConnectionDefinition,
@@ -25,9 +26,11 @@ class LLMFactory:
         self,
         catalog: ModelCatalog,
         api_registry: LLMApiRegistry | None = None,
+        auth_registry: ProviderAuthRegistry | None = None,
     ) -> None:
         self._catalog = catalog
         self._api_registry = api_registry or LLMApiRegistry.default()
+        self._auth_registry = auth_registry or ProviderAuthRegistry.default()
 
     def _model_config_to_definition(
         self,
@@ -118,11 +121,11 @@ class LLMFactory:
             ),
         )
 
-    def create(self, settings: SettingsManager) -> LLM:
+    async def create(self, settings: SettingsManager) -> LLM:
         """Create an LLM instance from settings."""
         route = self.resolve_route_for_settings(settings)
         api = self._api_registry.get(route.connection.api)
-        return api(
+        return await api(
             LLMApiContext(
                 provider_id=route.provider_id,
                 provider=route.provider,
@@ -130,6 +133,7 @@ class LLMFactory:
                 connection=route.connection,
                 model=route.model,
                 settings=settings,
+                auth_registry=self._auth_registry,
             )
         )
 

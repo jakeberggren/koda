@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from time import time
 from typing import TYPE_CHECKING
 
 from koda.llm import exceptions
@@ -7,6 +8,9 @@ from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential, 
 
 if TYPE_CHECKING:
     from koda.llm.apis.base import LLMApiContext
+
+
+OAUTH_REFRESH_SKEW_SECONDS = 60
 
 
 def _credential_key(context: LLMApiContext) -> str:
@@ -34,9 +38,24 @@ def resolve_api_key_credential(context: LLMApiContext) -> str:
     return normalized_api_key
 
 
-def resolve_oauth_credential(context: LLMApiContext) -> OAuthCredential:
-    """Return the configured provider OAuth credential or raise a configuration error."""
+def _oauth_needs_refresh(credential: OAuthCredential) -> bool:
+    try:
+        expires_at = int(credential.expires_at)
+    except ValueError:
+        return True
+    return expires_at <= int(time()) + OAUTH_REFRESH_SKEW_SECONDS
+
+
+async def resolve_oauth_credential(context: LLMApiContext) -> OAuthCredential:
+    """Return a fresh provider OAuth credential or raise a configuration error."""
+    credential_key = _credential_key(context)
     credential = _resolve_credential(context)
     if not isinstance(credential, OAuthCredential):
-        raise exceptions.OAuthCredentialRequiredError(_credential_key(context))
-    return credential
+        raise exceptions.OAuthCredentialRequiredError(credential_key)
+    if not _oauth_needs_refresh(credential):
+        return credential
+
+    auth = context.auth_registry.get(credential_key)
+    refreshed = await auth.refresh(credential)
+    context.settings.set_credential(credential_key, refreshed)
+    return refreshed

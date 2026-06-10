@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
+    from koda.llm.auth.registry import ProviderAuthRegistry
     from koda.llm.models import ProviderConfig, ProviderConnectionConfig, ProviderModelConfig
     from koda.llm.protocols import LLM
     from koda_common.settings import SettingsManager
@@ -19,12 +20,13 @@ class LLMApiContext:
     connection: ProviderConnectionConfig
     model: ProviderModelConfig
     settings: SettingsManager
+    auth_registry: ProviderAuthRegistry
 
 
 class LLMApiFactory(Protocol):
     """Callable constructor registered for a model-catalog API id."""
 
-    def __call__(
+    async def __call__(
         self,
         context: LLMApiContext,
     ) -> LLM:

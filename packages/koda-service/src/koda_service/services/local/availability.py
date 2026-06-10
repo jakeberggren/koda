@@ -148,20 +148,17 @@ class LocalAvailability:
             connection_id=route.connection_id,
         )
 
-    def agent_status(self) -> ServiceStatus | None:
-        """Build the cached agent if needed and return any blocking status."""
+    def tools_status(self) -> ServiceStatus | None:
+        """Validate sync runtime dependencies that do not require LLM construction."""
         if self.runtime.agent is not None:
             return None
         try:
-            self.runtime.get_agent()
+            self.runtime.create_tools()
         except StartupConfigurationError as e:
             return ServiceStatus.from_startup_error(e)
-        except SecretsLoadError as e:
-            return ServiceStatus.from_startup_error(StartupError.from_secrets_load_error(e))
         except PermissionError as e:
             startup_error = StartupEnvironmentError.from_permission_error(e)
             return ServiceStatus.from_startup_error(startup_error)
-
         return None
 
     def status(self) -> ServiceStatus:
@@ -178,7 +175,7 @@ class LocalAvailability:
         if status is not None:
             return status
 
-        status = self.agent_status()
+        status = self.tools_status()
         if status is not None:
             return status
 
