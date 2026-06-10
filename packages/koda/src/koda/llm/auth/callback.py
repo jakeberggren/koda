@@ -25,6 +25,21 @@ if TYPE_CHECKING:
 type OAuthCallbackResult = str | OAuthCallbackError
 
 
+def extract_callback_code(query: str, *, expected_state: str) -> str:
+    """Extract an OAuth authorization code from callback query parameters."""
+
+    params = parse_qs(query)
+    state = params.get("state", [None])[0]
+    if state != expected_state:
+        raise OAuthCallbackStateError
+
+    code = params.get("code", [None])[0]
+    if not code:
+        raise OAuthCallbackCodeMissingError
+
+    return code
+
+
 class OAuthCallbackServer(ThreadingHTTPServer):
     """One-shot HTTP server for receiving an OAuth redirect on localhost."""
 
@@ -51,42 +66,6 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 
     server: OAuthCallbackServer
 
-    def do_GET(self) -> None:
-        """Validate the callback request and write the result to the server queue."""
-        url = urlparse(self.path)
-        log.info("oauth_callback_request_received", path=url.path)
-
-        if url.path != self.server.callback_path:
-            log.info(
-                "oauth_callback_path_mismatch", expected=self.server.callback_path, got=url.path
-            )
-            self._send_text(404, "Not found")
-            return
-
-        params = parse_qs(url.query)
-        code = params.get("code", [None])[0]
-        state = params.get("state", [None])[0]
-
-        if state != self.server.state:
-            log.warning(
-                "oauth_callback_state_mismatch",
-                expected_prefix=self.server.state[:8],
-                got_prefix=state[:8] if state else None,
-            )
-            self._send_text(400, "State mismatch")
-            self.server.result.put(OAuthCallbackStateError())
-            return
-
-        if not code:
-            log.warning("oauth_callback_missing_code", error=params.get("error"))
-            self._send_text(400, "Missing authorization code")
-            self.server.result.put(OAuthCallbackCodeMissingError())
-            return
-
-        log.info("oauth_callback_success")
-        self._send_text(200, "Authentication complete. You can close this window.")
-        self.server.result.put(code)
-
     def _send_text(self, status: int, body: str) -> None:
         """Send a short plain-text response to the browser."""
         data = body.encode("utf-8")
@@ -96,7 +75,40 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def do_GET(self) -> None:
+        """Validate the callback request and write the result to the server queue."""
+        url = urlparse(self.path)
+        log.info("oauth_callback_request_received", path=url.path)
+
+        if url.path != self.server.callback_path:
+            log.info(
+                "oauth_callback_path_mismatch",
+                expected=self.server.callback_path,
+                got=url.path,
+            )
+            self._send_text(404, "Not found")
+            return
+
+        try:
+            code = extract_callback_code(url.query, expected_state=self.server.state)
+        except OAuthCallbackStateError as error:
+            log.warning("oauth_callback_state_mismatch", expected_prefix=self.server.state[:8])
+            self._send_text(400, "State mismatch")
+            self.server.result.put(error)
+            return
+        except OAuthCallbackCodeMissingError as error:
+            params = parse_qs(url.query)
+            log.warning("oauth_callback_missing_code", error=params.get("error"))
+            self._send_text(400, "Missing authorization code")
+            self.server.result.put(error)
+            return
+
+        log.info("oauth_callback_success")
+        self._send_text(200, "Authentication complete. You can close this window.")
+        self.server.result.put(code)
+
     def log_message(self, format: str, *args: object) -> None:  # noqa: ARG002
+        """Suppress BaseHTTPRequestHandler's default stderr access logs."""
         return
 
 

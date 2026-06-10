@@ -102,14 +102,13 @@ class LLMFactory:
             credential_ids=credential_ids,
         )
 
-    def create(self, settings: SettingsManager) -> LLM:
-        """Create an LLM instance from settings."""
+    def resolve_route_for_settings(self, settings: SettingsManager):
+        """Resolve the selected provider/model using currently configured credentials."""
         if settings.provider is None:
             raise exceptions.ProviderSelectionMissingError
         if settings.model is None:
             raise exceptions.ModelSelectionMissingError
-
-        route = self._catalog.resolve_route(
+        return self._catalog.resolve_route(
             settings.provider,
             settings.model,
             credential_ids=self._configured_credential_ids(
@@ -118,6 +117,10 @@ class LLMFactory:
                 settings.model,
             ),
         )
+
+    def create(self, settings: SettingsManager) -> LLM:
+        """Create an LLM instance from settings."""
+        route = self.resolve_route_for_settings(settings)
         api = self._api_registry.get(route.connection.api)
         return api(
             LLMApiContext(

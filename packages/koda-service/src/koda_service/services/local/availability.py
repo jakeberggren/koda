@@ -134,7 +134,7 @@ class LocalAvailability:
             return self._model_selection_required_status()
 
         try:
-            route = self.runtime.llm_factory.resolve_route(provider, model)
+            route = self.runtime.llm_factory.resolve_route_for_settings(self.settings)
         except LLMConfigurationError:
             return self._model_unavailable_status()
 

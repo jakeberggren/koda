@@ -68,7 +68,7 @@ def _make_settings() -> Mock:
     settings.bash_execution_sandbox = "none"
     credential = ApiKeyCredential(type="api_key", value="test-key")
     settings.credentials = {"openai:api-key": credential}
-    settings.get_credential.return_value = credential
+    settings.get_credential.side_effect = settings.credentials.get
     return settings
 
 

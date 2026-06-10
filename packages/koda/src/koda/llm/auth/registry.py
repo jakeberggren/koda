@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda.llm.auth.codex import CodexOAuthTokenClient, OpenAICodexProviderAuth
+from koda.llm.auth.codex import CodexOAuthClient, OpenAICodexProviderAuth
 from koda.llm.auth.exceptions import (
     AuthAlreadyRegisteredError,
     AuthNameEmptyError,
@@ -26,7 +26,7 @@ class ProviderAuthRegistry:
     def default(cls) -> ProviderAuthRegistry:
         """Build the registry containing Koda's built-in provider auth flows."""
 
-        codex_auth = OpenAICodexProviderAuth(token_client=CodexOAuthTokenClient())
+        codex_auth = OpenAICodexProviderAuth(oauth_client=CodexOAuthClient())
         return cls({codex_auth.id: codex_auth})
 
     def __init__(self, auth_providers: Mapping[str, ProviderAuth] | None = None) -> None:

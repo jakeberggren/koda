@@ -70,16 +70,22 @@ Example adding OpenRouter as a provider:
     "openrouter": {
       "name": "OpenRouter",
       "description": "Unified Interface with access to all major LLMs",
-      "api": "openai-completions",
-      "base_url": "https://openrouter.ai/api/v1",
-      "models": [
-        {
-          "id": "moonshotai/kimi-k2.6",
-          "name": "Kimi K2.6",
-          "context_window": 256000,
-          "max_output_tokens": 32000
+      "connections": {
+        "api-key": {
+          "auth": "api-key",
+          "label": "API key",
+          "api": "openai-completions",
+          "base_url": "https://openrouter.ai/api/v1",
+          "models": [
+            {
+              "id": "moonshotai/kimi-k2.6",
+              "name": "Kimi K2.6",
+              "context_window": 256000,
+              "max_output_tokens": 32000
+            }
+          ]
         }
-      ]
+      }
     }
   }
 }
