@@ -12,7 +12,6 @@ from koda_common.logging import get_logger
 from koda_common.settings.credentials import ApiKeyCredential
 from koda_tui.overlays.dialogs import DialogChoice
 from koda_tui.palette.items import ListItem
-from koda_tui.palette.menus.models import apply_model_selection
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -115,7 +114,7 @@ class ProviderMenu:
             return
         models = self._service.list_models(provider.id)
         if models:
-            apply_model_selection(models[0], current_model=None, settings=self._settings.core)
+            self._settings.core.update(provider=models[0].provider, model=models[0].id)
 
     def _submit_api_key(self, selection: ProviderConnectionSelection, key: str) -> None:
         self._settings.core.set_credential(

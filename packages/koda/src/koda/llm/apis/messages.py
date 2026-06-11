@@ -78,7 +78,6 @@ class AnthropicMessagesAPIConfig:
     model: str
     max_output_tokens: int
     thinking_budget_tokens: int | None = None
-    thinking_modes: tuple[str, ...] = ()
 
 
 class AnthropicMessagesAdapter(
@@ -197,10 +196,7 @@ def _resolve_thinking(
     thinking: str,
     budget_tokens: int | None,
     max_tokens: int,
-    thinking_modes: tuple[str, ...] = (),
 ) -> tuple[ThinkingConfigParam, OutputConfigParam | Omit]:
-    if thinking_modes and thinking not in thinking_modes:
-        thinking = thinking_modes[0]
     if thinking == "enabled":
         if budget_tokens is None:
             raise exceptions.ThinkingBudgetTokensNotConfiguredError
@@ -318,7 +314,6 @@ class AnthropicMessagesAPI(LLM):
             model=context.model.id,
             max_output_tokens=_max_output_tokens(context),
             thinking_budget_tokens=_thinking_budget_tokens(context.model),
-            thinking_modes=tuple(context.model.thinking.modes),
         )
         return cls(
             config,
@@ -340,7 +335,6 @@ class AnthropicMessagesAPI(LLM):
             thinking=request.options.thinking,
             budget_tokens=self.config.thinking_budget_tokens,
             max_tokens=max_tokens,
-            thinking_modes=self.config.thinking_modes,
         )
         try:
             response = await self.client.messages.create(
@@ -365,7 +359,6 @@ class AnthropicMessagesAPI(LLM):
             thinking=request.options.thinking,
             budget_tokens=self.config.thinking_budget_tokens,
             max_tokens=max_tokens,
-            thinking_modes=self.config.thinking_modes,
         )
         emitted_tool_call_ids: set[str] = set()
         try:

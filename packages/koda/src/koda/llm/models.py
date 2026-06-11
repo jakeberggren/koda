@@ -1,11 +1,32 @@
 from __future__ import annotations
 
-from typing import Literal, Self
+from typing import TYPE_CHECKING, Literal, Self
 
 from pydantic import BaseModel, Field
 
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
 type ThinkingOptionId = str
 type AuthMethod = Literal["api-key", "oauth"]
+
+
+def resolve_thinking_mode(
+    requested: ThinkingOptionId,
+    supported: Sequence[ThinkingOptionId],
+) -> ThinkingOptionId:
+    """Resolve a requested thinking mode against ordered model-supported modes.
+
+    The first supported mode is the model default/fallback. Models with no declared
+    thinking modes fall back to explicit no-thinking.
+    """
+    if not supported:
+        return "none"
+    if requested in supported:
+        return requested
+    return supported[0]
+
+
 type ProviderApi = Literal[
     "anthropic-messages",
     "openai-responses",
@@ -63,9 +84,10 @@ class ModelDefinition(BaseModel):
         return any(option.id != "none" for option in self.effective_thinking_options)
 
     def resolve_thinking_option(self, thinking_id: ThinkingOptionId) -> ThinkingOption:
-        """Return the matching thinking option or the first effective option."""
+        """Return the matching thinking option or the model's default option."""
         options = self.effective_thinking_options
-        return next((option for option in options if option.id == thinking_id), options[0])
+        resolved_id = resolve_thinking_mode(thinking_id, [option.id for option in options])
+        return next(option for option in options if option.id == resolved_id)
 
 
 class ProviderThinkingBudgetConfig(BaseModel):

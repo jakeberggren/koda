@@ -15,6 +15,7 @@ from koda.llm.models import (
     ProviderThinkingModeConfig,
     ThinkingOption,
     ThinkingOptionId,
+    resolve_thinking_mode,
 )
 from koda.llm.protocols import LLM
 from koda.llm.types import (
@@ -50,4 +51,5 @@ __all__ = [
     "ThinkingMode",
     "ThinkingOption",
     "ThinkingOptionId",
+    "resolve_thinking_mode",
 ]

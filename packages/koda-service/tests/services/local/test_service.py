@@ -81,6 +81,7 @@ def _make_service(
     system_prompt: SystemPrompt | None = None,
     session_store: InMemorySessionStore | None = None,
     llm: _FakeLLM | None = None,
+    settings: Mock | None = None,
 ) -> LocalKodaService:
     runtime_config = (
         LocalRuntimeConfig(
@@ -97,7 +98,7 @@ def _make_service(
         )
     )
     return LocalKodaService(
-        settings=_make_settings(),
+        settings=settings or _make_settings(),
         runtime=runtime_config,
         session_store=session_store or InMemorySessionStore(),
     )
@@ -131,6 +132,24 @@ async def test_chat_creates_session_lazily_on_first_message() -> None:
     assert active.session_id == sessions[0].session_id
     assert fake_llm.last_request is not None
     assert fake_llm.last_request.messages[0].content == "hello"
+
+
+@pytest.mark.asyncio
+async def test_chat_resolves_thinking_to_first_supported_model_mode() -> None:
+    fake_llm = _FakeLLM()
+    settings = _make_settings()
+    settings.provider = "anthropic"
+    settings.model = "claude-fable-5"
+    settings.thinking = "none"
+    settings.credentials = {"anthropic:api-key": ApiKeyCredential(type="api_key", value="test-key")}
+    settings.get_credential.side_effect = settings.credentials.get
+    service = _make_service(llm=fake_llm, settings=settings)
+
+    _events = [event async for event in service.chat(ChatRequest(message="hello"))]
+
+    assert fake_llm.last_request is not None
+    assert fake_llm.last_request.options.thinking == "low"
+    assert settings.thinking == "none"
 
 
 async def test_chat_translates_llm_creation_authentication_error(

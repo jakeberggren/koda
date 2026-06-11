@@ -130,7 +130,6 @@ def _provider(
     client: _FakeClient,
     *,
     thinking_budget_tokens: int | None = None,
-    thinking_modes: tuple[str, ...] = (),
 ) -> AnthropicMessagesAPI:
     return AnthropicMessagesAPI(
         AnthropicMessagesAPIConfig(
@@ -139,7 +138,6 @@ def _provider(
             model="claude-sonnet-4-6",
             max_output_tokens=1024,
             thinking_budget_tokens=thinking_budget_tokens,
-            thinking_modes=thinking_modes,
         ),
         client=cast("AsyncAnthropic", client),
         adapter=AnthropicMessagesAdapter(),
@@ -204,19 +202,6 @@ async def test_anthropic_thinking_requests_summarized_display() -> None:
     assert create_kwargs is not None
     assert create_kwargs["thinking"] == {"type": "adaptive", "display": "summarized"}
     assert create_kwargs["output_config"] == {"effort": "high"}
-
-
-@pytest.mark.asyncio
-async def test_anthropic_thinking_uses_first_model_mode_when_request_is_unsupported() -> None:
-    fake_client = _FakeClient()
-    provider = _provider(fake_client, thinking_modes=("low", "medium", "high"))
-
-    await provider.generate(LLMRequest(messages=[]))
-
-    create_kwargs = fake_client.messages.create_kwargs
-    assert create_kwargs is not None
-    assert create_kwargs["thinking"] == {"type": "adaptive", "display": "summarized"}
-    assert create_kwargs["output_config"] == {"effort": "low"}
 
 
 @pytest.mark.asyncio

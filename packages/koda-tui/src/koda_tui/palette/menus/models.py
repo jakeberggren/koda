@@ -10,8 +10,7 @@ from koda_tui.palette.items import ListItem
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-    from koda.llm import ModelDefinition, ThinkingOptionId
-    from koda_common.settings import SettingsManager
+    from koda.llm import ModelDefinition
     from koda_tui.palette.palette import Palette
 
 
@@ -33,50 +32,6 @@ def _truncate_label(label: str, max_length: int) -> str:
     if max_length <= len(ellipsis):
         return ellipsis[:max_length]
     return label[: max_length - len(ellipsis)] + ellipsis
-
-
-def _normalize_thinking_for_model_switch(
-    current: ThinkingOptionId,
-    *,
-    current_model: ModelDefinition | None,
-    new_model: ModelDefinition,
-) -> ThinkingOptionId:
-    new_ids = [option.id for option in new_model.effective_thinking_options]
-    if current in new_ids:
-        return current
-
-    current_options = (
-        current_model.effective_thinking_options
-        if current_model is not None
-        else new_model.effective_thinking_options
-    )
-    current_ids = [option.id for option in current_options]
-    try:
-        current_index = current_ids.index(current)
-    except ValueError:
-        return new_ids[0]
-
-    return new_ids[min(current_index, len(new_ids) - 1)]
-
-
-def apply_model_selection(
-    model: ModelDefinition,
-    *,
-    current_model: ModelDefinition | None,
-    settings: SettingsManager,
-) -> None:
-    changes: dict[str, object] = {
-        "provider": model.provider,
-        "model": model.id,
-    }
-    normalized_thinking = _normalize_thinking_for_model_switch(
-        settings.thinking,
-        current_model=current_model,
-        new_model=model,
-    )
-    if normalized_thinking != settings.thinking:
-        changes["thinking"] = normalized_thinking
-    settings.update(**changes)
 
 
 class ModelMenu:
@@ -108,11 +63,7 @@ class ModelMenu:
     def select(self, model: ModelDefinition) -> None:
         """Handle model selection."""
         try:
-            apply_model_selection(
-                model,
-                current_model=self._palette.state.active_model,
-                settings=self._settings.core,
-            )
+            self._settings.core.update(provider=model.provider, model=model.id)
         except ValueError:
             log.warning("select_model_failed", model_id=model.id)
             return

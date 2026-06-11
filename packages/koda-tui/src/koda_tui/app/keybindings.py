@@ -139,7 +139,7 @@ def _handle_cycle_thinking(app: KodaTuiApp) -> None:
     if not options:
         return
     try:
-        current_index = options.index(app.app_settings.core.thinking)
+        current_index = options.index(app.state.thinking.id)
     except ValueError:
         current_index = -1
     app.app_settings.core.set("thinking", options[(current_index + 1) % len(options)])
