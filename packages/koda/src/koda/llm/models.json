@@ -11,6 +11,43 @@
           "models": [
             {
               "context_window": 1000000,
+              "id": "claude-fable-5",
+              "max_output_tokens": 128000,
+              "name": "Claude Fable 5",
+              "thinking": {
+                "budget_tokens": {
+                  "max_tokens": 128000
+                },
+                "modes": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
+              "id": "claude-opus-4-8",
+              "max_output_tokens": 128000,
+              "name": "Claude Opus 4.8",
+              "thinking": {
+                "budget_tokens": {
+                  "max_tokens": 128000
+                },
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
               "id": "claude-opus-4-7",
               "max_output_tokens": 128000,
               "name": "Claude Opus 4.7",

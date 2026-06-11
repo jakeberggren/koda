@@ -10,7 +10,9 @@ from koda.llm.models import (
     ProviderConnectionDefinition,
     ProviderDefinition,
     ThinkingOption,
+    resolve_thinking_mode,
 )
+from koda.llm.types import LLMRequestOptions
 
 if TYPE_CHECKING:
     from koda.llm.catalog import ModelCatalog
@@ -119,6 +121,15 @@ class LLMFactory:
                 settings.provider,
                 settings.model,
             ),
+        )
+
+    def request_options_for_settings(self, settings: SettingsManager) -> LLMRequestOptions:
+        """Build model-valid request defaults from user settings."""
+        route = self.resolve_route_for_settings(settings)
+        return LLMRequestOptions(
+            thinking=resolve_thinking_mode(settings.thinking, route.model.thinking.modes),
+            web_search=settings.allow_web_search,
+            extended_prompt_retention=settings.allow_extended_prompt_retention,
         )
 
     async def create(self, settings: SettingsManager) -> LLM:

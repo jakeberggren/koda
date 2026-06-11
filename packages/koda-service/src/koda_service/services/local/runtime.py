@@ -76,9 +76,15 @@ class LocalRuntime:
 
     def create_agent(self, llm: LLM) -> Agent:
         """Create an Agent wired to the current settings and session manager."""
-        agent_config = AgentConfig.from_settings(
-            self.settings,
+        try:
+            request_options = self.llm_factory.request_options_for_settings(self.settings)
+        except llm_exceptions.LLMConfigurationError:
+            if self.config.llm is None:
+                raise
+            request_options = AgentConfig.from_settings(self.settings).request_options
+        agent_config = AgentConfig(
             system_prompt=self.load_system_prompt(),
+            request_options=request_options,
         )
         return Agent(
             llm=llm,
