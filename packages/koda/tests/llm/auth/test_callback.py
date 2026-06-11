@@ -9,11 +9,7 @@ from urllib.request import urlopen
 import pytest
 
 from koda.llm.auth.callback import OAuthCallbackListener
-from koda.llm.auth.exceptions import (
-    OAuthCallbackCodeMissingError,
-    OAuthCallbackStateError,
-    OAuthCallbackTimeoutError,
-)
+from koda.llm.auth.exceptions import OAuthCallbackCodeMissingError, OAuthCallbackTimeoutError
 
 
 @pytest.fixture
@@ -56,7 +52,7 @@ def test_receive_callback_returns_authorization_code(free_port: int) -> None:
     assert future.result(timeout=1) == "auth-code"
 
 
-def test_receive_callback_raises_on_state_mismatch(free_port: int) -> None:
+def test_receive_callback_ignores_state_mismatch_and_accepts_valid_callback(free_port: int) -> None:
     listener = OAuthCallbackListener(
         port=free_port,
         callback_path="/auth/callback",
@@ -69,11 +65,15 @@ def test_receive_callback_raises_on_state_mismatch(free_port: int) -> None:
         status, body = _read_url(
             f"http://127.0.0.1:{free_port}/auth/callback?code=auth-code&state=wrong-state"
         )
+        valid_status, valid_body = _read_url(
+            f"http://127.0.0.1:{free_port}/auth/callback?code=valid-code&state=expected-state"
+        )
 
     assert status == 400
     assert "State mismatch" in body
-    with pytest.raises(OAuthCallbackStateError):
-        future.result(timeout=1)
+    assert valid_status == 200
+    assert "Authentication complete" in valid_body
+    assert future.result(timeout=1) == "valid-code"
 
 
 def test_receive_callback_raises_on_missing_code(free_port: int) -> None:

@@ -91,10 +91,9 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 
         try:
             code = extract_callback_code(url.query, expected_state=self.server.state)
-        except OAuthCallbackStateError as error:
+        except OAuthCallbackStateError:
             log.warning("oauth_callback_state_mismatch", expected_prefix=self.server.state[:8])
             self._send_text(400, "State mismatch")
-            self.server.result.put(error)
             return
         except OAuthCallbackCodeMissingError as error:
             params = parse_qs(url.query)
@@ -122,16 +121,6 @@ class OAuthCallbackListener:
     host: str = "127.0.0.1"
     timeout: float = 300
     poll_interval: float = 0.25
-
-    def _server(self, result: Queue[OAuthCallbackResult]) -> OAuthCallbackServer:
-        server = OAuthCallbackServer(
-            (self.host, self.port),
-            callback_path=self.callback_path,
-            state=self.state,
-            result=result,
-        )
-        server.timeout = self.poll_interval
-        return server
 
     def _wait_for_result(
         self,
