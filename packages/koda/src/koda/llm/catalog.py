@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from koda.llm.models import (
         ProviderConfig,
+        ProviderConnectionConfig,
         ProviderModelConfig,
     )
 
@@ -27,6 +28,15 @@ log = logging.getLogger(__name__)
 class ModelCatalogWarning:
     summary: str
     detail: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedModelRoute:
+    provider_id: str
+    provider: ProviderConfig
+    connection_id: str
+    connection: ProviderConnectionConfig
+    model: ProviderModelConfig
 
 
 def _normalize(value: str) -> str:
@@ -40,7 +50,7 @@ class ModelCatalog:
     def __init__(self, providers: dict[str, ProviderConfig]) -> None:
         # Providers are already normalized by _merge_providers
         self._providers = providers
-        self._models = self._index_provider_models(self._providers)
+        self._models, self._model_connections = self._index_provider_models(self._providers)
 
     @staticmethod
     def _load_config(path: Path) -> ProvidersConfig:
@@ -51,43 +61,23 @@ class ModelCatalog:
     @staticmethod
     def _index_provider_models(
         providers: dict[str, ProviderConfig],
-    ) -> dict[tuple[str, str], ProviderModelConfig]:
-        """Index models by (provider_id, model_id) for fast lookup."""
-        return {
-            (provider_id, _normalize(model.id)): model
-            for provider_id, provider in providers.items()
-            for model in provider.models
-        }
-
-    @staticmethod
-    def _merge_provider(
-        builtin_provider: ProviderConfig,
-        user_provider: ProviderConfig,
-    ) -> ProviderConfig:
-        """Merge a user-defined provider config with the builtin config."""
-        # Merge models, with user-defined models taking precedence
-        models_by_id = {
-            _normalize(model.id): model.model_copy(deep=True)
-            for model in (*builtin_provider.models, *user_provider.models)
-        }
-        return builtin_provider.model_copy(
-            update={
-                "name": user_provider.name,
-                "description": user_provider.description or builtin_provider.description,
-                "base_url": user_provider.base_url,
-                "api": user_provider.api,
-                "capabilities": {
-                    **builtin_provider.capabilities,
-                    **user_provider.capabilities,
-                },
-                "thinking_modes": {
-                    **builtin_provider.thinking_modes,
-                    **user_provider.thinking_modes,
-                },
-                "models": list(models_by_id.values()),
-            },
-            deep=True,
-        )
+    ) -> tuple[
+        dict[tuple[str, str], ProviderModelConfig],
+        dict[tuple[str, str], list[str]],
+    ]:
+        """Index connection-scoped models by (provider_id, model_id)."""
+        models: dict[tuple[str, str], ProviderModelConfig] = {}
+        model_connections: dict[tuple[str, str], list[str]] = {}
+        for provider_id, provider in providers.items():
+            for connection_id, connection in provider.connections.items():
+                normalized_connection_id = _normalize(connection_id)
+                for model in connection.models:
+                    key = (provider_id, _normalize(model.id))
+                    models.setdefault(key, model.model_copy(deep=True))
+                    model_connections.setdefault(key, [])
+                    if normalized_connection_id not in model_connections[key]:
+                        model_connections[key].append(normalized_connection_id)
+        return models, model_connections
 
     @staticmethod
     def _merge_providers(
@@ -102,11 +92,7 @@ class ModelCatalog:
 
         for provider_id, provider in (user_config.providers if user_config else {}).items():
             normalized_provider_id = _normalize(provider_id)
-            providers[normalized_provider_id] = (
-                ModelCatalog._merge_provider(providers[normalized_provider_id], provider)
-                if normalized_provider_id in providers
-                else provider.model_copy(deep=True)
-            )
+            providers[normalized_provider_id] = provider.model_copy(deep=True)
         return providers
 
     @staticmethod
@@ -163,6 +149,59 @@ class ModelCatalog:
         if model is None:
             raise exceptions.ModelNotSupportedError(model_id, provider_id)
         return model
+
+    def model_connection_ids(self, provider_id: str, model_id: str) -> list[str]:
+        """Return connection ids that expose a provider model, in catalog order."""
+        key = (_normalize(provider_id), _normalize(model_id))
+        connection_ids = self._model_connections.get(key)
+        if connection_ids is None:
+            raise exceptions.ModelNotSupportedError(model_id, provider_id)
+        return list(connection_ids)
+
+    @staticmethod
+    def _prefer_oauth(connection_ids: list[str]) -> list[str]:
+        """Prefer OAuth when the same model is available through multiple connections."""
+        if "oauth" not in connection_ids:
+            return connection_ids
+        return [
+            "oauth",
+            *(connection_id for connection_id in connection_ids if connection_id != "oauth"),
+        ]
+
+    def resolve_route(
+        self,
+        provider_id: str,
+        model_id: str,
+        *,
+        credential_ids: set[str] | None = None,
+    ) -> ResolvedModelRoute:
+        """Resolve a provider/model selection to a concrete provider connection."""
+        normalized_provider_id = _normalize(provider_id)
+        provider = self.get_provider(normalized_provider_id)
+        model = self.get_model(normalized_provider_id, model_id)
+        connection_ids = self._prefer_oauth(
+            self.model_connection_ids(normalized_provider_id, model_id)
+        )
+        connections = {_normalize(k): v for k, v in provider.connections.items()}
+
+        selected_route = connection_ids[0]
+        if credential_ids is not None:
+            selected_route = next(
+                (
+                    connection_id
+                    for connection_id in connection_ids
+                    if f"{normalized_provider_id}:{connection_id}" in credential_ids
+                ),
+                selected_route,
+            )
+
+        return ResolvedModelRoute(
+            provider_id=normalized_provider_id,
+            provider=provider,
+            connection_id=selected_route,
+            connection=connections[selected_route],
+            model=model,
+        )
 
     def list_providers(self) -> list[tuple[str, ProviderConfig]]:
         """List all providers."""

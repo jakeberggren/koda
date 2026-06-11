@@ -5,6 +5,13 @@ from typing import Literal, Self
 from pydantic import BaseModel, Field
 
 type ThinkingOptionId = str
+type AuthMethod = Literal["api-key", "oauth"]
+type ProviderApi = Literal[
+    "anthropic-messages",
+    "openai-responses",
+    "openai-completions",
+    "openai-codex-responses",
+]
 
 
 class ThinkingOption(BaseModel):
@@ -18,10 +25,19 @@ class ThinkingOption(BaseModel):
         return cls(id="none", label="none")
 
 
+class ProviderConnectionDefinition(BaseModel):
+    id: str
+    label: str | None = None
+    description: str | None = None
+    auth: AuthMethod = "api-key"
+
+
 class ProviderDefinition(BaseModel):
     id: str
     name: str
     description: str | None = None
+    auth: AuthMethod = "api-key"
+    connections: list[ProviderConnectionDefinition] = Field(default_factory=list)
     provider_features: dict[str, object] = Field(default_factory=dict)
 
 
@@ -29,9 +45,10 @@ class ModelDefinition(BaseModel):
     id: str
     name: str
     provider: str
-    description: str | None = None
+    detail: str | None = None
     context_window: int | None = None
     max_output_tokens: int | None = None
+    routes: list[str] = Field(default_factory=list)
     thinking_options: list[ThinkingOption] = Field(default_factory=list)
     model_features: dict[str, object] = Field(default_factory=dict)
 
@@ -69,21 +86,30 @@ class ProviderThinkingConfig(BaseModel):
 class ProviderModelConfig(BaseModel):
     id: str
     name: str
-    description: str | None = None
+    detail: str | None = None
     context_window: int | None = None
     max_output_tokens: int | None = None
     capabilities: dict[str, object] = Field(default_factory=dict)
     thinking: ProviderThinkingConfig = Field(default_factory=ProviderThinkingConfig)
 
 
+class ProviderConnectionConfig(BaseModel):
+    auth: AuthMethod = "api-key"
+    label: str | None = None
+    detail: str | None = None
+    description: str | None = None
+    api: ProviderApi
+    base_url: str
+    capabilities: dict[str, object] = Field(default_factory=dict)
+    models: list[ProviderModelConfig] = Field(default_factory=list)
+
+
 class ProviderConfig(BaseModel):
     name: str
     description: str | None = None
-    base_url: str
-    api: Literal["anthropic-messages", "openai-responses", "openai-completions"]
+    connections: dict[str, ProviderConnectionConfig]
     capabilities: dict[str, object] = Field(default_factory=dict)
     thinking_modes: dict[ThinkingOptionId, ProviderThinkingModeConfig] = Field(default_factory=dict)
-    models: list[ProviderModelConfig] = Field(default_factory=list)
 
 
 class ProvidersConfig(BaseModel):

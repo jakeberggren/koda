@@ -33,7 +33,7 @@ class ThinkingMenu:
             ListItem(
                 id=f"select_thinking:{option.id}",
                 label=option.label,
-                description=option.description or "",
+                detail=option.description or "",
                 marker="*" if self._settings.core.thinking == option.id else None,
                 marker_style=(
                     "class:palette.current" if self._settings.core.thinking == option.id else None

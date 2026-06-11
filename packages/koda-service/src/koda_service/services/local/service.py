@@ -72,9 +72,9 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
 
         if request.session_id is not None:
             self.switch_session(request.session_id)
-        agent = self.runtime.get_agent()
 
         try:
+            agent = await self.runtime.get_agent()
             async for event in agent.run(request.message):
                 yield event
         except llm_exceptions.LLMError as error:
@@ -91,7 +91,12 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
         providers = self.list_providers()
         try:
             connected_ids = {
-                provider.id for provider in providers if self.settings.get_api_key(provider.id)
+                provider.id
+                for provider in providers
+                if any(
+                    self.settings.get_credential(f"{provider.id}:{connection.id}")
+                    for connection in provider.connections
+                )
             }
         except SecretsLoadError:
             return []
@@ -120,11 +125,70 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
         warnings = [warning.summary for warning in self.runtime.warnings]
         return ServiceDiagnostics(startup_warnings=warnings)
 
+    @staticmethod
+    def _connection_credential_key(provider_id: str, connection_id: str) -> str:
+        return f"{provider_id}:{connection_id}"
+
+    def _configured_credential_ids(self) -> set[str]:
+        return {
+            self._connection_credential_key(provider.id, connection.id)
+            for provider in self.list_providers()
+            for connection in provider.connections
+            if self.settings.get_credential(
+                self._connection_credential_key(provider.id, connection.id)
+            )
+        }
+
+    @staticmethod
+    def _has_multiple_configured_connections(
+        provider_id: str,
+        credential_ids: set[str],
+    ) -> bool:
+        prefix = f"{provider_id}:"
+        provider_credentials = [
+            credential_id for credential_id in credential_ids if credential_id.startswith(prefix)
+        ]
+        return len(provider_credentials) > 1
+
+    def _model_has_configured_connection(
+        self,
+        model: ModelDefinition,
+        credential_ids: set[str],
+    ) -> bool:
+        return any(
+            self._connection_credential_key(model.provider, connection_id) in credential_ids
+            for connection_id in model.routes
+        )
+
+    def _configured_model_definition(
+        self,
+        model: ModelDefinition,
+        credential_ids: set[str],
+    ) -> ModelDefinition:
+        route = self.runtime.llm_factory.resolve_route(
+            model.provider,
+            model.id,
+            credential_ids=credential_ids,
+        )
+        detail = None
+        if self._has_multiple_configured_connections(model.provider, credential_ids):
+            detail = route.connection.detail or model.detail
+        return model.model_copy(update={"detail": detail})
+
     def list_configured_models(self) -> list[ModelDefinition]:
-        """List models whose providers currently have configured credentials."""
-        connected_providers = {provider.id for provider in self.list_configured_providers()}
+        """List models with detail set to the effective configured connection."""
         models = self.runtime.llm_factory.list_models()
-        return [model for model in models if model.provider in connected_providers]
+        try:
+            credential_ids = self._configured_credential_ids()
+            configured_models = [
+                self._configured_model_definition(model, credential_ids)
+                for model in models
+                if self._model_has_configured_connection(model, credential_ids)
+            ]
+        except SecretsLoadError:
+            return []
+        else:
+            return configured_models
 
     def active_session(self) -> Session | None:
         """Get the currently active session, if any."""

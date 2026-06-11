@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
 from unittest.mock import Mock
@@ -6,11 +7,14 @@ import pytest
 from pydantic import BaseModel
 
 from koda.agent import AgentIterationStarted, AgentTurnCompleted, AgentTurnStarted
+from koda.llm.exceptions import LLMAuthenticationError
 from koda.llm.types import LLMEvent, LLMRequest, LLMResponse
 from koda.messages import AssistantMessage
 from koda.prompts import SystemPrompt
 from koda.sessions import InMemorySessionStore
+from koda_common.settings.credentials import ApiKeyCredential
 from koda_service import ChatRequest, ServiceStatusCode
+from koda_service.exceptions import ServiceAuthenticationError
 from koda_service.services.local import LocalKodaService, LocalRuntimeConfig
 
 
@@ -54,7 +58,8 @@ def _make_settings() -> Mock:
             "allow_extended_prompt_retention",
             "langfuse_tracing_enabled",
             "bash_execution_sandbox",
-            "get_api_key",
+            "credentials",
+            "get_credential",
         ]
     )
     settings.provider = "openai"
@@ -64,7 +69,9 @@ def _make_settings() -> Mock:
     settings.allow_extended_prompt_retention = False
     settings.langfuse_tracing_enabled = False
     settings.bash_execution_sandbox = "none"
-    settings.get_api_key.return_value = "test-key"
+    credential = ApiKeyCredential(type="api_key", value="test-key")
+    settings.credentials = {"openai:api-key": credential}
+    settings.get_credential.side_effect = settings.credentials.get
     return settings
 
 
@@ -124,6 +131,41 @@ async def test_chat_creates_session_lazily_on_first_message() -> None:
     assert active.session_id == sessions[0].session_id
     assert fake_llm.last_request is not None
     assert fake_llm.last_request.messages[0].content == "hello"
+
+
+async def test_chat_translates_llm_creation_authentication_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _make_service(llm=_FakeLLM())
+
+    async def fail_to_create_agent() -> None:
+        raise LLMAuthenticationError("openai", RuntimeError("refresh failed"))
+
+    monkeypatch.setattr(service.runtime, "get_agent", fail_to_create_agent)
+
+    with pytest.raises(ServiceAuthenticationError, match="Authentication failed"):
+        _ = [event async for event in service.chat(ChatRequest(message="hello"))]
+
+
+async def test_runtime_creates_agent_once_for_concurrent_requests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_llm = _FakeLLM()
+    service = _make_service(llm=fake_llm)
+    create_calls = 0
+
+    async def create_llm() -> _FakeLLM:
+        nonlocal create_calls
+        create_calls += 1
+        await asyncio.sleep(0)
+        return fake_llm
+
+    monkeypatch.setattr(service.runtime, "create_llm", create_llm)
+
+    agents = await asyncio.gather(*(service.runtime.get_agent() for _ in range(3)))
+
+    assert create_calls == 1
+    assert agents == [agents[0]] * 3
 
 
 @pytest.mark.asyncio

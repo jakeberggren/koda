@@ -1,67 +1,70 @@
 {
   "providers": {
     "anthropic": {
-      "api": "anthropic-messages",
-      "base_url": "https://api.anthropic.com",
       "capabilities": {},
-      "description": "Thoughtful, capable models optimized for reliability, reasoning, and long-context work.",
-      "models": [
-        {
-          "context_window": 1000000,
-          "description": "Anthropic's most capable generally available model for complex reasoning and agentic coding",
-          "id": "claude-opus-4-7",
-          "max_output_tokens": 128000,
-          "name": "Claude Opus 4.7",
-          "thinking": {
-            "budget_tokens": {
-              "max_tokens": 128000
+      "connections": {
+        "api-key": {
+          "api": "anthropic-messages",
+          "auth": "api-key",
+          "base_url": "https://api.anthropic.com",
+          "label": "API key",
+          "models": [
+            {
+              "context_window": 1000000,
+              "id": "claude-opus-4-7",
+              "max_output_tokens": 128000,
+              "name": "Claude Opus 4.7",
+              "thinking": {
+                "budget_tokens": {
+                  "max_tokens": 128000
+                },
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
             },
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh",
-              "max"
-            ]
-          }
-        },
-        {
-          "context_window": 1000000,
-          "description": "The best combination of speed and intelligence of Anthropic's models.",
-          "id": "claude-sonnet-4-6",
-          "max_output_tokens": 64000,
-          "name": "Claude Sonnet 4.6",
-          "thinking": {
-            "budget_tokens": {
-              "max_tokens": 64000
+            {
+              "context_window": 1000000,
+              "id": "claude-sonnet-4-6",
+              "max_output_tokens": 64000,
+              "name": "Claude Sonnet 4.6",
+              "thinking": {
+                "budget_tokens": {
+                  "max_tokens": 64000
+                },
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ]
+              }
             },
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "max"
-            ]
-          }
-        },
-        {
-          "context_window": 200000,
-          "description": "The fastest model from Anthropic with near-frontier intelligence",
-          "id": "claude-haiku-4-5",
-          "max_output_tokens": 64000,
-          "name": "Claude Haiku 4.5",
-          "thinking": {
-            "budget_tokens": {
-              "max_tokens": 4096
-            },
-            "modes": [
-              "none",
-              "enabled"
-            ]
-          }
+            {
+              "context_window": 200000,
+              "id": "claude-haiku-4-5",
+              "max_output_tokens": 64000,
+              "name": "Claude Haiku 4.5",
+              "thinking": {
+                "budget_tokens": {
+                  "max_tokens": 4096
+                },
+                "modes": [
+                  "none",
+                  "enabled"
+                ]
+              }
+            }
+          ]
         }
-      ],
+      },
+      "description": "Thoughtful, capable models optimized for reliability, reasoning, and long-context work.",
       "name": "Anthropic",
       "thinking_modes": {
         "enabled": {
@@ -95,272 +98,342 @@
       }
     },
     "bergetai": {
-      "api": "openai-completions",
-      "base_url": "https://api.berget.ai/v1",
       "capabilities": {},
-      "description": "Swedish AI inference with privacy-focused, sovereign infrastructure.",
-      "models": [
-        {
-          "context_window": 256000,
-          "id": "moonshotai/Kimi-K2.6",
-          "max_output_tokens": 32000,
-          "name": "Kimi K2.6"
-        },
-        {
-          "context_window": 256000,
-          "id": "google/gemma-4-31B-it",
-          "max_output_tokens": 128000,
-          "name": "Gemma-4-31B-it"
-        },
-        {
-          "context_window": 200000,
-          "id": "zai-org/GLM-4.7-FP8",
-          "max_output_tokens": 128000,
-          "name": "GLM-4.7"
-        },
-        {
-          "context_window": 128000,
-          "id": "openai/gpt-oss-120b",
-          "max_output_tokens": 128000,
-          "name": "gpt-oss-120b"
-        },
-        {
-          "context_window": 128000,
-          "id": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
-          "max_output_tokens": 128000,
-          "name": "Mistral-Small-3.2-24B-Instruct-2506"
-        },
-        {
-          "context_window": 128000,
-          "id": "meta-llama/Llama-3.1-8B-Instruct",
-          "max_output_tokens": 128000,
-          "name": "Llama-3.1-8B-Instruct"
-        },
-        {
-          "context_window": 128000,
-          "id": "meta-llama/Llama-3.3-70B-Instruct",
-          "max_output_tokens": 128000,
-          "name": "Llama-3.3-70B-Instruct"
+      "connections": {
+        "api-key": {
+          "api": "openai-completions",
+          "auth": "api-key",
+          "base_url": "https://api.berget.ai/v1",
+          "label": "API key",
+          "models": [
+            {
+              "context_window": 256000,
+              "id": "moonshotai/Kimi-K2.6",
+              "max_output_tokens": 32000,
+              "name": "Kimi K2.6"
+            },
+            {
+              "context_window": 256000,
+              "id": "google/gemma-4-31B-it",
+              "max_output_tokens": 128000,
+              "name": "Gemma-4-31B-it"
+            },
+            {
+              "context_window": 200000,
+              "id": "zai-org/GLM-4.7-FP8",
+              "max_output_tokens": 128000,
+              "name": "GLM-4.7"
+            },
+            {
+              "context_window": 128000,
+              "id": "openai/gpt-oss-120b",
+              "max_output_tokens": 128000,
+              "name": "gpt-oss-120b"
+            },
+            {
+              "context_window": 128000,
+              "id": "mistralai/Mistral-Small-3.2-24B-Instruct-2506",
+              "max_output_tokens": 128000,
+              "name": "Mistral-Small-3.2-24B-Instruct-2506"
+            },
+            {
+              "context_window": 128000,
+              "id": "meta-llama/Llama-3.1-8B-Instruct",
+              "max_output_tokens": 128000,
+              "name": "Llama-3.1-8B-Instruct"
+            },
+            {
+              "context_window": 128000,
+              "id": "meta-llama/Llama-3.3-70B-Instruct",
+              "max_output_tokens": 128000,
+              "name": "Llama-3.3-70B-Instruct"
+            }
+          ]
         }
-      ],
+      },
+      "description": "Swedish AI inference with privacy-focused, sovereign infrastructure.",
       "name": "BergetAI",
       "thinking_modes": {}
     },
     "openai": {
-      "api": "openai-responses",
-      "base_url": "https://api.openai.com/v1",
       "capabilities": {
         "web_search": true
       },
-      "description": "Frontier models for powerful reasoning, coding, and general-purpose AI.",
-      "models": [
-        {
+      "connections": {
+        "api-key": {
+          "api": "openai-responses",
+          "auth": "api-key",
+          "base_url": "https://api.openai.com/v1",
           "capabilities": {
-            "extended_prompt_retention": true
+            "web_search": true
           },
-          "context_window": 1050000,
-          "description": "A new class of intelligence for coding and professional work.",
-          "id": "gpt-5.5",
-          "max_output_tokens": 128000,
-          "name": "gpt-5.5",
-          "thinking": {
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
-          }
+          "detail": "api-key",
+          "label": "API key",
+          "models": [
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 1050000,
+              "id": "gpt-5.5",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.5",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            },
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 1000000,
+              "id": "gpt-5.4",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.4",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            },
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 400000,
+              "id": "gpt-5.4-mini",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.4-mini",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            },
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 400000,
+              "id": "gpt-5.4-nano",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.4-nano",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            },
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 400000,
+              "id": "gpt-5.3-codex",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.3-codex",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            },
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 400000,
+              "id": "gpt-5.2-codex",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.2-codex",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            },
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 400000,
+              "id": "gpt-5.2",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.2",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            },
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 400000,
+              "id": "gpt-5.1-codex",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.1-codex",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            },
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 400000,
+              "id": "gpt-5.1",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.1",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            },
+            {
+              "capabilities": {
+                "extended_prompt_retention": true
+              },
+              "context_window": 400000,
+              "id": "gpt-5",
+              "max_output_tokens": 128000,
+              "name": "gpt-5",
+              "thinking": {
+                "modes": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            },
+            {
+              "context_window": 400000,
+              "id": "gpt-5-mini",
+              "max_output_tokens": 128000,
+              "name": "gpt-5-mini",
+              "thinking": {
+                "modes": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            },
+            {
+              "context_window": 400000,
+              "id": "gpt-5-nano",
+              "max_output_tokens": 128000,
+              "name": "gpt-5-nano",
+              "thinking": {
+                "modes": [
+                  "low",
+                  "medium",
+                  "high"
+                ]
+              }
+            }
+          ]
         },
-        {
+        "oauth": {
+          "api": "openai-codex-responses",
+          "auth": "oauth",
+          "base_url": "https://chatgpt.com/backend-api/codex",
           "capabilities": {
-            "extended_prompt_retention": true
+            "extended_prompt_retention": true,
+            "web_search": true
           },
-          "context_window": 1000000,
-          "description": "A more affordable model for coding and professional work.",
-          "id": "gpt-5.4",
-          "max_output_tokens": 128000,
-          "name": "gpt-5.4",
-          "thinking": {
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
-          }
-        },
-        {
-          "capabilities": {
-            "extended_prompt_retention": true
-          },
-          "context_window": 400000,
-          "description": "OpenAI's strongest mini model yet for coding, computer use, and subagents",
-          "id": "gpt-5.4-mini",
-          "max_output_tokens": 128000,
-          "name": "gpt-5.4-mini",
-          "thinking": {
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
-          }
-        },
-        {
-          "capabilities": {
-            "extended_prompt_retention": true
-          },
-          "context_window": 400000,
-          "description": "OpenAI's cheapest GPT-5.4-class model for simple high-volume tasks",
-          "id": "gpt-5.4-nano",
-          "max_output_tokens": 128000,
-          "name": "gpt-5.4-nano",
-          "thinking": {
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
-          }
-        },
-        {
-          "capabilities": {
-            "extended_prompt_retention": true
-          },
-          "context_window": 400000,
-          "id": "gpt-5.3-codex",
-          "max_output_tokens": 128000,
-          "name": "gpt-5.3-codex",
-          "thinking": {
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
-          }
-        },
-        {
-          "capabilities": {
-            "extended_prompt_retention": true
-          },
-          "context_window": 400000,
-          "id": "gpt-5.2-codex",
-          "max_output_tokens": 128000,
-          "name": "gpt-5.2-codex",
-          "thinking": {
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
-          }
-        },
-        {
-          "capabilities": {
-            "extended_prompt_retention": true
-          },
-          "context_window": 400000,
-          "id": "gpt-5.2",
-          "max_output_tokens": 128000,
-          "name": "gpt-5.2",
-          "thinking": {
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high",
-              "xhigh"
-            ]
-          }
-        },
-        {
-          "capabilities": {
-            "extended_prompt_retention": true
-          },
-          "context_window": 400000,
-          "id": "gpt-5.1-codex",
-          "max_output_tokens": 128000,
-          "name": "gpt-5.1-codex",
-          "thinking": {
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
-          }
-        },
-        {
-          "capabilities": {
-            "extended_prompt_retention": true
-          },
-          "context_window": 400000,
-          "id": "gpt-5.1",
-          "max_output_tokens": 128000,
-          "name": "gpt-5.1",
-          "thinking": {
-            "modes": [
-              "none",
-              "low",
-              "medium",
-              "high"
-            ]
-          }
-        },
-        {
-          "capabilities": {
-            "extended_prompt_retention": true
-          },
-          "context_window": 400000,
-          "id": "gpt-5",
-          "max_output_tokens": 128000,
-          "name": "gpt-5",
-          "thinking": {
-            "modes": [
-              "low",
-              "medium",
-              "high"
-            ]
-          }
-        },
-        {
-          "context_window": 400000,
-          "id": "gpt-5-mini",
-          "max_output_tokens": 128000,
-          "name": "gpt-5-mini",
-          "thinking": {
-            "modes": [
-              "low",
-              "medium",
-              "high"
-            ]
-          }
-        },
-        {
-          "context_window": 400000,
-          "id": "gpt-5-nano",
-          "max_output_tokens": 128000,
-          "name": "gpt-5-nano",
-          "thinking": {
-            "modes": [
-              "low",
-              "medium",
-              "high"
-            ]
-          }
+          "detail": "pro/plus",
+          "label": "ChatGPT Plus/Pro",
+          "models": [
+            {
+              "context_window": 1050000,
+              "id": "gpt-5.5",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.5",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
+              "id": "gpt-5.4",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.4",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            },
+            {
+              "context_window": 400000,
+              "id": "gpt-5.4-mini",
+              "max_output_tokens": 128000,
+              "name": "gpt-5.4-mini",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh"
+                ]
+              }
+            }
+          ]
         }
-      ],
+      },
+      "description": "Frontier models for powerful reasoning, coding, and general-purpose AI.",
       "name": "OpenAI",
       "thinking_modes": {
         "high": {

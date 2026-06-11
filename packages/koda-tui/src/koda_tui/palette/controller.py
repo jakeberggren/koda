@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda.llm.auth.registry import ProviderAuthRegistry
 from koda_common.logging import get_logger
 from koda_tui.palette.menus.models import ModelMenu
 from koda_tui.palette.menus.providers import ProviderMenu
@@ -28,14 +29,14 @@ class PaletteController:
         self._app = app
         self._settings = app.app_settings
         self.root = RootMenu(app.state)
-        self.providers = ProviderMenu(app)
+        self.providers = ProviderMenu(app, ProviderAuthRegistry.default())
         self.models = ModelMenu(app)
         self.thinking = ThinkingMenu(app)
         self.sessions = SessionMenu(app)
 
     def _execute_with_param(self, base_id: str, param: str, data: Any) -> None:
         match base_id:
-            case "select_provider":
+            case "select_provider" | "select_provider_connection":
                 self.providers.select(data)
             case "select_model":
                 self.models.select(data)

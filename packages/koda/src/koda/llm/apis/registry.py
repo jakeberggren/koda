@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda.llm import exceptions
+from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.completions import OpenAICompletionsAPI
 from koda.llm.apis.messages import AnthropicMessagesAPI
 from koda.llm.apis.responses import OpenAIResponsesAPI
@@ -26,6 +27,7 @@ class LLMApiRegistry:
         return cls(
             {
                 "anthropic-messages": AnthropicMessagesAPI.from_context,
+                "openai-codex-responses": OpenAICodexResponsesAPI.from_context,
                 "openai-completions": OpenAICompletionsAPI.from_context,
                 "openai-responses": OpenAIResponsesAPI.from_context,
             }

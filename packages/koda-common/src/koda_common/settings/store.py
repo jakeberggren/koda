@@ -1,8 +1,11 @@
 import json
 from pathlib import Path
 
+from pydantic import TypeAdapter
+
 from koda_common.logging.config import get_logger
 from koda_common.paths import config_file_path, secrets_file_path
+from koda_common.settings.credentials import ProviderCredential
 from koda_common.settings.errors import (
     SecretsDecodeError,
     SecretsPermissionError,
@@ -13,6 +16,8 @@ from koda_common.settings.errors import (
 from koda_common.settings.protocols import JsonObject, SecretsStore, SettingsStore
 
 log = get_logger(__name__)
+
+_PROVIDER_CREDENTIAL_ADAPTER = TypeAdapter(ProviderCredential)
 
 
 class JsonFileSettingsStore(SettingsStore):
@@ -94,17 +99,20 @@ class JsonFileSecretsStore(SecretsStore):
     def validate(self) -> None:
         self._load_data()
 
-    def get_key(self, key: str) -> str | None:
+    def get_credential(self, provider: str) -> ProviderCredential | None:
         data = self._load_data()
-        return data.get(key)
+        raw = data.get(provider)
+        if raw is None:
+            return None
+        return _PROVIDER_CREDENTIAL_ADAPTER.validate_python(raw)
 
-    def set_key(self, key: str, value: str) -> None:
+    def set_credential(self, provider: str, credential: ProviderCredential) -> None:
         data = self._load_data()
-        data[key] = value
+        data[provider] = _PROVIDER_CREDENTIAL_ADAPTER.dump_python(credential, mode="json")
         self._save_data(data)
 
-    def delete_key(self, key: str) -> None:
+    def delete_credential(self, provider: str) -> None:
         data = self._load_data()
-        if key in data:
-            del data[key]
+        if provider in data:
+            del data[provider]
             self._save_data(data)

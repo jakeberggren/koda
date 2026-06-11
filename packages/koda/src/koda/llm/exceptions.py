@@ -94,6 +94,34 @@ class ApiKeyNotConfiguredError(LLMConfigurationError):
         super().__init__(f"{backend_name} API key not configured")
 
 
+class ProviderCredentialNotConfiguredError(LLMConfigurationError):
+    """Provider credential is not configured."""
+
+    def __init__(self, backend_name: str) -> None:
+        super().__init__(f"{backend_name} credential not configured")
+
+
+class ApiKeyCredentialRequiredError(LLMConfigurationError):
+    """Provider is configured with a non-API-key credential."""
+
+    def __init__(self, backend_name: str) -> None:
+        super().__init__(f"{backend_name} requires an API key credential")
+
+
+class OAuthCredentialRequiredError(LLMConfigurationError):
+    """Provider is configured with a non-OAuth credential."""
+
+    def __init__(self, backend_name: str) -> None:
+        super().__init__(f"{backend_name} requires an OAuth credential")
+
+
+class OAuthAccountIdMissingError(LLMConfigurationError):
+    """OAuth credential must include an account id."""
+
+    def __init__(self, backend_name: str) -> None:
+        super().__init__(f"{backend_name} OAuth credential must include an account id")
+
+
 class EmptyMessagesListError(LLMValidationError):
     """Messages list cannot be empty."""
 
@@ -206,3 +234,13 @@ class ModelThinkingModeNotConfiguredError(ModelConfigurationError):
         self.model_id = model_id
         self.provider_name = provider_name
         self.thinking_mode = thinking_mode
+
+
+class ModelRouteNotConfiguredError(ModelConfigurationError):
+    def __init__(self, model_id: str, provider_name: str) -> None:
+        super().__init__(
+            f"Model '{model_id}' for provider {provider_name} does not reference any "
+            "configured route"
+        )
+        self.model_id = model_id
+        self.provider_name = provider_name

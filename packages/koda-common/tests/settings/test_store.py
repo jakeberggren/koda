@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from koda_common.settings import SecretsDecodeError, SettingsDecodeError, SettingsStructureError
+from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential
 from koda_common.settings.store import JsonFileSecretsStore, JsonFileSettingsStore
 
 if TYPE_CHECKING:
@@ -80,35 +81,69 @@ def test_json_store_load_raises_on_non_object_section(tmp_path: Path) -> None:
     assert exc_info.value.message == "Settings section 'core' must be an object"
 
 
-def test_json_file_secrets_store_get_returns_none_when_missing(tmp_path: Path) -> None:
+def test_json_file_secrets_store_get_credential_returns_none_when_missing(tmp_path: Path) -> None:
     store = JsonFileSecretsStore(tmp_path / "secrets.json")
-    assert store.get_key("openai") is None
+    assert store.get_credential("openai") is None
 
 
-def test_json_file_secrets_store_set_creates_file_and_persists_value(tmp_path: Path) -> None:
+def test_json_file_secrets_store_set_credential_persists_api_key(tmp_path: Path) -> None:
     path = tmp_path / "config" / "koda" / "secrets.json"
     store = JsonFileSecretsStore(path)
 
-    store.set_key("openai", "sk-secret")
+    credential = ApiKeyCredential(type="api_key", value="sk-secret")
+    store.set_credential("openai", credential)
 
-    assert json.loads(path.read_text()) == {"openai": "sk-secret"}
-    assert store.get_key("openai") == "sk-secret"
+    assert json.loads(path.read_text()) == {"openai": {"type": "api_key", "value": "sk-secret"}}
+    assert store.get_credential("openai") == credential
 
 
-def test_json_file_secrets_store_delete_removes_existing_key(tmp_path: Path) -> None:
-    path = tmp_path / "secrets.json"
-    path.write_text('{"openai": "sk-secret", "anthropic": "sk-other"}')
+def test_json_file_secrets_store_set_credential_persists_oauth(tmp_path: Path) -> None:
+    path = tmp_path / "config" / "koda" / "secrets.json"
     store = JsonFileSecretsStore(path)
 
-    store.delete_key("openai")
+    credential = OAuthCredential(
+        type="oauth",
+        access_token="dummy-access-token",  # noqa: S106
+        refresh_token="dummy-refresh-token",  # noqa: S106
+        expires_at="2026-05-27T12:00:00Z",
+        metadata={"chatgpt_account_id": "account-id"},
+    )
 
-    assert json.loads(path.read_text()) == {"anthropic": "sk-other"}
-    assert store.get_key("openai") is None
+    store.set_credential("openai-codex", credential)
+
+    assert json.loads(path.read_text()) == {
+        "openai-codex": {
+            "type": "oauth",
+            "access_token": "dummy-access-token",
+            "refresh_token": "dummy-refresh-token",
+            "expires_at": "2026-05-27T12:00:00Z",
+            "metadata": {"chatgpt_account_id": "account-id"},
+        }
+    }
+    assert store.get_credential("openai-codex") == credential
+
+
+def test_json_file_secrets_store_delete_removes_existing_credential(tmp_path: Path) -> None:
+    path = tmp_path / "secrets.json"
+    path.write_text(
+        json.dumps(
+            {
+                "openai": {"type": "api_key", "value": "sk-secret"},
+                "anthropic": {"type": "api_key", "value": "sk-other"},
+            }
+        )
+    )
+    store = JsonFileSecretsStore(path)
+
+    store.delete_credential("openai")
+
+    assert json.loads(path.read_text()) == {"anthropic": {"type": "api_key", "value": "sk-other"}}
+    assert store.get_credential("openai") is None
 
 
 def test_json_file_secrets_store_delete_missing_file_is_noop(tmp_path: Path) -> None:
     store = JsonFileSecretsStore(tmp_path / "secrets.json")
-    store.delete_key("openai")
+    store.delete_credential("openai")
 
 
 def test_json_file_secrets_store_validate_raises_on_invalid_json(tmp_path: Path) -> None:

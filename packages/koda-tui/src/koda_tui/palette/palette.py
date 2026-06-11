@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_tui.overlays.dialogs import ConfirmDialog, TextInputDialog
+from koda_tui.overlays.dialogs import (
+    ChoiceDialog,
+    ConfirmDialog,
+    DialogChoice,
+    MessageDialog,
+    TextInputDialog,
+)
 from koda_tui.overlays.manager import OverlayManager
 from koda_tui.palette.controller import PaletteController
 from koda_tui.palette.overlay import PaletteOverlay
@@ -98,6 +104,7 @@ class Palette:
         title: str,
         on_submit: Callable[[str], None],
         *,
+        detail: str | None = None,
         mask_input: bool = False,
     ) -> None:
         """Open a palette-owned text input dialog."""
@@ -108,9 +115,12 @@ class Palette:
             title=title,
             on_submit=on_submit,
             on_cancel=self.close_top_overlay,
+            detail=detail,
             mask_input=mask_input,
         )
         self._overlay_manager.push(dialog, width=dialog.preferred_width)
+        self.state.palette_open = True
+        self.invalidate()
 
     def open_confirm(
         self,
@@ -127,6 +137,40 @@ class Palette:
             on_cancel=self.close_top_overlay,
         )
         self._overlay_manager.push(dialog, width=dialog.preferred_width)
+        self.state.palette_open = True
+        self.invalidate()
+
+    def open_choice(
+        self,
+        message: str,
+        choices: list[DialogChoice],
+    ) -> None:
+        """Open a palette-owned choice dialog."""
+        if self._overlay_manager is None:
+            return
+
+        dialog = ChoiceDialog(
+            message=message,
+            choices=choices,
+            on_cancel=self.close_top_overlay,
+        )
+        self._overlay_manager.push(dialog, width=dialog.preferred_width)
+        self.state.palette_open = True
+        self.invalidate()
+
+    def open_message(self, title: str, detail: str) -> None:
+        """Open a palette-owned non-input message dialog."""
+        if self._overlay_manager is None:
+            return
+
+        dialog = MessageDialog(
+            title=title,
+            detail=detail,
+            on_close=self.close_top_overlay,
+        )
+        self._overlay_manager.push(dialog, width=dialog.preferred_width)
+        self.state.palette_open = True
+        self.invalidate()
 
     def close_top_overlay(self) -> None:
         """Close the top palette overlay or dialog."""
