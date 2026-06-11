@@ -47,15 +47,17 @@ For more information, see [kit/README.md](kit/README.md).
 
 ## Models and Providers
 
-Koda ships with a bundled `models.json` model catalog and uses your own provider API keys.
+Koda ships with a bundled `models.json` model catalog. You can connect with your own
+provider API keys (BYOK), or sign in with a ChatGPT Plus/Pro subscription for OpenAI model access.
 
 Built-in providers:
 
-| Provider | API adapter |
-| -------- | ----------- |
-| Anthropic | `anthropic-messages` |
-| BergetAI | `openai-completions` |
-| OpenAI | `openai-responses` |
+| Provider | Connection | API |
+| -------- | ---------- | ----------- |
+| Anthropic | API key | `anthropic-messages` |
+| BergetAI | API key | `openai-completions` |
+| OpenAI | API key | `openai-responses` |
+| OpenAI | ChatGPT Plus/Pro OAuth | `openai-codex-responses` |
 
 Note that the bundled catalog will grow over time with more providers and models to come shortly.
 
