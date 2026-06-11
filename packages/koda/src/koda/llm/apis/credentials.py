@@ -56,6 +56,9 @@ async def resolve_oauth_credential(context: LLMApiContext) -> OAuthCredential:
         return credential
 
     auth = context.auth_registry.get(credential_key)
-    refreshed = await auth.refresh(credential)
+    try:
+        refreshed = await auth.refresh(credential)
+    except Exception as error:
+        raise exceptions.LLMAuthenticationError(context.provider_id, error) from error
     context.settings.set_credential(credential_key, refreshed)
     return refreshed

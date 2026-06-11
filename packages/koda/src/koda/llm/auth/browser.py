@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from koda.llm.auth.callback import OAuthCallbackListener, extract_callback_code
-from koda.llm.auth.exceptions import OAuthCallbackCancelledError
+from koda.llm.auth.exceptions import OAuthCallbackCancelledError, OAuthCallbackRedirectError
 
 if TYPE_CHECKING:
     from koda.llm.auth.protocols import OAuthLoginCallbacks
@@ -19,6 +19,7 @@ class AuthorizationRequest:
     """Browser authorization URL and state needed to complete the code flow."""
 
     url: str
+    redirect_uri: str
     state: str
     code_verifier: str
     nonce: str | None = None
@@ -33,11 +34,26 @@ class LoopbackRedirect:
     path: str
 
 
+def _matches_redirect(callback_url: str, redirect_uri: str) -> bool:
+    callback = urlparse(callback_url)
+    expected = urlparse(redirect_uri)
+    return (
+        callback.scheme.lower() == expected.scheme.lower()
+        and callback.hostname == expected.hostname
+        and callback.port == expected.port
+        and callback.path == expected.path
+        and callback.username is None
+        and callback.password is None
+    )
+
+
 def extract_authorization_code(request: AuthorizationRequest, callback_url: str) -> str:
     """Extract an authorization code from a pasted callback URL."""
 
-    query = urlparse(callback_url.strip()).query
-    return extract_callback_code(query, expected_state=request.state)
+    callback_url = callback_url.strip()
+    if not _matches_redirect(callback_url, request.redirect_uri):
+        raise OAuthCallbackRedirectError
+    return extract_callback_code(urlparse(callback_url).query, expected_state=request.state)
 
 
 async def complete_browser_authorization(

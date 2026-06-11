@@ -39,8 +39,13 @@ class _FakeSettings:
 class _FakeAuthProvider:
     id = "openai:oauth"
 
-    def __init__(self, refreshed: OAuthCredential | None = None) -> None:
+    def __init__(
+        self,
+        refreshed: OAuthCredential | None = None,
+        refresh_error: Exception | None = None,
+    ) -> None:
         self.refreshed = refreshed
+        self.refresh_error = refresh_error
         self.refresh_calls: list[OAuthCredential] = []
 
     async def login(self, callbacks: object) -> OAuthCredential:
@@ -49,6 +54,8 @@ class _FakeAuthProvider:
 
     async def refresh(self, credential: OAuthCredential) -> OAuthCredential:
         self.refresh_calls.append(credential)
+        if self.refresh_error is not None:
+            raise self.refresh_error
         return self.refreshed or credential
 
 
@@ -202,3 +209,27 @@ async def test_codex_responses_factory_refreshes_expired_oauth_credential(
         "chatgpt-account-id": "fresh-account-id",
         "originator": CODEX_ORIGINATOR,
     }
+
+
+async def test_codex_responses_factory_translates_oauth_refresh_failure() -> None:
+    expired = OAuthCredential(
+        type="oauth",
+        access_token="expired-access-token",  # noqa: S106
+        refresh_token="old-refresh-token",  # noqa: S106
+        expires_at="1",
+    )
+    context = _context(expired)
+    context = LLMApiContext(
+        provider_id=context.provider_id,
+        provider=context.provider,
+        connection_id=context.connection_id,
+        connection=context.connection,
+        model=context.model,
+        settings=context.settings,
+        auth_registry=ProviderAuthRegistry(
+            {"openai:oauth": _FakeAuthProvider(refresh_error=RuntimeError("refresh failed"))}
+        ),
+    )
+
+    with pytest.raises(exceptions.LLMAuthenticationError, match="refresh failed"):
+        await OpenAICodexResponsesAPI.from_context(context)

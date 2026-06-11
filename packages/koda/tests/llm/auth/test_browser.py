@@ -11,13 +11,18 @@ from koda.llm.auth.browser import (
     complete_browser_authorization,
     extract_authorization_code,
 )
-from koda.llm.auth.exceptions import OAuthCallbackCodeMissingError, OAuthCallbackStateError
+from koda.llm.auth.exceptions import (
+    OAuthCallbackCodeMissingError,
+    OAuthCallbackRedirectError,
+    OAuthCallbackStateError,
+)
 from koda.llm.auth.protocols import OAuthLoginCallbacks
 
 
 def _request() -> AuthorizationRequest:
     return AuthorizationRequest(
         url="https://auth.example/login",
+        redirect_uri="http://localhost/callback",
         state="expected-state",
         nonce="expected-nonce",
         code_verifier="verifier",
@@ -36,7 +41,7 @@ def test_extract_authorization_code_from_callback_url() -> None:
 @pytest.mark.parametrize(
     ("value", "error"),
     [
-        ("auth-code", OAuthCallbackStateError),
+        ("auth-code", OAuthCallbackRedirectError),
         ("http://localhost/callback?state=expected-state", OAuthCallbackCodeMissingError),
         (
             "http://localhost/callback?code=auth-code&state=wrong-state",
@@ -49,6 +54,18 @@ def test_extract_authorization_code_rejects_invalid_callback(
     error: type[Exception],
 ) -> None:
     with pytest.raises(error):
+        extract_authorization_code(_request(), value)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "https://example.com/callback?code=auth-code&state=expected-state",
+        "http://localhost/other?code=auth-code&state=expected-state",
+    ],
+)
+def test_extract_authorization_code_rejects_unexpected_redirect(value: str) -> None:
+    with pytest.raises(OAuthCallbackRedirectError):
         extract_authorization_code(_request(), value)
 
 

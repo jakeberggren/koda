@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 
 from koda.agent import Agent, AgentConfig
@@ -37,6 +38,7 @@ class LocalRuntime:
         self.warnings = warnings
         self.llm_factory = LLMFactory(catalog)
         self.agent: Agent | None = None
+        self._agent_lock = asyncio.Lock()
 
     def update_settings(self, settings: SettingsManager) -> None:
         """Replace settings and invalidate runtime objects derived from them."""
@@ -89,5 +91,8 @@ class LocalRuntime:
     async def get_agent(self) -> Agent:
         """Return the cached Agent, creating it on first use."""
         if self.agent is None:
-            self.agent = self.create_agent(await self.create_llm())
+            # OAuth refresh tokens may rotate, so concurrent initialization must refresh only once.
+            async with self._agent_lock:
+                if self.agent is None:
+                    self.agent = self.create_agent(await self.create_llm())
         return self.agent

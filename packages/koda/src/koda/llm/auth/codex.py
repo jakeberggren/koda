@@ -126,6 +126,7 @@ def create_authorization_request(*, originator: str = "koda") -> AuthorizationRe
     )
     return AuthorizationRequest(
         url=url,
+        redirect_uri=REDIRECT_URI,
         state=state,
         nonce=nonce,
         code_verifier=code_verifier,

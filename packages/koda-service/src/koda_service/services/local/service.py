@@ -72,9 +72,9 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
 
         if request.session_id is not None:
             self.switch_session(request.session_id)
-        agent = await self.runtime.get_agent()
 
         try:
+            agent = await self.runtime.get_agent()
             async for event in agent.run(request.message):
                 yield event
         except llm_exceptions.LLMError as error:

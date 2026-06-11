@@ -30,6 +30,13 @@ class OAuthCallbackCodeMissingError(OAuthCallbackError):
         super().__init__("Missing authorization code")
 
 
+class OAuthCallbackRedirectError(OAuthCallbackError):
+    """Raised when a pasted callback URL does not match the expected redirect."""
+
+    def __init__(self) -> None:
+        super().__init__("OAuth callback URL does not match the expected redirect")
+
+
 class AuthNameEmptyError(Exception):
     """Raised when an auth provider id is empty."""
 
