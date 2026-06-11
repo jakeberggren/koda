@@ -48,7 +48,7 @@ For more information, see [kit/README.md](kit/README.md).
 ## Models and Providers
 
 Koda ships with a bundled `models.json` model catalog. You can connect with your own
-provider API keys (BYOK), or sign in in with a ChatGPT Plus/Pro subscription for OpenAI model access.
+provider API keys (BYOK), or sign in with a ChatGPT Plus/Pro subscription for OpenAI model access.
 
 Built-in providers:
 
