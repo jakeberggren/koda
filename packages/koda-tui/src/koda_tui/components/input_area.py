@@ -20,7 +20,7 @@ from prompt_toolkit.completion import (
 )
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.document import Document
-from prompt_toolkit.layout import BufferControl, UIContent, Window
+from prompt_toolkit.layout import BufferControl, HSplit, UIContent, Window
 from prompt_toolkit.layout.dimension import Dimension
 from prompt_toolkit.layout.margins import Margin
 from prompt_toolkit.layout.processors import explode_text_fragments
@@ -86,11 +86,11 @@ class _IgnoreMatcher:
         return self._spec.match_file(match_path)
 
 
-class _PromptMargin(Margin):
-    """Renders the prompt character on every visible line."""
+class _InputPaddingMargin(Margin):
+    """Renders left padding inside the input background block."""
 
     def get_width(self, get_ui_content: Callable[[], UIContent]) -> int:  # noqa: ARG002
-        return 2
+        return 1
 
     def create_margin(
         self,
@@ -98,9 +98,7 @@ class _PromptMargin(Margin):
         width: int,  # noqa: ARG002
         height: int,  # noqa: ARG002
     ) -> StyleAndTextTuples:
-        fragments = []
-        fragments.extend(("class:prompt", "▌\n") for _ in range(window_render_info.window_height))
-        return fragments
+        return [("class:input-area", " \n") for _ in range(window_render_info.window_height)]
 
 
 class _WorkspaceFileCompleter(Completer):
@@ -438,8 +436,8 @@ class _WordWrapBufferControl(BufferControl):
 class InputArea:
     """Dynamic-height input area that grows with content."""
 
-    # Account for prompt (2) and scrollbar (1)
-    DEFAULT_WIDTH_OFFSET = 3
+    # Account for left padding (1) and optional scrollbar margin (1).
+    DEFAULT_WIDTH_OFFSET = 2
     MIN_HEIGHT = 1
     MAX_HEIGHT = 10
     FILE_DISCOVERY_MAX_RESULTS = 10
@@ -476,7 +474,7 @@ class InputArea:
         if self._window and self._window.render_info is not None:
             return max(1, self._window.render_info.window_width)
 
-        width_offset = self.DEFAULT_WIDTH_OFFSET if self._state.show_scrollbar else 2
+        width_offset = self.DEFAULT_WIDTH_OFFSET if self._state.show_scrollbar else 1
         return max(1, shutil.get_terminal_size().columns - width_offset)
 
     def _sync_wrapped_lines(self) -> None:
@@ -646,16 +644,19 @@ class InputArea:
         height = max(self.MIN_HEIGHT, min(line_count, self.MAX_HEIGHT))
         return Dimension(min=self.MIN_HEIGHT, max=self.MAX_HEIGHT, preferred=height)
 
-    def create_window(self) -> Window:
-        """Create the input window with buffer control."""
+    def create_window(self) -> HSplit:
+        """Create the input window with block padding and buffer control."""
         self._window = Window(
             content=self._control,
             height=self.get_height,
             wrap_lines=False,
             dont_extend_height=True,
-            left_margins=[_PromptMargin()],
+            style="class:input-area",
+            left_margins=[_InputPaddingMargin()],
         )
-        return self._window
+        top_padding = Window(height=1, char=" ", style="class:input-area")
+        bottom_padding = Window(height=1, char=" ", style="class:input-area")
+        return HSplit([top_padding, self._window, bottom_padding])
 
     def get_text(self) -> str:
         """Get current input text."""

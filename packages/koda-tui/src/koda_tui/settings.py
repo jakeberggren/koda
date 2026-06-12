@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -11,6 +11,7 @@ from koda_common.settings import (
     SettingsUnknownKeysError,
     SettingsValidationError,
 )
+from koda_tui.theme import ThemeSetting  # noqa: TC001 - pydantic resolves this at runtime
 
 if TYPE_CHECKING:
     from koda_common.settings.protocols import JsonObject, SettingsStore
@@ -30,7 +31,7 @@ class TuiSettings(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    theme: Literal["dark", "light"] = Field(default="dark", description="UI theme")
+    theme: ThemeSetting = Field(default="auto", description="UI theme")
     show_scrollbar: bool = Field(default=True, description="Show chat scrollbar")
     queue_inputs: bool = Field(default=True, description="Queue inputs during streaming")
 

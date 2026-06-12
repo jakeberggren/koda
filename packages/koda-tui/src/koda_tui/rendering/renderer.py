@@ -19,23 +19,18 @@ from koda_tui.state import Message, MessageRole
 Theme = Literal["dark", "light"]
 type DiffBlockType = Literal["add", "del", "context"]
 
-# Per-theme rendering constants
 _THEME_COLORS = {
     "dark": {
         "code_theme": "ansi_dark",
-        "user_fg": "#ffffff",
         "user_bg": "gray30",
         "diff_add_bg": "dark_green",
         "diff_del_bg": "dark_red",
-        "quote_prefix": "magenta",
     },
     "light": {
         "code_theme": "ansi_light",
-        "user_fg": "grey0",
         "user_bg": "grey89",
         "diff_add_bg": "#d4edda",
         "diff_del_bg": "#f8d7da",
-        "quote_prefix": "magenta",
     },
 }
 
@@ -194,22 +189,29 @@ def _create_themed_markdown(code_theme: str) -> type:
     return _Markdown
 
 
-class QuotedContent:
-    """Wraps a renderable with quoted prefix and full-width background."""
+class BlockContent:
+    """Wraps a renderable with a full-width background."""
 
-    def __init__(self, renderable, *, bg_color: str, prefix_color: str) -> None:
+    _LEFT_PADDING = 1
+
+    def __init__(self, renderable, *, bg_color: str) -> None:
         self.renderable = renderable
         self._bg_style = Style(bgcolor=bg_color)
-        self._prefix_style = Style(color=prefix_color)
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        render_options = options.update(width=options.max_width - 2)
+        render_options = options.update(width=max(1, options.max_width - self._LEFT_PADDING))
         lines = console.render_lines(self.renderable, render_options)
         new_line = Segment("\n")
+        full_width_padding = Segment(" " * options.max_width, self._bg_style)
+        left_padding = Segment(" " * self._LEFT_PADDING, self._bg_style)
+
+        # One full-width blank row above the message.
+        yield full_width_padding
+        yield new_line
 
         for line in lines:
-            yield Segment("▌ ", self._prefix_style)
-            line_width = 2
+            yield left_padding
+            line_width = self._LEFT_PADDING
             for seg in line:
                 if seg.text:
                     style = seg.style + self._bg_style if seg.style else self._bg_style
@@ -219,6 +221,10 @@ class QuotedContent:
             if padding > 0:
                 yield Segment(" " * padding, self._bg_style)
             yield new_line
+
+        # One full-width blank row below the message.
+        yield full_width_padding
+        yield new_line
 
 
 class MessageRenderer:
@@ -449,17 +455,10 @@ class MessageRenderer:
             case MessageRole.USER:
                 user_content = self._markdown_cls(
                     message.content,
-                    style=Style(
-                        color=self._colors["user_fg"],
-                        bgcolor=self._colors["user_bg"],
-                    ),
+                    style=Style(bgcolor=self._colors["user_bg"]),
                 )
-                quoted_content = QuotedContent(
-                    user_content,
-                    bg_color=self._colors["user_bg"],
-                    prefix_color=self._colors["quote_prefix"],
-                )
-                return self.convert(quoted_content)
+                block_content = BlockContent(user_content, bg_color=self._colors["user_bg"])
+                return self.convert(block_content)
             case MessageRole.ASSISTANT:
                 return self._render_assistant_message(message)
             case MessageRole.TOOL if message.tool_call:

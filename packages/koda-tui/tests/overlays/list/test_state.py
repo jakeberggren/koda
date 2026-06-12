@@ -94,7 +94,7 @@ class TestGrouping:
             ListItem(id="new_session", label="New Session", group="Sessions"),
             ListItem(id="list_sessions", label="List Sessions", group="Sessions"),
             ListItem(id="switch_model", label="Switch Model", group="Agent"),
-            ListItem(id="toggle_theme", label="Toggle Theme", group="Appearance"),
+            ListItem(id="select_theme", label="Select Theme", group="Appearance"),
         ]
         state = ListState(items=items)
         state.move_selection(4)

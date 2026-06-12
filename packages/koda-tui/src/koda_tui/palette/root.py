@@ -56,9 +56,9 @@ class RootMenu:
                 group="Agent",
             ),
             ListItem(
-                id="toggle_theme",
-                label="Toggle Theme",
-                detail="Switch between dark and light mode",
+                id="select_theme",
+                label="Select Theme",
+                detail="Choose auto, light, or dark mode",
                 group="Appearance",
             ),
             ListItem(
