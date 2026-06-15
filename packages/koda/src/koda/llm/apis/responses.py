@@ -15,6 +15,7 @@ from openai.types.responses import (
     ResponseFunctionWebSearch,
     ResponseInputParam,
     ResponseOutputItemDoneEvent,
+    ResponseReasoningSummaryPartAddedEvent,
     ResponseReasoningSummaryTextDeltaEvent,
     ResponseStreamEvent,
     ResponseTextDeltaEvent,
@@ -253,9 +254,12 @@ class OpenAIResponsesEventAdapter:
         result = ToolResult(output=output, call_id=event.item.id)
         yield LLMToolCompleted(tool_name="web_search", result=result)
 
-    def to_llm_events(self, event: ResponseStreamEvent) -> Iterator[LLMEvent]:
+    def to_llm_events(self, event: ResponseStreamEvent) -> Iterator[LLMEvent]:  # noqa: C901
         if isinstance(event, ResponseTextDeltaEvent):
             yield LLMTextDelta(text=event.delta)
+        elif isinstance(event, ResponseReasoningSummaryPartAddedEvent):
+            if event.summary_index > 0:
+                yield LLMThinkingDelta(text="\n\n")
         elif isinstance(event, ResponseReasoningSummaryTextDeltaEvent):
             yield LLMThinkingDelta(text=event.delta)
         elif isinstance(event, ResponseWebSearchCallInProgressEvent):
