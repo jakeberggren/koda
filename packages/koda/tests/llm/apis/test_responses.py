@@ -8,6 +8,7 @@ from openai.types.responses import (
     ResponseCompletedEvent,
     ResponseFunctionToolCall,
     ResponseOutputItemDoneEvent,
+    ResponseReasoningSummaryPartAddedEvent,
 )
 
 from koda.llm.apis.responses import (
@@ -16,7 +17,12 @@ from koda.llm.apis.responses import (
     OpenAIResponsesAPIConfig,
     OpenAIResponsesEventAdapter,
 )
-from koda.llm.types import LLMRequest, LLMResponseCompleted, LLMToolCallRequested
+from koda.llm.types import (
+    LLMRequest,
+    LLMResponseCompleted,
+    LLMThinkingDelta,
+    LLMToolCallRequested,
+)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
@@ -117,3 +123,30 @@ async def test_generate_stream_emits_function_tool_call_once() -> None:
     assert streamed_events[0].call.call_id == "call_1"
     assert streamed_events[0].call.arguments == {"path": "foo.py"}
     assert isinstance(streamed_events[1], LLMResponseCompleted)
+
+
+def test_to_llm_events_separates_reasoning_summary_parts() -> None:
+    adapter = OpenAIResponsesEventAdapter()
+    first_part = ResponseReasoningSummaryPartAddedEvent.model_validate(
+        {
+            "item_id": "rs_1",
+            "output_index": 0,
+            "part": {"text": "", "type": "summary_text"},
+            "sequence_number": 0,
+            "summary_index": 0,
+            "type": "response.reasoning_summary_part.added",
+        }
+    )
+    second_part = ResponseReasoningSummaryPartAddedEvent.model_validate(
+        {
+            "item_id": "rs_1",
+            "output_index": 0,
+            "part": {"text": "", "type": "summary_text"},
+            "sequence_number": 1,
+            "summary_index": 1,
+            "type": "response.reasoning_summary_part.added",
+        }
+    )
+
+    assert list(adapter.to_llm_events(first_part)) == []
+    assert list(adapter.to_llm_events(second_part)) == [LLMThinkingDelta(text="\n\n")]
