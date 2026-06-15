@@ -90,7 +90,7 @@ class _InputPaddingMargin(Margin):
     """Renders left padding inside the input background block."""
 
     def get_width(self, get_ui_content: Callable[[], UIContent]) -> int:  # noqa: ARG002
-        return 1
+        return 3
 
     def create_margin(
         self,
@@ -98,7 +98,7 @@ class _InputPaddingMargin(Margin):
         width: int,  # noqa: ARG002
         height: int,  # noqa: ARG002
     ) -> StyleAndTextTuples:
-        return [("class:input-area", " \n") for _ in range(window_render_info.window_height)]
+        return [("class:prompt", " ❯ \n") for _ in range(window_render_info.window_height)]  # noqa: RUF001
 
 
 class _WorkspaceFileCompleter(Completer):
@@ -436,8 +436,8 @@ class _WordWrapBufferControl(BufferControl):
 class InputArea:
     """Dynamic-height input area that grows with content."""
 
-    # Account for left padding (1) and optional scrollbar margin (1).
-    DEFAULT_WIDTH_OFFSET = 2
+    # Account for left padding (3) and optional scrollbar margin (1).
+    DEFAULT_WIDTH_OFFSET = 4
     MIN_HEIGHT = 1
     MAX_HEIGHT = 10
     FILE_DISCOVERY_MAX_RESULTS = 10
@@ -474,7 +474,7 @@ class InputArea:
         if self._window and self._window.render_info is not None:
             return max(1, self._window.render_info.window_width)
 
-        width_offset = self.DEFAULT_WIDTH_OFFSET if self._state.show_scrollbar else 1
+        width_offset = self.DEFAULT_WIDTH_OFFSET if self._state.show_scrollbar else 3
         return max(1, shutil.get_terminal_size().columns - width_offset)
 
     def _sync_wrapped_lines(self) -> None:

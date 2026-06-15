@@ -15,20 +15,18 @@ from rich.text import Text
 
 from koda.tools import ToolCall
 from koda_tui.state import Message, MessageRole
+from koda_tui.theme import TerminalTheme, rgb_to_hex
 
-Theme = Literal["dark", "light"]
 type DiffBlockType = Literal["add", "del", "context"]
 
 _THEME_COLORS = {
     "dark": {
         "code_theme": "ansi_dark",
-        "user_bg": "gray30",
         "diff_add_bg": "dark_green",
         "diff_del_bg": "dark_red",
     },
     "light": {
         "code_theme": "ansi_light",
-        "user_bg": "grey89",
         "diff_add_bg": "#d4edda",
         "diff_del_bg": "#f8d7da",
     },
@@ -235,18 +233,20 @@ class MessageRenderer:
     prompt_toolkit FormattedText for display in TUI components.
     """
 
-    def __init__(self, width: int = 80, theme: Theme = "dark") -> None:
+    def __init__(self, theme: TerminalTheme, width: int = 80) -> None:
         self._width = width
-        self._colors = _THEME_COLORS[theme]
+        self._colors = _THEME_COLORS[theme.theme]
+        self._user_bg = rgb_to_hex(theme.surface)
         self._markdown_cls = _create_themed_markdown(self._colors["code_theme"])
 
     def set_width(self, width: int) -> None:
         """Update the rendering width."""
         self._width = width
 
-    def set_theme(self, theme: Theme) -> None:
-        """Switch the rendering theme."""
-        self._colors = _THEME_COLORS.get(theme, _THEME_COLORS["dark"])
+    def set_theme(self, theme: TerminalTheme) -> None:
+        """Switch the rendering theme and terminal-derived surface color."""
+        self._colors = _THEME_COLORS[theme.theme]
+        self._user_bg = rgb_to_hex(theme.surface)
         self._markdown_cls = _create_themed_markdown(self._colors["code_theme"])
 
     @staticmethod
@@ -455,9 +455,9 @@ class MessageRenderer:
             case MessageRole.USER:
                 user_content = self._markdown_cls(
                     message.content,
-                    style=Style(bgcolor=self._colors["user_bg"]),
+                    style=Style(bgcolor=self._user_bg),
                 )
-                block_content = BlockContent(user_content, bg_color=self._colors["user_bg"])
+                block_content = BlockContent(user_content, bg_color=self._user_bg)
                 return self.convert(block_content)
             case MessageRole.ASSISTANT:
                 return self._render_assistant_message(message)

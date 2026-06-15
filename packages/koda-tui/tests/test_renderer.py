@@ -34,6 +34,7 @@ class TestMessageRendererMessages:
         result = converter.render_message(message)
         content = "".join(t[1] for t in result)
         assert "Hello" in content
+        assert any("bg:#123456" in fragment[0] for fragment in result)
 
     def test_render_assistant_message(self, converter: MessageRenderer) -> None:
         """render_message() should render assistant messages as markdown."""

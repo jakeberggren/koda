@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, cast
 
 from prompt_toolkit import Application
 from prompt_toolkit.application.current import get_app_session
+from prompt_toolkit.output import ColorDepth
 
 from koda.llm import ThinkingOption
 from koda_tui.app.keybindings import create_keybindings
@@ -60,7 +61,7 @@ class KodaTuiApp:
         )
         self._closed = False
 
-        resolved_theme = resolve_theme(self._app_settings.tui.theme)
+        theme = resolve_theme(self._app_settings.tui.theme)
 
         # Initialize state
         self.state = AppState(
@@ -75,8 +76,7 @@ class KodaTuiApp:
         )
 
         # Initialize layout
-        self.layout = TUILayout(self.state)
-        self.layout.renderer.set_theme(resolved_theme)
+        self.layout = TUILayout(self.state, theme)
 
         # Application instance (created on run)
         self._app: Application[None] | None = None
@@ -107,6 +107,7 @@ class KodaTuiApp:
             key_bindings=create_keybindings(self),
             style=get_tui_style(resolve_theme(self._app_settings.tui.theme)),
             full_screen=True,
+            color_depth=ColorDepth.TRUE_COLOR,
             mouse_support=True,
             output=synced_output,
         )
@@ -136,10 +137,10 @@ class KodaTuiApp:
 
     def apply_theme(self) -> None:
         """Re-resolve and apply the current theme setting."""
-        resolved_theme = resolve_theme(self._app_settings.tui.theme)
+        theme = resolve_theme(self._app_settings.tui.theme)
         if self._app:
-            self._app.style = get_tui_style(resolved_theme)
-        self.layout.renderer.set_theme(resolved_theme)
+            self._app.style = get_tui_style(theme)
+        self.layout.renderer.set_theme(theme)
         self.layout.chat_area.clear_caches()
 
     def refresh_theme(self) -> None:
