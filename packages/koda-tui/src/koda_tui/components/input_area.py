@@ -98,7 +98,13 @@ class _InputPaddingMargin(Margin):
         width: int,  # noqa: ARG002
         height: int,  # noqa: ARG002
     ) -> StyleAndTextTuples:
-        return [("class:prompt", " ❯ \n") for _ in range(window_render_info.window_height)]  # noqa: RUF001
+        fragments: StyleAndTextTuples = []
+        for row in range(window_render_info.window_height):
+            if row == 0:
+                fragments.append(("class:prompt", " ❯ \n"))  # noqa: RUF001
+            else:
+                fragments.append(("class:prompt", "   \n"))
+        return fragments
 
 
 class _WorkspaceFileCompleter(Completer):
