@@ -33,14 +33,8 @@ class TestBasics:
         assert item_rows[0].text[0] == ("class:palette.item", "  ")
         assert item_rows[1].text[0] == ("class:palette.selected", "- ")
 
-    @pytest.mark.parametrize(
-        ("selected", "expected_style"),
-        [
-            (True, "class:palette.selected"),
-            (False, "class:palette.marker"),
-        ],
-    )
-    def test_marker_style(self, selected, expected_style) -> None:
+    @pytest.mark.parametrize("selected", [True, False])
+    def test_marker_style(self, selected) -> None:
         items = [
             _item("A"),
             _item("B", marker="*", marker_style="class:palette.current"),
@@ -50,7 +44,10 @@ class TestBasics:
             state.move_selection(1)
         rows = ListRenderer().render(state)
         item_rows = [r for r in rows if r.kind == RowKind.ITEM]
-        assert item_rows[1].text[0][0] == expected_style
+        expected_marker_style = "class:palette.selected" if selected else "class:palette.marker"
+        expected_label_style = "class:palette.selected" if selected else "class:palette.current"
+        assert item_rows[1].text[0][0] == expected_marker_style
+        assert item_rows[1].text[1][0] == expected_label_style
 
     def test_empty(self) -> None:
         rows = ListRenderer().render(ListState(items=[]))

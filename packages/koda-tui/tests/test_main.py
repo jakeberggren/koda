@@ -156,7 +156,7 @@ def test_report_startup_error_logs_and_prints(
     _report_startup_error(
         StartupConfigurationError(
             "Invalid configuration",
-            details=("theme: Input should be 'dark' or 'light'",),
+            details=("theme: Input should be 'auto', 'dark' or 'light'",),
         ),
         cast("BoundLogger", _LoggerStub()),
     )
@@ -164,7 +164,7 @@ def test_report_startup_error_logs_and_prints(
     captured = capsys.readouterr()
     assert captured.err == (
         "Application failed to start (StartupConfigurationError): "
-        "Invalid configuration\n- theme: Input should be 'dark' or 'light'\n"
+        "Invalid configuration\n- theme: Input should be 'auto', 'dark' or 'light'\n"
     )
 
 
@@ -201,7 +201,7 @@ def test_main_prints_startup_error_and_exits(
         monkeypatch,
         StartupConfigurationError(
             "Invalid configuration",
-            details=("theme: Input should be 'dark' or 'light'",),
+            details=("theme: Input should be 'auto', 'dark' or 'light'",),
         ),
     )
 

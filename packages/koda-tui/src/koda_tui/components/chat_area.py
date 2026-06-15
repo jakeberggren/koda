@@ -110,6 +110,11 @@ class ChatAreaControl(UIControl):
         """Height of the visible viewport."""
         return self._view_height
 
+    def clear_caches(self) -> None:
+        """Clear cached rendered chat fragments and wrapped lines."""
+        self._message_cache.clear()
+        self._lines_cache.clear()
+
     def _message_cache_key(self, message: Message) -> tuple:
         """Return cache key for a single message."""
         return (
@@ -253,6 +258,7 @@ class ChatAreaControl(UIControl):
         # rendering/wrapping work, so this iteration is cheap.
         if width != self._cached_width:
             self._renderer.set_width(width)
+            self.clear_caches()
             self._cached_width = width
 
         self._lines = self._rebuild_lines(width)
@@ -270,15 +276,15 @@ class ChatScrollbarMargin(Margin):
 
     SCROLLBAR_CHAR = "█"
     SCROLLBAR_LEFT_PADDING = " "
-    SCROLLBAR_TRACK = ("class:scrollbar.track", SCROLLBAR_LEFT_PADDING + SCROLLBAR_CHAR + "\n")
-    SCROLLBAR_THUMB = ("class:scrollbar.thumb", SCROLLBAR_LEFT_PADDING + SCROLLBAR_CHAR + "\n")
 
     def __init__(self, chat_control: ChatAreaControl, state: AppState) -> None:
         self._chat = chat_control
         self._state = state
 
     def get_width(self, get_ui_content: Callable[[], UIContent]) -> int:  # noqa: ARG002
-        return 2
+        if not self._state.show_scrollbar:
+            return 0
+        return 2 if self._chat.total_lines > self._chat.view_height else 0
 
     def create_margin(
         self,
@@ -303,11 +309,14 @@ class ChatScrollbarMargin(Margin):
         max_offset = total - view_height
         thumb_pos = (height - thumb_size) * offset // max_offset if max_offset > 0 else 0
 
-        result.extend(
-            self.SCROLLBAR_THUMB
-            if thumb_pos <= i < thumb_pos + thumb_size
-            else self.SCROLLBAR_TRACK
-            for i in range(height)
-        )
+        for i in range(height):
+            style = (
+                "class:scrollbar.thumb"
+                if thumb_pos <= i < thumb_pos + thumb_size
+                else "class:scrollbar.track"
+            )
+            result.append(("", self.SCROLLBAR_LEFT_PADDING))
+            result.append((style, self.SCROLLBAR_CHAR))
+            result.append(("", "\n"))
 
         return result

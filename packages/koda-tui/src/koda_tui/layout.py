@@ -21,6 +21,7 @@ from koda_tui.components import (
 )
 from koda_tui.rendering import MessageRenderer
 from koda_tui.state import AppState
+from koda_tui.theme import TerminalTheme
 
 SEPARATOR_HEIGHT = 1
 RESPONSE_INDICATOR_HEIGHT = 2
@@ -30,9 +31,9 @@ STATUS_BAR_HEIGHT = 1
 class TUILayout:
     """Manages the TUI layout composition."""
 
-    def __init__(self, state: AppState) -> None:
+    def __init__(self, state: AppState, theme: TerminalTheme) -> None:
         self._state = state
-        self.renderer = MessageRenderer()
+        self.renderer = MessageRenderer(theme)
 
         # Initialize components
         self.chat_area = ChatAreaControl(state, self.renderer)

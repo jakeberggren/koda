@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, cast
 
 from prompt_toolkit import Application
 from prompt_toolkit.application.current import get_app_session
+from prompt_toolkit.output import ColorDepth
 
 from koda.llm import ThinkingOption
 from koda_tui.app.keybindings import create_keybindings
@@ -12,9 +13,10 @@ from koda_tui.app.output import SynchronizedOutput
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
 from koda_tui.layout import TUILayout
+from koda_tui.osc import query_osc11
 from koda_tui.palette.palette import Palette
 from koda_tui.state import AppState
-from koda_tui.styles import get_style
+from koda_tui.theme import get_tui_style, resolve_theme
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -60,6 +62,9 @@ class KodaTuiApp:
         )
         self._closed = False
 
+        self._terminal_background = query_osc11()
+        theme = resolve_theme(self._app_settings.tui.theme, self._terminal_background)
+
         # Initialize state
         self.state = AppState(
             workspace_root=self._workspace_root,
@@ -73,8 +78,7 @@ class KodaTuiApp:
         )
 
         # Initialize layout
-        self.layout = TUILayout(self.state)
-        self.layout.renderer.set_theme(self._app_settings.tui.theme)
+        self.layout = TUILayout(self.state, theme)
 
         # Application instance (created on run)
         self._app: Application[None] | None = None
@@ -103,8 +107,11 @@ class KodaTuiApp:
         app = _KodaApplication(
             layout=self.layout.create_layout(),
             key_bindings=create_keybindings(self),
-            style=get_style(self._app_settings.tui.theme),
+            style=get_tui_style(
+                resolve_theme(self._app_settings.tui.theme, self._terminal_background)
+            ),
             full_screen=True,
+            color_depth=ColorDepth.TRUE_COLOR,
             mouse_support=True,
             output=synced_output,
         )
@@ -132,17 +139,30 @@ class KodaTuiApp:
         self._refresh_service_state()
         return True
 
+    def apply_theme(self) -> None:
+        """Re-resolve and apply the current theme setting."""
+        theme = resolve_theme(self._app_settings.tui.theme, self._terminal_background)
+        if self._app:
+            self._app.style = get_tui_style(theme)
+        self.layout.renderer.set_theme(theme)
+        self.layout.chat_area.clear_caches()
+
+    def refresh_theme(self) -> None:
+        """Reapply the current theme setting and redraw."""
+        self.apply_theme()
+        self.invalidate()
+
     def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
         should_invalidate = False
         if "show_scrollbar" in change_names:
             self.state.show_scrollbar = self._app_settings.tui.show_scrollbar
+            self.layout.chat_area.clear_caches()
             should_invalidate = True
         if "queue_inputs" in change_names:
             self.state.queue_inputs = self._app_settings.tui.queue_inputs
             should_invalidate = True
-        if "theme" in change_names and self._app:
-            self._app.style = get_style(self._app_settings.tui.theme)
-            self.layout.renderer.set_theme(self._app_settings.tui.theme)
+        if "theme" in change_names:
+            self.apply_theme()
             should_invalidate = True
         return should_invalidate
 

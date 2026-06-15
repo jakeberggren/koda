@@ -9,6 +9,7 @@ from koda_common.logging import get_logger
 from koda_tui.palette.menus.models import ModelMenu
 from koda_tui.palette.menus.providers import ProviderMenu
 from koda_tui.palette.menus.sessions import SessionMenu
+from koda_tui.palette.menus.theme import ThemeMenu
 from koda_tui.palette.menus.thinking import ThinkingMenu
 from koda_tui.palette.root import RootMenu
 
@@ -32,9 +33,10 @@ class PaletteController:
         self.providers = ProviderMenu(app, ProviderAuthRegistry.default())
         self.models = ModelMenu(app)
         self.thinking = ThinkingMenu(app)
+        self.theme = ThemeMenu(app)
         self.sessions = SessionMenu(app)
 
-    def _execute_with_param(self, base_id: str, param: str, data: Any) -> None:
+    def _execute_with_param(self, base_id: str, param: str, data: Any) -> None:  # noqa: C901
         match base_id:
             case "select_provider" | "select_provider_connection":
                 self.providers.select(data)
@@ -42,14 +44,12 @@ class PaletteController:
                 self.models.select(data)
             case "select_thinking":
                 self.thinking.select(data)
+            case "select_theme":
+                self.theme.select(data)
             case "switch_session":
                 self.sessions.switch(data)
             case _:
                 log.warning("unknown_palette_item", base_id=base_id, param=param)
-
-    def _toggle_theme(self) -> None:
-        self._settings.tui.set("theme", "light" if self._settings.tui.theme == "dark" else "dark")
-        self._app.close_all_overlays()
 
     def _toggle_scrollbar(self) -> None:
         self._settings.tui.set("show_scrollbar", not self._settings.tui.show_scrollbar)
@@ -77,8 +77,8 @@ class PaletteController:
                 self.models.open()
             case "set_thinking":
                 self.thinking.open()
-            case "toggle_theme":
-                self._toggle_theme()
+            case "select_theme":
+                self.theme.open()
             case "toggle_scrollbar":
                 self._toggle_scrollbar()
             case "toggle_queue_inputs":
