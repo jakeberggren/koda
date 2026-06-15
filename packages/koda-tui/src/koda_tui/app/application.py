@@ -13,6 +13,7 @@ from koda_tui.app.output import SynchronizedOutput
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
 from koda_tui.layout import TUILayout
+from koda_tui.osc import query_osc11
 from koda_tui.palette.palette import Palette
 from koda_tui.state import AppState
 from koda_tui.theme import get_tui_style, resolve_theme
@@ -61,7 +62,8 @@ class KodaTuiApp:
         )
         self._closed = False
 
-        theme = resolve_theme(self._app_settings.tui.theme)
+        self._terminal_background = query_osc11()
+        theme = resolve_theme(self._app_settings.tui.theme, self._terminal_background)
 
         # Initialize state
         self.state = AppState(
@@ -105,7 +107,9 @@ class KodaTuiApp:
         app = _KodaApplication(
             layout=self.layout.create_layout(),
             key_bindings=create_keybindings(self),
-            style=get_tui_style(resolve_theme(self._app_settings.tui.theme)),
+            style=get_tui_style(
+                resolve_theme(self._app_settings.tui.theme, self._terminal_background)
+            ),
             full_screen=True,
             color_depth=ColorDepth.TRUE_COLOR,
             mouse_support=True,
@@ -137,7 +141,7 @@ class KodaTuiApp:
 
     def apply_theme(self) -> None:
         """Re-resolve and apply the current theme setting."""
-        theme = resolve_theme(self._app_settings.tui.theme)
+        theme = resolve_theme(self._app_settings.tui.theme, self._terminal_background)
         if self._app:
             self._app.style = get_tui_style(theme)
         self.layout.renderer.set_theme(theme)

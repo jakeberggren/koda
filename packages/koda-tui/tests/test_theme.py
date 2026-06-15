@@ -1,7 +1,7 @@
 import pytest
 
-from koda_tui import theme
-from koda_tui.theme import RGBColor, TerminalTheme, _parse_osc_11_response
+from koda_tui.osc import RGBColor, parse_osc11
+from koda_tui.theme import TerminalTheme, resolve_theme
 
 
 @pytest.mark.parametrize(
@@ -15,26 +15,18 @@ from koda_tui.theme import RGBColor, TerminalTheme, _parse_osc_11_response
     ],
 )
 def test_parse_osc_11_response(response: str, expected: RGBColor | None) -> None:
-    assert _parse_osc_11_response(response) == expected
+    assert parse_osc11(response) == expected
 
 
-def test_resolve_theme_uses_detected_background(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(theme, "detect_terminal_background", lambda: (0, 0, 128))
-
-    assert theme.resolve_theme("auto") == TerminalTheme(
+def test_resolve_theme_uses_detected_background() -> None:
+    assert resolve_theme("auto", (0, 0, 128)) == TerminalTheme(
         theme="dark",
         surface=(13, 13, 134),
     )
 
 
-def test_resolve_theme_falls_back_without_osc_11(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(theme, "detect_terminal_background", lambda: None)
-
-    assert theme.resolve_theme("auto") == TerminalTheme(
+def test_resolve_theme_falls_back_without_osc_11() -> None:
+    assert resolve_theme("auto", None) == TerminalTheme(
         theme="dark",
         surface=(78, 78, 78),
     )

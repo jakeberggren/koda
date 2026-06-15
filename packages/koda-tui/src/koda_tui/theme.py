@@ -2,27 +2,16 @@
 
 from __future__ import annotations
 
-import contextlib
-import os
-import re
-import select
-import sys
-import termios
-import tty
 from dataclasses import dataclass
-from functools import cache
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from prompt_toolkit.styles import Style
 
+if TYPE_CHECKING:
+    from koda_tui.osc import RGBColor
+
 ThemeSetting = Literal["auto", "dark", "light"]
 ResolvedTheme = Literal["dark", "light"]
-RGBColor = tuple[int, int, int]
-_OSC_11_QUERY = "\033]11;?\033\\"
-_OSC_11_RESPONSE_RE = re.compile(
-    r"\x1b\]11;rgb:([0-9a-fA-F]{2,4})/([0-9a-fA-F]{2,4})/([0-9a-fA-F]{2,4})(?:\x1b\\|\x07)"
-)
-_OSC_11_TIMEOUT_SECONDS = 0.05
 _LUMINANCE_LIGHT_THRESHOLD = 0.5
 _SURFACE_BLEND_AMOUNT = 0.05
 _FALLBACK_SURFACE_COLORS: dict[ResolvedTheme, RGBColor] = {
@@ -120,66 +109,6 @@ def _theme_from_rgb(red: int, green: int, blue: int) -> ResolvedTheme:
     return "light" if luminance >= _LUMINANCE_LIGHT_THRESHOLD else "dark"
 
 
-def _parse_osc_11_response(response: str) -> RGBColor | None:
-    match = _OSC_11_RESPONSE_RE.search(response)
-    if not match:
-        return None
-
-    components: list[int] = []
-    for value in match.groups():
-        max_value = (16 ** len(value)) - 1
-        components.append(round(int(value, 16) * 255 / max_value))
-    return (components[0], components[1], components[2])
-
-
-def _read_osc_11_response(fd: int) -> str:
-    response = ""
-    while select.select([fd], [], [], _OSC_11_TIMEOUT_SECONDS)[0]:
-        chunk = os.read(fd, 128).decode(errors="ignore")
-        if not chunk:
-            break
-        response += chunk
-        if _parse_osc_11_response(response) is not None:
-            break
-    return response
-
-
-@cache
-def detect_terminal_background() -> RGBColor | None:
-    """Best-effort terminal background color detection via OSC 11.
-
-    OSC 11 queries the terminal's default background RGB color. Not every
-    terminal responds, so callers should provide a fallback when this returns
-    None.
-    """
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
-        return None
-
-    fd = sys.stdin.fileno()
-    try:
-        old_attrs = termios.tcgetattr(fd)
-    except termios.error:
-        return None
-
-    try:
-        tty.setcbreak(fd)
-        sys.stdout.write(_OSC_11_QUERY)
-        sys.stdout.flush()
-        response = _read_osc_11_response(fd)
-    except OSError:
-        return None
-    finally:
-        with contextlib.suppress(termios.error):
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
-
-    return _parse_osc_11_response(response)
-
-
-def refresh_terminal_theme_detection() -> None:
-    """Clear cached terminal theme detection so auto mode can re-query."""
-    detect_terminal_background.cache_clear()
-
-
 def _blend_color(color: RGBColor, target: RGBColor, amount: float) -> RGBColor:
     return (
         round(color[0] + (target[0] - color[0]) * amount),
@@ -194,17 +123,21 @@ def _surface_from_background(background: RGBColor) -> RGBColor:
     return _blend_color(background, target, _SURFACE_BLEND_AMOUNT)
 
 
-def resolve_theme(theme: ThemeSetting) -> TerminalTheme:
+def resolve_theme(
+    theme: ThemeSetting,
+    terminal_background: RGBColor | None,
+) -> TerminalTheme:
     """Resolve theme settings and derive a surface from the terminal background."""
-    background = detect_terminal_background()
     if theme == "auto":
-        resolved_theme = _theme_from_rgb(*background) if background is not None else "dark"
+        resolved_theme = (
+            _theme_from_rgb(*terminal_background) if terminal_background is not None else "dark"
+        )
     else:
         resolved_theme = theme
 
     surface = (
-        _surface_from_background(background)
-        if background is not None
+        _surface_from_background(terminal_background)
+        if terminal_background is not None
         else _FALLBACK_SURFACE_COLORS[resolved_theme]
     )
     return TerminalTheme(

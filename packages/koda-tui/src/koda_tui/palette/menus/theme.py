@@ -5,10 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_tui.palette.items import ListItem
-from koda_tui.theme import ThemeSetting, refresh_terminal_theme_detection
 
 if TYPE_CHECKING:
     from koda_tui.palette.palette import Palette
+    from koda_tui.theme import ThemeSetting
 
 
 _TITLE = "Select Theme"
@@ -49,9 +49,6 @@ class ThemeMenu:
 
     def select(self, theme: ThemeSetting) -> None:
         """Handle theme selection."""
-        if theme == "auto":
-            refresh_terminal_theme_detection()
-
         if self._settings.tui.theme == theme:
             self._palette.refresh_theme()
         else:
