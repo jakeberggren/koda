@@ -1,6 +1,6 @@
 [project]
 name = "koda-common"
-version = "0.6.1"
+version = "0.6.2"
 description = "KODA Common utilities"
 readme = "README.md"
 

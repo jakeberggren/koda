@@ -568,7 +568,7 @@ wheels = [
 
 [[package]]
 name = "koda"
-version = "0.6.1"
+version = "0.6.2"
 source = { editable = "packages/koda" }
 dependencies = [
     { name = "anthropic" },
@@ -599,7 +599,7 @@ requires-dist = [
 
 [[package]]
 name = "koda-common"
-version = "0.6.1"
+version = "0.6.2"
 source = { editable = "packages/koda-common" }
 dependencies = [
     { name = "pydantic" },
@@ -616,7 +616,7 @@ requires-dist = [
 
 [[package]]
 name = "koda-service"
-version = "0.6.1"
+version = "0.6.2"
 source = { editable = "packages/koda-service" }
 dependencies = [
     { name = "koda" },
@@ -631,7 +631,7 @@ requires-dist = [
 
 [[package]]
 name = "koda-tui"
-version = "0.6.1"
+version = "0.6.2"
 source = { editable = "packages/koda-tui" }
 dependencies = [
     { name = "koda-common" },
@@ -649,7 +649,7 @@ requires-dist = [
     { name = "pathspec", specifier = ">=1.1.1,<2" },
     { name = "prompt-toolkit", specifier = ">=3.0.52,<4" },
     { name = "rich", specifier = ">=15.0.0,<16" },
-    { name = "wcwidth", specifier = ">=0.6.1,<1" },
+    { name = "wcwidth", specifier = ">=0.6.2,<1" },
 ]
 
 [[package]]
