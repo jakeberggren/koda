@@ -77,6 +77,7 @@ _TUI_STYLE = {
     "palette.dim": "dim",
     "palette.group": "dim bold",
     # Dialog
+    "dialog": "bg:",
     "dialog.frame": "dim",
     "dialog.box": "",
     "dialog.title": "nodim bold",
