@@ -11,6 +11,8 @@ if TYPE_CHECKING:
 # Terminals that don't support it simply ignore the sequences.
 _SYNC_BEGIN = "\033[?2026h"
 _SYNC_END = "\033[?2026l"
+_FOCUS_REPORTING_ENABLE = "\033[?1004h"
+_FOCUS_REPORTING_DISABLE = "\033[?1004l"
 
 
 class SynchronizedOutput:
@@ -19,6 +21,27 @@ class SynchronizedOutput:
     def __init__(self, output: Output) -> None:
         self._output = output
         self._in_frame = False
+        self._focus_reporting = False
+
+    def enable_focus_reporting(self) -> None:
+        """Request xterm focus-in/focus-out events from supporting terminals."""
+        if self._focus_reporting:
+            return
+        if self._in_frame:
+            self.flush()
+        self._output.write_raw(_FOCUS_REPORTING_ENABLE)
+        self._output.flush()
+        self._focus_reporting = True
+
+    def disable_focus_reporting(self) -> None:
+        """Disable xterm focus-in/focus-out events if they were enabled."""
+        if not self._focus_reporting:
+            return
+        if self._in_frame:
+            self.flush()
+        self._output.write_raw(_FOCUS_REPORTING_DISABLE)
+        self._output.flush()
+        self._focus_reporting = False
 
     def write(self, data: str) -> None:
         if not self._in_frame:

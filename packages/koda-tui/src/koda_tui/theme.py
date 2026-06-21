@@ -13,10 +13,10 @@ if TYPE_CHECKING:
 ThemeSetting = Literal["auto", "dark", "light"]
 ResolvedTheme = Literal["dark", "light"]
 _LUMINANCE_LIGHT_THRESHOLD = 0.5
-_SURFACE_BLEND_AMOUNT = 0.05
+_SURFACE_BLEND_AMOUNT = 0.125
 _FALLBACK_SURFACE_COLORS: dict[ResolvedTheme, RGBColor] = {
-    "dark": (78, 78, 78),
-    "light": (228, 228, 228),
+    "dark": (67, 67, 67),
+    "light": (220, 220, 220),
 }
 
 
@@ -136,11 +136,9 @@ def resolve_theme(
     else:
         resolved_theme = theme
 
-    surface = (
-        _surface_from_background(terminal_background)
-        if terminal_background is not None
-        else _FALLBACK_SURFACE_COLORS[resolved_theme]
-    )
+    surface = _FALLBACK_SURFACE_COLORS[resolved_theme]
+    if theme == "auto" and terminal_background is not None:
+        surface = _surface_from_background(terminal_background)
     return TerminalTheme(
         theme=resolved_theme,
         surface=surface,

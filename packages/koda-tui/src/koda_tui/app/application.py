@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, cast
 
 from prompt_toolkit import Application
 from prompt_toolkit.application.current import get_app_session
-from prompt_toolkit.output import ColorDepth
+from prompt_toolkit.output import ColorDepth, Output
 
 from koda.llm import ThinkingOption
 from koda_tui.app.keybindings import create_keybindings
@@ -20,8 +20,6 @@ from koda_tui.theme import get_tui_style, resolve_theme
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from prompt_toolkit.output import Output
 
     from koda_common.settings import SettingChange
     from koda_service import KodaService
@@ -82,6 +80,7 @@ class KodaTuiApp:
 
         # Application instance (created on run)
         self._app: Application[None] | None = None
+        self._output: SynchronizedOutput | None = None
         self._exit_reset_handle: asyncio.TimerHandle | None = None
 
         self._message_queue = MessageQueue(
@@ -102,7 +101,9 @@ class KodaTuiApp:
         # Wrap output in synchronized update sequences (DEC mode 2026).
         # The terminal buffers all writes between begin/end markers and
         # displays them atomically, eliminating tearing on scroll/redraw.
-        synced_output = cast("Output", SynchronizedOutput(get_app_session().output))
+        synced_output = SynchronizedOutput(get_app_session().output)
+        synced_output.enable_focus_reporting()
+        self._output = synced_output
 
         app = _KodaApplication(
             layout=self.layout.create_layout(),
@@ -113,7 +114,7 @@ class KodaTuiApp:
             full_screen=True,
             color_depth=ColorDepth.TRUE_COLOR,
             mouse_support=True,
-            output=synced_output,
+            output=cast("Output", synced_output),
         )
         app.ttimeoutlen = 0.01  # Reduce escape key delay (default 0.5s)
 
@@ -139,18 +140,25 @@ class KodaTuiApp:
         self._refresh_service_state()
         return True
 
-    def apply_theme(self) -> None:
+    def apply_theme(self, *, detect_terminal: bool = False) -> None:
         """Re-resolve and apply the current theme setting."""
+        if detect_terminal:
+            self._terminal_background = query_osc11()
         theme = resolve_theme(self._app_settings.tui.theme, self._terminal_background)
         if self._app:
             self._app.style = get_tui_style(theme)
         self.layout.renderer.set_theme(theme)
         self.layout.chat_area.clear_caches()
 
-    def refresh_theme(self) -> None:
+    def refresh_theme(self, *, detect_terminal: bool = False) -> None:
         """Reapply the current theme setting and redraw."""
-        self.apply_theme()
+        self.apply_theme(detect_terminal=detect_terminal)
         self.invalidate()
+
+    def handle_terminal_focus_in(self) -> None:
+        """Refresh auto theme detection after the terminal regains focus."""
+        if self._app_settings.tui.theme == "auto":
+            self.refresh_theme(detect_terminal=True)
 
     def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
         should_invalidate = False
@@ -162,7 +170,7 @@ class KodaTuiApp:
             self.state.queue_inputs = self._app_settings.tui.queue_inputs
             should_invalidate = True
         if "theme" in change_names:
-            self.apply_theme()
+            self.apply_theme(detect_terminal=self._app_settings.tui.theme == "auto")
             should_invalidate = True
         return should_invalidate
 
@@ -276,6 +284,9 @@ class KodaTuiApp:
         if self._closed:
             return
         self._closed = True
+        if self._output:
+            self._output.disable_focus_reporting()
+            self._output = None
         self._unsubscribe_settings()
         self._unsubscribe_tui_settings()
 
