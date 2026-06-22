@@ -52,9 +52,9 @@ class Palette:
         """Return shared UI state updated by palette actions."""
         return self._app.state
 
-    def refresh_theme(self) -> None:
+    def refresh_theme(self, *, detect_terminal: bool = False) -> None:
         """Reapply the current app theme setting."""
-        self._app.refresh_theme()
+        self._app.refresh_theme(detect_terminal=detect_terminal)
 
     def attach(self, pt_app: Application[None], root_container: FloatContainer) -> None:
         """Attach prompt_toolkit runtime objects after app creation."""

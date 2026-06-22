@@ -13,6 +13,8 @@ from prompt_toolkit.key_binding import (
 )
 from prompt_toolkit.keys import Keys
 
+from koda_tui.app.input import FOCUS_IN_KEY, FOCUS_OUT_KEY, OSC11_RESPONSE_KEY
+
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
     from koda_tui.app.application import KodaTuiApp
@@ -201,6 +203,18 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
     @kb.add(Keys.ControlT)
     def _cycle_thinking(_event: KeyPressEvent) -> None:
         _handle_cycle_thinking(app)
+
+    @kb.add(FOCUS_IN_KEY, eager=True, record_in_macro=False)
+    def _terminal_focus_in(_event: KeyPressEvent) -> None:
+        app.handle_terminal_focus_in()
+
+    @kb.add(FOCUS_OUT_KEY, eager=True, record_in_macro=False)
+    def _terminal_focus_out(_event: KeyPressEvent) -> None:
+        return None
+
+    @kb.add(OSC11_RESPONSE_KEY, eager=True, record_in_macro=False)
+    def _terminal_background_response(event: KeyPressEvent) -> None:
+        app.handle_terminal_background_response(event.key_sequence[0].data)
 
     @kb.add(Keys.Up, eager=True, filter=has_focus(app.layout.input_area.buffer))
     def _move_up(event: KeyPressEvent) -> None:

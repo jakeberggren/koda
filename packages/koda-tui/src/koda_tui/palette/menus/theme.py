@@ -50,7 +50,7 @@ class ThemeMenu:
     def select(self, theme: ThemeSetting) -> None:
         """Handle theme selection."""
         if self._settings.tui.theme == theme:
-            self._palette.refresh_theme()
+            self._palette.refresh_theme(detect_terminal=theme == "auto")
         else:
             self._settings.tui.set("theme", theme)
         self._palette.close_all_overlays()

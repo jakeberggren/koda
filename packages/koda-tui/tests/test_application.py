@@ -119,6 +119,46 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
     assert app.state.context_window == 128_000
 
 
+def test_theme_change_to_auto_requeries_terminal_background(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    request_refresh = Mock()
+    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
+    on_tui_settings_changed = tui_settings.subscribe.call_args.args[0]
+
+    tui_settings.theme = "auto"
+    on_tui_settings_changed((SettingChange(name="theme", old_value="dark", new_value="auto"),))
+
+    request_refresh.assert_called_once_with()
+
+
+def test_terminal_focus_in_requeries_terminal_background_in_auto_theme(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    request_refresh = Mock()
+    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
+
+    tui_settings.theme = "auto"
+    app.handle_terminal_focus_in()
+
+    request_refresh.assert_called_once_with()
+
+
+def test_terminal_focus_in_ignores_manual_theme(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    request_refresh = Mock()
+    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
+
+    tui_settings.theme = "light"
+    app.handle_terminal_focus_in()
+
+    request_refresh.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_run_always_closes(monkeypatch: pytest.MonkeyPatch) -> None:
     app, _settings, _tui_settings, _service, unsubscribe, unsubscribe_tui = _make_app()
