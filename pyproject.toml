@@ -23,6 +23,8 @@ tag_message = "Release v{new_version}"
 
 [[tool.bumpversion.files]]
 glob = "packages/*/pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
 
 [tool.ruff]
 line-length = 100
