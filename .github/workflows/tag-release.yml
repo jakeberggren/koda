@@ -1,0 +1,165 @@
+name: Tag Release
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Merged Release PR
+    if: >-
+      ${{
+        github.event.pull_request.merged == true &&
+        startsWith(github.event.pull_request.head.ref, 'release/v') &&
+        startsWith(github.event.pull_request.title, 'release: v')
+      }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      merge_sha: ${{ github.event.pull_request.merge_commit_sha }}
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout merge commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Validate merged release
+        id: release
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${PR_TITLE}" =~ ^release:\ v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            version="${BASH_REMATCH[1]}"
+          else
+            echo "Release PR title must be 'release: vX.Y.Z': ${PR_TITLE}" >&2
+            exit 1
+          fi
+
+          tag="v${version}"
+
+          expected_files="$(
+            {
+              echo "pyproject.toml"
+              echo "uv.lock"
+              git ls-files 'packages/*/pyproject.toml'
+            } | sort
+          )"
+
+          changed_files="$(git diff --name-only "${BASE_SHA}" "${MERGE_SHA}" | sort)"
+          unexpected_files="$(comm -13 <(printf '%s\n' "${expected_files}") <(printf '%s\n' "${changed_files}"))"
+          if [[ -n "${unexpected_files}" ]]; then
+            echo "Release PR changed unexpected files:" >&2
+            printf '%s\n' "${unexpected_files}" >&2
+            exit 1
+          fi
+
+          python - "${version}" <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          expected = sys.argv[1]
+          files = [pathlib.Path("pyproject.toml"), *pathlib.Path("packages").glob("*/pyproject.toml")]
+          for path in files:
+              text = path.read_text()
+              if path.name == "pyproject.toml" and path.parent == pathlib.Path("."):
+                  match = re.search(r'^current_version = "([^"]+)"$', text, re.M)
+                  field = "current_version"
+              else:
+                  match = re.search(r'^version = "([^"]+)"$', text, re.M)
+                  field = "version"
+              if not match:
+                  raise SystemExit(f"{path}: missing {field}")
+              if match.group(1) != expected:
+                  raise SystemExit(f"{path}: {field} is {match.group(1)}, expected {expected}")
+          PY
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "Tag already exists: ${tag}" >&2
+            exit 1
+          fi
+
+          {
+            echo "version=${version}"
+            echo "tag=${tag}"
+          } >> "${GITHUB_OUTPUT}"
+
+  tag:
+    name: Tag Release
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout merge commit
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.validate.outputs.merge_sha }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Configure git author
+        shell: bash
+        run: |
+          git config user.name "koda-release-bot"
+          git config user.email "koda-release-bot@users.noreply.github.com"
+
+      - name: Create annotated tag
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          MERGE_SHA: ${{ needs.validate.outputs.merge_sha }}
+        run: git tag -a "${TAG}" -m "Release ${TAG}" "${MERGE_SHA}"
+
+      - name: Push tag
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: git push origin "refs/tags/${TAG}"
+
+      - name: Summary
+        shell: bash
+        env:
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          MERGE_SHA: ${{ needs.validate.outputs.merge_sha }}
+        run: |
+          {
+            echo "## Release tagged"
+            echo
+            echo "- Version: ${VERSION}"
+            echo "- Tag: ${TAG}"
+            echo "- Commit: ${MERGE_SHA}"
+          } >> "${GITHUB_STEP_SUMMARY}"

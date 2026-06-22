@@ -1,0 +1,275 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate Release Tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+      commit: ${{ steps.tag.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag and version files
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag="${{ github.ref_name }}"
+          if [[ ! "${tag}" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "Release tag must match vX.Y.Z: ${tag}" >&2
+            exit 1
+          fi
+          version="${BASH_REMATCH[1]}"
+
+          git fetch origin main --tags --force
+
+          tag_type="$(git cat-file -t "refs/tags/${tag}")"
+          if [[ "${tag_type}" != "tag" ]]; then
+            echo "Release tag must be annotated: ${tag}" >&2
+            exit 1
+          fi
+
+          commit="$(git rev-parse "${tag}^{commit}")"
+          if ! git merge-base --is-ancestor "${commit}" origin/main; then
+            echo "Release tag ${tag} does not point to a commit on origin/main" >&2
+            exit 1
+          fi
+
+          python - "${version}" <<'PY2'
+          import pathlib
+          import re
+          import sys
+
+          expected = sys.argv[1]
+          files = [pathlib.Path("pyproject.toml"), *pathlib.Path("packages").glob("*/pyproject.toml")]
+          for path in files:
+              text = path.read_text()
+              if path.name == "pyproject.toml" and path.parent == pathlib.Path("."):
+                  match = re.search(r'^current_version = "([^"\n]+)"$', text, re.M)
+                  field = "current_version"
+              else:
+                  match = re.search(r'^version = "([^"\n]+)"$', text, re.M)
+                  field = "version"
+              if not match:
+                  raise SystemExit(f"{path}: missing {field}")
+              if match.group(1) != expected:
+                  raise SystemExit(f"{path}: {field} is {match.group(1)}, expected {expected}")
+          PY2
+
+          {
+            echo "version=${version}"
+            echo "commit=${commit}"
+          } >> "${GITHUB_OUTPUT}"
+
+  build:
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+            arch: x86_64
+            archive_ext: tar.gz
+            artifact_label: linux-x86_64
+
+          - runner: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+            archive_ext: tar.gz
+            artifact_label: linux-arm64
+
+          - runner: macos-15-intel
+            platform: macos
+            arch: x86_64
+            archive_ext: tar.gz
+            artifact_label: macos-x86_64
+
+          - runner: macos-latest
+            platform: macos
+            arch: arm64
+            archive_ext: tar.gz
+            artifact_label: macos-arm64
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Build
+        run: uv run pyinstaller koda.spec
+
+      - name: Rename output folder
+        shell: bash
+        run: |
+          mv dist/koda "dist/koda-${{ github.ref_name }}-${{ matrix.artifact_label }}"
+
+      - name: Archive build
+        shell: bash
+        run: |
+          cd dist
+          tar -czf "koda-${{ github.ref_name }}-${{ matrix.artifact_label }}.tar.gz" \
+            "koda-${{ github.ref_name }}-${{ matrix.artifact_label }}"
+
+      - name: Attest artifact
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: dist/koda-${{ github.ref_name }}-${{ matrix.artifact_label }}.${{ matrix.archive_ext }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: koda-${{ github.ref_name }}-${{ matrix.artifact_label }}
+          path: dist/*.${{ matrix.archive_ext }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish Release
+    needs:
+      - validate
+      - build
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: dist
+          pattern: koda-${{ github.ref_name }}-*
+          merge-multiple: true
+
+      - name: Validate assets and generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          expected_assets=(
+            "koda-${{ github.ref_name }}-linux-x86_64.tar.gz"
+            "koda-${{ github.ref_name }}-linux-arm64.tar.gz"
+            "koda-${{ github.ref_name }}-macos-x86_64.tar.gz"
+            "koda-${{ github.ref_name }}-macos-arm64.tar.gz"
+          )
+
+          for asset in "${expected_assets[@]}"; do
+            if [[ ! -f "dist/${asset}" ]]; then
+              echo "Missing release asset: ${asset}" >&2
+              exit 1
+            fi
+          done
+
+          cd dist
+          sha256sum "${expected_assets[@]}" > SHA256SUMS
+
+          python - "${{ github.ref_name }}" "${{ needs.validate.outputs.version }}" "${{ needs.validate.outputs.commit }}" "${expected_assets[@]}" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          tag, version, commit, *assets = sys.argv[1:]
+          manifest = {
+              "tag": tag,
+              "version": version,
+              "commit": commit,
+              "assets": [],
+          }
+          for asset in assets:
+              path = pathlib.Path(asset)
+              manifest["assets"].append({
+                  "name": asset,
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  "size": path.stat().st_size,
+              })
+          pathlib.Path("release-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+          PY
+
+      - name: Create draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            is_draft="$(gh release view "${{ github.ref_name }}" --json isDraft --jq '.isDraft')"
+            if [[ "${is_draft}" != "true" ]]; then
+              echo "Release ${{ github.ref_name }} already exists and is not a draft" >&2
+              exit 1
+            fi
+          else
+            gh release create "${{ github.ref_name }}" \
+              --draft \
+              --title "Release ${{ github.ref_name }}" \
+              --generate-notes
+          fi
+
+      - name: Upload release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          assets=(dist/*.tar.gz dist/SHA256SUMS dist/release-manifest.json)
+          for asset_path in "${assets[@]}"; do
+            gh release upload "${{ github.ref_name }}" "${asset_path}" --clobber
+          done
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh release edit "${{ github.ref_name }}" --draft=false
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo "## Release published"
+            echo
+            echo "- Tag: ${{ github.ref_name }}"
+            echo "- Assets:"
+            find dist -maxdepth 1 -type f -printf '  - %f\n' | sort
+          } >> "${GITHUB_STEP_SUMMARY}"
