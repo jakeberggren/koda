@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from prompt_toolkit.filters import Condition, has_focus
 from prompt_toolkit.input.ansi_escape_sequences import ANSI_SEQUENCES
@@ -12,6 +12,8 @@ from prompt_toolkit.key_binding import (
     merge_key_bindings,
 )
 from prompt_toolkit.keys import Keys
+
+from koda_tui.app.input import FOCUS_IN_KEY, FOCUS_OUT_KEY, OSC11_RESPONSE_KEY
 
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
@@ -45,14 +47,10 @@ _CTRL_LETTER_KEYS = {
     "y": Keys.ControlY,
     "z": Keys.ControlZ,
 }
-_FOCUS_IN_KEY = "\ue000"
-_FOCUS_OUT_KEY = "\ue001"
-type _AnsiSequenceValue = Keys | tuple[Keys, ...] | str
 
 
 def _register_terminal_sequences() -> None:
     """Register terminal-specific escape sequences for modified keys."""
-    ansi_sequences = cast("dict[str, _AnsiSequenceValue]", ANSI_SEQUENCES)
     # Ctrl+letter keys - kitty keyboard protocol / CSI u.
     for letter, key in _CTRL_LETTER_KEYS.items():
         ANSI_SEQUENCES[f"\x1b[{ord(letter)};5u"] = key
@@ -83,10 +81,6 @@ def _register_terminal_sequences() -> None:
 
     # Shift+Enter - ESC+CR (terminals that send literal escape + enter)
     ANSI_SEQUENCES["\x1b\r"] = Keys.ControlJ
-
-    # Xterm focus events, emitted by terminals that support DECSET 1004.
-    ansi_sequences["\x1b[I"] = _FOCUS_IN_KEY
-    ansi_sequences["\x1b[O"] = _FOCUS_OUT_KEY
 
 
 async def _submit_buffer(
@@ -210,13 +204,17 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
     def _cycle_thinking(_event: KeyPressEvent) -> None:
         _handle_cycle_thinking(app)
 
-    @kb.add(_FOCUS_IN_KEY, eager=True, record_in_macro=False)
+    @kb.add(FOCUS_IN_KEY, eager=True, record_in_macro=False)
     def _terminal_focus_in(_event: KeyPressEvent) -> None:
         app.handle_terminal_focus_in()
 
-    @kb.add(_FOCUS_OUT_KEY, eager=True, record_in_macro=False)
+    @kb.add(FOCUS_OUT_KEY, eager=True, record_in_macro=False)
     def _terminal_focus_out(_event: KeyPressEvent) -> None:
         return None
+
+    @kb.add(OSC11_RESPONSE_KEY, eager=True, record_in_macro=False)
+    def _terminal_background_response(event: KeyPressEvent) -> None:
+        app.handle_terminal_background_response(event.key_sequence[0].data)
 
     @kb.add(Keys.Up, eager=True, filter=has_focus(app.layout.input_area.buffer))
     def _move_up(event: KeyPressEvent) -> None:

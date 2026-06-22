@@ -83,7 +83,7 @@ _TUI_STYLE = {
     "dialog.title": "nodim bold",
     "dialog.hint": "dim",
     "dialog.button": "dim",
-    "dialog.selected": "bg:ansimagenta fg:ansiwhite bold",
+    "dialog.selected": "nodim bg:ansimagenta fg:ansiwhite bold",
 }
 
 

@@ -2,25 +2,39 @@
 
 from __future__ import annotations
 
-import contextlib
-import os
 import re
-import select
-import sys
-import termios
-import tty
 
 RGBColor = tuple[int, int, int]
-_OSC11_QUERY = "\033]11;?\033\\"
-_OSC11_RESPONSE_RE = re.compile(
-    r"\x1b\]11;rgb:([0-9a-fA-F]{2,4})/([0-9a-fA-F]{2,4})/([0-9a-fA-F]{2,4})(?:\x1b\\|\x07)"
+OSC_BEL = "\x07"
+OSC_STRING_TERMINATOR = "\x1b\\"
+OSC11_QUERY = "\033]11;?\033\\"
+
+# Regex matching any OSC 11 terminal background color response.
+OSC11_RESPONSE_RE = re.compile(
+    "^"
+    + re.escape("\x1b]11;rgb:")
+    + r"([0-9a-fA-F]{2,4})/([0-9a-fA-F]{2,4})/([0-9a-fA-F]{2,4})"
+    + r"(?:"
+    + re.escape(OSC_STRING_TERMINATOR)
+    + "|"
+    + re.escape(OSC_BEL)
+    + r")\Z"
 )
-_OSC11_TIMEOUT_SECONDS = 0.05
+OSC11_RESPONSE_START = "\x1b]11;rgb:"
+
+# Regex matching any valid prefix of an OSC 11 response after the fixed start.
+# The final string terminator can arrive as "\x1b\\" split across input reads.
+OSC11_PREFIX_RE = re.compile(
+    "^"
+    + re.escape(OSC11_RESPONSE_START)
+    + r"[0-9a-fA-F]{0,4}(?:/[0-9a-fA-F]{0,4}"
+    + r"(?:/[0-9a-fA-F]{0,4}(?:\x1b?)?)?)?\Z"
+)
 
 
 def parse_osc11(response: str) -> RGBColor | None:
     """Parse an OSC 11 terminal background color response."""
-    match = _OSC11_RESPONSE_RE.search(response)
+    match = OSC11_RESPONSE_RE.search(response)
     if not match:
         return None
 
@@ -31,42 +45,10 @@ def parse_osc11(response: str) -> RGBColor | None:
     return (components[0], components[1], components[2])
 
 
-def _read_osc11_response(fd: int) -> str:
-    response = ""
-    while select.select([fd], [], [], _OSC11_TIMEOUT_SECONDS)[0]:
-        chunk = os.read(fd, 128).decode(errors="ignore")
-        if not chunk:
-            break
-        response += chunk
-        if parse_osc11(response) is not None:
-            break
-    return response
-
-
-def query_osc11() -> RGBColor | None:
-    """Best-effort OSC 11 query for the terminal background color.
-
-    OSC query responses arrive on terminal input. Call this only before the
-    prompt_toolkit application starts owning input.
-    """
-    if not sys.stdin.isatty() or not sys.stdout.isatty():
-        return None
-
-    fd = sys.stdin.fileno()
-    try:
-        old_attrs = termios.tcgetattr(fd)
-    except termios.error:
-        return None
-
-    try:
-        tty.setcbreak(fd)
-        sys.stdout.write(_OSC11_QUERY)
-        sys.stdout.flush()
-        response = _read_osc11_response(fd)
-    except OSError:
-        return None
-    finally:
-        with contextlib.suppress(termios.error):
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
-
-    return parse_osc11(response)
+def is_osc11_response_prefix(prefix: str) -> bool:
+    """Return whether text is a partial OSC 11 response."""
+    return (
+        len(prefix) > 1
+        and parse_osc11(prefix) is None
+        and (OSC11_RESPONSE_START.startswith(prefix) or bool(OSC11_PREFIX_RE.match(prefix)))
+    )

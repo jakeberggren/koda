@@ -122,41 +122,41 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
 def test_theme_change_to_auto_requeries_terminal_background(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    query_osc11 = Mock(side_effect=[(0, 0, 0), (255, 255, 255)])
-    monkeypatch.setattr("koda_tui.app.application.query_osc11", query_osc11)
-    _app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    request_refresh = Mock()
+    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
     on_tui_settings_changed = tui_settings.subscribe.call_args.args[0]
 
     tui_settings.theme = "auto"
     on_tui_settings_changed((SettingChange(name="theme", old_value="dark", new_value="auto"),))
 
-    assert query_osc11.call_count == 2
+    request_refresh.assert_called_once_with()
 
 
 def test_terminal_focus_in_requeries_terminal_background_in_auto_theme(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    query_osc11 = Mock(side_effect=[(0, 0, 0), (255, 255, 255)])
-    monkeypatch.setattr("koda_tui.app.application.query_osc11", query_osc11)
     app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    request_refresh = Mock()
+    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
 
     tui_settings.theme = "auto"
     app.handle_terminal_focus_in()
 
-    assert query_osc11.call_count == 2
+    request_refresh.assert_called_once_with()
 
 
 def test_terminal_focus_in_ignores_manual_theme(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    query_osc11 = Mock(side_effect=[(0, 0, 0), (255, 255, 255)])
-    monkeypatch.setattr("koda_tui.app.application.query_osc11", query_osc11)
     app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    request_refresh = Mock()
+    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
 
     tui_settings.theme = "light"
     app.handle_terminal_focus_in()
 
-    assert query_osc11.call_count == 1
+    request_refresh.assert_not_called()
 
 
 @pytest.mark.asyncio
