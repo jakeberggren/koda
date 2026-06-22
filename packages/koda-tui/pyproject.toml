@@ -1,6 +1,6 @@
 [project]
 name = "koda-tui"
-version = "0.6.2"
+version = "0.6.3"
 description = "KODA Terminal UI"
 readme = "README.md"
 
