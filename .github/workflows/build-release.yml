@@ -163,6 +163,7 @@ jobs:
       - validate
       - build
     runs-on: ubuntu-latest
+    environment: release
     steps:
       - name: Generate token
         id: app-token
@@ -251,19 +252,9 @@ jobs:
           set -euo pipefail
 
           assets=(dist/*.tar.gz dist/SHA256SUMS dist/release-manifest.json)
-          remote_assets="$(mktemp)"
-          gh release view "${{ github.ref_name }}" --json assets \
-            --jq '.assets[].name' > "${remote_assets}"
-
           for asset_path in "${assets[@]}"; do
-            asset_name="$(basename "${asset_path}")"
-            if grep -Fxq "${asset_name}" "${remote_assets}"; then
-              echo "Release asset already exists; refusing to overwrite: ${asset_name}" >&2
-              exit 1
-            fi
+            gh release upload "${{ github.ref_name }}" "${asset_path}" --clobber
           done
-
-          gh release upload "${{ github.ref_name }}" "${assets[@]}"
 
       - name: Publish release
         shell: bash
