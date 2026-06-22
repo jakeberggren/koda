@@ -1,0 +1,288 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump to prepare
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - explicit
+      version:
+        description: Explicit version, without leading v. Required when bump is explicit.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare Release PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: pyproject.toml
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Compute version
+        id: version
+        shell: bash
+        env:
+          BUMP: ${{ inputs.bump }}
+          EXPLICIT_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          current_version="$(uv run bump-my-version show current_version)"
+          [[ -n "${current_version}" ]] || {
+            echo "Could not read current version" >&2
+            exit 1
+          }
+
+          semver_re='^[0-9]+\.[0-9]+\.[0-9]+$'
+          if [[ ! "${current_version}" =~ ${semver_re} ]]; then
+            echo "Current version is not valid semver: ${current_version}" >&2
+            exit 1
+          fi
+
+          if [[ "${BUMP}" == "explicit" ]]; then
+            if [[ -z "${EXPLICIT_VERSION}" ]]; then
+              echo "Explicit version is required when bump=explicit" >&2
+              exit 1
+            fi
+            if [[ ! "${EXPLICIT_VERSION}" =~ ${semver_re} ]]; then
+              echo "Explicit version must look like X.Y.Z: ${EXPLICIT_VERSION}" >&2
+              exit 1
+            fi
+            new_version="${EXPLICIT_VERSION}"
+            bump_part="$(python - "${current_version}" "${new_version}" <<'PY'
+          import sys
+
+          current = tuple(int(part) for part in sys.argv[1].split("."))
+          new = tuple(int(part) for part in sys.argv[2].split("."))
+          if new[0] > current[0]:
+              print("major")
+          elif new[1] > current[1]:
+              print("minor")
+          else:
+              print("patch")
+          PY
+          )"
+          else
+            if [[ -n "${EXPLICIT_VERSION}" ]]; then
+              echo "version input is only valid when bump=explicit" >&2
+              exit 1
+            fi
+
+            IFS=. read -r major minor patch <<< "${current_version}"
+            case "${BUMP}" in
+              patch)
+                patch=$((patch + 1))
+                ;;
+              minor)
+                minor=$((minor + 1))
+                patch=0
+                ;;
+              major)
+                major=$((major + 1))
+                minor=0
+                patch=0
+                ;;
+              *)
+                echo "Unsupported bump: ${BUMP}" >&2
+                exit 1
+                ;;
+            esac
+            new_version="${major}.${minor}.${patch}"
+            bump_part="${BUMP}"
+          fi
+
+          python - "${current_version}" "${new_version}" <<'PY'
+          import sys
+
+          current = tuple(int(part) for part in sys.argv[1].split("."))
+          new = tuple(int(part) for part in sys.argv[2].split("."))
+          if new <= current:
+              raise SystemExit(f"{sys.argv[2]} must be greater than {sys.argv[1]}")
+          PY
+
+          tag="v${new_version}"
+          branch="release/${tag}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+            echo "Tag already exists: ${tag}" >&2
+            exit 1
+          fi
+
+          if git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1; then
+            echo "Release branch already exists: ${branch}" >&2
+            exit 1
+          fi
+
+          open_release_prs="$(gh pr list --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("release/v"))] | length')"
+          if [[ "${open_release_prs}" != "0" ]]; then
+            echo "Another release PR is already open" >&2
+            exit 1
+          fi
+
+          if gh pr list --state open --head "${branch}" --json number --jq 'length' | grep -qx '0'; then
+            :
+          else
+            echo "An open release PR already exists for ${branch}" >&2
+            exit 1
+          fi
+
+          {
+            echo "current=${current_version}"
+            echo "version=${new_version}"
+            echo "tag=${tag}"
+            echo "branch=${branch}"
+            echo "bump_part=${bump_part}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Configure git author
+        shell: bash
+        run: |
+          git config user.name "koda-release-bot"
+          git config user.email "koda-release-bot@users.noreply.github.com"
+
+      - name: Create release branch
+        shell: bash
+        run: git switch -c "${{ steps.version.outputs.branch }}"
+
+      - name: Bump version
+        shell: bash
+        env:
+          BUMP: ${{ inputs.bump }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${BUMP}" == "explicit" ]]; then
+            uv run bump-my-version bump "${{ steps.version.outputs.bump_part }}" --new-version "${VERSION}" --no-commit --no-tag
+          else
+            uv run bump-my-version bump "${BUMP}" --no-commit --no-tag
+          fi
+
+      - name: Refresh lockfile
+        run: uv lock
+
+      - name: Validate version files
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          python - "${VERSION}" <<'PY'
+          import pathlib
+          import re
+          import sys
+
+          expected = sys.argv[1]
+          files = [pathlib.Path("pyproject.toml"), *pathlib.Path("packages").glob("*/pyproject.toml")]
+          for path in files:
+              text = path.read_text()
+              if path.name == "pyproject.toml" and path.parent == pathlib.Path("."):
+                  match = re.search(r'^current_version = "([^"]+)"$', text, re.M)
+                  field = "current_version"
+              else:
+                  match = re.search(r'^version = "([^"]+)"$', text, re.M)
+                  field = "version"
+              if not match:
+                  raise SystemExit(f"{path}: missing {field}")
+              if match.group(1) != expected:
+                  raise SystemExit(f"{path}: {field} is {match.group(1)}, expected {expected}")
+          PY
+
+      - name: Commit release bump
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git add pyproject.toml packages/*/pyproject.toml uv.lock
+          git diff --cached --quiet && {
+            echo "No release changes were produced" >&2
+            exit 1
+          }
+          git commit -m "release: bump version to ${VERSION}"
+
+      - name: Push release branch
+        shell: bash
+        run: git push --set-upstream origin "${{ steps.version.outputs.branch }}"
+
+      - name: Open release PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          CURRENT_VERSION: ${{ steps.version.outputs.current }}
+          BRANCH: ${{ steps.version.outputs.branch }}
+        run: |
+          set -euo pipefail
+
+          body="$(mktemp)"
+          {
+            echo "## Release"
+            echo
+            echo "- Current version: ${CURRENT_VERSION}"
+            echo "- Target version: ${VERSION}"
+            echo "- Tag after merge: ${TAG}"
+            echo
+            echo "After this PR is merged, the tag-release workflow will validate the merge commit and create ${TAG}."
+          } > "${body}"
+
+          gh pr create \
+            --base main \
+            --head "${BRANCH}" \
+            --title "release: ${TAG}" \
+            --body-file "${body}"
+
+      - name: Summary
+        shell: bash
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          BRANCH: ${{ steps.version.outputs.branch }}
+        run: |
+          {
+            echo "## Release PR prepared"
+            echo
+            echo "- Version: ${VERSION}"
+            echo "- Tag after merge: ${TAG}"
+            echo "- Branch: ${BRANCH}"
+          } >> "${GITHUB_STEP_SUMMARY}"
