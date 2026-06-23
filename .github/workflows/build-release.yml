@@ -164,6 +164,8 @@ jobs:
       - build
     runs-on: ubuntu-latest
     environment: release
+    env:
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Generate token
         id: app-token
