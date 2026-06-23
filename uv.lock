@@ -581,7 +581,7 @@ wheels = [
 
 [[package]]
 name = "koda"
-version = "0.6.3"
+version = "0.6.4"
 source = { editable = "packages/koda" }
 dependencies = [
     { name = "anthropic" },
@@ -612,7 +612,7 @@ requires-dist = [
 
 [[package]]
 name = "koda-common"
-version = "0.6.3"
+version = "0.6.4"
 source = { editable = "packages/koda-common" }
 dependencies = [
     { name = "pydantic" },
@@ -629,7 +629,7 @@ requires-dist = [
 
 [[package]]
 name = "koda-service"
-version = "0.6.3"
+version = "0.6.4"
 source = { editable = "packages/koda-service" }
 dependencies = [
     { name = "koda" },
@@ -644,7 +644,7 @@ requires-dist = [
 
 [[package]]
 name = "koda-tui"
-version = "0.6.3"
+version = "0.6.4"
 source = { editable = "packages/koda-tui" }
 dependencies = [
     { name = "koda-common" },
