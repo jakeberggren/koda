@@ -88,13 +88,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-24.04
+          - runner: ubuntu-22.04
             platform: linux
             arch: x86_64
             archive_ext: tar.gz
             artifact_label: linux-x86_64
 
-          - runner: ubuntu-24.04-arm
+          - runner: ubuntu-22.04-arm
             platform: linux
             arch: arm64
             archive_ext: tar.gz
@@ -106,7 +106,7 @@ jobs:
             archive_ext: tar.gz
             artifact_label: macos-x86_64
 
-          - runner: macos-latest
+          - runner: macos-14
             platform: macos
             arch: arm64
             archive_ext: tar.gz
