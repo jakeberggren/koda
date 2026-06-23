@@ -154,7 +154,7 @@ def _wrap_line_ranges(text: str, width: int) -> list[tuple[int, int]]:
         text,
         width=width,
         expand_tabs=False,
-        replace_whitespace=False,
+        replace_whitespace=True,
         drop_whitespace=False,
         break_on_hyphens=False,
     )
