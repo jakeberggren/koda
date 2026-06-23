@@ -114,7 +114,6 @@ jobs:
     name: Tag Release
     needs: validate
     runs-on: ubuntu-latest
-    environment: release
     steps:
       - name: Generate token
         id: app-token
