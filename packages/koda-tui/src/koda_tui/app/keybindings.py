@@ -15,6 +15,12 @@ from prompt_toolkit.keys import Keys
 
 from koda_tui.app.input import FOCUS_IN_KEY, FOCUS_OUT_KEY, OSC11_RESPONSE_KEY
 
+ALT_ENTER_KEY = (Keys.Escape, Keys.Enter)
+ALT_UP_KEY = (Keys.Escape, Keys.Up)
+ALT_DOWN_KEY = (Keys.Escape, Keys.Down)
+COMMAND_UP_KEY = (Keys.Escape, Keys.Escape, Keys.Up)
+COMMAND_DOWN_KEY = (Keys.Escape, Keys.Escape, Keys.Down)
+
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
     from koda_tui.app.application import KodaTuiApp
@@ -68,19 +74,32 @@ def _register_terminal_sequences() -> None:
     ANSI_SEQUENCES["\x1b[8;5u"] = Keys.ControlW
 
     # Modified Enter - kitty keyboard protocol / CSI u.
+    # Shift/Ctrl+Enter insert newlines; Alt+Enter is alternate submit.
     ANSI_SEQUENCES["\x1b[13;5u"] = Keys.ControlJ
     ANSI_SEQUENCES["\x1b[10;5u"] = Keys.ControlJ
     ANSI_SEQUENCES["\x1b[13;2u"] = Keys.ControlJ
     ANSI_SEQUENCES["\x1b[10;2u"] = Keys.ControlJ
+    ANSI_SEQUENCES["\x1b[13;3u"] = ALT_ENTER_KEY
+    ANSI_SEQUENCES["\x1b[10;3u"] = ALT_ENTER_KEY
 
     # Modified Enter - legacy terminal sequences.
-    # Ctrl+Enter (modifier 5) - ghostty
-    ANSI_SEQUENCES["\x1b[27;5;13~"] = Keys.ControlJ
-    # Shift+Enter (modifier 2) - xterm
-    ANSI_SEQUENCES["\x1b[27;2;13~"] = Keys.ControlJ
+    ANSI_SEQUENCES["\x1b[27;2;13~"] = Keys.ControlJ  # Shift+Enter - xterm
 
-    # Shift+Enter - ESC+CR (terminals that send literal escape + enter)
-    ANSI_SEQUENCES["\x1b\r"] = Keys.ControlJ
+    # Alt+Enter - ESC+CR/LF (terminals that send literal escape + enter)
+    ANSI_SEQUENCES["\x1b[27;3;13~"] = ALT_ENTER_KEY
+    ANSI_SEQUENCES["\x1b\r"] = ALT_ENTER_KEY
+    ANSI_SEQUENCES["\x1b\n"] = ALT_ENTER_KEY
+
+    # Alt+Up/Down - common modified-arrow encodings. Do not map plain ESC+[A/B.
+    ANSI_SEQUENCES["\x1b[1;3A"] = ALT_UP_KEY
+    ANSI_SEQUENCES["\x1b[65;3u"] = ALT_UP_KEY
+    ANSI_SEQUENCES["\x1b[1;3B"] = ALT_DOWN_KEY
+    ANSI_SEQUENCES["\x1b[66;3u"] = ALT_DOWN_KEY
+
+    # Command+Up/Down in some terminals emits CSI 1;1 A/B, which prompt_toolkit
+    # does not recognize. Swallow these so they don't leak into the input buffer.
+    ANSI_SEQUENCES["\x1b[1;1A"] = COMMAND_UP_KEY
+    ANSI_SEQUENCES["\x1b[1;1B"] = COMMAND_DOWN_KEY
 
 
 async def _submit_buffer(
@@ -88,7 +107,7 @@ async def _submit_buffer(
     *,
     cancel_current_if_streaming: bool,
 ) -> None:
-    """Submit the current buffer, optionally interrupting the current stream."""
+    """Submit the current buffer, optionally steering the current stream."""
     text = app.layout.input_area.get_text().strip()
     if not text:
         return
@@ -96,34 +115,13 @@ async def _submit_buffer(
     app.layout.input_area.clear()
 
     if app.state.is_streaming:
-        app.enqueue_message(text, cancel_current=cancel_current_if_streaming)
+        if cancel_current_if_streaming:
+            app.steer_message(text)
+        else:
+            app.enqueue_message(text)
         return
 
     await app.send_message(text)
-
-
-async def _handle_enter(app: KodaTuiApp) -> None:
-    """Submit message on Enter, or queue if streaming."""
-    await _submit_buffer(
-        app,
-        cancel_current_if_streaming=not app.state.queue_inputs,
-    )
-
-
-def _handle_cancel_or_exit(app: KodaTuiApp) -> None:
-    """Cancel streaming, or request exit if idle."""
-    if app.state.is_streaming:
-        app.cancel_streaming()
-    elif app.request_exit():
-        app.exit()
-    else:
-        app.invalidate()
-
-
-def _handle_escape(app: KodaTuiApp) -> None:
-    """Cancel streaming on Escape."""
-    if app.state.is_streaming:
-        app.cancel_streaming()
 
 
 def _get_cycle_thinking_options(app: KodaTuiApp) -> list[ThinkingOptionId]:
@@ -178,19 +176,46 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
 
     @kb.add(Keys.Enter)
     async def _submit(_event: KeyPressEvent) -> None:
-        await _handle_enter(app)
+        await _submit_buffer(app, cancel_current_if_streaming=not app.state.queue_inputs)
+
+    @kb.add(*ALT_ENTER_KEY)
+    async def _alternate_submit(_event: KeyPressEvent) -> None:
+        await _submit_buffer(app, cancel_current_if_streaming=app.state.queue_inputs)
 
     @kb.add(Keys.ControlJ)
     def _newline(event: KeyPressEvent) -> None:
         event.current_buffer.insert_text("\n")
 
+    @kb.add(*ALT_UP_KEY)
+    def _edit_last_queued(_event: KeyPressEvent) -> None:
+        text = app.pop_last_queued_message()
+        if text is not None:
+            app.layout.input_area.set_text(text)
+            app.invalidate()
+
+    @kb.add(*ALT_DOWN_KEY)
+    def _ignore_alt_down(_event: KeyPressEvent) -> None:
+        return None
+
+    @kb.add(*COMMAND_UP_KEY)
+    def _ignore_command_up(_event: KeyPressEvent) -> None:
+        return None
+
+    @kb.add(*COMMAND_DOWN_KEY)
+    def _ignore_command_down(_event: KeyPressEvent) -> None:
+        return None
+
     @kb.add(Keys.ControlC)
-    def _cancel_or_exit(_event: KeyPressEvent) -> None:
-        _handle_cancel_or_exit(app)
+    def _request_exit(_event: KeyPressEvent) -> None:
+        if app.request_exit():
+            app.exit()
+        else:
+            app.invalidate()
 
     @kb.add(Keys.Escape, filter=_cancelable(app))
     def _escape(_event: KeyPressEvent) -> None:
-        _handle_escape(app)
+        if app.state.is_streaming:
+            app.cancel_streaming()
 
     @kb.add(Keys.ControlP)
     def _toggle_palette(_event: KeyPressEvent) -> None:
@@ -232,8 +257,8 @@ def _create_queue_keybindings(app: KodaTuiApp) -> KeyBindings:
     kb = KeyBindings()
 
     @kb.add(Keys.Escape)
-    def _clear_queue(_event: KeyPressEvent) -> None:
-        app.dequeue_all()
+    def _send_queue_now(_event: KeyPressEvent) -> None:
+        app.steer_and_send_queue()
 
     return kb
 

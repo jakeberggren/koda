@@ -133,7 +133,8 @@ class KodaTuiApp:
             mouse_support=True,
             input=self._terminal_input,
         )
-        app.ttimeoutlen = 0.01  # Reduce escape key delay (default 0.5s)
+        app.ttimeoutlen = 0.01  # Raw terminal Esc sequence timeout.
+        app.timeoutlen = 0.05  # Key-binding prefix timeout, e.g. Esc before Alt chords.
         app.after_render += self._request_initial_terminal_background_refresh
 
         return app
@@ -289,13 +290,25 @@ class KodaTuiApp:
             else False
         )
 
-    def enqueue_message(self, text: str, *, cancel_current: bool = False) -> None:
+    def enqueue_message(self, text: str) -> None:
         """Queue a message to be sent after the current stream completes."""
-        self._message_queue.enqueue(text, cancel_current=cancel_current)
+        self._message_queue.enqueue(text)
+
+    def steer_message(self, text: str) -> None:
+        """Steer the current stream and send a message as soon as possible."""
+        self._message_queue.steer(text)
 
     def dequeue_all(self) -> None:
         """Remove all queued messages."""
         self._message_queue.dequeue_all()
+
+    def pop_last_queued_message(self) -> str | None:
+        """Remove and return the most recently queued message."""
+        return self._message_queue.pop_last()
+
+    def steer_and_send_queue(self) -> None:
+        """Steer the current stream and send queued messages as soon as possible."""
+        self._message_queue.steer_and_drain()
 
     async def send_message(self, text: str) -> None:
         """Send a message and process the response stream."""

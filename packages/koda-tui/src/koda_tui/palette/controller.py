@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from koda.llm.auth.registry import ProviderAuthRegistry
 from koda_common.logging import get_logger
+from koda_tui.palette.menus.input import InputMenu
 from koda_tui.palette.menus.models import ModelMenu
 from koda_tui.palette.menus.providers import ProviderMenu
 from koda_tui.palette.menus.sessions import SessionMenu
@@ -34,6 +35,7 @@ class PaletteController:
         self.models = ModelMenu(app)
         self.thinking = ThinkingMenu(app)
         self.theme = ThemeMenu(app)
+        self.input = InputMenu(app)
         self.sessions = SessionMenu(app)
 
     def _execute_with_param(self, base_id: str, param: str, data: Any) -> None:  # noqa: C901
@@ -46,6 +48,8 @@ class PaletteController:
                 self.thinking.select(data)
             case "select_theme":
                 self.theme.select(data)
+            case "select_input_mode":
+                self.input.select(data)
             case "switch_session":
                 self.sessions.switch(data)
             case _:
@@ -53,10 +57,6 @@ class PaletteController:
 
     def _toggle_scrollbar(self) -> None:
         self._settings.tui.set("show_scrollbar", not self._settings.tui.show_scrollbar)
-        self._app.close_all_overlays()
-
-    def _toggle_queue_inputs(self) -> None:
-        self._settings.tui.set("queue_inputs", not self._settings.tui.queue_inputs)
         self._app.close_all_overlays()
 
     def root_items(self) -> list[ListItem]:
@@ -81,8 +81,8 @@ class PaletteController:
                 self.theme.open()
             case "toggle_scrollbar":
                 self._toggle_scrollbar()
-            case "toggle_queue_inputs":
-                self._toggle_queue_inputs()
+            case "select_input_mode":
+                self.input.open()
             case "new_session":
                 self.sessions.new()
             case "list_sessions":
