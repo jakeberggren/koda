@@ -68,9 +68,9 @@ class RootMenu:
                 group="Appearance",
             ),
             ListItem(
-                id="toggle_queue_inputs",
-                label="Toggle Queue Inputs",
-                detail="Queue or cancel on input during streaming",
+                id="select_input_mode",
+                label="Input Mode",
+                detail="Prefer queue or steer as default input mode",
                 group="System",
             ),
         ]

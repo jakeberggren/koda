@@ -30,7 +30,7 @@ class QueuedInputs:
         fragments: StyleAndTextTuples = [
             (
                 "class:queued-inputs.title",
-                f"  {n} message{s} queued (esc to clear)",
+                f"  {n} message{s} queued (esc to send now, alt/option-up to edit)",
             ),
         ]
         for item in self._state.pending_inputs[-self.MAX_LINES :]:

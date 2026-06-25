@@ -161,10 +161,12 @@ switch models, manage sessions, and adjust TUI behavior or appearance.
 
 | Key | Action |
 | --- | ------ |
-| `Enter` | Submit the current message |
+| `Enter` | Submit using the preferred streaming behavior |
+| `Alt+Enter` | Submit using the alternate streaming behavior |
 | `Shift+Enter` / `Ctrl+Enter` | Insert a newline |
-| `Ctrl+C` | Cancel streaming, or press twice while idle to exit |
-| `Escape` | Cancel streaming, or clear queued input |
+| `Alt+Up` | Edit the most recently queued message |
+| `Ctrl+C` | Press twice while idle to exit |
+| `Escape` | Stop streaming, or send queued input now |
 | `Ctrl+P` / `Ctrl+K` | Open the command palette |
 | `Ctrl+T` | Cycle supported thinking levels |
 | `@` | Open workspace file suggestions |

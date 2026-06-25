@@ -672,6 +672,11 @@ class InputArea:
         """Clear the input buffer."""
         self.buffer.reset()
 
+    def set_text(self, text: str) -> None:
+        """Replace the input buffer text."""
+        self.buffer.text = text
+        self.buffer.cursor_position = len(text)
+
     def move_cursor_up(self, count: int = 1) -> None:
         """Move up by wrapped visual rows, falling back to buffer history behavior."""
         for _ in range(count):
