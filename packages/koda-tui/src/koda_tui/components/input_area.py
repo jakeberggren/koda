@@ -125,11 +125,22 @@ class _WorkspaceFileCompleter(Completer):
 
 @dataclass(slots=True, frozen=True)
 class _WrappedLine:
-    """Metadata for one visual wrapped line."""
+    """Metadata for one visual wrapped line.
+
+    Attributes:
+        row: Source document row this visual line belongs to.
+        start: Inclusive source-column start for cursor/source mapping.
+        end: Exclusive source-column end for cursor/source mapping and rendering.
+        display_start: Inclusive source-column start used for rendering. This can be
+            greater than ``start`` when a wrap-boundary separator space should remain
+            in the source range but not be displayed as leading whitespace.
+        fragments: Prompt-toolkit style/text fragments rendered for this visual line.
+    """
 
     row: int
     start: int
     end: int
+    display_start: int
     fragments: tuple[tuple[str, str], ...]
 
 
@@ -143,12 +154,29 @@ def _text_width(text: str) -> int:
     return max(wcswidth(text), 0)
 
 
-def _wrap_line_ranges(text: str, width: int) -> list[tuple[int, int]]:
-    """Return source index ranges for visual word-wrapped lines."""
+def _wrap_line_ranges(text: str, width: int) -> list[tuple[int, int, int]]:
+    """Return source and display ranges for wcwidth-aware word wrapping.
+
+    The returned tuples are ``(start, end, display_start)``. ``start`` and
+    ``end`` describe the source-text segment used for cursor mapping, while
+    ``display_start`` describes where rendering should begin. Keeping these
+    separate lets a continuation line retain its leading separator space in the
+    source range, but skip rendering that space at the start of the visual line.
+
+    Args:
+        text: Source line to wrap. Newline characters should already be split out
+            by the caller.
+        width: Maximum visual width for each wrapped line.
+
+    Returns:
+        A non-empty list of ``(start, end, display_start)`` ranges. Empty input or
+        non-positive width returns ``[(0, 0, 0)]`` so callers always have one
+        visual line to render.
+    """
     if width <= 0:
-        return [(0, 0)]
+        return [(0, 0, 0)]
     if not text:
-        return [(0, 0)]
+        return [(0, 0, 0)]
 
     wrapped_lines = wrap(
         text,
@@ -159,14 +187,17 @@ def _wrap_line_ranges(text: str, width: int) -> list[tuple[int, int]]:
         break_on_hyphens=False,
     )
 
-    ranges: list[tuple[int, int]] = []
+    ranges: list[tuple[int, int, int]] = []
     start = 0
     for wrapped_line in wrapped_lines:
         end = start + len(wrapped_line)
-        ranges.append((start, end))
+        display_start = start
+        if start > 0 and wrapped_line.startswith(" "):
+            display_start += 1
+        ranges.append((start, end, display_start))
         start = end
 
-    return ranges or [(0, 0)]
+    return ranges or [(0, 0, 0)]
 
 
 def _wrap_content_width(width: int) -> int:
@@ -216,7 +247,16 @@ class _WordWrapBufferControl(BufferControl):
         document: Document,
         wrap_width: int,
     ) -> tuple[list[_WrappedLine], Point]:
-        """Build wrapped content rows and the corresponding cursor position."""
+        """Build visual wrapped lines and cursor position for a document.
+
+        Args:
+            document: Prompt-toolkit document to render.
+            wrap_width: Maximum visual width available for text content.
+
+        Returns:
+            A tuple containing the wrapped visual-line metadata and the cursor
+            position translated into wrapped visual coordinates.
+        """
         wrapped_lines: list[_WrappedLine] = []
         cursor_position = Point(x=0, y=0)
         cursor_row = document.cursor_position_row
@@ -227,15 +267,16 @@ class _WordWrapBufferControl(BufferControl):
             line_length = len(line_text)
             ranges = _wrap_line_ranges(line_text, wrap_width)
 
-            for start, end in ranges:
+            for start, end, display_start in ranges:
                 wrapped_lines.append(
                     _WrappedLine(
                         row=row,
                         start=start,
                         end=end,
+                        display_start=display_start,
                         # Reserve one visible cell so prompt_toolkit has a stable
                         # cursor slot at wrapped segment boundaries.
-                        fragments=(("", line_text[start:end]), ("", " ")),
+                        fragments=(("", line_text[display_start:end]), ("", " ")),
                     )
                 )
 
@@ -246,14 +287,22 @@ class _WordWrapBufferControl(BufferControl):
                     line_length,
                 ):
                     cursor_position = Point(
-                        x=_text_width(line_text[start:cursor_col]),
+                        x=_text_width(line_text[display_start:cursor_col]),
                         y=len(wrapped_lines) - 1,
                     )
 
-        return wrapped_lines or [_WrappedLine(0, 0, 0, (("", " "),))], cursor_position
+        return wrapped_lines or [_WrappedLine(0, 0, 0, 0, (("", " "),))], cursor_position
 
     def _find_wrapped_cursor_position(self, document: Document) -> tuple[int, int] | None:
-        """Return the current visual wrapped row and display column."""
+        """Return the cursor location in wrapped visual coordinates.
+
+        Args:
+            document: Current buffer document.
+
+        Returns:
+            ``(wrapped_row, display_column)`` when the cursor falls within a known
+            wrapped segment; otherwise ``None``.
+        """
         cursor_row: int = document.cursor_position_row
         cursor_col: int = document.cursor_position_col
         line_text: str = document.lines[cursor_row]
@@ -267,11 +316,20 @@ class _WordWrapBufferControl(BufferControl):
                 len(line_text),
             ):
                 continue
-            return wrapped_index, _text_width(line_text[wrapped.start : cursor_col])
+            return wrapped_index, _text_width(line_text[wrapped.display_start : cursor_col])
         return None
 
     def move_cursor_vertical(self, direction: int) -> bool:
-        """Move the cursor by visual wrapped rows."""
+        """Move the cursor vertically across wrapped visual rows.
+
+        Args:
+            direction: Row delta to move. Negative values move up; positive values
+                move down.
+
+        Returns:
+            ``True`` if the cursor moved to another wrapped row, or ``False`` if
+            there was no valid target row.
+        """
         document = self.buffer.document
         current = self._find_wrapped_cursor_position(document)
         if current is None:
@@ -286,7 +344,7 @@ class _WordWrapBufferControl(BufferControl):
         target_line = document.lines[target.row]
         source_col = self._source_col_from_display_x(
             target_line,
-            target.start,
+            target.display_start,
             target.end,
             display_x,
         )
@@ -294,20 +352,34 @@ class _WordWrapBufferControl(BufferControl):
         return True
 
     def sync_wrapped_lines(self, width: int) -> None:
-        """Refresh wrapped line metadata for the current document and width."""
+        """Refresh cached wrapped-line metadata for the current buffer.
+
+        Args:
+            width: Current input window width before reserving the cursor cell.
+        """
         wrap_width = max(1, _wrap_content_width(width))
         self._wrapped_lines, _ = self._build_wrapped_lines(self.buffer.document, wrap_width)
 
     @staticmethod
     def _slice_processed_fragments(
         fragments: StyleAndTextTuples,
-        start: int,
+        display_start: int,
         end: int,
     ) -> tuple[tuple[str, str], ...]:
-        """Slice processed line fragments for one wrapped source segment."""
+        """Slice processed fragments for a wrapped visual segment.
+
+        Args:
+            fragments: Fully processed fragments for the source document row.
+            display_start: Inclusive source-column start for rendered content.
+            end: Exclusive source-column end for rendered content.
+
+        Returns:
+            The processed style/text fragments for the visual segment, followed by
+            a blank cursor slot fragment.
+        """
         exploded = explode_text_fragments(fragments)
         # Keep only the first 2 items (text and style) from each tuple
-        sliced = tuple((item[0], item[1]) for item in exploded[start:end])
+        sliced = tuple((item[0], item[1]) for item in exploded[display_start:end])
         return (*sliced, ("", " "))
 
     def _processed_wrapped_lines(
@@ -317,7 +389,17 @@ class _WordWrapBufferControl(BufferControl):
         height: int,
         wrapped_lines: list[_WrappedLine],
     ) -> list[_WrappedLine]:
-        """Apply prompt_toolkit's standard processors to wrapped segments."""
+        """Apply prompt-toolkit processors to wrapped visual segments.
+
+        Args:
+            document: Prompt-toolkit document used to generate processed lines.
+            width: Current input window width.
+            height: Current input window height.
+            wrapped_lines: Wrapped-line metadata before input processors are applied.
+
+        Returns:
+            Wrapped-line metadata with processed style/text fragments attached.
+        """
         get_processed_line = self._create_get_processed_line_func(document, width, height)
 
         return [
@@ -325,9 +407,10 @@ class _WordWrapBufferControl(BufferControl):
                 row=wrapped.row,
                 start=wrapped.start,
                 end=wrapped.end,
+                display_start=wrapped.display_start,
                 fragments=self._slice_processed_fragments(
                     get_processed_line(wrapped.row).fragments,
-                    wrapped.start,
+                    wrapped.display_start,
                     wrapped.end,
                 ),
             )
@@ -417,7 +500,7 @@ class _WordWrapBufferControl(BufferControl):
         line_text = self.buffer.document.lines[wrapped.row]
         source_col = self._source_col_from_display_x(
             line_text,
-            wrapped.start,
+            wrapped.display_start,
             wrapped.end,
             mouse_event.position.x,
         )
