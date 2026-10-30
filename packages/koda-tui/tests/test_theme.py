@@ -66,10 +66,10 @@ def test_runtime_osc_11_input_preserves_trailing_input() -> None:
 
 def _make_koda_input_for_parser_test() -> KodaVt100Input:
     input_ = object.__new__(KodaVt100Input)
-    input_._buffer = []  # noqa: SLF001
-    input_._osc11_parser = _Osc11InputParser()  # noqa: SLF001
-    input_._focus_parser = _FocusInputParser()  # noqa: SLF001
-    input_.vt100_parser = Vt100Parser(input_._buffer.append)  # noqa: SLF001
+    input_._buffer = []
+    input_._osc11_parser = _Osc11InputParser()
+    input_._focus_parser = _FocusInputParser()
+    input_.vt100_parser = Vt100Parser(input_._buffer.append)
     return input_
 
 

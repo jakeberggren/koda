@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
 log = get_logger(__name__)
 
-type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
+type JsonValue = bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
 type JsonObject = dict[str, JsonValue]
 type JwkDict = dict[str, str | list[str]]
 type BrowserAuthorizer = Callable[[AuthorizationRequest, OAuthLoginCallbacks], Awaitable[str]]
