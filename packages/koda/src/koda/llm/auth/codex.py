@@ -5,7 +5,7 @@ from collections.abc import Awaitable, Callable
 from time import time
 from typing import TYPE_CHECKING, Annotated, cast
 
-import httpx
+import httpx2
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 from authlib.oauth2.base import OAuth2Error
 from authlib.oauth2.client import OAuth2Client
@@ -154,8 +154,8 @@ class OpenAICodexAuth:
         self,
         *,
         browser_authorizer: BrowserAuthorizer = _authorize_in_browser,
-        oauth_transport: httpx.AsyncBaseTransport | None = None,
-        jwks_transport: httpx.AsyncBaseTransport | None = None,
+        oauth_transport: httpx2.AsyncBaseTransport | None = None,
+        jwks_transport: httpx2.AsyncBaseTransport | None = None,
     ) -> None:
         self._browser_authorizer = browser_authorizer
         self._oauth_transport = oauth_transport
@@ -193,7 +193,7 @@ class OpenAICodexAuth:
         try:
             async with self._token_client() as client:
                 token = await request(client)
-        except (OAuth2Error, httpx.HTTPError) as e:
+        except (OAuth2Error, httpx2.HTTPError) as e:
             raise OpenAICodexTokenError(operation, str(e)) from e
         return self._validate_model(operation, model, token)
 
@@ -229,11 +229,11 @@ class OpenAICodexAuth:
             return self._cached_jwks
 
         try:
-            async with httpx.AsyncClient(trust_env=False, transport=self._jwks_transport) as client:
+            async with httpx2.AsyncClient(trust_env=False, transport=self._jwks_transport) as client:
                 response = await client.get(JWKS_URL)
                 response.raise_for_status()
                 data = response.json()
-        except (httpx.HTTPError, ValueError) as error:
+        except (httpx2.HTTPError, ValueError) as error:
             raise OpenAICodexTokenError("credential", "openid jwks fetch failed") from error
         jwks = self._validate_model("credential", _JWKS, data, "openid jwks was invalid")
         try:
