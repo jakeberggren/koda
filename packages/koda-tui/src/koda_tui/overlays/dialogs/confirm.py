@@ -21,6 +21,7 @@ from prompt_toolkit.widgets import Box, Frame
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from prompt_toolkit.formatted_text import StyleAndTextTuples
     from prompt_toolkit.key_binding import KeyPressEvent
     from prompt_toolkit.layout import AnyContainer
 
@@ -89,7 +90,7 @@ class ConfirmDialog:
     def _on_no(self, _event: KeyPressEvent) -> None:
         self._on_cancel()
 
-    def _button_text(self) -> list[tuple[str, str]]:
+    def _button_text(self) -> StyleAndTextTuples:
         yes_style = "class:dialog.selected" if self._selected else "class:dialog.button"
         no_style = "class:dialog.button" if self._selected else "class:dialog.selected"
         return [

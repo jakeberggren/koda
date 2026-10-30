@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
+    from collections.abc import AsyncGenerator
     from pathlib import Path
 
     from koda.execution import CommandExecutor
@@ -40,7 +40,7 @@ class ToolExecutionCoordinator:
         return lock
 
     @asynccontextmanager
-    async def shared_access(self) -> AsyncIterator[None]:
+    async def shared_access(self) -> AsyncGenerator[None]:
         """Allow concurrent access unless an exclusive caller is queued or active."""
         async with self._condition:
             await self._condition.wait_for(
@@ -57,7 +57,7 @@ class ToolExecutionCoordinator:
                     self._condition.notify_all()
 
     @asynccontextmanager
-    async def exclusive_access(self) -> AsyncIterator[None]:
+    async def exclusive_access(self) -> AsyncGenerator[None]:
         """Run with exclusive access when no shared participant is active."""
         async with self._condition:
             self._exclusive_waiters += 1
