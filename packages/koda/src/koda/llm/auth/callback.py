@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from queue import Empty, Queue
 from time import monotonic
@@ -19,6 +20,8 @@ from koda_common.logging import get_logger
 log = get_logger(__name__)
 
 if TYPE_CHECKING:
+    from socket import socket
+    from socketserver import BaseServer
     from threading import Event
 
 
@@ -40,31 +43,22 @@ def extract_callback_code(query: str, *, expected_state: str) -> str:
     return code
 
 
-class OAuthCallbackServer(ThreadingHTTPServer):
-    """One-shot HTTP server for receiving an OAuth redirect on localhost."""
-
-    callback_path: str
-    state: str
-    result: Queue[OAuthCallbackResult]
-
-    def __init__(
-        self,
-        server_address: tuple[str, int],
-        *,
-        callback_path: str,
-        state: str,
-        result: Queue[OAuthCallbackResult],
-    ) -> None:
-        super().__init__(server_address, OAuthCallbackHandler)
-        self.callback_path = callback_path
-        self.state = state
-        self.result = result
-
-
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
     """Handle the OAuth redirect request and publish the authorization code."""
 
-    server: OAuthCallbackServer
+    def __init__(
+        self,
+        request: socket | tuple[bytes, socket],
+        client_address: tuple[str, int],
+        server: BaseServer,
+        *,
+        listener: OAuthCallbackListener,
+        result: Queue[OAuthCallbackResult],
+    ) -> None:
+        # The base initializer handles the request, so configure the handler first.
+        self.listener = listener
+        self.result = result
+        super().__init__(request, client_address, server)
 
     def _send_text(self, status: int, body: str) -> None:
         """Send a short plain-text response to the browser."""
@@ -80,31 +74,31 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         log.info("oauth_callback_request_received", path=url.path)
 
-        if url.path != self.server.callback_path:
+        if url.path != self.listener.callback_path:
             log.info(
                 "oauth_callback_path_mismatch",
-                expected=self.server.callback_path,
+                expected=self.listener.callback_path,
                 got=url.path,
             )
             self._send_text(404, "Not found")
             return
 
         try:
-            code = extract_callback_code(url.query, expected_state=self.server.state)
+            code = extract_callback_code(url.query, expected_state=self.listener.state)
         except OAuthCallbackStateError:
-            log.warning("oauth_callback_state_mismatch", expected_prefix=self.server.state[:8])
+            log.warning("oauth_callback_state_mismatch", expected_prefix=self.listener.state[:8])
             self._send_text(400, "State mismatch")
             return
         except OAuthCallbackCodeMissingError as error:
             params = parse_qs(url.query)
             log.warning("oauth_callback_missing_code", error=params.get("error"))
             self._send_text(400, "Missing authorization code")
-            self.server.result.put(error)
+            self.result.put(error)
             return
 
         log.info("oauth_callback_success")
         self._send_text(200, "Authentication complete. You can close this window.")
-        self.server.result.put(code)
+        self.result.put(code)
 
     def log_message(self, format: str, *args: object) -> None:  # noqa: ARG002
         """Suppress BaseHTTPRequestHandler's default stderr access logs."""
@@ -125,7 +119,7 @@ class OAuthCallbackListener:
     def _wait_for_result(
         self,
         *,
-        server: OAuthCallbackServer,
+        server: ThreadingHTTPServer,
         result: Queue[OAuthCallbackResult],
         cancel_event: Event | None,
     ) -> OAuthCallbackResult:
@@ -154,12 +148,12 @@ class OAuthCallbackListener:
             path=self.callback_path,
         )
         result: Queue[OAuthCallbackResult] = Queue(maxsize=1)
-        server = OAuthCallbackServer(
-            (self.host, self.port),
-            callback_path=self.callback_path,
-            state=self.state,
+        handler = partial(
+            OAuthCallbackHandler,
+            listener=self,
             result=result,
         )
+        server = ThreadingHTTPServer((self.host, self.port), handler)
         server.timeout = self.poll_interval
         try:
             value = self._wait_for_result(

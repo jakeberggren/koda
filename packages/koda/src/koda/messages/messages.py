@@ -14,7 +14,6 @@ class MessageRole(StrEnum):
 
 
 class Message(BaseModel):
-    role: MessageRole = Field(...)
     content: str = Field(default="")
 
 
