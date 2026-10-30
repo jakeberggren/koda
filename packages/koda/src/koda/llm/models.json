@@ -11,14 +11,104 @@
           "models": [
             {
               "context_window": 1000000,
+              "id": "claude-fable-5-1",
+              "max_output_tokens": 128000,
+              "name": "Claude Fable 5.1",
+              "thinking": {
+                "modes": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
+              "id": "claude-opus-5-5",
+              "max_output_tokens": 128000,
+              "name": "Claude Opus 5.5",
+              "thinking": {
+                "modes": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
+              "id": "claude-sonnet-5-5",
+              "max_output_tokens": 128000,
+              "name": "Claude Sonnet 5.5",
+              "thinking": {
+                "modes": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
+              "id": "claude-haiku-5-5",
+              "max_output_tokens": 128000,
+              "name": "Claude Haiku 5.5",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
               "id": "claude-fable-5",
               "max_output_tokens": 128000,
               "name": "Claude Fable 5",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
+              "id": "claude-opus-5",
+              "max_output_tokens": 128000,
+              "name": "Claude Opus 5",
+              "thinking": {
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
+              "id": "claude-sonnet-5",
+              "max_output_tokens": 128000,
+              "name": "Claude Sonnet 5",
+              "thinking": {
+                "modes": [
+                  "none",
                   "low",
                   "medium",
                   "high",
@@ -62,6 +152,39 @@
                   "high",
                   "xhigh",
                   "max"
+                ]
+              }
+            },
+            {
+              "context_window": 1000000,
+              "id": "claude-opus-4-6",
+              "max_output_tokens": 128000,
+              "name": "Claude Opus 4.6",
+              "thinking": {
+                "budget_tokens": {
+                  "max_tokens": 128000
+                },
+                "modes": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "max"
+                ]
+              }
+            },
+            {
+              "context_window": 200000,
+              "id": "claude-opus-4-5",
+              "max_output_tokens": 64000,
+              "name": "Claude Opus 4.5",
+              "thinking": {
+                "budget_tokens": {
+                  "max_tokens": 64000
+                },
+                "modes": [
+                  "none",
+                  "enabled"
                 ]
               }
             },
