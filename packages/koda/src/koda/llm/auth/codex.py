@@ -229,7 +229,9 @@ class OpenAICodexAuth:
             return self._cached_jwks
 
         try:
-            async with httpx2.AsyncClient(trust_env=False, transport=self._jwks_transport) as client:
+            async with httpx2.AsyncClient(
+                trust_env=False, transport=self._jwks_transport
+            ) as client:
                 response = await client.get(JWKS_URL)
                 response.raise_for_status()
                 data = response.json()
