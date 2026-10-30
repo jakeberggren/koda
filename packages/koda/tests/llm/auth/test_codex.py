@@ -29,7 +29,7 @@ from koda_common.settings.credentials import OAuthCredential
 if TYPE_CHECKING:
     from koda.llm.auth.browser import AuthorizationRequest
 
-type JsonValue = None | bool | int | float | str | list[JsonValue] | dict[str, JsonValue]
+type JsonValue = bool | int | float | str | list[JsonValue] | dict[str, JsonValue] | None
 type JsonObject = dict[str, JsonValue]
 
 
