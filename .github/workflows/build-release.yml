@@ -106,7 +106,7 @@ jobs:
             archive_ext: tar.gz
             artifact_label: macos-x86_64
 
-          - runner: macos-14
+          - runner: macos-15
             platform: macos
             arch: arm64
             archive_ext: tar.gz
