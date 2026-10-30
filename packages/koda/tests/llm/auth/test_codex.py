@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 from urllib.parse import parse_qs, urlparse
 
-import httpx
+import httpx2
 import pytest
 from joserfc import jwt
 from joserfc.jwk import RSAKey
@@ -79,12 +79,12 @@ def _signed_id_token(key: RSAKey, config: _IdTokenClaims) -> str:
     return jwt.encode({"alg": "RS256", "kid": "test-key"}, claims, key, algorithms=["RS256"])
 
 
-def _jwks_transport(key: RSAKey) -> httpx.MockTransport:
-    def handler(request: httpx.Request) -> httpx.Response:
+def _jwks_transport(key: RSAKey) -> httpx2.MockTransport:
+    def handler(request: httpx2.Request) -> httpx2.Response:
         assert str(request.url) == JWKS_URL
-        return httpx.Response(200, json={"keys": [key.as_dict(private=False)]})
+        return httpx2.Response(200, json={"keys": [key.as_dict(private=False)]})
 
-    return httpx.MockTransport(handler)
+    return httpx2.MockTransport(handler)
 
 
 def _callbacks(opened_urls: list[str] | None = None) -> OAuthLoginCallbacks:
@@ -117,12 +117,12 @@ def test_create_authorization_request_contains_codex_parameters() -> None:
 async def test_login_exchanges_code_and_builds_credential() -> None:
     key = RSAKey.generate_key(parameters={"kid": "test-key"}, private=True)
     browser = _BrowserAuthorizer()
-    token_requests: list[httpx.Request] = []
+    token_requests: list[httpx2.Request] = []
 
-    def token_handler(request: httpx.Request) -> httpx.Response:
+    def token_handler(request: httpx2.Request) -> httpx2.Response:
         token_requests.append(request)
         assert browser.request is not None
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={
                 "access_token": "access-token",
@@ -140,7 +140,7 @@ async def test_login_exchanges_code_and_builds_credential() -> None:
 
     auth = OpenAICodexAuth(
         browser_authorizer=browser,
-        oauth_transport=httpx.MockTransport(token_handler),
+        oauth_transport=httpx2.MockTransport(token_handler),
         jwks_transport=_jwks_transport(key),
     )
     opened_urls: list[str] = []
@@ -168,16 +168,16 @@ async def test_login_exchanges_code_and_builds_credential() -> None:
 
 
 async def test_refresh_preserves_fields_omitted_by_provider() -> None:
-    token_requests: list[httpx.Request] = []
+    token_requests: list[httpx2.Request] = []
 
-    def token_handler(request: httpx.Request) -> httpx.Response:
+    def token_handler(request: httpx2.Request) -> httpx2.Response:
         token_requests.append(request)
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={"access_token": "new-access", "expires_at": 123456},
         )
 
-    auth = OpenAICodexAuth(oauth_transport=httpx.MockTransport(token_handler))
+    auth = OpenAICodexAuth(oauth_transport=httpx2.MockTransport(token_handler))
     old_credential = OAuthCredential(
         type="oauth",
         access_token="old-access",  # noqa: S106
@@ -206,8 +206,8 @@ async def test_refresh_preserves_fields_omitted_by_provider() -> None:
 async def test_refresh_validates_new_id_token() -> None:
     key = RSAKey.generate_key(parameters={"kid": "test-key"}, private=True)
 
-    def token_handler(_: httpx.Request) -> httpx.Response:
-        return httpx.Response(
+    def token_handler(_: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(
             200,
             json={
                 "access_token": "new-access",
@@ -221,7 +221,7 @@ async def test_refresh_validates_new_id_token() -> None:
         )
 
     auth = OpenAICodexAuth(
-        oauth_transport=httpx.MockTransport(token_handler),
+        oauth_transport=httpx2.MockTransport(token_handler),
         jwks_transport=_jwks_transport(key),
     )
     old_credential = OAuthCredential(
@@ -254,12 +254,12 @@ async def test_login_rejects_invalid_id_token_claims(claims: _IdTokenClaims) -> 
     key = RSAKey.generate_key(parameters={"kid": "test-key"}, private=True)
     browser = _BrowserAuthorizer()
 
-    def token_handler(_: httpx.Request) -> httpx.Response:
+    def token_handler(_: httpx2.Request) -> httpx2.Response:
         assert browser.request is not None
         config = (
             claims if claims.nonce is not None else replace(claims, nonce=browser.request.nonce)
         )
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={
                 "access_token": "access-token",
@@ -271,7 +271,7 @@ async def test_login_rejects_invalid_id_token_claims(claims: _IdTokenClaims) -> 
 
     auth = OpenAICodexAuth(
         browser_authorizer=browser,
-        oauth_transport=httpx.MockTransport(token_handler),
+        oauth_transport=httpx2.MockTransport(token_handler),
         jwks_transport=_jwks_transport(key),
     )
 
@@ -283,9 +283,9 @@ async def test_login_rejects_missing_account_id() -> None:
     key = RSAKey.generate_key(parameters={"kid": "test-key"}, private=True)
     browser = _BrowserAuthorizer()
 
-    def token_handler(_: httpx.Request) -> httpx.Response:
+    def token_handler(_: httpx2.Request) -> httpx2.Response:
         assert browser.request is not None
-        return httpx.Response(
+        return httpx2.Response(
             200,
             json={
                 "access_token": "access-token",
@@ -300,7 +300,7 @@ async def test_login_rejects_missing_account_id() -> None:
 
     auth = OpenAICodexAuth(
         browser_authorizer=browser,
-        oauth_transport=httpx.MockTransport(token_handler),
+        oauth_transport=httpx2.MockTransport(token_handler),
         jwks_transport=_jwks_transport(key),
     )
 
@@ -311,7 +311,7 @@ async def test_login_rejects_missing_account_id() -> None:
 async def test_login_rejects_invalid_token_response() -> None:
     auth = OpenAICodexAuth(
         browser_authorizer=_BrowserAuthorizer(),
-        oauth_transport=httpx.MockTransport(lambda _: httpx.Response(200, json={})),
+        oauth_transport=httpx2.MockTransport(lambda _: httpx2.Response(200, json={})),
     )
 
     with pytest.raises(OpenAICodexTokenError, match="response JSON was invalid"):
