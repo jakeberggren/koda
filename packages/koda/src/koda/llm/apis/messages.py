@@ -129,14 +129,14 @@ class AnthropicMessagesAdapter(
             return content or ""
         return message.content
 
+    def _to_provider_message(self, message: KodaMessage) -> MessageParam:
+        content = self._to_provider_content(message)
+        if isinstance(message, AssistantMessage):
+            return {"role": "assistant", "content": content}
+        return {"role": "user", "content": content}
+
     def to_provider_messages(self, messages: Sequence[KodaMessage]) -> list[MessageParam]:
-        return [
-            {
-                "role": "assistant" if isinstance(message, AssistantMessage) else "user",
-                "content": self._to_provider_content(message),
-            }
-            for message in messages
-        ]
+        return [self._to_provider_message(message) for message in messages]
 
     def to_provider_tools(
         self,
@@ -209,10 +209,6 @@ def _resolve_thinking(
     if output_config is not None:
         return {"type": "adaptive", "display": "summarized"}, output_config
     return {"type": "disabled"}, omit
-
-
-def _or_omit[T](value: T | None) -> T | Omit:
-    return value if value is not None else omit
 
 
 def _coalesce[T](value: T | None, default: T) -> T:
@@ -344,10 +340,8 @@ class AnthropicMessagesAPI(LLM):
                 model=self.config.model,
                 output_config=output_config,
                 system=request.instructions or "",
-                temperature=_or_omit(request.options.temperature),
                 thinking=thinking,
                 tools=self.adapter.to_provider_tools(request.tools),
-                top_p=_or_omit(request.options.top_p),
             )
         except Exception as error:
             _raise_anthropic_error(error, backend="anthropic-messages")
@@ -369,10 +363,8 @@ class AnthropicMessagesAPI(LLM):
                 model=self.config.model,
                 output_config=output_config,
                 system=request.instructions or "",
-                temperature=_or_omit(request.options.temperature),
                 thinking=thinking,
                 tools=self.adapter.to_provider_tools(request.tools),
-                top_p=_or_omit(request.options.top_p),
             ) as stream:
                 async for event in stream:
                     processed_event = self.event_adapter.to_llm_event(event)
