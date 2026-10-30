@@ -15,9 +15,6 @@
               "max_output_tokens": 128000,
               "name": "Claude Fable 5.1",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
                   "low",
                   "medium",
@@ -33,11 +30,7 @@
               "max_output_tokens": 128000,
               "name": "Claude Opus 5.5",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
-                  "none",
                   "low",
                   "medium",
                   "high",
@@ -52,14 +45,11 @@
               "max_output_tokens": 128000,
               "name": "Claude Sonnet 5.5",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
-                  "none",
                   "low",
                   "medium",
                   "high",
+                  "xhigh",
                   "max"
                 ]
               }
@@ -70,14 +60,13 @@
               "max_output_tokens": 128000,
               "name": "Claude Haiku 5.5",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
                   "none",
                   "low",
                   "medium",
-                  "high"
+                  "high",
+                  "xhigh",
+                  "max"
                 ]
               }
             },
@@ -87,9 +76,6 @@
               "max_output_tokens": 128000,
               "name": "Claude Fable 5",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
                   "low",
                   "medium",
@@ -105,9 +91,6 @@
               "max_output_tokens": 128000,
               "name": "Claude Opus 5",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
                   "none",
                   "low",
@@ -124,14 +107,12 @@
               "max_output_tokens": 128000,
               "name": "Claude Sonnet 5",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
                   "none",
                   "low",
                   "medium",
                   "high",
+                  "xhigh",
                   "max"
                 ]
               }
@@ -188,7 +169,6 @@
                   "low",
                   "medium",
                   "high",
-                  "xhigh",
                   "max"
                 ]
               }
@@ -204,10 +184,7 @@
                 },
                 "modes": [
                   "none",
-                  "low",
-                  "medium",
-                  "high",
-                  "max"
+                  "enabled"
                 ]
               }
             },
