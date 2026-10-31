@@ -1,1 +1,1 @@
-"""Command palette feature package."""
+"""Palette: the command palette and its menus."""

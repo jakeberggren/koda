@@ -1,4 +1,4 @@
-"""Dialog components: a choice, a message, and a text input, each in a Panel."""
+"""Dialog widgets: a choice, a message, and a text input, each in a Panel."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import WindowAlign
 
 from koda_tui.appearance import Tokens, Width, compose
-from koda_tui.ui.components.panel import Panel
-from koda_tui.ui.primitives import Input, Spacer, Text
+from koda_tui.ui.primitives import Input, Overflow, Spacer, Text
+from koda_tui.ui.widgets.panel import Panel
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -93,7 +93,7 @@ class MessageDialog:
         kb.add(Keys.Enter)(lambda _event: on_close())
         self._panel = Panel(
             title,
-            [Text(detail, style=Tokens.Text.MUTED, wrap=True, focusable=True)],
+            [Text(detail, style=Tokens.Text.MUTED, overflow=Overflow.WRAP, focusable=True)],
             on_close=on_close,
             key_bindings=kb,
             width=Width.MEDIUM,
@@ -120,7 +120,11 @@ class InputDialog:
 
         kb = KeyBindings()
         kb.add(Keys.Enter)(self._on_enter)
-        detail_rows = [Text(detail, style=Tokens.Text.MUTED, wrap=True), Spacer()] if detail else []
+        detail_rows = (
+            [Text(detail, style=Tokens.Text.MUTED, overflow=Overflow.WRAP), Spacer()]
+            if detail
+            else []
+        )
         self._panel = Panel(
             title,
             [*detail_rows, Input(self.input_buffer, masked=mask_input)],

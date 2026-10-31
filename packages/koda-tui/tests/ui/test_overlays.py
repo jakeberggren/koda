@@ -1,66 +1,21 @@
-"""Tests for OverlayManager — overlay stack management."""
+"""Tests for Overlays: the stack, what floats, and where focus goes."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import pytest
-from prompt_toolkit.layout import Float, Window
+from prompt_toolkit.application.current import set_app
+from prompt_toolkit.buffer import Buffer
+from prompt_toolkit.layout import FloatContainer, Window
 
-from koda_tui.ui.overlays import OverlayManager
+from koda_tui.ui.overlays import Overlays
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
-@dataclass
-class _MockBuffer:
-    """Mock buffer for focus testing."""
-
-    name: str = "buffer"
-
-
-class _MockContainer:
-    """A valid prompt_toolkit container for mocks."""
-
-    def __pt_container__(self) -> Window:
-        return Window()
-
-
-@dataclass
-class _MockOverlay:
-    """Mock overlay: any prompt_toolkit container."""
-
-    name: str
-
-    def __pt_container__(self) -> _MockContainer:
-        return _MockContainer()
-
-
-class _MockFloats:
-    """Mock FloatContainer.floats list."""
-
-    def __init__(self) -> None:
-        self.items: list[Float] = []
-
-    def clear(self) -> None:
-        self.items.clear()
-
-    def append(self, item: Float) -> None:
-        self.items.append(item)
-
-    def __len__(self) -> int:
-        return len(self.items)
-
-    def __contains__(self, item: object) -> bool:
-        return item in self.items
-
-    def __iter__(self) -> Iterator[Float]:
-        return iter(self.items)
-
-
-class _MockLayout:
+class _Layout:
     def __init__(self) -> None:
         self.focused: object | None = None
 
@@ -68,119 +23,88 @@ class _MockLayout:
         self.focused = item
 
 
-class _MockApp:
+class _App:
     def __init__(self) -> None:
-        self.layout = _MockLayout()
+        self.layout = _Layout()
+        self.invalidated = 0
 
-
-class _MockRootContainer:
-    def __init__(self) -> None:
-        self.floats = _MockFloats()
+    def invalidate(self) -> None:
+        self.invalidated += 1
 
 
 @pytest.fixture
-def manager():
-    """OverlayManager with a mock root container."""
-    root = _MockRootContainer()
-    app = _MockApp()
-    return OverlayManager(root, app), root, app  # type: ignore
+def app() -> Iterator[_App]:
+    app = _App()
+    with set_app(app):  # type: ignore
+        yield app
 
 
 @pytest.fixture
-def manager_with_fallback():
-    """OverlayManager with a fallback focus target."""
-    fallback = _MockBuffer("input")
-    app = _MockApp()
-    root = _MockRootContainer()
-    return (
-        OverlayManager(root, app, fallback_focus_target=fallback),  # type: ignore
-        root,
-        app,
-        fallback,
-    )
+def root() -> FloatContainer:
+    return FloatContainer(Window(), floats=[])
 
 
-class TestConstruction:
-    def test_initially_closed(self, manager) -> None:
-        manager, _root, _app = manager
-        assert not manager.is_open
+@pytest.fixture
+def fallback() -> Buffer:
+    return Buffer()
 
 
-class TestPush:
-    def test_pushes_overlay(self, manager) -> None:
-        manager, _root, _app = manager
-        overlay = _MockOverlay("test")
-        manager.push(overlay)
-        assert manager.is_open
-
-    def test_clears_previous_float(self, manager) -> None:
-        manager, root, _app = manager
-        o1 = _MockOverlay("first")
-        o2 = _MockOverlay("second")
-        manager.push(o1)
-        first_float = root.floats.items[0]
-        manager.push(o2)
-        assert first_float not in root.floats
-
-    def test_focuses_the_overlay(self, manager) -> None:
-        manager, _root, app = manager
-        overlay = _MockOverlay("test")
-        manager.push(overlay)
-        assert app.layout.focused is overlay
+@pytest.fixture
+def overlays(root: FloatContainer, fallback: Buffer) -> Overlays:
+    return Overlays(root, fallback=fallback)
 
 
-class TestPop:
-    def test_pop_returns_overlay(self, manager) -> None:
-        manager, _root, _app = manager
-        overlay = _MockOverlay("test")
-        manager.push(overlay)
-        result = manager.pop()
-        assert result is overlay
-
-    def test_pop_empty_returns_none(self, manager) -> None:
-        manager, _root, _app = manager
-        assert manager.pop() is None
-
-    def test_pop_reveals_previous(self, manager) -> None:
-        manager, root, app = manager
-        o1 = _MockOverlay("first")
-        o2 = _MockOverlay("second")
-        manager.push(o1)
-        manager.push(o2)
-        manager.pop()
-        assert len(root.floats) == 1
-        assert app.layout.focused is o1
-
-    def test_pop_closes_when_last(self, manager) -> None:
-        manager, _root, _app = manager
-        overlay = _MockOverlay("test")
-        manager.push(overlay)
-        manager.pop()
-        assert not manager.is_open
-
-    def test_pop_last_restores_fallback_focus(self, manager_with_fallback) -> None:
-        manager, _root, app, fallback = manager_with_fallback
-        manager.push(_MockOverlay("test"))
-        manager.pop()
-        assert app.layout.focused is fallback
+def test_starts_closed(overlays: Overlays) -> None:
+    assert not overlays.is_open
 
 
-class TestClear:
-    def test_clears_all(self, manager) -> None:
-        manager, root, _app = manager
-        manager.push(_MockOverlay("a"))
-        manager.push(_MockOverlay("b"))
-        manager.clear()
-        assert not manager.is_open
-        assert len(root.floats) == 0
+def test_open_floats_and_focuses_only_the_top(
+    app: _App, root: FloatContainer, overlays: Overlays
+) -> None:
+    first, second = Window(), Window()
+    overlays.open(first)
+    overlays.open(second)
+    assert overlays.is_open
+    assert [f.content for f in root.floats] == [second]
+    assert app.layout.focused is second
 
-    def test_clear_empty_noop(self, manager) -> None:
-        manager, _root, _app = manager
-        manager.clear()
-        assert not manager.is_open
 
-    def test_clear_restores_fallback_focus(self, manager_with_fallback) -> None:
-        manager, _root, app, fallback = manager_with_fallback
-        manager.push(_MockOverlay("test"))
-        manager.clear()
-        assert app.layout.focused is fallback
+def test_close_reveals_the_one_below(app: _App, root: FloatContainer, overlays: Overlays) -> None:
+    first, second = Window(), Window()
+    overlays.open(first)
+    overlays.open(second)
+    overlays.close()
+    assert [f.content for f in root.floats] == [first]
+    assert app.layout.focused is first
+
+
+def test_closing_the_last_focuses_the_fallback(
+    app: _App,
+    root: FloatContainer,
+    overlays: Overlays,
+    fallback: Buffer,
+) -> None:
+    overlays.open(Window())
+    overlays.close()
+    assert not overlays.is_open
+    assert root.floats == []
+    assert app.layout.focused is fallback
+
+
+def test_close_all_empties_the_stack(app: _App, overlays: Overlays, fallback: Buffer) -> None:
+    overlays.open(Window())
+    overlays.open(Window())
+    overlays.close_all()
+    assert not overlays.is_open
+    assert app.layout.focused is fallback
+
+
+def test_close_when_empty_does_nothing(overlays: Overlays) -> None:
+    overlays.close()
+    assert not overlays.is_open
+
+
+def test_every_change_redraws(app: _App, overlays: Overlays) -> None:
+    overlays.open(Window())
+    overlays.close()
+    assert app.invalidated == 2

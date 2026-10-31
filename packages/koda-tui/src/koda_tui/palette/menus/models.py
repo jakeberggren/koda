@@ -5,47 +5,41 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
+from koda_tui.appearance import Tokens
 from koda_tui.ui.primitives import ListItem
+from koda_tui.ui.widgets import Picker
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
     from koda.llm import ModelDefinition
-    from koda_tui.palette.palette import Palette
+    from koda_tui.palette.context import PaletteContext
 
 
 log = get_logger(__name__)
 
 _TITLE = "Switch Model"
+_LABEL_WIDTH = 32  # Longer model names are cut, so details line up.
 _PROXY_MANAGED_MODEL_FOOTER: StyleAndTextTuples = [
     (
-        "fg:ansiyellow",
+        Tokens.Text.WARNING,
         "Proxy-managed credentials: model access is verified on request.",
     )
 ]
 
 
-def _truncate_label(label: str, max_length: int) -> str:
-    if len(label) <= max_length:
-        return label
-    ellipsis = "..."
-    if max_length <= len(ellipsis):
-        return ellipsis[:max_length]
-    return label[: max_length - len(ellipsis)] + ellipsis
-
-
 class ModelMenu:
     """Model submenu behavior."""
 
-    def __init__(self, palette: Palette) -> None:
-        self._palette = palette
-        self._service = palette.service
-        self._settings = palette.app_settings
+    def __init__(self, context: PaletteContext) -> None:
+        self._overlays = context.overlays
+        self._service = context.service
+        self._settings = context.settings
 
     def _is_proxy_managed(self) -> bool:
         return self._settings.core.credential_mode == "proxy-managed"
 
-    def items(self) -> list[ListItem]:
+    def items(self) -> list[ListItem[ModelDefinition]]:
         """Build model selection items and footer."""
         provider_names = {p.id: p.name for p in self._service.list_providers()}
 
@@ -58,7 +52,16 @@ class ModelMenu:
         """Open the model selection submenu."""
         proxy_managed = self._is_proxy_managed()
         footer = _PROXY_MANAGED_MODEL_FOOTER if proxy_managed else None
-        self._palette.open_palette(self.items(), title=_TITLE, footer=footer)
+        self._overlays.open(
+            Picker(
+                _TITLE,
+                self.items(),
+                on_select=lambda item: self.select(item.data),
+                footer=footer,
+                label_width=_LABEL_WIDTH,
+                on_close=self._overlays.close,
+            ),
+        )
 
     def select(self, model: ModelDefinition) -> None:
         """Handle model selection."""
@@ -67,15 +70,16 @@ class ModelMenu:
         except ValueError:
             log.warning("select_model_failed", model_id=model.id)
             return
-        self._palette.close_all_overlays()
+        self._overlays.close_all()
 
-    def _item_for_model(self, model: ModelDefinition, provider_name: str | None) -> ListItem:
+    def _item_for_model(
+        self, model: ModelDefinition, provider_name: str | None
+    ) -> ListItem[ModelDefinition]:
         is_active = (
             self._settings.core.provider == model.provider and self._settings.core.model == model.id
         )
         return ListItem(
-            id=f"select_model:{model.id}",
-            label=_truncate_label(model.name, 32),
+            label=model.name,
             detail=model.detail or "",
             group=provider_name,
             current=is_active,

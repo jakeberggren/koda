@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_tui.ui.primitives import ListItem
+from koda_tui.ui.widgets import Picker
 
 if TYPE_CHECKING:
-    from koda_tui.palette.palette import Palette
+    from koda_tui.palette.context import PaletteContext
 
 
 _TITLE = "Input Mode"
@@ -20,16 +21,15 @@ _INPUT_MODE_OPTIONS: tuple[tuple[bool, str, str], ...] = (
 class InputMenu:
     """Input mode selection submenu."""
 
-    def __init__(self, palette: Palette) -> None:
-        self._palette = palette
-        self._settings = palette.app_settings
+    def __init__(self, context: PaletteContext) -> None:
+        self._overlays = context.overlays
+        self._settings = context.settings
 
-    def items(self) -> list[ListItem]:
+    def items(self) -> list[ListItem[str]]:
         """Build input mode selection items."""
         current = self._settings.tui.queue_inputs
         return [
             ListItem(
-                id=f"select_input_mode:{'queue' if queue_inputs else 'steer'}",
                 label=label,
                 detail=detail,
                 current=current == queue_inputs,
@@ -40,9 +40,17 @@ class InputMenu:
 
     def open(self) -> None:
         """Open the input mode submenu."""
-        self._palette.open_palette(self.items(), title=_TITLE, list_heading=_LIST_HEADING)
+        self._overlays.open(
+            Picker(
+                _TITLE,
+                self.items(),
+                on_select=lambda item: self.select(item.data),
+                heading=_LIST_HEADING,
+                on_close=self._overlays.close,
+            ),
+        )
 
     def select(self, mode: str) -> None:
         """Handle input mode selection."""
         self._settings.tui.set("queue_inputs", mode == "queue")
-        self._palette.close_all_overlays()
+        self._overlays.close_all()

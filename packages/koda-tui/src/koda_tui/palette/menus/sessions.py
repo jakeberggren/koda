@@ -9,12 +9,14 @@ from koda_service.exceptions import ServiceSessionNotFoundError
 from koda_tui.appearance import Tokens
 from koda_tui.converters import convert_messages
 from koda_tui.ui.primitives import ListItem
+from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, Picker
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
     from koda.sessions import Session
-    from koda_tui.palette.palette import Palette
+    from koda_tui.palette.context import PaletteContext
+    from koda_tui.ui.widgets.picker import Shortcut
 
 
 log = get_logger(__name__)
@@ -32,18 +34,18 @@ _FOOTER: StyleAndTextTuples = [
 class SessionMenu:
     """Session submenu behavior."""
 
-    def __init__(self, palette: Palette) -> None:
-        self._palette = palette
-        self._service = palette.service
-        self._state = palette.state
+    def __init__(self, context: PaletteContext) -> None:
+        self._overlays = context.overlays
+        self._cancel_streaming = context.cancel_streaming
+        self._service = context.service
+        self._state = context.state
 
-    def items(self) -> list[ListItem]:
+    def items(self) -> list[ListItem[Session]]:
         """Build session selection items."""
         active = self._service.active_session()
         active_id = active.session_id if active is not None else None
         return [
             ListItem(
-                id=f"switch_session:{session.session_id}",
                 label=_format_session_label(session),
                 data=session,
                 current=session.session_id == active_id,
@@ -53,27 +55,32 @@ class SessionMenu:
 
     def open(self) -> None:
         """Open the session selection submenu."""
-        self._palette.open_palette(
-            self.items(),
-            title=_TITLE,
-            list_heading=_LIST_HEADING,
-            footer=_FOOTER,
-            shortcuts={
-                "c-n": lambda _item: self.new(),
-                "c-d": self.confirm_delete,
-            },
+        shortcuts: dict[str, Shortcut[Session]] = {
+            "c-n": lambda _item: self.new(),
+            "c-d": self.confirm_delete,
+        }
+        self._overlays.open(
+            Picker(
+                _TITLE,
+                self.items(),
+                on_select=lambda item: self.switch(item.data),
+                heading=_LIST_HEADING,
+                footer=_FOOTER,
+                shortcuts=shortcuts,
+                on_close=self._overlays.close,
+            ),
         )
 
     def new(self) -> None:
         """Create and switch to a new session."""
-        self._palette.cancel_streaming()
+        self._cancel_streaming()
         self._service.create_session()
         self._state.reset_conversation()
-        self._palette.close_all_overlays()
+        self._overlays.close_all()
 
     def switch(self, session: Session) -> None:
         """Switch to an existing session."""
-        self._palette.cancel_streaming()
+        self._cancel_streaming()
         try:
             switched = self._service.switch_session(session.session_id)
         except ServiceSessionNotFoundError:
@@ -83,16 +90,22 @@ class SessionMenu:
         self._state.messages = convert_messages(switched.messages)
         self._state.usage = switched.usage
         self._state.total_usage = switched.total_usage
-        self._palette.close_all_overlays()
+        self._overlays.close_all()
 
-    def confirm_delete(self, item: ListItem | None) -> None:
+    def confirm_delete(self, item: ListItem[Session] | None) -> None:
         """Open the delete confirmation dialog for a session item."""
-        if item is None or item.data is None:
+        if item is None:
             return
-        session: Session = item.data
-        self._palette.open_confirm(
-            message="Delete session?",
-            on_confirm=lambda: self.delete(session),
+        session = item.data
+        self._overlays.open(
+            ChoiceDialog(
+                "Delete session?",
+                [
+                    DialogChoice("Yes", lambda: self.delete(session), key="y"),
+                    DialogChoice("No", self._overlays.close, key="n"),
+                ],
+                on_cancel=self._overlays.close,
+            ),
         )
 
     def delete(self, session: Session) -> None:
@@ -100,7 +113,7 @@ class SessionMenu:
         active = self._service.active_session()
         removed_active = active is not None and active.session_id == session.session_id
         if removed_active:
-            self._palette.cancel_streaming()
+            self._cancel_streaming()
 
         try:
             self._service.delete_session(session.session_id)
@@ -110,7 +123,7 @@ class SessionMenu:
 
         if removed_active:
             self._state.reset_conversation()
-        self._palette.close_all_overlays()
+        self._overlays.close_all()
 
 
 def _format_session_label(session: Session) -> str:

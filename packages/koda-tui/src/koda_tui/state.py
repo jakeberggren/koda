@@ -69,7 +69,6 @@ class AppState:
     show_scrollbar: bool = True
     queue_inputs: bool = True
     exit_requested: bool = False
-    palette_open: bool = False
 
     def reset_conversation(self) -> None:
         """Clear all conversation and streaming state."""
