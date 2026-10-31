@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.formatted_text import FormattedText
@@ -15,6 +15,7 @@ from koda_tui.appearance import Tokens, compose
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
+    from prompt_toolkit.layout.containers import GetLinePrefixCallable
     from prompt_toolkit.layout.dimension import AnyDimension
 
 SELECTED_STYLE = compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG)
@@ -74,6 +75,14 @@ class ListState:
             item for item in self.items if self.search_text in item.label.lower()
         ]
         self.selected_index = 0
+
+    def set_items(self, items: list[ListItem]) -> None:
+        """Replace the items, keeping the selected item selected if it is still there."""
+        selected = self.selected_item
+        self.items = items
+        self.set_search(self.search_text)
+        if selected in self.display_items:
+            self.selected_index = self.display_items.index(selected)
 
     @property
     def filtered_items(self) -> list[ListItem]:
@@ -196,6 +205,16 @@ class ListControl(UIControl):
         self._view_height = 0
         self._rows: list[Row] = []
         self._item_row_indices: list[int] = []
+
+    @override
+    def preferred_height(
+        self,
+        width: int,
+        max_available_height: int,
+        wrap_lines: bool,
+        get_line_prefix: GetLinePrefixCallable | None,
+    ) -> int:
+        return len(self._list.rows())
 
     def _refresh(self) -> None:
         self._rows = self._list.rows()

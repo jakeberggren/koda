@@ -1,4 +1,4 @@
-from koda_tui.components.input_area import _wrap_line_ranges
+from koda_tui.ui.primitives.editor import _wrap_line_ranges
 
 
 def _display_lines(text: str, width: int) -> list[str]:

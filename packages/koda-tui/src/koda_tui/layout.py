@@ -15,8 +15,7 @@ from koda_tui.components import (
     ActivityIndicator,
     ChatAreaControl,
     ChatScrollbarMargin,
-    FileSuggestions,
-    InputArea,
+    Composer,
     PendingMessages,
     StatusBar,
 )
@@ -38,8 +37,7 @@ class TUILayout:
         self.chat_area = ChatAreaControl(state, self.renderer)
         self.activity = ActivityIndicator()
         self.pending = PendingMessages(state)
-        self.input_area = InputArea(state)
-        self.file_suggestions = FileSuggestions(self.input_area)
+        self.composer = Composer(state)
         self.status_bar = StatusBar(state)
         self.root_container: FloatContainer | None = None
 
@@ -58,8 +56,6 @@ class TUILayout:
             char="",
             style=Tokens.BORDER,
         )
-        file_suggestions = self.file_suggestions.create_window()
-        input = self.input_area.create_window()
 
         # Main layout body. Wrapped in FloatContainer for command palette support
         root_container = FloatContainer(
@@ -69,8 +65,8 @@ class TUILayout:
                     separator,
                     activity,
                     self.pending,
-                    file_suggestions,
-                    input,  # Dynamic height 1-10 lines
+                    self.composer.suggestions,
+                    self.composer,  # Grows with its text, up to 10 rows
                     separator,
                     self.status_bar,  # Fixed 1 line
                 ]
@@ -81,5 +77,5 @@ class TUILayout:
 
         return Layout(
             container=root_container,
-            focused_element=self.input_area.buffer,
+            focused_element=self.composer.buffer,
         )
