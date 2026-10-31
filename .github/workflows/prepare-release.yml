@@ -36,6 +36,8 @@ jobs:
         with:
           app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
           private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -181,18 +183,21 @@ jobs:
 
       - name: Create release branch
         shell: bash
-        run: git switch -c "${{ steps.version.outputs.branch }}"
+        env:
+          BRANCH: ${{ steps.version.outputs.branch }}
+        run: git switch -c "${BRANCH}"
 
       - name: Bump version
         shell: bash
         env:
           BUMP: ${{ inputs.bump }}
           VERSION: ${{ steps.version.outputs.version }}
+          BUMP_PART: ${{ steps.version.outputs.bump_part }}
         run: |
           set -euo pipefail
 
           if [[ "${BUMP}" == "explicit" ]]; then
-            uv run bump-my-version bump "${{ steps.version.outputs.bump_part }}" --new-version "${VERSION}" --no-commit --no-tag
+            uv run bump-my-version bump "${BUMP_PART}" --new-version "${VERSION}" --no-commit --no-tag
           else
             uv run bump-my-version bump "${BUMP}" --no-commit --no-tag
           fi
@@ -242,7 +247,9 @@ jobs:
 
       - name: Push release branch
         shell: bash
-        run: git push --set-upstream origin "${{ steps.version.outputs.branch }}"
+        env:
+          BRANCH: ${{ steps.version.outputs.branch }}
+        run: git push --set-upstream origin "${BRANCH}"
 
       - name: Open release PR
         shell: bash
