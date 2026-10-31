@@ -4,19 +4,23 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from prompt_toolkit.keys import Keys
 
 from koda.llm import ModelDefinition, ThinkingOption
 from koda_common.settings import SettingChange
 from koda_service import ServiceDiagnostics, ServiceStatus, ServiceStatusCode
 from koda_tui.app.application import KodaTuiApp
+from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import RGBColor
 from koda_tui.settings import AppSettings
+from koda_tui.state import PendingInput
 
 
 def _make_settings_mock(unsubscribe: Mock) -> Mock:
     settings = Mock(
         spec=[
             "subscribe",
+            "set",
             "provider",
             "model",
             "thinking",
@@ -170,3 +174,70 @@ async def test_run_always_closes(monkeypatch: pytest.MonkeyPatch) -> None:
 
     unsubscribe.assert_called_once_with()
     unsubscribe_tui.assert_called_once_with()
+
+
+def _thinking_model() -> ModelDefinition:
+    return ModelDefinition(
+        id="gpt-5.2",
+        name="GPT 5.2",
+        provider="openai",
+        thinking_options=[
+            ThinkingOption(id="none", label="None"),
+            ThinkingOption(id="low", label="Low"),
+            ThinkingOption(id="high", label="High"),
+        ],
+    )
+
+
+def test_cycle_thinking_moves_to_the_next_level_and_wraps_around() -> None:
+    app, settings, *_ = _make_app()
+    model = _thinking_model()
+    app.state.active_model = model
+
+    app.state.thinking = model.effective_thinking_options[0]
+    app.cycle_thinking()
+    settings.set.assert_called_with("thinking", model.effective_thinking_options[1].id)
+
+    app.state.thinking = model.effective_thinking_options[-1]
+    app.cycle_thinking()
+    settings.set.assert_called_with("thinking", model.effective_thinking_options[0].id)
+
+
+def test_cycle_thinking_does_nothing_without_a_model() -> None:
+    app, settings, *_ = _make_app()
+    app.state.active_model = None
+    app.cycle_thinking()
+    settings.set.assert_not_called()
+
+
+def _escape(app: KodaTuiApp):
+    (binding,) = create_keybindings(app).get_bindings_for_keys((Keys.Escape,))
+    return binding
+
+
+def test_escape_sends_whats_queued_now() -> None:
+    app, *_ = _make_app()
+    app.outbox = Mock()
+    app.state.responding = True
+    app.state.pending_inputs = [PendingInput("next")]
+    escape = _escape(app)
+    assert escape.filter()
+    escape.handler(Mock())
+    app.outbox.send_now.assert_called_once_with()
+    app.outbox.cancel.assert_not_called()
+
+
+def test_escape_with_nothing_queued_interrupts_the_response() -> None:
+    app, *_ = _make_app()
+    app.outbox = Mock()
+    app.state.responding = True
+    escape = _escape(app)
+    assert escape.filter()
+    escape.handler(Mock())
+    app.outbox.cancel.assert_called_once_with()
+    app.outbox.send_now.assert_not_called()
+
+
+def test_escape_is_free_for_others_while_idle() -> None:
+    app, *_ = _make_app()
+    assert not _escape(app).filter()
