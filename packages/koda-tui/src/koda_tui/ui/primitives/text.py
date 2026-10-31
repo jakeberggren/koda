@@ -6,7 +6,13 @@ import re
 from enum import Enum, auto
 from typing import TYPE_CHECKING, override
 
-from prompt_toolkit.formatted_text import FormattedText, fragment_list_width, to_formatted_text
+from prompt_toolkit.formatted_text import (
+    FormattedText,
+    fragment_list_to_text,
+    fragment_list_width,
+    to_formatted_text,
+)
+from prompt_toolkit.formatted_text.utils import split_lines
 from prompt_toolkit.layout import (
     Dimension,
     FormattedTextControl,
@@ -35,7 +41,7 @@ class Overflow(Enum):
     """What a Text does when it doesn't fit its width."""
 
     CLIP = auto()  # Cut off at the edge.
-    WRAP = auto()  # Wrap onto more lines, by word.
+    WRAP = auto()  # Break at newlines, and wrap onto more lines by word.
     ELLIPSIS = auto()  # Cut short, ending in the Text's ellipsis ("..." by default).
 
 
@@ -94,7 +100,7 @@ def _control(
 
 
 class WordWrapControl(UIControl):
-    """Wraps fragments by word, keeping their styles."""
+    """Fits fragments to the width: lines break at newlines, and wrap by word."""
 
     def __init__(
         self,
@@ -112,10 +118,7 @@ class WordWrapControl(UIControl):
         return to_formatted_text(self._content)
 
     def _lines(self, width: int) -> list[StyleAndTextTuples]:
-        fragments = self._fragments()
-        if not fragments:
-            return [[("", "")]]
-        return wrap(fragments, max(1, width))
+        return fit(self._fragments(), max(1, width))
 
     @override
     def preferred_height(
@@ -169,16 +172,30 @@ class TruncateControl(UIControl):
         return UIContent(get_line=lambda i: line if i == 0 else FormattedText([]), line_count=1)
 
 
+def fit(fragments: StyleAndTextTuples, width: int) -> list[StyleAndTextTuples]:
+    """``fragments`` as lines at most ``width`` cells wide: split at newlines, and each
+    line that is too wide wrapped by word. Lines that fit are kept exactly as they are,
+    trailing spaces and all."""
+    lines = [
+        fitted
+        for line in split_lines(fragments)
+        for fitted in ([line] if fragment_list_width(line) <= width else wrap(line, width))
+    ]
+    if len(lines) > 1 and not fragment_list_to_text(lines[-1]):
+        lines.pop()  # The text ended with a newline.
+    return lines
+
+
 def wrap(fragments: StyleAndTextTuples, width: int) -> list[StyleAndTextTuples]:
     """``fragments`` broken into lines at most ``width`` cells wide, between words.
 
     Whitespace becomes spaces and is dropped where a line breaks; words wider than
-    ``width`` get a line of their own and run past it.
+    ``width`` are broken between characters.
     """
     lines: list[StyleAndTextTuples] = [[]]
     used = 0
     space = ("", "")  # Whitespace waiting to see if the next word fits.
-    for style, token in _tokens(fragments):
+    for style, token in _tokens(fragments, width):
         if token.isspace():
             # Leading whitespace shows only on the first line.
             space = (style, token) if used or len(lines) == 1 else ("", "")
@@ -195,12 +212,28 @@ def wrap(fragments: StyleAndTextTuples, width: int) -> list[StyleAndTextTuples]:
     return [_tidy(line) for line in lines]
 
 
-def _tokens(fragments: StyleAndTextTuples) -> Iterator[tuple[str, str]]:
-    """Each word and run of whitespace in ``fragments``, with its style; whitespace
-    becomes spaces."""
+def _tokens(fragments: StyleAndTextTuples, width: int) -> Iterator[tuple[str, str]]:
+    """Each word and run of whitespace in ``fragments``, with its style: whitespace as
+    spaces, and words wider than ``width`` in pieces that fit."""
     for style, text, *_ in fragments:
         for token in WORDS.findall(text):
-            yield style, " " * len(token) if token.isspace() else token
+            if token.isspace():
+                yield style, " " * len(token)
+            else:
+                yield from ((style, piece) for piece in _pieces(token, width))
+
+
+def _pieces(word: str, width: int) -> Iterator[str]:
+    """``word`` in pieces at most ``width`` cells wide; a character wider than ``width``
+    is a piece of its own."""
+    piece, used = "", 0
+    for char in word:
+        if piece and used + get_cwidth(char) > width:
+            yield piece
+            piece, used = "", 0
+        piece += char
+        used += get_cwidth(char)
+    yield piece
 
 
 def truncate(

@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from prompt_toolkit.formatted_text import fragment_list_width
 
-from koda_tui.ui.primitives.text import truncate, wrap
+from koda_tui.ui.primitives.text import fit, truncate, wrap
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -59,13 +60,37 @@ def test_wrap_measures_cells_not_characters() -> None:
     assert wrap([("", "日本 語")], 4) == [[("", "日本")], [("", "語")]]
 
 
-def test_wrap_gives_long_words_their_own_line() -> None:
-    assert wrap([("", "a supercalifragilistic b")], 6) == [
+def test_wrap_breaks_words_wider_than_the_line() -> None:
+    assert wrap([("", "a superlative b")], 6) == [
         [("", "a")],
-        [("", "supercalifragilistic")],
+        [("", "superl")],
+        [("", "ative")],
         [("", "b")],
     ]
 
 
 def test_wrap_keeps_text_that_fits_on_one_line() -> None:
     assert wrap([("", "  indented  text")], 40) == [[("", "  indented  text")]]
+
+
+def _text(lines: list) -> list[str]:
+    return ["".join(text for _, text, *_ in line) for line in lines]
+
+
+def test_fit_splits_at_newlines_without_a_trailing_empty_line() -> None:
+    assert _text(fit([("", "one\ntwo\n")], 10)) == ["one", "two"]
+    assert _text(fit([("", "one\n\n")], 10)) == ["one", ""]
+    assert _text(fit([], 10)) == [""]
+
+
+def test_fit_keeps_lines_that_fit_exactly_as_they_are() -> None:
+    # A raised block's trailing spaces carry its background, so they stay.
+    line: StyleAndTextTuples = [("bg", "hi  "), ("bg", "    ")]
+    assert fit(line, 8) == [line]
+
+
+def test_fit_wraps_lines_that_prompt_toolkit_draws_wider() -> None:
+    # Rich measures a skin-toned emoji as 2 columns; prompt_toolkit draws 4.
+    lines = fit([("", "ab👍🏽cd")], 4)
+    assert all(fragment_list_width(line) <= 4 for line in lines)
+    assert "".join(_text(lines)) == "ab👍🏽cd"
