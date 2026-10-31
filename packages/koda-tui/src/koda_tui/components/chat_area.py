@@ -312,7 +312,7 @@ class ChatScrollbarMargin(Margin):
         thumb_pos = (height - thumb_size) * offset // max_offset if max_offset > 0 else 0
 
         for i in range(height):
-            thumb = (Tokens.SCROLLBAR, self.SCROLLBAR_CHAR)
+            thumb = (Tokens.Text.DEFAULT, self.SCROLLBAR_CHAR)
             track = (Tokens.Surface.RAISED, " ")
             result.append(("", self.SCROLLBAR_LEFT_PADDING))
             result.append(thumb if thumb_pos <= i < thumb_pos + thumb_size else track)

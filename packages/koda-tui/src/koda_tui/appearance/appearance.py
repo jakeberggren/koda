@@ -47,11 +47,7 @@ def _select_theme(setting: str, terminal_background: RGBColor | None) -> Theme:
 
 def _surface(theme: Theme, terminal_background: RGBColor | None) -> str:
     """Nudge a matching terminal background toward contrast, else use the theme's surface."""
-    if (
-        not theme.derive_surface
-        or terminal_background is None
-        or _is_light(terminal_background) == theme.dark
-    ):
+    if terminal_background is None or _is_light(terminal_background) == theme.dark:
         return theme.surface
     target = 0 if _is_light(terminal_background) else 255
     red, green, blue = (
@@ -80,7 +76,6 @@ def _stylesheet(setting: str, terminal_background: RGBColor | None) -> Style:
         Tokens.Surface.RAISED: f"bg:{surface}",
         Tokens.Surface.SELECTED: f"bg:{theme.accent} fg:{theme.on_accent}",
         Tokens.BORDER: theme.border,
-        Tokens.SCROLLBAR: theme.scrollbar,
         Tokens.Heading.H1: "bold underline",
         Tokens.Heading.H2: f"{theme.accent} underline",
         Tokens.Heading.H3: f"{theme.accent} bold",

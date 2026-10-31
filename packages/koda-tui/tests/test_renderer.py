@@ -1,8 +1,11 @@
+from rich.padding import Padding
 from rich.text import Text
 
 from koda.tools import ToolCall
 from koda_tui.appearance import Tokens
+from koda_tui.appearance import rich as rich_bridge
 from koda_tui.rendering import MessageRenderer
+from koda_tui.rendering.renderer import _Markdown
 from koda_tui.state import Message, MessageRole
 
 
@@ -278,3 +281,31 @@ class TestMessageRendererStyleClasses:
         added = "".join(fragment[1] for fragment in result if Tokens.Diff.ADD in fragment[0])
         assert any(Tokens.Diff.REMOVE in fragment[0] for fragment in result)
         assert added.rstrip("\n").endswith(" ")
+
+
+def test_rich_emits_no_colors_so_every_color_comes_from_a_token(
+    converter: MessageRenderer,
+) -> None:
+    markdown = (
+        "# H1\n## H2 *em* **strong** ~~s~~ `code`\n> [link](https://example.com)\n\n"
+        "- item\n1. item\n\n| a | b |\n|---|---|\n| c | d |\n\n---\n"
+        "```python\nclass A: pass\n```\n\n    indented = True\n"
+    )
+    diff = "--- a/foo.py\n+++ b/foo.py\n@@ -1 +1 @@\n-x = 1\n+x = 2\n"
+    renderables = [
+        Padding(_Markdown(markdown), 1, style=Tokens.Surface.RAISED),
+        converter._render_diff(diff),  # noqa: SLF001
+    ]
+    console = rich_bridge._Console(width=60, theme=rich_bridge._THEME)  # noqa: SLF001
+
+    colored = [
+        segment
+        for renderable in renderables
+        for segment in console.render(renderable)
+        if segment.style
+        and any(
+            color and not color.is_default for color in (segment.style.color, segment.style.bgcolor)
+        )
+    ]
+
+    assert colored == []

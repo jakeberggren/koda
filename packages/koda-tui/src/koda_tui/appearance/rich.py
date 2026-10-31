@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.styles.pygments import pygments_token_to_classname
-from rich.color import Color, ColorType
 from rich.console import Console
 from rich.segment import Segment
 from rich.style import Style
@@ -24,30 +23,9 @@ from rich.theme import Theme
 from koda_tui.appearance.tokens import Tokens, compose
 
 if TYPE_CHECKING:
-    from rich.console import ConsoleOptions, RenderableType, RenderResult
+    from rich.console import RenderableType
 
 _CLASS_PREFIX = "class:"
-
-# Rich standard color number → prompt_toolkit color name.
-# Note: Rich "white" (7) maps to PT "ansigray", Rich "bright_white" (15) to PT "ansiwhite".
-_STANDARD_COLOR_TO_PT = {
-    0: "ansiblack",
-    1: "ansired",
-    2: "ansigreen",
-    3: "ansiyellow",
-    4: "ansiblue",
-    5: "ansimagenta",
-    6: "ansicyan",
-    7: "ansigray",
-    8: "ansibrightblack",
-    9: "ansibrightred",
-    10: "ansibrightgreen",
-    11: "ansibrightyellow",
-    12: "ansibrightblue",
-    13: "ansibrightmagenta",
-    14: "ansibrightcyan",
-    15: "ansiwhite",
-}
 
 _RICH_ATTR_TO_PT = (
     ("bold", "bold"),
@@ -127,21 +105,6 @@ def render(renderable: RenderableType, width: int) -> FormattedText:
     return FormattedText(fragments)
 
 
-class StyleBlock:
-    """Render a renderable with a token applied across full-width lines."""
-
-    def __init__(self, renderable: RenderableType, style: str) -> None:
-        self._renderable = renderable
-        self._style = style
-
-    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        style = console.get_style(self._style)
-        new_line = Segment.line()
-        for line in console.render_lines(self._renderable, options, style=style, pad=True):
-            yield from line
-            yield new_line
-
-
 class _SyntaxTheme(SyntaxTheme):
     """Syntax theme that emits ``pygments.*`` classes instead of colors."""
 
@@ -155,28 +118,10 @@ class _SyntaxTheme(SyntaxTheme):
 SYNTAX_THEME = _SyntaxTheme()
 
 
-def _to_pt_color(color: Color | None) -> str:
-    if color is None or color.is_default:
-        return ""
-    if color.type == ColorType.STANDARD and color.number is not None:
-        return _STANDARD_COLOR_TO_PT.get(color.number, "")
-    if color.triplet is not None:
-        r, g, b = color.triplet
-        return f"#{r:02x}{g:02x}{b:02x}"
-    if color.type == ColorType.EIGHT_BIT:
-        triplet = color.get_truecolor()
-        return f"#{triplet.red:02x}{triplet.green:02x}{triplet.blue:02x}"
-    return ""
-
-
 def _to_pt_style(style: Style | None) -> str:
     if style is None:
         return ""
-    # Classes first so inline attributes take precedence over the stylesheet.
+    # Every color comes from a token, so Rich only contributes classes and attributes.
     parts = [key for key in style.meta if key.startswith(_CLASS_PREFIX)]
-    if fg := _to_pt_color(style.color):
-        parts.append(fg)
-    if bg := _to_pt_color(style.bgcolor):
-        parts.append(f"bg:{bg}")
     parts.extend(pt for attr, pt in _RICH_ATTR_TO_PT if getattr(style, attr))
     return " ".join(parts)

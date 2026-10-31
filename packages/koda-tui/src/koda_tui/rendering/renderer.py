@@ -4,17 +4,15 @@ from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
 from prompt_toolkit.formatted_text import FormattedText, merge_formatted_text, to_formatted_text
-from rich.cells import cell_len
 from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.markdown import CodeBlock, Heading, Markdown
-from rich.segment import Segment
-from rich.style import Style
+from rich.padding import Padding
 from rich.syntax import Syntax
 from rich.text import Text
 
 from koda.tools import ToolCall
 from koda_tui.appearance import Tokens, compose
-from koda_tui.appearance.rich import SYNTAX_THEME, StyleBlock, render
+from koda_tui.appearance.rich import SYNTAX_THEME, render
 from koda_tui.state import Message, MessageRole
 
 type DiffBlockType = Literal["add", "del", "context"]
@@ -56,7 +54,7 @@ class DiffBlockAccumulator:
         )
         style = _DIFF_STYLES.get(self.block_type)
         if style is not None:
-            syntax = StyleBlock(syntax, style)
+            syntax = Padding(syntax, 0, style=style)
         self.renderables.append(syntax)
         self.lines = []
         self.block_type = None
@@ -87,48 +85,9 @@ class _Markdown(Markdown):
     elements: ClassVar = {
         **Markdown.elements,
         "fence": _CodeBlock,
+        "code_block": _CodeBlock,
         "heading_open": _Heading,
     }
-
-
-class BlockContent:
-    """Wraps a renderable with a full-width background from a token."""
-
-    _LEFT_PADDING = 1
-
-    def __init__(self, renderable, *, style: str) -> None:
-        self.renderable = renderable
-        self._style = style
-
-    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-        # Reset inline backgrounds so the style's background covers the whole block.
-        bg_style = Style(bgcolor="default") + console.get_style(self._style)
-        render_options = options.update(width=max(1, options.max_width - self._LEFT_PADDING))
-        lines = console.render_lines(self.renderable, render_options)
-        new_line = Segment("\n")
-        full_width_padding = Segment(" " * options.max_width, bg_style)
-        left_padding = Segment(" " * self._LEFT_PADDING, bg_style)
-
-        # One full-width blank row above the message.
-        yield full_width_padding
-        yield new_line
-
-        for line in lines:
-            yield left_padding
-            line_width = self._LEFT_PADDING
-            for seg in line:
-                if seg.text:
-                    style = seg.style + bg_style if seg.style else bg_style
-                    yield Segment(seg.text, style)
-                    line_width += cell_len(seg.text)
-            padding = options.max_width - line_width
-            if padding > 0:
-                yield Segment(" " * padding, bg_style)
-            yield new_line
-
-        # One full-width blank row below the message.
-        yield full_width_padding
-        yield new_line
 
 
 class MessageRenderer:
@@ -321,10 +280,11 @@ class MessageRenderer:
         """Render a single message to FormattedText."""
         match message.role:
             case MessageRole.USER:
-                block_content = BlockContent(
-                    _Markdown(message.content), style=Tokens.Surface.RAISED
+                # A blank row above and below, and one column of left padding.
+                block = Padding(
+                    _Markdown(message.content), (1, 0, 1, 1), style=Tokens.Surface.RAISED
                 )
-                return self.convert(block_content)
+                return self.convert(block)
             case MessageRole.ASSISTANT:
                 return self._render_assistant_message(message)
             case MessageRole.TOOL if message.tool_call:

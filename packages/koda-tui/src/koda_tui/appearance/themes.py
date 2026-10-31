@@ -34,14 +34,11 @@ class Theme:
     warning: str
     error: str
     info: str
-    scrollbar: str
     surface: str
     diff_add: str
     diff_remove: str
     # prompt_toolkit styles for ``pygments.*`` token classes.
     syntax: Mapping[str, str]
-    # Derive the surface from the terminal background when it matches this theme.
-    derive_surface: bool = False
 
 
 # Rich's ANSI syntax themes as stylesheet entries. Classes inherit from their dotted
@@ -109,12 +106,10 @@ TERMINAL_DARK = Theme(
     warning="ansiyellow",
     error="ansired",
     info="ansicyan",
-    scrollbar="ansiwhite",
     surface="#434343",
     diff_add="#005f00",
     diff_remove="#870000",
     syntax=_ANSI_DARK_SYNTAX,
-    derive_surface=True,
 )
 
 TERMINAL_LIGHT = Theme(
@@ -131,12 +126,10 @@ TERMINAL_LIGHT = Theme(
     warning="ansiyellow",
     error="ansired",
     info="ansicyan",
-    scrollbar="ansibrightblack",
     surface="#dcdcdc",
     diff_add="#d4edda",
     diff_remove="#f8d7da",
     syntax=_ANSI_LIGHT_SYNTAX,
-    derive_surface=True,
 )
 
 THEMES: dict[str, Theme] = {theme.name: theme for theme in (TERMINAL_DARK, TERMINAL_LIGHT)}

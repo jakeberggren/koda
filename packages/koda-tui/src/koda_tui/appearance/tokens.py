@@ -30,7 +30,6 @@ class Tokens:
         SELECTED = "class:surface.selected"
 
     BORDER = "class:border"
-    SCROLLBAR = "class:scrollbar"
 
     class Heading:
         H1 = "class:heading.h1"
