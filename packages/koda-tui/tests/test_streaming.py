@@ -8,14 +8,42 @@ from koda.agent import AgentTextDelta, AgentToolCallRequested, AgentToolComplete
 from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda_service import ChatRequest
 from koda_service.exceptions import ServiceConnectionError, ServiceRateLimitError
+from koda_tui.app.conversation import Conversation
 from koda_tui.app.streaming import StreamProcessor
-from koda_tui.state import AppState, MessageRole
+from koda_tui.state import (
+    AppState,
+    AssistantMessage,
+    Message,
+    ToolMessage,
+    UserMessage,
+)
+
+
+def _tool(message: Message) -> ToolMessage:
+    assert isinstance(message, ToolMessage)
+    return message
+
+
+def _output(message: Message) -> ToolOutput:
+    output = _tool(message).result
+    assert output is not None
+    return output
+
+
+def _reply(message: Message) -> AssistantMessage:
+    assert isinstance(message, AssistantMessage)
+    return message
+
+
+def _text(message: Message) -> str:
+    assert isinstance(message, UserMessage | AssistantMessage)
+    return message.text
 
 
 @pytest.fixture
 def processor(state: AppState) -> StreamProcessor:
     """A StreamProcessor for testing."""
-    return StreamProcessor(state=state, invalidate=lambda: None)
+    return StreamProcessor(conversation=Conversation(state), invalidate=lambda: None)
 
 
 class TestStreamProcessor:
@@ -34,12 +62,12 @@ class TestStreamProcessor:
 
         await processor.stream("hi", client)
 
-        assert state.is_streaming is False
+        assert state.responding is False
         user_msg, assistant_msg = state.messages
-        assert user_msg.role == MessageRole.USER
-        assert user_msg.content == "hi"
-        assert assistant_msg.role == MessageRole.ASSISTANT
-        assert assistant_msg.content == "Hello world"
+        assert isinstance(user_msg, UserMessage)
+        assert _text(user_msg) == "hi"
+        assert isinstance(assistant_msg, AssistantMessage)
+        assert _text(assistant_msg) == "Hello world"
 
     @pytest.mark.asyncio
     async def test_stream_with_tool_call(self, state: AppState, processor: StreamProcessor) -> None:
@@ -63,17 +91,17 @@ class TestStreamProcessor:
 
         await processor.stream("read file", client)
 
-        assert state.is_streaming is False
+        assert state.responding is False
         user_msg, first_assistant, tool_msg, second_assistant = state.messages
-        assert user_msg.role == MessageRole.USER
-        assert first_assistant.role == MessageRole.ASSISTANT
-        assert first_assistant.content == "Let me check..."
-        assert tool_msg.role == MessageRole.TOOL
-        assert tool_msg.tool_running is False
-        assert tool_msg.tool_result_display == "file contents"
-        assert tool_msg.tool_result_content == {"data": "file contents"}
-        assert second_assistant.role == MessageRole.ASSISTANT
-        assert second_assistant.content == "Done!"
+        assert isinstance(user_msg, UserMessage)
+        assert isinstance(first_assistant, AssistantMessage)
+        assert _text(first_assistant) == "Let me check..."
+        assert isinstance(tool_msg, ToolMessage)
+        assert _tool(tool_msg).result is not None
+        assert _output(tool_msg).display == "file contents"
+        assert _output(tool_msg).content == {"data": "file contents"}
+        assert isinstance(second_assistant, AssistantMessage)
+        assert _text(second_assistant) == "Done!"
 
     @pytest.mark.asyncio
     async def test_stream_tool_error(self, state: AppState, processor: StreamProcessor) -> None:
@@ -99,10 +127,10 @@ class TestStreamProcessor:
 
         await processor.stream("read bad file", client)
 
-        assert state.messages[1].role == MessageRole.TOOL
-        assert state.messages[1].tool_error is True
-        assert state.messages[1].tool_error_message == "File not found"
-        assert state.messages[1].tool_result_display == "File not found"
+        assert isinstance(state.messages[1], ToolMessage)
+        assert _output(state.messages[1]).is_error is True
+        assert _output(state.messages[1]).error_message == "File not found"
+        assert _output(state.messages[1]).display is None
 
     @pytest.mark.asyncio
     async def test_stream_handles_rate_limit_error(
@@ -127,11 +155,11 @@ class TestStreamProcessor:
 
         await processor.stream("do something", client)
 
-        assert state.is_streaming is False
+        assert state.responding is False
         _user_msg, assistant_msg = state.messages
-        assert "Starting..." in assistant_msg.content
-        assert "**Rate limit exceeded.**" in assistant_msg.content
-        assert "quota hit" in assistant_msg.content
+        assert "Starting..." in _text(assistant_msg)
+        assert "**Rate limit exceeded.**" in _text(assistant_msg)
+        assert "quota hit" in _text(assistant_msg)
 
     @pytest.mark.asyncio
     async def test_stream_propagates_unexpected_exception(self, processor: StreamProcessor) -> None:
@@ -169,10 +197,10 @@ class TestStreamProcessor:
 
         await processor.stream("do something", client)
 
-        assert state.is_streaming is False
+        assert state.responding is False
         _user_msg, assistant_msg = state.messages
-        assert "**Connection error.**" in assistant_msg.content
-        assert "network down" in assistant_msg.content
+        assert "**Connection error.**" in _text(assistant_msg)
+        assert "network down" in _text(assistant_msg)
 
     @pytest.mark.asyncio
     async def test_cancel_stream(self, state: AppState, processor: StreamProcessor) -> None:
@@ -195,4 +223,4 @@ class TestStreamProcessor:
         processor.cancel_stream()
         await task  # Should complete quickly due to cancellation
 
-        assert state.is_streaming is False
+        assert state.responding is False

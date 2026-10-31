@@ -84,7 +84,7 @@ async def test_enqueue_drains_visible_queue_fifo_when_idle(
 @pytest.mark.asyncio
 async def test_enqueue_waits_while_streaming(queue_harness: QueueHarness) -> None:
     queue = queue_harness.create_queue()
-    queue_harness.state.is_streaming = True
+    queue_harness.state.responding = True
 
     queue.enqueue("first")
     queue.enqueue("second")
@@ -110,7 +110,7 @@ def test_blank_messages_are_ignored(queue_harness: QueueHarness, text: str) -> N
 
 def test_dequeue_all_clears_visible_queue_once(queue_harness: QueueHarness) -> None:
     queue = queue_harness.create_queue()
-    queue_harness.state.is_streaming = True
+    queue_harness.state.responding = True
     queue.enqueue("first")
     queue.enqueue("second")
 
@@ -129,7 +129,7 @@ async def test_steer_sends_next_without_adding_to_visible_queue(
     queue_harness: QueueHarness,
 ) -> None:
     queue = queue_harness.create_queue()
-    queue_harness.state.is_streaming = True
+    queue_harness.state.responding = True
 
     queue.enqueue("queued")
     queue.steer(" steer ")
@@ -138,7 +138,7 @@ async def test_steer_sends_next_without_adding_to_visible_queue(
     assert queue_harness.state.pending_inputs == ["queued"]
     assert queue_harness.sent == []
 
-    queue_harness.state.is_streaming = False
+    queue_harness.state.responding = False
     queue.kick()
     await _wait_for_sent(queue_harness, ["steer", "queued"])
 
@@ -164,14 +164,14 @@ async def test_multiple_steers_are_fifo_and_precede_visible_queue(
     queue_harness: QueueHarness,
 ) -> None:
     queue = queue_harness.create_queue()
-    queue_harness.state.is_streaming = True
+    queue_harness.state.responding = True
     queue.enqueue("queued")
 
     queue.steer("steer one")
     queue.steer("steer two")
 
     assert queue_harness.cancellations == 2
-    queue_harness.state.is_streaming = False
+    queue_harness.state.responding = False
     queue.kick()
     await _wait_for_sent(queue_harness, ["steer one", "steer two", "queued"])
 
@@ -205,7 +205,7 @@ async def test_kick_serializes_sends_and_includes_messages_enqueued_mid_drain(
 
 def test_pop_last_edits_visible_queue_only(queue_harness: QueueHarness) -> None:
     queue = queue_harness.create_queue()
-    queue_harness.state.is_streaming = True
+    queue_harness.state.responding = True
 
     queue.enqueue("first")
     queue.enqueue("second")
@@ -223,7 +223,7 @@ async def test_steer_and_drain_stops_current_stream_then_sends_visible_queue(
     queue_harness: QueueHarness,
 ) -> None:
     queue = queue_harness.create_queue()
-    queue_harness.state.is_streaming = True
+    queue_harness.state.responding = True
     queue.enqueue("queued")
 
     queue.steer_and_drain()
@@ -232,7 +232,7 @@ async def test_steer_and_drain_stops_current_stream_then_sends_visible_queue(
     assert queue_harness.sent == []
     assert queue_harness.state.pending_inputs == ["queued"]
 
-    queue_harness.state.is_streaming = False
+    queue_harness.state.responding = False
     queue.kick()
     await _wait_for_sent(queue_harness, ["queued"])
 
@@ -245,9 +245,9 @@ async def test_steer_and_drain_starts_queued_send_when_idle(
     queue_harness: QueueHarness,
 ) -> None:
     queue = queue_harness.create_queue()
-    queue_harness.state.is_streaming = True
+    queue_harness.state.responding = True
     queue.enqueue("queued")
-    queue_harness.state.is_streaming = False
+    queue_harness.state.responding = False
 
     queue.steer_and_drain()
     await _wait_for_sent(queue_harness, ["queued"])

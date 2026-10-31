@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
     from koda.llm.auth.protocols import OAuthLoginCallbacks
     from koda_service import KodaService
+    from koda_tui.app.conversation import Conversation
     from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
     from koda_tui.ui.overlays import Overlays
@@ -132,6 +133,7 @@ def _provider_menu(
         service=cast("KodaService", palette.service),
         settings=cast("AppSettings", palette.settings),
         state=cast("AppState", None),
+        conversation=cast("Conversation", None),
         cancel_streaming=lambda: None,
         refresh_theme=lambda: None,
     )

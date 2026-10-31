@@ -8,13 +8,18 @@ from prompt_toolkit.layout import to_container
 from prompt_toolkit.layout.mouse_handlers import MouseHandlers
 from prompt_toolkit.layout.screen import Screen, WritePosition
 
+from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui.state import AppState
 from koda_tui.views import PendingMessages
+
+READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 
 
 def _rows(pending: list[str], width: int = 40) -> list[str]:
     container = to_container(
-        PendingMessages(AppState(workspace_root=Path("/tmp"), pending_inputs=pending)),
+        PendingMessages(
+            AppState(workspace=Path("/tmp"), service_status=READY, pending_inputs=pending)
+        ),
     )
     height = container.preferred_height(width, 20).preferred
     screen = Screen()

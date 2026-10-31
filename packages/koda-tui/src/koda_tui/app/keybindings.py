@@ -114,7 +114,7 @@ async def _submit_buffer(
 
     app.screen.composer.clear()
 
-    if app.state.is_streaming:
+    if app.state.responding:
         if cancel_current_if_streaming:
             app.steer_message(text)
         else:
@@ -158,7 +158,7 @@ def _has_suggestion(app: KodaTuiApp) -> Condition:
 
 def _cancelable(app: KodaTuiApp) -> Condition:
     """Return whether there is in-flight work to cancel."""
-    return Condition(lambda: app.state.is_streaming)
+    return Condition(lambda: app.state.responding)
 
 
 def _queue_pending(app: KodaTuiApp) -> Condition:
@@ -172,11 +172,11 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
 
     @kb.add(Keys.Enter)
     async def _submit(_event: KeyPressEvent) -> None:
-        await _submit_buffer(app, cancel_current_if_streaming=not app.state.queue_inputs)
+        await _submit_buffer(app, cancel_current_if_streaming=not app.app_settings.tui.queue_inputs)
 
     @kb.add(*ALT_ENTER_KEY)
     async def _alternate_submit(_event: KeyPressEvent) -> None:
-        await _submit_buffer(app, cancel_current_if_streaming=app.state.queue_inputs)
+        await _submit_buffer(app, cancel_current_if_streaming=app.app_settings.tui.queue_inputs)
 
     @kb.add(Keys.ControlJ)
     def _newline(event: KeyPressEvent) -> None:
@@ -210,7 +210,7 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
 
     @kb.add(Keys.Escape, filter=_cancelable(app))
     def _escape(_event: KeyPressEvent) -> None:
-        if app.state.is_streaming:
+        if app.state.responding:
             app.cancel_streaming()
 
     @kb.add(Keys.ControlP)

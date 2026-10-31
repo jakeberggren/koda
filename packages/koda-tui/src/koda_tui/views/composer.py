@@ -29,7 +29,7 @@ class Composer:
     """
 
     def __init__(self, state: AppState) -> None:
-        self._files = WorkspaceFiles(state.workspace_root)
+        self._files = WorkspaceFiles(state.workspace)
         self._suggestions: ListState[str] = ListState([])
         self._mention: tuple[int, int] | None = None  # Text range of the @ mention.
         self.buffer = Buffer(

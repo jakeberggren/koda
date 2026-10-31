@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from koda_common.logging import get_logger
 from koda_service.exceptions import ServiceSessionNotFoundError
 from koda_tui.appearance import Tokens
-from koda_tui.converters import convert_messages
 from koda_tui.ui.primitives import ListItem
 from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, Picker
 
@@ -38,7 +37,7 @@ class SessionMenu:
         self._overlays = context.overlays
         self._cancel_streaming = context.cancel_streaming
         self._service = context.service
-        self._state = context.state
+        self._conversation = context.conversation
 
     def items(self) -> list[ListItem[Session]]:
         """Build session selection items."""
@@ -75,7 +74,7 @@ class SessionMenu:
         """Create and switch to a new session."""
         self._cancel_streaming()
         self._service.create_session()
-        self._state.reset_conversation()
+        self._conversation.clear()
         self._overlays.close_all()
 
     def switch(self, session: Session) -> None:
@@ -86,10 +85,7 @@ class SessionMenu:
         except ServiceSessionNotFoundError:
             log.warning("switch_session_failed", session_id=str(session.session_id))
             return
-        self._state.reset_conversation()
-        self._state.messages = convert_messages(switched.messages)
-        self._state.usage = switched.usage
-        self._state.total_usage = switched.total_usage
+        self._conversation.load(switched)
         self._overlays.close_all()
 
     def confirm_delete(self, item: ListItem[Session] | None) -> None:
@@ -122,7 +118,7 @@ class SessionMenu:
             return
 
         if removed_active:
-            self._state.reset_conversation()
+            self._conversation.clear()
         self._overlays.close_all()
 
 

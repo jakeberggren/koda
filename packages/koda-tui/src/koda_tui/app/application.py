@@ -5,11 +5,13 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
 from prompt_toolkit.application.current import get_app_session
+from prompt_toolkit.filters import Condition
 from prompt_toolkit.input.vt100 import Vt100Input
 from prompt_toolkit.layout import Layout
 from prompt_toolkit.output import ColorDepth, Output
 
 from koda.llm import ThinkingOption
+from koda_tui.app.conversation import Conversation
 from koda_tui.app.input import OSC11_QUERY, KodaVt100Input, parse_osc11
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.queue import MessageQueue
@@ -56,11 +58,11 @@ class KodaTuiApp:
         self,
         app_settings: AppSettings,
         service: KodaService,
-        workspace_root: Path,
+        workspace: Path,
     ) -> None:
         self._app_settings = app_settings
         self._service = service
-        self._workspace_root = workspace_root
+        self._workspace_root = workspace
 
         # Subscribe to settings changes
         self._unsubscribe_settings = self._app_settings.core.subscribe(self._on_settings_changed)
@@ -73,17 +75,14 @@ class KodaTuiApp:
 
         # Initialize state
         self.state = AppState(
-            workspace_root=self._workspace_root,
-            provider_id=self._app_settings.core.provider,
+            workspace=self._workspace_root,
             service_status=self._service.status(),
-            thinking=ThinkingOption.none(),
-            context_window=None,
-            thinking_supported=False,
-            show_scrollbar=self._app_settings.tui.show_scrollbar,
-            queue_inputs=self._app_settings.tui.queue_inputs,
         )
 
-        self.screen = Screen(self.state)
+        self.screen = Screen(
+            self.state,
+            show_scrollbar=Condition(lambda: self._app_settings.tui.show_scrollbar),
+        )
 
         # Application instance (created on run)
         self._app: Application[None] | None = None
@@ -98,8 +97,9 @@ class KodaTuiApp:
             invalidate=self.invalidate,
             cancel_streaming=self.cancel_streaming,
         )
+        self.conversation = Conversation(self.state)
         self._stream_processor = StreamProcessor(
-            state=self.state,
+            conversation=self.conversation,
             invalidate=self.invalidate,
         )
         self.overlays = Overlays(self.screen.root, fallback=self.screen.composer.buffer)
@@ -109,6 +109,7 @@ class KodaTuiApp:
                 service=self._service,
                 settings=self._app_settings,
                 state=self.state,
+                conversation=self.conversation,
                 cancel_streaming=self.cancel_streaming,
                 refresh_theme=self.refresh_theme,
             ),
@@ -213,11 +214,9 @@ class KodaTuiApp:
     def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
         should_invalidate = False
         if "show_scrollbar" in change_names:
-            self.state.show_scrollbar = self._app_settings.tui.show_scrollbar
             self.screen.chat.clear_caches()
             should_invalidate = True
         if "queue_inputs" in change_names:
-            self.state.queue_inputs = self._app_settings.tui.queue_inputs
             should_invalidate = True
         if "theme" in change_names:
             self.appearance.theme = self._app_settings.tui.theme
@@ -273,7 +272,6 @@ class KodaTuiApp:
         return self._service
 
     def _refresh_service_state(self) -> None:
-        self.state.provider_id = self._app_settings.core.provider
         self.state.service_status = self._service.status()
         self.state.warnings = self._service.diagnostics().startup_warnings
         self.state.configured_providers = self._service.list_configured_providers()
@@ -293,14 +291,6 @@ class KodaTuiApp:
             self.state.active_model.resolve_thinking_option(self._app_settings.core.thinking)
             if self.state.active_model is not None
             else ThinkingOption.none()
-        )
-        self.state.context_window = (
-            self.state.active_model.context_window if self.state.active_model else None
-        )
-        self.state.thinking_supported = (
-            self.state.active_model.supports_thinking
-            if self.state.active_model is not None
-            else False
         )
 
     def enqueue_message(self, text: str) -> None:

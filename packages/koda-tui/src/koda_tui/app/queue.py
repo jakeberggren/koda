@@ -37,7 +37,7 @@ class MessageQueue:
         self._pending_messages.append(cleaned)
         self._state.pending_inputs.append(cleaned)
         self._invalidate()
-        if not self._state.is_streaming:
+        if not self._state.responding:
             self.kick()
 
     def steer(self, text: str) -> None:
@@ -45,7 +45,7 @@ class MessageQueue:
         if not text or not text.strip():
             return
         self._steer_messages.append(text.strip())
-        if self._state.is_streaming:
+        if self._state.responding:
             self._cancel_streaming()
         else:
             self.kick()
@@ -70,7 +70,7 @@ class MessageQueue:
 
     def steer_and_drain(self) -> None:
         """Steer the current stream, then drain queued messages when idle."""
-        if self._state.is_streaming:
+        if self._state.responding:
             self._cancel_streaming()
         else:
             self.kick()
@@ -88,7 +88,7 @@ class MessageQueue:
         return next_message
 
     async def _drain(self) -> None:
-        while not self._state.is_streaming:
+        while not self._state.responding:
             next_message = self._pop_next_message()
             if next_message is None:
                 return

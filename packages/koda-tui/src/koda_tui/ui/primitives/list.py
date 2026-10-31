@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, override
 
 from prompt_toolkit.data_structures import Point
 from prompt_toolkit.formatted_text import FormattedText
@@ -53,7 +53,6 @@ class Row:
 
     kind: RowKind
     text: FormattedText
-    item: ListItem[Any] | None = None
 
 
 class ListState[T]:
@@ -132,12 +131,12 @@ class ListState[T]:
         return grouped
 
 
-class List:
+class List[T]:
     """Shows a ListState: group headers, the selected item, scrolled to stay visible."""
 
     def __init__(
         self,
-        state: ListState[Any],
+        state: ListState[T],
         *,
         heading: str | None = None,
         empty_message: str = "No results found",
@@ -186,7 +185,7 @@ class List:
         return rows
 
 
-def _item_row(item: ListItem[Any], *, selected: bool, width: int) -> Row:
+def _item_row[T](item: ListItem[T], *, selected: bool, width: int) -> Row:
     """A row for one item: marker or selection indicator, padded label, then detail."""
     style = SELECTED_STYLE if selected else Tokens.Text.DEFAULT
     label_style = CURRENT_STYLE if item.current and not selected else style
@@ -200,7 +199,7 @@ def _item_row(item: ListItem[Any], *, selected: bool, width: int) -> Row:
     line.append((label_style, _cut(item.label, width).ljust(width)))
     if item.detail:
         line.append((SELECTED_STYLE if selected else Tokens.Text.MUTED, f"  {item.detail}"))
-    return Row(RowKind.ITEM, FormattedText(line), item)
+    return Row(RowKind.ITEM, FormattedText(line))
 
 
 def _cut(label: str, width: int) -> str:
@@ -212,10 +211,10 @@ def _cut(label: str, width: int) -> str:
     return label[: width - len(ELLIPSIS)] + ELLIPSIS
 
 
-class ListControl(UIControl):
+class ListControl[T](UIControl):
     """Draws a List's rows, scrolled so the selected item stays visible."""
 
-    def __init__(self, items: List) -> None:
+    def __init__(self, items: List[T]) -> None:
         self._list = items
         self._scroll_offset = 0
         self._view_height = 0
