@@ -90,6 +90,7 @@ class KodaTuiApp:
         self._terminal_input: Input | None = None
         self._terminal_output: Output | None = None
         self._exit_reset_handle: asyncio.TimerHandle | None = None
+        self._focus_reporting_enabled = False
 
         self._message_queue = MessageQueue(
             state=self.state,
@@ -120,7 +121,6 @@ class KodaTuiApp:
         app_session = get_app_session()
         self._terminal_input = self._wrap_terminal_input(app_session.input)
         self._terminal_output = app_session.output
-        self._write_control_sequence(_FOCUS_REPORTING_ENABLE)
 
         app = _KodaApplication(
             layout=self.layout.create_layout(),
@@ -135,9 +135,27 @@ class KodaTuiApp:
         )
         app.ttimeoutlen = 0.01  # Raw terminal Esc sequence timeout.
         app.timeoutlen = 0.05  # Key-binding prefix timeout, e.g. Esc before Alt chords.
+        app.after_render += self._sync_focus_reporting
         app.after_render += self._request_initial_terminal_background_refresh
 
         return app
+
+    def _sync_focus_reporting(self, app: Application[None]) -> None:
+        """Toggle terminal focus reporting only while the terminal is in raw mode.
+
+        Renders happen inside prompt_toolkit's ``raw_mode()`` context, including the
+        final "done" render. Enabling here (instead of before ``run_async``) ensures the
+        terminal's immediate ``ESC[I`` focus report is not echoed by the cooked-mode tty
+        onto the main screen, and disabling on the final render ensures no focus events
+        leak to the shell after exit.
+        """
+        if app.is_done:
+            if self._focus_reporting_enabled:
+                self._write_control_sequence(_FOCUS_REPORTING_DISABLE)
+                self._focus_reporting_enabled = False
+        elif not self._focus_reporting_enabled:
+            self._write_control_sequence(_FOCUS_REPORTING_ENABLE)
+            self._focus_reporting_enabled = True
 
     @staticmethod
     def _has_service_change(change_names: set[str]) -> bool:
@@ -334,7 +352,10 @@ class KodaTuiApp:
             return
         self._closed = True
         if self._terminal_output:
-            self._write_control_sequence(_FOCUS_REPORTING_DISABLE)
+            # Fallback in case the final render failed before disabling it.
+            if self._focus_reporting_enabled:
+                self._write_control_sequence(_FOCUS_REPORTING_DISABLE)
+                self._focus_reporting_enabled = False
             self._terminal_output = None
         self._terminal_input = None
         self._unsubscribe_settings()

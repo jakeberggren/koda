@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 
 from koda.llm import ModelDefinition, ThinkingOption
 from koda_common.settings import SettingChange
 from koda_service import ServiceDiagnostics, ServiceStatus, ServiceStatusCode
-from koda_tui.app.application import KodaTuiApp
+from koda_tui.app.application import (
+    _FOCUS_REPORTING_DISABLE,
+    _FOCUS_REPORTING_ENABLE,
+    KodaTuiApp,
+)
 from koda_tui.settings import AppSettings
 
 
@@ -83,6 +87,39 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
         workspace_root=Path("/workspace"),
     )
     return (app, settings, tui_settings, service, unsubscribe_settings, unsubscribe_tui_settings)
+
+
+def test_focus_reporting_is_enabled_on_first_render_and_disabled_when_done(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app, _settings, _tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    write = Mock()
+    monkeypatch.setattr(app, "_write_control_sequence", write)
+    running, done = Mock(is_done=False), Mock(is_done=True)
+
+    for pt_app in (running, running, done, done):
+        app._sync_focus_reporting(pt_app)  # noqa: SLF001
+
+    assert write.call_args_list == [call(_FOCUS_REPORTING_ENABLE), call(_FOCUS_REPORTING_DISABLE)]
+
+
+@pytest.mark.parametrize("rendered", [True, False])
+def test_close_disables_focus_reporting_only_if_still_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    rendered: bool,
+) -> None:
+    app, _settings, _tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    write = Mock()
+    monkeypatch.setattr(app, "_write_control_sequence", write)
+    app._terminal_output = Mock()  # noqa: SLF001
+    if rendered:
+        app._sync_focus_reporting(Mock(is_done=False))  # noqa: SLF001
+        write.reset_mock()
+
+    app.close()
+
+    assert write.call_args_list == ([call(_FOCUS_REPORTING_DISABLE)] if rendered else [])
 
 
 def test_close_is_idempotent() -> None:
