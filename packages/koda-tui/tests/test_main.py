@@ -103,7 +103,7 @@ def test_build_app_raises_settings_error_from_store(tmp_path: Path) -> None:
     )
     with pytest.raises(SettingsDecodeError) as exc_info:
         build_app(
-            workspace_root=tmp_path,
+            workspace=tmp_path,
             settings_store=_FakeSettingsStore(error=error),
             secrets_store=_FakeSecretsStore(),
             telemetry=_TelemetryStub(),
@@ -121,7 +121,7 @@ def test_build_app_raises_secrets_error_from_store(tmp_path: Path) -> None:
     )
     with pytest.raises(SecretsDecodeError) as exc_info:
         build_app(
-            workspace_root=tmp_path,
+            workspace=tmp_path,
             settings_store=_FakeSettingsStore(),
             secrets_store=_FakeSecretsStore(error=error),
             telemetry=_TelemetryStub(),
@@ -136,7 +136,7 @@ def test_build_app_creates_application_with_injected_dependencies(tmp_path: Path
     secrets_store = _FakeSecretsStore()
 
     app = build_app(
-        workspace_root=tmp_path,
+        workspace=tmp_path,
         settings_store=_FakeSettingsStore(),
         secrets_store=secrets_store,
         telemetry=telemetry,
@@ -145,7 +145,7 @@ def test_build_app_creates_application_with_injected_dependencies(tmp_path: Path
 
     assert app.app_settings is not None
     assert app.service is not None
-    assert app.state.workspace_root == tmp_path
+    assert app.state.workspace == tmp_path
     assert secrets_store.validate_calls == 1
     assert telemetry.settings is app.app_settings.core
 

@@ -18,7 +18,11 @@ if TYPE_CHECKING:
     from koda_tui.ui.widgets import Segment
 
 ACTIVITY_TEXT = "Working... (esc to interrupt)"
-PHASES = {ResponsePhase.RESPONDING: "responding", ResponsePhase.WORKING: "working"}
+PHASES = {
+    ResponsePhase.THINKING: "thinking",
+    ResponsePhase.RESPONDING: "responding",
+    ResponsePhase.WORKING: "working",
+}
 
 
 class StatusBar:
@@ -44,7 +48,7 @@ class ActivityIndicator:
         )
         self._container = ConditionalContainer(
             HSplit([row, Spacer()]),
-            filter=Condition(lambda: state.is_streaming),
+            filter=Condition(lambda: state.responding),
         )
 
     def __pt_container__(self) -> ConditionalContainer:
@@ -61,7 +65,7 @@ def _right(state: AppState) -> list[Segment]:
 
 def _location(state: AppState) -> Segment:
     """The workspace, relative to the home directory when it is inside it."""
-    root = state.workspace_root
+    root = state.workspace
     try:
         path = f"~/{root.relative_to(Path.home())}"
     except ValueError:
@@ -84,15 +88,16 @@ def _context(state: AppState) -> list[Segment]:
     """How full the context window is, once it is known."""
     if state.usage is None:
         return []
-    percentage = state.usage.context_window_percentage(state.context_window)
+    percentage = state.usage.latest.context_window_percentage(state.context_window)
     return [] if percentage is None else [[(Tokens.Text.MUTED, f"ctx {percentage}%")]]
 
 
 def _tokens(state: AppState) -> list[Segment]:
     """The tokens sent and received so far in this session."""
-    if state.total_usage is None:
+    if state.usage is None:
         return []
-    counts = (state.total_usage.input_tokens, "in"), (state.total_usage.output_tokens, "out")
+    total = state.usage.total
+    counts = (total.input_tokens, "in"), (total.output_tokens, "out")
     return [
         [(Tokens.Text.MUTED, f"{_compact(count)} {label}")]
         for count, label in counts
@@ -126,8 +131,6 @@ def _activity(state: AppState) -> Segment:
 
 def _phase(state: AppState) -> str:
     """The stage of the current response, or "ready" between responses."""
-    if state.is_thinking:
-        return "thinking"
     return PHASES.get(state.response_phase, "ready")
 
 

@@ -8,10 +8,12 @@ from prompt_toolkit.layout import to_container
 from prompt_toolkit.layout.mouse_handlers import MouseHandlers
 from prompt_toolkit.layout.screen import Screen, WritePosition
 
+from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui.appearance import Tokens
 from koda_tui.state import AppState
 from koda_tui.views.composer import Composer
 
+READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 WIDTH = 30
 
 
@@ -31,7 +33,7 @@ def _screen(composer: Composer) -> tuple[Screen, int]:
 
 
 async def test_prompt_column_keeps_the_surface_beside_several_lines() -> None:
-    composer = Composer(AppState(workspace_root=Path()))
+    composer = Composer(AppState(workspace=Path(), service_status=READY))
     composer.buffer.text = "first\nsecond\nthird"
 
     screen, height = _screen(composer)
@@ -42,7 +44,7 @@ async def test_prompt_column_keeps_the_surface_beside_several_lines() -> None:
 
 
 async def test_prompt_stays_one_column_wide() -> None:
-    composer = Composer(AppState(workspace_root=Path()))
+    composer = Composer(AppState(workspace=Path(), service_status=READY))
     composer.buffer.text = "hello"
 
     screen, _ = _screen(composer)

@@ -13,16 +13,22 @@ from koda.llm import ModelDefinition, ThinkingOption
 from koda.messages import TokenUsage
 from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui.appearance import Tokens
-from koda_tui.state import AppState, ResponsePhase
+from koda_tui.state import AppState, AssistantMessage, Usage, UserMessage
 from koda_tui.views import status
+
+READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 
 
 def _texts(segments) -> list[str]:
     return [fragment_list_to_text(segment) for segment in segments]
 
 
-def _state(**fields) -> AppState:
-    return AppState(workspace_root=Path.home() / "dev" / "koda", **fields)
+def _state(*, service_status: ServiceStatus = READY, **fields) -> AppState:
+    return AppState(
+        workspace=Path.home() / "dev" / "koda",
+        service_status=service_status,
+        **fields,
+    )
 
 
 def test_left_shows_workspace_model_thinking_and_usage() -> None:
@@ -37,9 +43,7 @@ def test_left_shows_workspace_model_thinking_and_usage() -> None:
     state = _state(
         active_model=model,
         thinking=ThinkingOption(id="medium", label="Medium"),
-        context_window=1000,
-        usage=usage,
-        total_usage=TokenUsage(input_tokens=34, output_tokens=15_900),
+        usage=Usage(latest=usage, total=TokenUsage(input_tokens=34, output_tokens=15_900)),
     )
     assert _texts(status._left(state)) == [
         "~/dev/koda",
@@ -52,11 +56,19 @@ def test_left_shows_workspace_model_thinking_and_usage() -> None:
 
 
 def test_workspace_outside_home_shows_its_name() -> None:
-    assert _texts([status._location(AppState(workspace_root=Path("/srv/app")))]) == ["~/app"]
+    assert _texts(
+        [status._location(AppState(workspace=Path("/srv/app"), service_status=READY))]
+    ) == ["~/app"]
 
 
 def test_right_shows_hints_warning_and_activity() -> None:
-    state = _state(thinking_supported=True, warnings=["Config has unknown keys"])
+    model = ModelDefinition(
+        id="m",
+        name="Model",
+        provider="provider",
+        thinking_options=[ThinkingOption(id="medium", label="Medium")],
+    )
+    state = _state(active_model=model, warnings=["Config has unknown keys"])
     assert _texts(status._right(state)) == [
         "ctrl+t thinking",
         "ctrl+p/k palette",
@@ -69,9 +81,9 @@ def test_right_shows_hints_warning_and_activity() -> None:
     ("fields", "text"),
     [
         ({"exit_requested": True}, "press ctrl+c again to exit"),
-        ({"is_thinking": True}, "thinking"),
-        ({"response_phase": ResponsePhase.RESPONDING}, "responding"),
-        ({"response_phase": ResponsePhase.WORKING}, "working"),
+        ({"responding": True, "messages": [AssistantMessage("", "hmm")]}, "thinking"),
+        ({"responding": True, "messages": [AssistantMessage("Hi")]}, "responding"),
+        ({"responding": True, "messages": [UserMessage("hi")]}, "working"),
         ({}, "ready"),
     ],
 )

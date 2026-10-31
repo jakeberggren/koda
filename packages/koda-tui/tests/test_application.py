@@ -84,7 +84,7 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
     app = KodaTuiApp(
         app_settings=AppSettings(core=settings, tui=tui_settings),
         service=service,
-        workspace_root=Path("/workspace"),
+        workspace=Path("/workspace"),
     )
     return (app, settings, tui_settings, service, unsubscribe_settings, unsubscribe_tui_settings)
 
@@ -152,7 +152,6 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
 
     service.update_settings.assert_called_once_with(settings)
     service.get_model.assert_called_with("bergetai", "zai-org/GLM-4.7")
-    assert app.state.provider_id == "bergetai"
     assert app.state.context_window == 128_000
 
 

@@ -6,13 +6,12 @@ from typing import TYPE_CHECKING
 
 from koda_service import ChatRequest
 from koda_service.exceptions import ServiceChatError
-from koda_tui.app.response import ResponseLifecycle
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from koda_service import KodaService
-    from koda_tui.state import AppState
+    from koda_tui.app.conversation import Conversation
 
 
 def _render_stream_error(error: ServiceChatError) -> str:
@@ -27,12 +26,11 @@ class StreamProcessor:
     def __init__(
         self,
         *,
-        state: AppState,
+        conversation: Conversation,
         invalidate: Callable[[], None],
     ) -> None:
-        self._state = state
+        self._conversation = conversation
         self._invalidate = invalidate
-        self._lifecycle = ResponseLifecycle(state)
         self._spinner_task: asyncio.Task | None = None
         self._streaming_task: asyncio.Task | None = None
 
@@ -52,15 +50,15 @@ class StreamProcessor:
                 await self._spinner_task
             self._spinner_task = None
 
-    async def _finish_stream(self) -> None:
+    async def _finish_stream(self, error: str | None) -> None:
         await self._stop_spinner()
-        self._lifecycle.end()
+        self._conversation.end(error)
         self._streaming_task = None
         self._invalidate()
 
     async def _process_stream(self, message: str, service: KodaService) -> None:
         async for event in service.chat(ChatRequest(message=message)):
-            self._lifecycle.apply_event(event)
+            self._conversation.apply(event)
             self._invalidate()
 
     async def stream(
@@ -68,10 +66,11 @@ class StreamProcessor:
         text: str,
         service: KodaService,
     ) -> None:
-        """Stream a message and process the full response lifecycle."""
-        self._lifecycle.begin(text)
+        """Stream the response to ``text`` into the conversation."""
+        self._conversation.start(text)
         self._invalidate()
 
+        error_text = None
         try:
             self._start_spinner()
             self._streaming_task = asyncio.create_task(self._process_stream(text, service))
@@ -79,9 +78,9 @@ class StreamProcessor:
         except asyncio.CancelledError:
             pass
         except ServiceChatError as error:
-            self._lifecycle.append_content(_render_stream_error(error))
+            error_text = _render_stream_error(error)
         finally:
-            await self._finish_stream()
+            await self._finish_stream(error_text)
 
     def cancel_stream(self) -> None:
         if self._streaming_task and not self._streaming_task.done():

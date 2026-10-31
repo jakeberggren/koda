@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from rich.console import RenderableType
 
-    from koda.tools import ToolCall
+    from koda.tools import ToolCall, ToolOutput
 
 type Arguments = dict[str, object]
 type Content = dict[str, Any] | None
@@ -32,24 +32,24 @@ FAILED = ("✕", Tokens.Text.ERROR)
 DONE = ("✓", Tokens.Text.SUCCESS)
 
 
-def render_tool_call(
-    tool_call: ToolCall,
-    *,
-    running: bool = False,
-    error: bool = False,
-    display: str | None = None,
-    content: Content = None,
-) -> RenderableType:
-    """The call's status, name and arguments, then its result if it has one.
-
-    ``display`` is the result as text; ``content`` is the raw result, for tools that
-    show more from it.
-    """
+def render_tool_call(tool_call: ToolCall, output: ToolOutput | None) -> RenderableType:
+    """The call's status, name and arguments, then its output once it has one; ``None``
+    means it is still running."""
     tool = TOOLS.get(tool_call.tool_name, Tool())
-    line = _call_line(tool_call, tool, error=error or tool.failed(content), running=running)
+    content = output.content if output else None
+    failed = output is not None and (output.is_error or tool.failed(content))
+    line = _call_line(tool_call, tool, error=failed, running=output is None)
+    display = _display(output)
     if (result := tool.result(line, display, content)) is not None:
         return result
     return line + _result_line(display) if display else line
+
+
+def _display(output: ToolOutput | None) -> str | None:
+    """The output as text; a failure without any shows its error message."""
+    if output is None:
+        return None
+    return output.display or (output.error_message if output.is_error else None)
 
 
 def _call_line(tool_call: ToolCall, tool: Tool, *, running: bool, error: bool) -> Text:

@@ -11,7 +11,7 @@ from koda_tui.appearance import Spacing, Tokens, compose
 from koda_tui.appearance.rich import render
 from koda_tui.rendering.markdown import Markdown
 from koda_tui.rendering.tools import render_tool_call
-from koda_tui.state import MessageRole
+from koda_tui.state import AssistantMessage, ToolMessage, UserMessage
 
 if TYPE_CHECKING:
     from koda_tui.state import Message
@@ -22,53 +22,36 @@ GAP = "\n" * (Spacing.GAP + 1)  # Ends a line, then leaves blank rows.
 
 
 def render_message(message: Message, width: int) -> FormattedText:
-    """A message by its role: the user's on a raised block, the assistant's after its
-    thinking, a tool's as its call and result."""
-    match message.role:
-        case MessageRole.USER:
-            block = Padding(Markdown(message.content), USER_PADDING, style=Tokens.Surface.RAISED)
+    """The user's message on a raised block, a reply after its thinking, a tool as its
+    call and result."""
+    match message:
+        case UserMessage():
+            block = Padding(Markdown(message.text), USER_PADDING, style=Tokens.Surface.RAISED)
             return render(block, width)
-        case MessageRole.ASSISTANT:
+        case AssistantMessage():
             return _assistant(message, width)
-        case MessageRole.TOOL if message.tool_call:
-            call = render_tool_call(
-                message.tool_call,
-                running=message.tool_running,
-                error=message.tool_error,
-                display=_display(message),
-                content=message.tool_result_content,
-            )
-            return render(call, width)
-        case MessageRole.TOOL:
-            return FormattedText([])
+        case ToolMessage():
+            return render(render_tool_call(message.call, message.result), width)
 
 
-def render_streaming(content: str, width: int) -> FormattedText:
-    """A reply still streaming."""
+def _reply(content: str, width: int) -> FormattedText:
     return render(Markdown(content), width)
 
 
-def render_thinking(content: str, width: int) -> FormattedText:
-    """Thinking, muted, whether streaming or kept with its reply."""
+def _thinking(content: str, width: int) -> FormattedText:
+    """Thinking, muted."""
     return render(Markdown(content, style=THINKING_STYLE), width)
 
 
-def _assistant(message: Message, width: int) -> FormattedText:
+def _assistant(message: AssistantMessage, width: int) -> FormattedText:
     parts: list[FormattedText] = []
-    if message.thinking_content:
-        parts.append(render_thinking(message.thinking_content, width))
-    if message.content:
-        parts.append(render_streaming(message.content, width))
+    if message.thinking:
+        parts.append(_thinking(message.thinking, width))
+    if message.text:
+        parts.append(_reply(message.text, width))
     fragments = FormattedText()
     for index, part in enumerate(parts):
         if index:
             fragments.append(("", GAP))
         fragments.extend(part)
     return fragments
-
-
-def _display(message: Message) -> str | None:
-    """The result to show: the tool's own, or its error message if it failed without one."""
-    if not message.tool_result_display and message.tool_error and message.tool_error_message:
-        return message.tool_error_message
-    return message.tool_result_display

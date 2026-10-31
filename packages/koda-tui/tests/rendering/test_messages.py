@@ -6,10 +6,10 @@ from koda.tools import ToolCall
 from koda_tui.appearance import Tokens
 from koda_tui.appearance import rich as rich_bridge
 from koda_tui.appearance.rich import render
-from koda_tui.rendering import render_message, render_streaming, render_thinking
+from koda_tui.rendering import render_message
 from koda_tui.rendering.diff import diff_blocks
 from koda_tui.rendering.markdown import Markdown
-from koda_tui.state import Message, MessageRole
+from koda_tui.state import AssistantMessage, ToolMessage, UserMessage
 
 WIDTH = 80
 
@@ -19,7 +19,7 @@ class TestMessages:
 
     def test_render_user_message(self) -> None:
         """render_message() should render user messages as markdown."""
-        message = Message(role=MessageRole.USER, content="Hello")
+        message = UserMessage("Hello")
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "Hello" in content
@@ -27,18 +27,14 @@ class TestMessages:
 
     def test_render_assistant_message(self) -> None:
         """render_message() should render assistant messages as markdown."""
-        message = Message(role=MessageRole.ASSISTANT, content="I can help")
+        message = AssistantMessage("I can help")
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "I can help" in content
 
     def test_render_assistant_message_with_thinking(self) -> None:
         """render_message() should keep persisted thinking content visible."""
-        message = Message(
-            role=MessageRole.ASSISTANT,
-            content="I can help",
-            thinking_content="Comparing options",
-        )
+        message = AssistantMessage("I can help", thinking="Comparing options")
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "Comparing options" in content
@@ -48,11 +44,7 @@ class TestMessages:
 
     def test_render_assistant_thinking_renders_markdown(self) -> None:
         """thinking content should be rendered through markdown, not as literal markers."""
-        message = Message(
-            role=MessageRole.ASSISTANT,
-            content="",
-            thinking_content="**Exploring the meaning of 42**",
-        )
+        message = AssistantMessage("", thinking="**Exploring the meaning of 42**")
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "Exploring the meaning of 42" in content
@@ -65,38 +57,17 @@ class TestMessages:
             arguments={"query": "test"},
             call_id="call_123",
         )
-        message = Message(
-            role=MessageRole.TOOL,
-            content="Tool: search",
-            tool_call=tool_call,
-        )
+        message = ToolMessage(tool_call)
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "search" in content
-
-
-class TestStreaming:
-    """Tests for streaming content rendering."""
-
-    def test_render_streaming_content(self) -> None:
-        """render_streaming_content() should show streaming content."""
-        result = render_streaming("Hello wor", WIDTH)
-        content = "".join(t[1] for t in result)
-        assert "Hello wor" in content
-
-    def test_render_thinking_content_renders_markdown(self) -> None:
-        """render_thinking_content() should parse markdown markers."""
-        result = render_thinking("**Exploring the meaning of 42**", WIDTH)
-        content = "".join(t[1] for t in result)
-        assert "Exploring the meaning of 42" in content
-        assert "**Exploring the meaning of 42**" not in content
 
 
 class TestStyleClasses:
     """Theme-dependent styling is emitted as style classes, not baked-in colors."""
 
     def test_code_block_emits_pygments_classes(self) -> None:
-        message = Message(role=MessageRole.ASSISTANT, content="```python\nimport os\n```")
+        message = AssistantMessage("```python\nimport os\n```")
         result = render_message(message, WIDTH)
         assert ("class:pygments.keyword.namespace", "import") in result
 

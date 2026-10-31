@@ -4,13 +4,19 @@ from typing import Any
 
 from prompt_toolkit.formatted_text import FormattedText
 
-from koda.tools import ToolCall
+from koda.tools import ToolCall, ToolOutput
 from koda_tui.appearance.rich import render
 from koda_tui.rendering.tools import render_tool_call
 
 
-def _tool_call(tool_call: ToolCall, **kwargs: Any) -> FormattedText:
-    return render(render_tool_call(tool_call, **kwargs), 80)
+def _tool_call(
+    tool_call: ToolCall,
+    *,
+    running: bool = False,
+    content: dict[str, Any] | None = None,
+) -> FormattedText:
+    output = None if running else ToolOutput(content=content or {})
+    return render(render_tool_call(tool_call, output), 80)
 
 
 class TestToolCalls:
@@ -28,7 +34,7 @@ class TestToolCalls:
         assert "read_file" in content
 
     def test_render_tool_call_running(self) -> None:
-        """render_tool_call() with running=True should display the tool name."""
+        """A running tool call should display the tool name."""
         tool_call = ToolCall(
             tool_name="search",
             arguments={},
@@ -162,3 +168,13 @@ class TestToolCalls:
         assert "command=set -u printf 'Working directory: '; pwd uv run pytest -q" in content
         assert "timeout=300s" in content
         assert "command=set -u\n" not in content
+
+    def test_failed_tool_without_display_shows_its_error(self) -> None:
+        """A failure with no display of its own shows its error message."""
+        tool_call = ToolCall(tool_name="read_file", arguments={"path": "a.py"}, call_id="c1")
+        output = ToolOutput(is_error=True, error_message="File not found")
+
+        content = "".join(t[1] for t in render(render_tool_call(tool_call, output), 80))
+
+        assert "✕ read_file" in content
+        assert "\n  └ File not found" in content

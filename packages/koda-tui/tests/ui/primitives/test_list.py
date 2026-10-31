@@ -125,8 +125,8 @@ def _item(label: str, **kwargs) -> ListItem:
 
 
 def _item_label(row: Row) -> str:
-    assert row.item is not None
-    return row.item.label
+    """The label of an item row: its second fragment, after the marker."""
+    return row.text[1][1].strip()
 
 
 class TestRows:

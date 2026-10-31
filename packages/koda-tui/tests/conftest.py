@@ -2,20 +2,20 @@ from pathlib import Path
 
 import pytest
 
+from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui import AppState
-from koda_tui.app.response import ResponseLifecycle
+from koda_tui.app.conversation import Conversation
+
+READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 
 
 @pytest.fixture
 def state() -> AppState:
     """An AppState for testing."""
-    return AppState(
-        provider_id="test",
-        workspace_root=Path("/workspace"),
-    )
+    return AppState(workspace=Path("/workspace"), service_status=READY)
 
 
 @pytest.fixture
-def lifecycle(state: AppState) -> ResponseLifecycle:
-    """A ResponseLifecycle for testing."""
-    return ResponseLifecycle(state)
+def conversation(state: AppState) -> Conversation:
+    """A Conversation over ``state``."""
+    return Conversation(state)

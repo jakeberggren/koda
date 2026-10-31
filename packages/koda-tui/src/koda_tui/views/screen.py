@@ -13,6 +13,8 @@ from koda_tui.views.pending import PendingMessages
 from koda_tui.views.status import ActivityIndicator, StatusBar
 
 if TYPE_CHECKING:
+    from prompt_toolkit.filters import FilterOrBool
+
     from koda_tui.state import AppState
 
 
@@ -22,8 +24,8 @@ class Screen:
     ``root`` hosts overlays as floats.
     """
 
-    def __init__(self, state: AppState) -> None:
-        self.chat = Chat(state)
+    def __init__(self, state: AppState, *, show_scrollbar: FilterOrBool = True) -> None:
+        self.chat = Chat(state, scrollbar=show_scrollbar)
         self.composer = Composer(state)
         self.root = FloatContainer(
             HSplit(

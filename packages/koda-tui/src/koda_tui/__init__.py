@@ -32,7 +32,7 @@ def _report_startup_error(error: StartupError, logger: BoundLogger) -> None:
 
 
 def build_app(
-    workspace_root: Path,
+    workspace: Path,
     settings_store: SettingsStore,
     secrets_store: SecretsStore,
     telemetry: Telemetry,
@@ -49,7 +49,7 @@ def build_app(
     return KodaTuiApp(
         app_settings=app_settings,
         service=service,
-        workspace_root=workspace_root,
+        workspace=workspace,
     )
 
 
@@ -61,7 +61,7 @@ def main() -> None:
     try:
         workspace_root = Path.cwd().resolve()
         app = build_app(
-            workspace_root=workspace_root,
+            workspace=workspace_root,
             settings_store=JsonFileSettingsStore(),
             secrets_store=JsonFileSecretsStore(),
             telemetry=LangfuseTelemetry(),
