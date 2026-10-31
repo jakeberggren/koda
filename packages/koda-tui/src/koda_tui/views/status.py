@@ -10,12 +10,12 @@ from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit
 
 from koda_tui.appearance import Tokens
 from koda_tui.state import ResponsePhase
-from koda_tui.ui.components import Bar
 from koda_tui.ui.primitives import Spacer, Spinner, Text
+from koda_tui.ui.widgets import Bar
 
 if TYPE_CHECKING:
     from koda_tui.state import AppState
-    from koda_tui.ui.components import Segment
+    from koda_tui.ui.widgets import Segment
 
 ACTIVITY_TEXT = "Working... (esc to interrupt)"
 PHASES = {ResponsePhase.RESPONDING: "responding", ResponsePhase.WORKING: "working"}

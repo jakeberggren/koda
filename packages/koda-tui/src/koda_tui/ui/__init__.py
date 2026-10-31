@@ -1,1 +1,1 @@
-"""Reusable UI building blocks: primitives, and components composed from them."""
+"""Reusable UI building blocks: primitives, and widgets composed from them."""

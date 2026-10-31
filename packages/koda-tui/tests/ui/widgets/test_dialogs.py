@@ -1,4 +1,4 @@
-"""Tests for the dialog components."""
+"""Tests for the dialog widgets."""
 
 # ruff: noqa: SLF001 - allow private member access for tests
 
@@ -11,8 +11,8 @@ from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import FormattedTextControl, Layout
 
 from koda_tui.appearance import Tokens, compose
-from koda_tui.ui.components import ChoiceDialog, DialogChoice, InputDialog, MessageDialog
 from koda_tui.ui.primitives.text import WordWrapControl
+from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, InputDialog, MessageDialog
 
 
 def _press(dialog: ChoiceDialog | InputDialog, key: str) -> None:

@@ -10,8 +10,8 @@ import pytest
 from prompt_toolkit.keys import Keys
 
 from koda_tui.palette.overlay import PaletteOverlay
-from koda_tui.ui.components import Panel
 from koda_tui.ui.primitives import ListItem
+from koda_tui.ui.widgets import Panel
 
 if TYPE_CHECKING:
     from collections.abc import Callable

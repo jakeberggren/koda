@@ -1,4 +1,4 @@
-"""Panel component: a framed box with a title row above its body."""
+"""Panel widget: a framed box with a title row above its body."""
 
 from __future__ import annotations
 

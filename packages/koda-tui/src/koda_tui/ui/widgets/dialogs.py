@@ -1,4 +1,4 @@
-"""Dialog components: a choice, a message, and a text input, each in a Panel."""
+"""Dialog widgets: a choice, a message, and a text input, each in a Panel."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import WindowAlign
 
 from koda_tui.appearance import Tokens, Width, compose
-from koda_tui.ui.components.panel import Panel
 from koda_tui.ui.primitives import Input, Overflow, Spacer, Text
+from koda_tui.ui.widgets.panel import Panel
 
 if TYPE_CHECKING:
     from collections.abc import Callable

@@ -1,8 +1,8 @@
-"""Design tokens: styles named for their intent, never for a specific component.
+"""Design tokens: styles named for their intent, never for a specific widget.
 
 Each token is a prompt_toolkit class (``"class:text.muted"``) usable directly in
 fragments and ``style=`` arguments, and by Rich renderables through the Rich
-bridge. Themes decide how each token looks; components combine tokens with
+bridge. Themes decide how each token looks; the UI combines tokens with
 ``compose``.
 """
 

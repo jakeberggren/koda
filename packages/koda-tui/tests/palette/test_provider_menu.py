@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from koda.llm.auth.protocols import OAuthLoginCallbacks
     from koda_tui.palette.palette import Palette
-    from koda_tui.ui.components import DialogChoice
+    from koda_tui.ui.widgets import DialogChoice
 
 
 class _FakeCoreSettings:

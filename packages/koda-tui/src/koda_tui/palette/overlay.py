@@ -10,8 +10,8 @@ from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import Dimension, VSplit
 
 from koda_tui.appearance import Tokens, Width, compose
-from koda_tui.ui.components import Panel
 from koda_tui.ui.primitives import Input, List, ListState, Overflow, Spacer, Text
+from koda_tui.ui.widgets import Panel
 
 if TYPE_CHECKING:
     from collections.abc import Callable

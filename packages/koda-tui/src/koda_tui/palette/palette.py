@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 from koda_tui.palette.controller import PaletteController
 from koda_tui.palette.overlay import PaletteOverlay
-from koda_tui.ui.components import ChoiceDialog, DialogChoice, InputDialog, MessageDialog
 from koda_tui.ui.overlays import OverlayManager
+from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, InputDialog, MessageDialog
 
 if TYPE_CHECKING:
     from collections.abc import Callable

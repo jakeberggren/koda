@@ -1,4 +1,4 @@
-"""Bar component: one line with segments on the left and on the right."""
+"""Bar widget: one line with segments on the left and on the right."""
 
 from __future__ import annotations
 

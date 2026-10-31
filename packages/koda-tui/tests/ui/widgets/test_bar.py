@@ -1,4 +1,4 @@
-"""Tests for the Bar component: joining, spacing, and truncation."""
+"""Tests for the Bar widget: joining, spacing, and truncation."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from prompt_toolkit.layout.mouse_handlers import MouseHandlers
 from prompt_toolkit.layout.screen import Screen, WritePosition
 
 from koda_tui.appearance import Tokens
-from koda_tui.ui.components import Bar
+from koda_tui.ui.widgets import Bar
 
 
 def _cells(bar: Bar, width: int) -> list[tuple[str, str]]:
