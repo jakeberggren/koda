@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -12,21 +12,13 @@ from koda_common.settings.errors import (
     SettingsUnknownKeysError,
 )
 from koda_common.settings.store import JsonObject, SecretsStore
-from koda_service import LocalRuntimeConfig
 from koda_service.exceptions import StartupConfigurationError
-from koda_tui.main import _report_startup_error, build_app, main
+from koda_tui.main import _fail, build_app, main
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from structlog.stdlib import BoundLogger
-
     from koda_common.settings.credentials import ProviderCredential
-
-
-class _LoggerStub:
-    def error(self, _event: str, **_kwargs: object) -> None:
-        return
 
 
 class _FakeSettingsStore(SettingsStore):
@@ -74,25 +66,21 @@ class _TelemetryStub:
 
 def _run_main_with_error(
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
     error: Exception,
-) -> tuple[int, list[StartupConfigurationError]]:
-    reported: list[StartupConfigurationError] = []
-
+) -> str:
+    """Run main with build_app raising ``error``; it must exit with 1. Returns stderr."""
     monkeypatch.setattr(
         "koda_tui.main.build_app",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(error),
     )
     monkeypatch.setattr("koda_tui.main.configure_logging", lambda _config: None)
-    monkeypatch.setattr(
-        "koda_tui.main._report_startup_error",
-        lambda raised, _logger: reported.append(raised),
-    )
 
     with pytest.raises(SystemExit) as exc_info:
         main()
 
     assert exc_info.value.code == 1
-    return 1, reported
+    return capsys.readouterr().err
 
 
 def test_build_app_raises_settings_error_from_store(tmp_path: Path) -> None:
@@ -103,11 +91,10 @@ def test_build_app_raises_settings_error_from_store(tmp_path: Path) -> None:
     )
     with pytest.raises(SettingsDecodeError) as exc_info:
         build_app(
-            workspace=tmp_path,
+            tmp_path,
             settings_store=_FakeSettingsStore(error=error),
             secrets_store=_FakeSecretsStore(),
             telemetry=_TelemetryStub(),
-            runtime_config=LocalRuntimeConfig(cwd=tmp_path, sandbox_dir=tmp_path),
         )
 
     assert exc_info.value is error
@@ -121,11 +108,10 @@ def test_build_app_raises_secrets_error_from_store(tmp_path: Path) -> None:
     )
     with pytest.raises(SecretsDecodeError) as exc_info:
         build_app(
-            workspace=tmp_path,
+            tmp_path,
             settings_store=_FakeSettingsStore(),
             secrets_store=_FakeSecretsStore(error=error),
             telemetry=_TelemetryStub(),
-            runtime_config=LocalRuntimeConfig(cwd=tmp_path, sandbox_dir=tmp_path),
         )
 
     assert exc_info.value is error
@@ -136,11 +122,10 @@ def test_build_app_creates_application_with_injected_dependencies(tmp_path: Path
     secrets_store = _FakeSecretsStore()
 
     app = build_app(
-        workspace=tmp_path,
+        tmp_path,
         settings_store=_FakeSettingsStore(),
         secrets_store=secrets_store,
         telemetry=telemetry,
-        runtime_config=LocalRuntimeConfig(cwd=tmp_path, sandbox_dir=tmp_path),
     )
 
     assert app.app_settings is not None
@@ -150,60 +135,57 @@ def test_build_app_creates_application_with_injected_dependencies(tmp_path: Path
     assert telemetry.settings is app.app_settings.core
 
 
-def test_report_startup_error_logs_and_prints(
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    _report_startup_error(
-        StartupConfigurationError(
-            "Invalid configuration",
-            details=("theme: Input should be 'auto', 'dark' or 'light'",),
-        ),
-        cast("BoundLogger", _LoggerStub()),
+def test_fail_prints_what_to_fix_and_exits(capsys: pytest.CaptureFixture[str]) -> None:
+    error = StartupConfigurationError(
+        "Invalid configuration",
+        details=("theme: Input should be 'auto', 'dark' or 'light'",),
     )
 
-    captured = capsys.readouterr()
-    assert captured.err == (
-        "Application failed to start (StartupConfigurationError): "
-        "Invalid configuration\n- theme: Input should be 'auto', 'dark' or 'light'\n"
+    with pytest.raises(SystemExit) as exc_info:
+        _fail(error)
+
+    assert exc_info.value.code == 1
+    assert capsys.readouterr().err == (
+        "Koda failed to start: Invalid configuration\n"
+        "- theme: Input should be 'auto', 'dark' or 'light'\n"
     )
 
 
-def test_main_maps_settings_errors_to_startup_error(
+def test_main_reports_a_settings_file_that_isnt_json(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     path = tmp_path / "config.json"
     error = SettingsDecodeError(
         path=path,
         error=json.JSONDecodeError("Expecting value", "{", 1),
     )
-    exit_code, reported = _run_main_with_error(monkeypatch, error)
+    err = _run_main_with_error(monkeypatch, capsys, error)
 
-    assert exit_code == 1
-    assert reported[0].summary == f"Settings file is not valid JSON: {path}"
-    assert reported[0].details == ("Expecting value at line 1, column 2",)
+    assert f"Settings file is not valid JSON: {path}" in err
+    assert "Expecting value at line 1, column 2" in err
 
 
-def test_main_maps_unknown_settings_keys_to_startup_error(
+def test_main_reports_unknown_settings_keys(
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     error = SettingsUnknownKeysError({"not_a_setting"})
-    exit_code, reported = _run_main_with_error(monkeypatch, error)
+    err = _run_main_with_error(monkeypatch, capsys, error)
 
-    assert exit_code == 1
-    assert reported[0].summary == "Unknown settings keys: not_a_setting"
+    assert "Unknown settings keys: not_a_setting" in err
 
 
-def test_main_prints_startup_error_and_exits(
+def test_main_reports_a_secrets_file_that_isnt_json(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    exit_code, reported = _run_main_with_error(
-        monkeypatch,
-        StartupConfigurationError(
-            "Invalid configuration",
-            details=("theme: Input should be 'auto', 'dark' or 'light'",),
-        ),
+    error = SecretsDecodeError(
+        path=tmp_path / "secrets.json",
+        error=json.JSONDecodeError("Expecting value", "{", 1),
     )
+    err = _run_main_with_error(monkeypatch, capsys, error)
 
-    assert exit_code == 1
-    assert reported[0].summary == "Invalid configuration"
+    assert err.startswith("Koda failed to start: ")
