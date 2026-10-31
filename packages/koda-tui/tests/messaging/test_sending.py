@@ -8,8 +8,7 @@ from koda.agent import AgentTextDelta, AgentToolCallRequested, AgentToolComplete
 from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda_service import ChatRequest
 from koda_service.exceptions import ServiceConnectionError, ServiceRateLimitError
-from koda_tui.app.conversation import Conversation
-from koda_tui.app.streaming import StreamProcessor
+from koda_tui.messaging import Conversation, Outbox
 from koda_tui.state import (
     AppState,
     AssistantMessage,
@@ -40,17 +39,24 @@ def _text(message: Message) -> str:
     return message.text
 
 
-@pytest.fixture
-def processor(state: AppState) -> StreamProcessor:
-    """A StreamProcessor for testing."""
-    return StreamProcessor(conversation=Conversation(state), invalidate=lambda: None)
+def _outbox(state: AppState, service: object) -> Outbox:
+    conversation = Conversation(state)
+    return Outbox(state=state, conversation=conversation, service=service, invalidate=lambda: None)  # type: ignore
 
 
-class TestStreamProcessor:
-    """Tests for StreamProcessor async streaming."""
+async def _send(state: AppState, service: object, text: str) -> None:
+    """Submit ``text`` while idle, and wait for its response to end."""
+    outbox = _outbox(state, service)
+    outbox.submit(text, steer=False)
+    assert outbox._sending is not None  # noqa: SLF001
+    await outbox._sending  # noqa: SLF001
+
+
+class TestSending:
+    """A message's response, applied to the conversation."""
 
     @pytest.mark.asyncio
-    async def test_stream_text_only(self, state: AppState, processor: StreamProcessor) -> None:
+    async def test_stream_text_only(self, state: AppState) -> None:
         """Streaming text should append to messages."""
         client = AsyncMock()
 
@@ -60,7 +66,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("hi", client)
+        await _send(state, client, "hi")
 
         assert state.responding is False
         user_msg, assistant_msg = state.messages
@@ -70,7 +76,7 @@ class TestStreamProcessor:
         assert _text(assistant_msg) == "Hello world"
 
     @pytest.mark.asyncio
-    async def test_stream_with_tool_call(self, state: AppState, processor: StreamProcessor) -> None:
+    async def test_stream_with_tool_call(self, state: AppState) -> None:
         """Streaming with tool calls should track tools."""
         client = AsyncMock()
         tool = ToolCall(tool_name="read_file", arguments={"path": "/tmp"}, call_id="c1")
@@ -89,7 +95,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("read file", client)
+        await _send(state, client, "read file")
 
         assert state.responding is False
         user_msg, first_assistant, tool_msg, second_assistant = state.messages
@@ -104,7 +110,7 @@ class TestStreamProcessor:
         assert _text(second_assistant) == "Done!"
 
     @pytest.mark.asyncio
-    async def test_stream_tool_error(self, state: AppState, processor: StreamProcessor) -> None:
+    async def test_stream_tool_error(self, state: AppState) -> None:
         """Tool errors should be flagged on the message."""
         client = AsyncMock()
         tool = ToolCall(tool_name="read_file", arguments={"path": "/bad"}, call_id="c1")
@@ -125,7 +131,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("read bad file", client)
+        await _send(state, client, "read bad file")
 
         assert isinstance(state.messages[1], ToolMessage)
         assert _output(state.messages[1]).is_error is True
@@ -133,9 +139,7 @@ class TestStreamProcessor:
         assert _output(state.messages[1]).display is None
 
     @pytest.mark.asyncio
-    async def test_stream_handles_rate_limit_error(
-        self, state: AppState, processor: StreamProcessor
-    ) -> None:
+    async def test_stream_handles_rate_limit_error(self, state: AppState) -> None:
         """Rate limit failures should show a user-friendly inline message."""
         client = AsyncMock()
 
@@ -153,7 +157,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("do something", client)
+        await _send(state, client, "do something")
 
         assert state.responding is False
         _user_msg, assistant_msg = state.messages
@@ -162,7 +166,7 @@ class TestStreamProcessor:
         assert "quota hit" in _text(assistant_msg)
 
     @pytest.mark.asyncio
-    async def test_stream_propagates_unexpected_exception(self, processor: StreamProcessor) -> None:
+    async def test_stream_propagates_unexpected_exception(self, state: AppState) -> None:
         """Unexpected exceptions should escape local handling."""
         client = AsyncMock()
 
@@ -173,12 +177,10 @@ class TestStreamProcessor:
         client.chat = mock_chat
 
         with pytest.raises(ValueError, match="Something went wrong"):
-            await processor.stream("do something", client)
+            await _send(state, client, "do something")
 
     @pytest.mark.asyncio
-    async def test_stream_handles_connection_error(
-        self, state: AppState, processor: StreamProcessor
-    ) -> None:
+    async def test_stream_handles_connection_error(self, state: AppState) -> None:
         """Connection failures should show recovery guidance."""
         client = AsyncMock()
 
@@ -195,7 +197,7 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        await processor.stream("do something", client)
+        await _send(state, client, "do something")
 
         assert state.responding is False
         _user_msg, assistant_msg = state.messages
@@ -203,7 +205,7 @@ class TestStreamProcessor:
         assert "network down" in _text(assistant_msg)
 
     @pytest.mark.asyncio
-    async def test_cancel_stream(self, state: AppState, processor: StreamProcessor) -> None:
+    async def test_cancel_stream(self, state: AppState) -> None:
         """Cancelling stream should stop processing."""
         client = AsyncMock()
 
@@ -216,11 +218,12 @@ class TestStreamProcessor:
 
         client.chat = mock_chat
 
-        # Start streaming in background
-        task = asyncio.create_task(processor.stream("test", client))
+        outbox = _outbox(state, client)
+        outbox.submit("test", steer=False)
         await asyncio.sleep(0.05)  # Let it start
 
-        processor.cancel_stream()
-        await task  # Should complete quickly due to cancellation
+        outbox.cancel()
+        assert outbox._sending is not None  # noqa: SLF001
+        await outbox._sending  # noqa: SLF001  # Ends quickly, being cancelled.
 
         assert state.responding is False

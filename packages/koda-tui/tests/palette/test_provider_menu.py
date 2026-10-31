@@ -17,9 +17,10 @@ if TYPE_CHECKING:
 
     from koda.llm.auth.protocols import OAuthLoginCallbacks
     from koda_service import KodaService
-    from koda_tui.app.conversation import Conversation
+    from koda_tui.messaging import Conversation, Outbox
     from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
+    from koda_tui.terminal import Terminal
     from koda_tui.ui.overlays import Overlays
     from koda_tui.ui.widgets import DialogChoice
 
@@ -134,8 +135,8 @@ def _provider_menu(
         settings=cast("AppSettings", palette.settings),
         state=cast("AppState", None),
         conversation=cast("Conversation", None),
-        cancel_streaming=lambda: None,
-        refresh_theme=lambda: None,
+        outbox=cast("Outbox", None),
+        terminal=cast("Terminal", None),
     )
     return ProviderMenu(
         context,

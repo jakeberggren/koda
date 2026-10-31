@@ -4,7 +4,7 @@ import pytest
 
 from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui import AppState
-from koda_tui.app.conversation import Conversation
+from koda_tui.messaging import Conversation
 
 READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 

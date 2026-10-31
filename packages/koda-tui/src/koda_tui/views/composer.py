@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.document import Document
@@ -18,28 +18,28 @@ from koda_tui.ui.widgets import Prompt
 from koda_tui.workspace import WorkspaceFiles
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
     from prompt_toolkit.key_binding import KeyBindingsBase, KeyPressEvent
 
     from koda_tui.state import AppState
 
-    type Submit = Callable[[str], Awaitable[None]]
-
 MAX_ROWS = 10  # The composer grows with its text up to this many rows.
 SUGGESTIONS = 10  # Most files suggested for an @ mention.
+
+
+class Submit(Protocol):
+    def __call__(self, text: str, /, *, alternate: bool) -> None: ...
 
 
 class Composer:
     """An editor with a prompt on a raised surface. Typing ``@`` and part of a path
     suggests workspace files; accepting one replaces the mention with its path.
 
-    Enter submits the text to ``on_submit``, Alt+Enter to ``on_alternate_submit``;
+    Enter submits the text to ``on_submit``; Alt+Enter too, as the ``alternate`` way.
     Ctrl+J starts a new line. ``suggestions`` is a separate container, so the layout
     can place it above.
     """
 
-    def __init__(self, state: AppState, *, on_submit: Submit, on_alternate_submit: Submit) -> None:
+    def __init__(self, state: AppState, *, on_submit: Submit) -> None:
         self._files = WorkspaceFiles(state.workspace)
         self._suggestions: ListState[str] = ListState([])
         self._mention: tuple[int, int] | None = None  # Text range of the @ mention.
@@ -68,7 +68,7 @@ class Composer:
                 Spacer(),
             ],
             style=Tokens.Surface.RAISED,
-            key_bindings=self._key_bindings(on_submit, on_alternate_submit),
+            key_bindings=self._key_bindings(on_submit),
         )
 
     def __pt_container__(self) -> HSplit:
@@ -128,32 +128,28 @@ class Composer:
         self._close_suggestions()
         return True
 
-    def _key_bindings(self, on_submit: Submit, on_alternate_submit: Submit) -> KeyBindingsBase:
+    def _key_bindings(self, on_submit: Submit) -> KeyBindingsBase:
         """Writing keys, then the suggestion keys, which take over while suggesting."""
         suggesting = Condition(lambda: self.has_suggestion)
         return merge_key_bindings(
             [
-                self._writing_keys(on_submit, on_alternate_submit),
+                self._writing_keys(on_submit),
                 ConditionalKeyBindings(self._suggestion_keys(), suggesting),
             ],
         )
 
-    def _writing_keys(  # noqa: C901 - one handler per key
-        self,
-        on_submit: Submit,
-        on_alternate_submit: Submit,
-    ) -> KeyBindings:
+    def _writing_keys(self, on_submit: Submit) -> KeyBindings:  # noqa: C901 - one handler per key
         kb = KeyBindings()
 
         @kb.add(Keys.Enter)
-        async def _submit(_event: KeyPressEvent) -> None:
+        def _submit(_event: KeyPressEvent) -> None:
             if text := self._take_text():
-                await on_submit(text)
+                on_submit(text, alternate=False)
 
         @kb.add(*ALT_ENTER)
-        async def _alternate_submit(_event: KeyPressEvent) -> None:
+        def _alternate_submit(_event: KeyPressEvent) -> None:
             if text := self._take_text():
-                await on_alternate_submit(text)
+                on_submit(text, alternate=True)
 
         @kb.add(Keys.ControlJ)
         def _newline(_event: KeyPressEvent) -> None:

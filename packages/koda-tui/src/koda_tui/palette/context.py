@@ -6,12 +6,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from koda_service import KodaService
-    from koda_tui.app.conversation import Conversation
+    from koda_tui.messaging import Conversation, Outbox
     from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
+    from koda_tui.terminal import Terminal
     from koda_tui.ui.overlays import Overlays
 
 
@@ -24,5 +23,5 @@ class PaletteContext:
     settings: AppSettings
     state: AppState
     conversation: Conversation
-    cancel_streaming: Callable[[], None]
-    refresh_theme: Callable[[], None]
+    outbox: Outbox
+    terminal: Terminal

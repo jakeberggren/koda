@@ -35,7 +35,7 @@ class SessionMenu:
 
     def __init__(self, context: PaletteContext) -> None:
         self._overlays = context.overlays
-        self._cancel_streaming = context.cancel_streaming
+        self._outbox = context.outbox
         self._service = context.service
         self._conversation = context.conversation
 
@@ -72,14 +72,14 @@ class SessionMenu:
 
     def new(self) -> None:
         """Create and switch to a new session."""
-        self._cancel_streaming()
+        self._outbox.cancel()
         self._service.create_session()
         self._conversation.clear()
         self._overlays.close_all()
 
     def switch(self, session: Session) -> None:
         """Switch to an existing session."""
-        self._cancel_streaming()
+        self._outbox.cancel()
         try:
             switched = self._service.switch_session(session.session_id)
         except ServiceSessionNotFoundError:
@@ -109,7 +109,7 @@ class SessionMenu:
         active = self._service.active_session()
         removed_active = active is not None and active.session_id == session.session_id
         if removed_active:
-            self._cancel_streaming()
+            self._outbox.cancel()
 
         try:
             self._service.delete_session(session.session_id)

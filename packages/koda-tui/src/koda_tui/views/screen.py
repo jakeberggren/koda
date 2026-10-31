@@ -30,14 +30,12 @@ class Screen:
         state: AppState,
         *,
         on_submit: Submit,
-        on_alternate_submit: Submit,
         show_scrollbar: FilterOrBool = True,
     ) -> None:
         self.chat = Chat(state, scrollbar=show_scrollbar)
         self.composer = Composer(
             state,
             on_submit=on_submit,
-            on_alternate_submit=on_alternate_submit,
         )
         self.root = FloatContainer(
             HSplit(

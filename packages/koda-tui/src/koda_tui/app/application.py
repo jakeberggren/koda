@@ -11,11 +11,9 @@ from prompt_toolkit.layout import Layout
 from prompt_toolkit.output import ColorDepth
 
 from koda.llm import ThinkingOption
-from koda_tui.app.conversation import Conversation
 from koda_tui.app.keybindings import create_keybindings
-from koda_tui.app.queue import MessageQueue
-from koda_tui.app.streaming import StreamProcessor
 from koda_tui.appearance import Appearance
+from koda_tui.messaging import Conversation, Outbox
 from koda_tui.palette.context import PaletteContext
 from koda_tui.palette.root import RootMenu
 from koda_tui.state import AppState
@@ -79,7 +77,6 @@ class KodaTuiApp:
         self.screen = Screen(
             self.state,
             on_submit=self._submit,
-            on_alternate_submit=self._alternate_submit,
             show_scrollbar=Condition(lambda: self._app_settings.tui.show_scrollbar),
         )
 
@@ -88,15 +85,11 @@ class KodaTuiApp:
         self._terminal = Terminal()
         self._exit_reset_handle: asyncio.TimerHandle | None = None
 
-        self._message_queue = MessageQueue(
-            state=self.state,
-            send_message=self.send_message,
-            invalidate=self.invalidate,
-            cancel_streaming=self.cancel_streaming,
-        )
         self.conversation = Conversation(self.state)
-        self._stream_processor = StreamProcessor(
+        self.outbox = Outbox(
+            state=self.state,
             conversation=self.conversation,
+            service=self._service,
             invalidate=self.invalidate,
         )
         self.overlays = Overlays(self.screen.root, fallback=self.screen.composer.buffer)
@@ -107,8 +100,8 @@ class KodaTuiApp:
                 settings=self._app_settings,
                 state=self.state,
                 conversation=self.conversation,
-                cancel_streaming=self.cancel_streaming,
-                refresh_theme=self.refresh_theme,
+                outbox=self.outbox,
+                terminal=self._terminal,
             ),
         )
         self._refresh_service_state()
@@ -163,11 +156,6 @@ class KodaTuiApp:
 
     def _on_terminal_background(self, background: RGBColor) -> None:
         self.appearance.terminal_background = background
-        self.invalidate()
-
-    def refresh_theme(self) -> None:
-        """Re-detect the terminal background and redraw with the current theme."""
-        self._terminal.ask_background()
         self.invalidate()
 
     def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
@@ -252,51 +240,10 @@ class KodaTuiApp:
             else ThinkingOption.none()
         )
 
-    async def _submit(self, text: str) -> None:
-        """Enter: steer or queue while responding, by the input mode."""
-        await self._send(text, steer=not self._app_settings.tui.queue_inputs)
-
-    async def _alternate_submit(self, text: str) -> None:
-        """Alt+Enter: the other of steer or queue."""
-        await self._send(text, steer=self._app_settings.tui.queue_inputs)
-
-    async def _send(self, text: str, *, steer: bool) -> None:
-        """Send ``text`` now if idle; while responding, steer with it or queue it."""
-        if not self.state.responding:
-            await self.send_message(text)
-        elif steer:
-            self.steer_message(text)
-        else:
-            self.enqueue_message(text)
-
-    def enqueue_message(self, text: str) -> None:
-        """Queue a message to be sent after the current stream completes."""
-        self._message_queue.enqueue(text)
-
-    def steer_message(self, text: str) -> None:
-        """Steer the current stream and send a message as soon as possible."""
-        self._message_queue.steer(text)
-
-    def dequeue_all(self) -> None:
-        """Remove all queued messages."""
-        self._message_queue.dequeue_all()
-
-    def pop_last_queued_message(self) -> str | None:
-        """Remove and return the most recently queued message."""
-        return self._message_queue.pop_last()
-
-    def steer_and_send_queue(self) -> None:
-        """Steer the current stream and send queued messages as soon as possible."""
-        self._message_queue.steer_and_drain()
-
-    async def send_message(self, text: str) -> None:
-        """Send a message and process the response stream."""
-        await self._stream_processor.stream(text, self._service)
-        self._message_queue.kick()
-
-    def cancel_streaming(self) -> None:
-        """Cancel the current streaming operation."""
-        self._stream_processor.cancel_stream()
+    def _submit(self, text: str, *, alternate: bool) -> None:
+        """While Koda responds, Enter queues and Alt+Enter steers, or the other way
+        round when the input mode prefers steering."""
+        self.outbox.submit(text, steer=alternate == self._app_settings.tui.queue_inputs)
 
     def toggle_palette(self) -> None:
         """Open the command palette, or close it and any dialogs it opened."""
