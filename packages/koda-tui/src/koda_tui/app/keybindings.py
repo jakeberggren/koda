@@ -31,11 +31,9 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901 - one hand
         """Keys bound only so they don't type their escape sequence as text."""
 
     @kb.add(Keys.ControlC)
-    def _request_exit(_event: KeyPressEvent) -> None:
-        if app.request_exit():
+    def _exit(_event: KeyPressEvent) -> None:
+        if app.confirm_exit():
             app.exit()
-        else:
-            app.invalidate()
 
     @kb.add(Keys.Escape, filter=Condition(lambda: state.responding or bool(state.pending_inputs)))
     def _escape(_event: KeyPressEvent) -> None:

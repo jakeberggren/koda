@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
@@ -30,6 +31,9 @@ if TYPE_CHECKING:
     from koda_service import KodaService
     from koda_tui.appearance import RGBColor
     from koda_tui.settings import AppSettings
+
+
+EXIT_TIMEOUT = 3.0  # Seconds a second Ctrl+C has to come within to exit.
 
 
 class _KodaApplication(Application):
@@ -83,7 +87,7 @@ class KodaTuiApp:
         # Application instance (created on run)
         self._app: Application[None] | None = None
         self._terminal = Terminal(on_background=self._on_terminal_background)
-        self._exit_reset_handle: asyncio.TimerHandle | None = None
+        self._exit_expiry: asyncio.TimerHandle | None = None
 
         self.conversation = Conversation(self.state)
         self.outbox = Outbox(
@@ -130,76 +134,44 @@ class KodaTuiApp:
 
         return app
 
-    @staticmethod
-    def _has_service_change(change_names: set[str]) -> bool:
-        return bool(
-            {
-                "provider",
-                "model",
-                "thinking",
-                "allow_web_search",
-                "allow_extended_prompt_retention",
-            }
-            & change_names
-        ) or any(name.startswith("credentials.") for name in change_names)
-
-    def _apply_service_setting_changes(self, change_names: set[str]) -> bool:
-        if not self._has_service_change(change_names):
-            return False
-        self._service.update_settings(self._app_settings.core)
-        self._refresh_service_state()
-        return True
-
     def _on_terminal_background(self, background: RGBColor) -> None:
         self.appearance.terminal_background = background
         self.invalidate()
 
-    def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
-        should_invalidate = False
-        if "show_scrollbar" in change_names:
-            self.screen.chat.clear_caches()
-            should_invalidate = True
-        if "queue_inputs" in change_names:
-            should_invalidate = True
-        if "theme" in change_names:
-            self.appearance.theme = self._app_settings.tui.theme
-            should_invalidate = True
-        return should_invalidate
-
-    def _on_settings_changed(self, changes: tuple[SettingChange, ...]) -> None:
-        """Handle committed settings changes."""
-        change_names = {change.name for change in changes}
-        should_invalidate = self._apply_service_setting_changes(change_names)
-        if self._apply_ui_setting_changes(change_names):
-            should_invalidate = True
-        if should_invalidate:
-            self.invalidate()
-
-    def _on_tui_settings_changed(self, changes: tuple[SettingChange, ...]) -> None:
-        """Handle committed TUI-only settings changes."""
-        change_names = {change.name for change in changes}
-        if self._apply_ui_setting_changes(change_names):
-            self.invalidate()
-
-    def _on_exit_timeout(self) -> None:
-        self.state.exit_requested = False
-        self._exit_reset_handle = None
+    def _on_settings_changed(self, _changes: tuple[SettingChange, ...]) -> None:
+        """Pass the settings on to the service, which rebuilds its agent when next
+        asked, and show what they change."""
+        self._service.update_settings(self._app_settings.core)
+        self._refresh_service_state()
         self.invalidate()
 
-    def request_exit(self, timeout_seconds: float = 3.0) -> bool:
-        """Request application exit. Returns True if should exit immediately (on double-press)."""
-        if self._exit_reset_handle:
-            self._exit_reset_handle.cancel()
-            self._exit_reset_handle = None
+    def _on_tui_settings_changed(self, changes: tuple[SettingChange, ...]) -> None:
+        """Apply a new theme, and redraw for any change."""
+        if any(change.name == "theme" for change in changes):
+            self.appearance.theme = self._app_settings.tui.theme
+        self.invalidate()
 
+    def confirm_exit(self) -> bool:
+        """Whether this Ctrl+C confirms the exit. The first press asks for a second,
+        through ``state.exit_requested``, until ``EXIT_TIMEOUT`` runs out."""
         if self.state.exit_requested:
+            self._dismiss_exit()
             return True
-
         self.state.exit_requested = True
-        if self._app:
+        with suppress(RuntimeError):  # Without a running app, it asks until dismissed.
             loop = asyncio.get_running_loop()
-            self._exit_reset_handle = loop.call_later(timeout_seconds, self._on_exit_timeout)
+            self._exit_expiry = loop.call_later(EXIT_TIMEOUT, self._dismiss_exit)
+        self.invalidate()
         return False
+
+    def _dismiss_exit(self) -> None:
+        """Stop asking for a second Ctrl+C."""
+        if self._exit_expiry is not None:
+            self._exit_expiry.cancel()
+            self._exit_expiry = None
+        if self.state.exit_requested:
+            self.state.exit_requested = False
+            self.invalidate()
 
     def invalidate(self) -> None:
         """Trigger a UI refresh."""
@@ -238,7 +210,9 @@ class KodaTuiApp:
 
     def _submit(self, text: str, *, alternate: bool) -> None:
         """While Koda responds, Enter queues and Alt+Enter steers, or the other way
-        round when the input mode prefers steering."""
+        round when the input mode prefers steering. Writing a message takes back a
+        press of Ctrl+C."""
+        self._dismiss_exit()
         self.outbox.submit(text, steer=alternate == self._app_settings.tui.queue_inputs)
 
     def cycle_thinking(self) -> None:
