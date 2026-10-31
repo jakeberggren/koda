@@ -1,5 +1,6 @@
-from collections.abc import Sequence
-from pathlib import Path
+from collections.abc import Callable, Sequence
+
+import pytest
 
 from koda import messages as core
 from koda.agent import (
@@ -13,7 +14,6 @@ from koda.agent import (
 from koda.messages import TokenUsage
 from koda.sessions import Session
 from koda.tools import ToolCall, ToolOutput, ToolResult
-from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui.messaging import Conversation
 from koda_tui.state import (
     AppState,
@@ -24,8 +24,6 @@ from koda_tui.state import (
     Usage,
     UserMessage,
 )
-
-READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 
 
 def _tool(message: Message) -> ToolMessage:
@@ -417,12 +415,19 @@ class TestResponse:
         assert _reply(state.messages[1]).thinking == "partial thinking"
 
 
-def _load(
-    history: Sequence[core.UserMessage | core.AssistantMessage | core.ToolMessage],
-) -> list[Message]:
-    state = AppState(workspace=Path("/workspace"), service_status=READY)
-    Conversation(state).load(Session(messages=list(history)))
-    return state.messages
+type History = Sequence[core.UserMessage | core.AssistantMessage | core.ToolMessage]
+type Load = Callable[[History], list[Message]]
+
+
+@pytest.fixture
+def load(state: AppState, conversation: Conversation) -> Load:
+    """Load a saved history into the conversation, giving back its messages."""
+
+    def load(history: History) -> list[Message]:
+        conversation.load(Session(messages=list(history)))
+        return state.messages
+
+    return load
 
 
 def _make_tool_call(call_id: str = "call_1", tool_name: str = "search") -> ToolCall:
@@ -451,27 +456,27 @@ def _make_tool_result(
 class TestLoad:
     """A saved session's history, loaded as messages."""
 
-    def test_empty_list(self) -> None:
-        result = _load([])
+    def test_empty_list(self, load: Load) -> None:
+        result = load([])
 
         assert result == []
 
-    def test_user_message(self) -> None:
-        result = _load([core.UserMessage(content="hello")])
+    def test_user_message(self, load: Load) -> None:
+        result = load([core.UserMessage(content="hello")])
 
         assert len(result) == 1
         assert isinstance(result[0], UserMessage)
         assert _text(result[0]) == "hello"
 
-    def test_assistant_message(self) -> None:
-        result = _load([core.AssistantMessage(content="hi there")])
+    def test_assistant_message(self, load: Load) -> None:
+        result = load([core.AssistantMessage(content="hi there")])
 
         assert len(result) == 1
         assert isinstance(result[0], AssistantMessage)
         assert _text(result[0]) == "hi there"
 
-    def test_assistant_message_with_thinking(self) -> None:
-        result = _load(
+    def test_assistant_message_with_thinking(self, load: Load) -> None:
+        result = load(
             [core.AssistantMessage(content="hi there", thinking_content="Compare options")]
         )
 
@@ -480,27 +485,27 @@ class TestLoad:
         assert _text(result[0]) == "hi there"
         assert _reply(result[0]).thinking == "Compare options"
 
-    def test_assistant_message_with_only_thinking(self) -> None:
-        result = _load([core.AssistantMessage(content="", thinking_content="Need a tool")])
+    def test_assistant_message_with_only_thinking(self, load: Load) -> None:
+        result = load([core.AssistantMessage(content="", thinking_content="Need a tool")])
 
         assert len(result) == 1
         assert isinstance(result[0], AssistantMessage)
         assert _text(result[0]) == ""
         assert _reply(result[0]).thinking == "Need a tool"
 
-    def test_user_assistant_roundtrip(self) -> None:
+    def test_user_assistant_roundtrip(self, load: Load) -> None:
         messages = [
             core.UserMessage(content="hello"),
             core.AssistantMessage(content="hi"),
         ]
 
-        result = _load(messages)
+        result = load(messages)
 
         assert len(result) == 2
         assert isinstance(result[0], UserMessage)
         assert isinstance(result[1], AssistantMessage)
 
-    def test_tool_call_linked_to_result(self) -> None:
+    def test_tool_call_linked_to_result(self, load: Load) -> None:
         tc = _make_tool_call(call_id="c1", tool_name="search")
         tr = _make_tool_result(call_id="c1", display="found it")
 
@@ -510,7 +515,7 @@ class TestLoad:
             core.ToolMessage(tool_name="search", tool_result=tr),
         ]
 
-        result = _load(messages)
+        result = load(messages)
 
         # user + tool entry (assistant with no content is skipped, tool result merged)
         assert len(result) == 2
@@ -522,7 +527,7 @@ class TestLoad:
         assert _output(tool_msg).content == {}
         assert _output(tool_msg).is_error is False
 
-    def test_tool_call_with_error_result(self) -> None:
+    def test_tool_call_with_error_result(self, load: Load) -> None:
         tc = _make_tool_call(call_id="c1")
         tr = _make_tool_result(call_id="c1", is_error=True, error_message="not found")
 
@@ -531,17 +536,17 @@ class TestLoad:
             core.ToolMessage(tool_name="search", tool_result=tr),
         ]
 
-        result = _load(messages)
+        result = load(messages)
 
         assert len(result) == 1
         assert _output(result[0]).is_error is True
         assert _output(result[0]).error_message == "not found"
 
-    def test_failed_tool_keeps_its_output(self) -> None:
+    def test_failed_tool_keeps_its_output(self, load: Load) -> None:
         tc = _make_tool_call(call_id="c1")
         tr = _make_tool_result(call_id="c1", display=None, is_error=True, error_message="not found")
 
-        result = _load(
+        result = load(
             [
                 core.AssistantMessage(content="", tool_calls=[tc]),
                 core.ToolMessage(tool_name="search", tool_result=tr),
@@ -551,7 +556,7 @@ class TestLoad:
         assert _output(result[0]).is_error is True
         assert _output(result[0]).error_message == "not found"
 
-    def test_multiple_tool_calls_linked(self) -> None:
+    def test_multiple_tool_calls_linked(self, load: Load) -> None:
         tc1 = _make_tool_call(call_id="c1", tool_name="search")
         tc2 = _make_tool_call(call_id="c2", tool_name="read")
         tr1 = _make_tool_result(call_id="c1", display="search result")
@@ -563,24 +568,24 @@ class TestLoad:
             core.ToolMessage(tool_name="read", tool_result=tr2),
         ]
 
-        result = _load(messages)
+        result = load(messages)
 
         assert len(result) == 2
         assert _output(result[0]).display == "search result"
         assert _output(result[1]).display == "file content"
 
-    def test_result_without_its_call_is_left_out(self) -> None:
+    def test_result_without_its_call_is_left_out(self, load: Load) -> None:
         tr = _make_tool_result(call_id="orphan", display="orphan result")
 
         messages = [
             core.ToolMessage(tool_name="unknown", tool_result=tr),
         ]
 
-        result = _load(messages)
+        result = load(messages)
 
         assert result == []  # A result with no call to show it under is left out.
 
-    def test_assistant_with_content_and_tool_calls(self) -> None:
+    def test_assistant_with_content_and_tool_calls(self, load: Load) -> None:
         tc = _make_tool_call(call_id="c1")
         tr = _make_tool_result(call_id="c1")
 
@@ -589,7 +594,7 @@ class TestLoad:
             core.ToolMessage(tool_name="search", tool_result=tr),
         ]
 
-        result = _load(messages)
+        result = load(messages)
 
         # assistant text + tool entry
         assert len(result) == 2
@@ -597,20 +602,20 @@ class TestLoad:
         assert _text(result[0]) == "Let me search"
         assert isinstance(result[1], ToolMessage)
 
-    def test_assistant_empty_content_no_tools(self) -> None:
-        result = _load([core.AssistantMessage(content="")])
+    def test_assistant_empty_content_no_tools(self, load: Load) -> None:
+        result = load([core.AssistantMessage(content="")])
 
         assert result == []
 
-    def test_assistant_whitespace_only_content_no_tools(self) -> None:
-        result = _load([core.AssistantMessage(content="\n\n")])
+    def test_assistant_whitespace_only_content_no_tools(self, load: Load) -> None:
+        result = load([core.AssistantMessage(content="\n\n")])
 
         assert result == []
 
-    def test_assistant_whitespace_only_content_with_tool_call(self) -> None:
+    def test_assistant_whitespace_only_content_with_tool_call(self, load: Load) -> None:
         tc = _make_tool_call(call_id="c1", tool_name="search")
 
-        result = _load([core.AssistantMessage(content="\n\n", tool_calls=[tc])])
+        result = load([core.AssistantMessage(content="\n\n", tool_calls=[tc])])
 
         assert len(result) == 1
         assert isinstance(result[0], ToolMessage)

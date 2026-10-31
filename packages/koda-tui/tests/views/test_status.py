@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -16,22 +17,17 @@ from koda_tui.appearance import Tokens
 from koda_tui.state import AppState, AssistantMessage, Usage, UserMessage
 from koda_tui.views import status
 
-READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
-
 
 def _texts(segments) -> list[str]:
     return [fragment_list_to_text(segment) for segment in segments]
 
 
-def _state(*, service_status: ServiceStatus = READY, **fields) -> AppState:
-    return AppState(
-        workspace=Path.home() / "dev" / "koda",
-        service_status=service_status,
-        **fields,
-    )
+def _state(state: AppState, **fields) -> AppState:
+    """``state`` in a workspace under the home directory, with ``fields`` changed."""
+    return replace(state, workspace=Path.home() / "dev" / "koda", **fields)
 
 
-def test_left_shows_workspace_model_thinking_and_usage() -> None:
+def test_left_shows_workspace_model_thinking_and_usage(state: AppState) -> None:
     model = ModelDefinition(
         id="m",
         name="Model",
@@ -41,6 +37,7 @@ def test_left_shows_workspace_model_thinking_and_usage() -> None:
     )
     usage = TokenUsage(input_tokens=120, output_tokens=0)
     state = _state(
+        state,
         active_model=model,
         thinking=ThinkingOption(id="medium", label="Medium"),
         usage=Usage(latest=usage, total=TokenUsage(input_tokens=34, output_tokens=15_900)),
@@ -55,20 +52,18 @@ def test_left_shows_workspace_model_thinking_and_usage() -> None:
     ]
 
 
-def test_workspace_outside_home_shows_its_name() -> None:
-    assert _texts(
-        [status._location(AppState(workspace=Path("/srv/app"), service_status=READY))]
-    ) == ["~/app"]
+def test_workspace_outside_home_shows_its_name(state: AppState) -> None:
+    assert _texts([status._location(replace(state, workspace=Path("/srv/app")))]) == ["~/app"]
 
 
-def test_right_shows_hints_warning_and_activity() -> None:
+def test_right_shows_hints_warning_and_activity(state: AppState) -> None:
     model = ModelDefinition(
         id="m",
         name="Model",
         provider="provider",
         thinking_options=[ThinkingOption(id="medium", label="Medium")],
     )
-    state = _state(active_model=model, warnings=["Config has unknown keys"])
+    state = _state(state, active_model=model, warnings=["Config has unknown keys"])
     assert _texts(status._right(state)) == [
         "ctrl+t thinking",
         "ctrl+p/k palette",
@@ -87,13 +82,15 @@ def test_right_shows_hints_warning_and_activity() -> None:
         ({}, "ready"),
     ],
 )
-def test_activity_follows_the_response(fields: dict, text: str) -> None:
-    assert status._activity(_state(**fields)) == [(Tokens.Text.ACCENT, text)]
+def test_activity_follows_the_response(state: AppState, fields: dict, text: str) -> None:
+    assert status._activity(_state(state, **fields)) == [(Tokens.Text.ACCENT, text)]
 
 
-def test_activity_warns_when_the_service_is_not_ready() -> None:
+def test_activity_warns_when_the_service_is_not_ready(state: AppState) -> None:
     not_ready = next(code for code in ServiceStatusCode if code is not ServiceStatusCode.READY)
-    state = _state(service_status=ServiceStatus(code=not_ready, summary="No provider configured"))
+    state = _state(
+        state, service_status=ServiceStatus(code=not_ready, summary="No provider configured")
+    )
     assert status._activity(state) == [(Tokens.Text.WARNING, "No provider configured")]
 
 
