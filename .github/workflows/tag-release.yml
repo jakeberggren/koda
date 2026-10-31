@@ -30,20 +30,12 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       merge_sha: ${{ github.event.pull_request.merge_commit_sha }}
     steps:
-      - name: Generate token
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
-          private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
-          permission-contents: read
-
       - name: Checkout merge commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.merge_commit_sha }}
-          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
 
       - name: Validate merged release
         id: release
@@ -129,7 +121,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ needs.validate.outputs.merge_sha }}
-          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
 
       - name: Configure git author
         shell: bash
@@ -148,7 +140,8 @@ jobs:
         shell: bash
         env:
           TAG: ${{ needs.validate.outputs.tag }}
-        run: git push origin "refs/tags/${TAG}"
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}"
 
       - name: Summary
         shell: bash
