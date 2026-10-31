@@ -14,23 +14,15 @@ from rich.syntax import Syntax
 from rich.text import Text
 
 from koda.tools import ToolCall
+from koda_tui.rendering.style_classes import (
+    SYNTAX_THEME,
+    StyleClassBlock,
+    style_class,
+    style_classes,
+)
 from koda_tui.state import Message, MessageRole
-from koda_tui.theme import TerminalTheme, rgb_to_hex
 
 type DiffBlockType = Literal["add", "del", "context"]
-
-_THEME_COLORS = {
-    "dark": {
-        "code_theme": "ansi_dark",
-        "diff_add_bg": "dark_green",
-        "diff_del_bg": "dark_red",
-    },
-    "light": {
-        "code_theme": "ansi_light",
-        "diff_add_bg": "#d4edda",
-        "diff_del_bg": "#f8d7da",
-    },
-}
 
 BASH_PREVIEW_LINES = 6
 BASH_PREVIEW_CHARS = 600
@@ -93,10 +85,11 @@ def _rich_attrs_to_pt(style: Style) -> list[str]:
 
 def _rich_style_to_pt(style: Style | None) -> str:
     """Convert a Rich Style to a prompt_toolkit style string."""
-    if style is None or not str(style):
+    if style is None:
         return ""
 
-    parts: list[str] = []
+    # Classes first so inline attributes take precedence over the stylesheet.
+    parts = style_classes(style)
 
     fg = _rich_color_to_pt(style.color)
     if fg:
@@ -116,15 +109,14 @@ DIFF_HUNK_RE = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 DIFF_ADDITION_RE = re.compile(r"^\+(?!\+\+)", re.MULTILINE)
 DIFF_DELETION_RE = re.compile(r"^-(?!--)", re.MULTILINE)
 
+_DIFF_STYLE_CLASSES: dict[DiffBlockType | None, str] = {"add": "diff.add", "del": "diff.remove"}
+
 
 @dataclass
 class DiffBlockAccumulator:
     """Accumulates diff lines and renders them as syntax-highlighted blocks."""
 
     lexer: str
-    code_theme: str
-    diff_add_bg: str
-    diff_del_bg: str
     renderables: list = field(default_factory=list)
     block_type: DiffBlockType | None = None
     lines: list[str] = field(default_factory=list)
@@ -135,22 +127,18 @@ class DiffBlockAccumulator:
         if not self.lines:
             return
 
-        bg_by_type: dict[DiffBlockType, str] = {
-            "add": self.diff_add_bg,
-            "del": self.diff_del_bg,
-            "context": "default",
-        }
-        bg = "default" if self.block_type is None else bg_by_type[self.block_type]
-        self.renderables.append(
-            Syntax(
-                "\n".join(self.lines),
-                self.lexer,
-                theme=self.code_theme,
-                background_color=bg,
-                line_numbers=True,
-                start_line=self.start_line or 1,
-            )
+        syntax = Syntax(
+            "\n".join(self.lines),
+            self.lexer,
+            theme=SYNTAX_THEME,
+            background_color="default",
+            line_numbers=True,
+            start_line=self.start_line or 1,
         )
+        style_name = _DIFF_STYLE_CLASSES.get(self.block_type)
+        if style_name is not None:
+            syntax = StyleClassBlock(syntax, style_name)
+        self.renderables.append(syntax)
         self.lines = []
         self.block_type = None
         self.start_line = None
@@ -164,37 +152,35 @@ class DiffBlockAccumulator:
         self.lines.append(line)
 
 
-def _create_themed_markdown(code_theme: str) -> type:
-    """Create a Markdown subclass with themed elements."""
+class _CodeBlock(CodeBlock):
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        code = str(self.text).rstrip()
+        yield Syntax(code, self.lexer_name, theme=SYNTAX_THEME, background_color="default")
 
-    class _CodeBlock(CodeBlock):
-        def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-            code = str(self.text).rstrip()
-            yield Syntax(code, self.lexer_name, theme=code_theme, background_color="default")
 
-    class _Heading(Heading):
-        def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
-            self.text.justify = "left"
-            yield self.text
+class _Heading(Heading):
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        self.text.justify = "left"
+        yield self.text
 
-    class _Markdown(Markdown):
-        elements: ClassVar = {
-            **Markdown.elements,
-            "fence": _CodeBlock,
-            "heading_open": _Heading,
-        }
 
-    return _Markdown
+class _Markdown(Markdown):
+    elements: ClassVar = {
+        **Markdown.elements,
+        "fence": _CodeBlock,
+        "heading_open": _Heading,
+    }
 
 
 class BlockContent:
-    """Wraps a renderable with a full-width background."""
+    """Wraps a renderable with a full-width background from a style class."""
 
     _LEFT_PADDING = 1
 
-    def __init__(self, renderable, *, bg_color: str) -> None:
+    def __init__(self, renderable, *, style_name: str) -> None:
         self.renderable = renderable
-        self._bg_style = Style(bgcolor=bg_color)
+        # Reset inline backgrounds so the class background covers the whole block.
+        self._bg_style = Style(bgcolor="default") + style_class(style_name)
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         render_options = options.update(width=max(1, options.max_width - self._LEFT_PADDING))
@@ -233,21 +219,12 @@ class MessageRenderer:
     prompt_toolkit FormattedText for display in TUI components.
     """
 
-    def __init__(self, theme: TerminalTheme, width: int = 80) -> None:
+    def __init__(self, width: int = 80) -> None:
         self._width = width
-        self._colors = _THEME_COLORS[theme.theme]
-        self._user_bg = rgb_to_hex(theme.surface)
-        self._markdown_cls = _create_themed_markdown(self._colors["code_theme"])
 
     def set_width(self, width: int) -> None:
         """Update the rendering width."""
         self._width = width
-
-    def set_theme(self, theme: TerminalTheme) -> None:
-        """Switch the rendering theme and terminal-derived surface color."""
-        self._colors = _THEME_COLORS[theme.theme]
-        self._user_bg = rgb_to_hex(theme.surface)
-        self._markdown_cls = _create_themed_markdown(self._colors["code_theme"])
 
     @staticmethod
     def _trim_leading_newline_fragments(fragments: list[tuple[str, str]]) -> None:
@@ -293,9 +270,6 @@ class MessageRenderer:
         """Render a unified diff with syntax highlighting and colored backgrounds."""
         accumulator = DiffBlockAccumulator(
             lexer=self._get_lexer_from_diff(diff),
-            code_theme=self._colors["code_theme"],
-            diff_add_bg=self._colors["diff_add_bg"],
-            diff_del_bg=self._colors["diff_del_bg"],
         )
         old_line: int | None = None
         new_line: int | None = None
@@ -426,7 +400,7 @@ class MessageRenderer:
         *,
         add_spacing: bool = False,
     ) -> FormattedText:
-        fragment = self.convert(self._markdown_cls(content, style=Style(dim=True, italic=True)))
+        fragment = self.convert(_Markdown(content, style=Style(dim=True, italic=True)))
         if not add_spacing:
             return fragment
         return self._combine_formatted_text(fragment, FormattedText([("", "\n\n")]))
@@ -441,7 +415,7 @@ class MessageRenderer:
                 )
             )
         if message.content:
-            fragments.append(self.convert(self._markdown_cls(message.content)))
+            fragments.append(self.convert(_Markdown(message.content)))
 
         if not fragments:
             return FormattedText([])
@@ -453,11 +427,7 @@ class MessageRenderer:
         """Render a single message to FormattedText."""
         match message.role:
             case MessageRole.USER:
-                user_content = self._markdown_cls(
-                    message.content,
-                    style=Style(bgcolor=self._user_bg),
-                )
-                block_content = BlockContent(user_content, bg_color=self._user_bg)
+                block_content = BlockContent(_Markdown(message.content), style_name="message.user")
                 return self.convert(block_content)
             case MessageRole.ASSISTANT:
                 return self._render_assistant_message(message)
@@ -608,7 +578,7 @@ class MessageRenderer:
 
     def render_streaming_content(self, content: str) -> FormattedText:
         """Render currently streaming content inside a panel."""
-        md = self._markdown_cls(content)
+        md = _Markdown(content)
         return self.convert(md)
 
     def render_thinking_content(self, content: str) -> FormattedText:

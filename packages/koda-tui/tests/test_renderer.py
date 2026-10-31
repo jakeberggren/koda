@@ -34,7 +34,7 @@ class TestMessageRendererMessages:
         result = converter.render_message(message)
         content = "".join(t[1] for t in result)
         assert "Hello" in content
-        assert any("bg:#123456" in fragment[0] for fragment in result)
+        assert any("class:message.user" in fragment[0] for fragment in result)
 
     def test_render_assistant_message(self, converter: MessageRenderer) -> None:
         """render_message() should render assistant messages as markdown."""
@@ -261,3 +261,19 @@ class TestMessageRendererStreaming:
         content = "".join(t[1] for t in result)
         assert "Exploring the meaning of 42" in content
         assert "**Exploring the meaning of 42**" not in content
+
+
+class TestMessageRendererStyleClasses:
+    """Theme-dependent styling is emitted as style classes, not baked-in colors."""
+
+    def test_code_block_emits_pygments_classes(self, converter: MessageRenderer) -> None:
+        message = Message(role=MessageRole.ASSISTANT, content="```python\nimport os\n```")
+        result = converter.render_message(message)
+        assert ("class:pygments.keyword.namespace", "import") in result
+
+    def test_diff_lines_emit_full_width_diff_classes(self, converter: MessageRenderer) -> None:
+        diff = "--- a/foo.py\n+++ b/foo.py\n@@ -1 +1 @@\n-x = 1\n+x = 2\n"
+        result = converter.convert(converter._render_diff(diff))  # noqa: SLF001
+        added = "".join(fragment[1] for fragment in result if "class:diff.add" in fragment[0])
+        assert any("class:diff.remove" in fragment[0] for fragment in result)
+        assert added.rstrip("\n").endswith(" ")

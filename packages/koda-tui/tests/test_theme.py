@@ -1,6 +1,8 @@
 import pytest
 from prompt_toolkit.input.vt100_parser import Vt100Parser
 from prompt_toolkit.key_binding.key_processor import KeyPress
+from prompt_toolkit.styles import Attrs
+from pydantic import ValidationError
 
 from koda_tui.app.input import (
     OSC11_RESPONSE_KEY,
@@ -8,11 +10,12 @@ from koda_tui.app.input import (
     _FocusInputParser,
     _Osc11InputParser,
 )
+from koda_tui.design import THEMES, Theme, style_for
 from koda_tui.osc import (
     RGBColor,
     parse_osc11,
 )
-from koda_tui.theme import TerminalTheme, ThemeSetting, resolve_theme
+from koda_tui.settings import TuiSettings
 
 
 @pytest.mark.parametrize(
@@ -81,30 +84,65 @@ def _key_presses(input_: KodaVt100Input) -> list[KeyPress]:
     return input_._buffer  # noqa: SLF001
 
 
-def test_resolve_theme_uses_detected_background() -> None:
-    assert resolve_theme("auto", (0, 0, 128)) == TerminalTheme(
-        theme="dark",
-        surface=(32, 32, 144),
-    )
+def _attrs(setting: str, terminal_background: RGBColor | None, style_class: str) -> Attrs:
+    return style_for(setting, terminal_background).get_attrs_for_style_str(f"class:{style_class}")
 
 
-def test_resolve_theme_falls_back_without_osc_11() -> None:
-    assert resolve_theme("auto", None) == TerminalTheme(
-        theme="dark",
-        surface=(67, 67, 67),
-    )
+def test_auto_theme_derives_surface_from_dark_terminal_background() -> None:
+    assert _attrs("auto", (0, 0, 128), "message.user").bgcolor == "202090"
+    assert _attrs("auto", (0, 0, 128), "pygments.keyword").color == "ansibrightblue"
+
+
+def test_auto_theme_switches_to_light_theme_on_light_terminal_background() -> None:
+    assert _attrs("auto", (250, 250, 240), "message.user").bgcolor == "dbdbd2"
+    assert _attrs("auto", (250, 250, 240), "pygments.keyword").color == "ansiblue"
+
+
+def test_auto_theme_falls_back_to_dark_without_osc_11() -> None:
+    assert _attrs("auto", None, "input-area").bgcolor == "434343"
 
 
 @pytest.mark.parametrize(
-    ("theme", "terminal_background", "expected"),
+    ("setting", "terminal_background", "surface"),
     [
-        ("dark", (255, 255, 255), TerminalTheme(theme="dark", surface=(67, 67, 67))),
-        ("light", (0, 0, 0), TerminalTheme(theme="light", surface=(220, 220, 220))),
+        ("terminal-dark", (255, 255, 255), "434343"),
+        ("terminal-light", (0, 0, 0), "dcdcdc"),
+        ("terminal-dark", (0, 0, 128), "202090"),
     ],
 )
-def test_manual_theme_uses_fallback_surface(
-    theme: ThemeSetting,
+def test_terminal_theme_derives_surface_only_from_matching_background(
+    setting: str,
     terminal_background: RGBColor,
-    expected: TerminalTheme,
+    surface: str,
 ) -> None:
-    assert resolve_theme(theme, terminal_background) == expected
+    assert _attrs(setting, terminal_background, "input-area").bgcolor == surface
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("auto", "auto"),
+        ("terminal-dark", "terminal-dark"),
+        ("dark", "terminal-dark"),
+        ("light", "terminal-light"),
+    ],
+)
+def test_theme_setting_accepts_registered_and_legacy_names(value: str, expected: str) -> None:
+    assert TuiSettings(theme=value).theme == expected
+
+
+def test_theme_setting_rejects_unknown_theme() -> None:
+    with pytest.raises(ValidationError, match="Input should be one of 'auto', 'terminal-dark'"):
+        TuiSettings(theme="solarized")
+
+
+@pytest.mark.parametrize("theme", THEMES.values(), ids=lambda theme: theme.name)
+def test_selection_uses_theme_accent(theme: Theme) -> None:
+    attrs = _attrs(theme.name, None, "palette.selected")
+
+    assert (attrs.bgcolor, attrs.color) == (theme.accent, theme.on_accent)
+
+
+def test_syntax_child_classes_reset_inherited_dim() -> None:
+    assert _attrs("terminal-dark", None, "pygments.comment").dim
+    assert not _attrs("terminal-dark", None, "pygments.comment.preproc").dim

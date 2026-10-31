@@ -7,17 +7,18 @@ from prompt_toolkit import Application
 from prompt_toolkit.application.current import get_app_session
 from prompt_toolkit.input.vt100 import Vt100Input
 from prompt_toolkit.output import ColorDepth, Output
+from prompt_toolkit.styles import DynamicStyle
 
 from koda.llm import ThinkingOption
 from koda_tui.app.input import KodaVt100Input
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
+from koda_tui.design import style_for
 from koda_tui.layout import TUILayout
 from koda_tui.osc import OSC11_QUERY, parse_osc11
 from koda_tui.palette.palette import Palette
 from koda_tui.state import AppState
-from koda_tui.theme import get_tui_style, resolve_theme
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -68,7 +69,6 @@ class KodaTuiApp:
         self._closed = False
 
         self._terminal_background = None
-        theme = resolve_theme(self._app_settings.tui.theme, self._terminal_background)
 
         # Initialize state
         self.state = AppState(
@@ -83,7 +83,7 @@ class KodaTuiApp:
         )
 
         # Initialize layout
-        self.layout = TUILayout(self.state, theme)
+        self.layout = TUILayout(self.state)
 
         # Application instance (created on run)
         self._app: Application[None] | None = None
@@ -125,8 +125,8 @@ class KodaTuiApp:
         app = _KodaApplication(
             layout=self.layout.create_layout(),
             key_bindings=create_keybindings(self),
-            style=get_tui_style(
-                resolve_theme(self._app_settings.tui.theme, self._terminal_background)
+            style=DynamicStyle(
+                lambda: style_for(self._app_settings.tui.theme, self._terminal_background)
             ),
             full_screen=True,
             color_depth=ColorDepth.TRUE_COLOR,
@@ -163,39 +163,26 @@ class KodaTuiApp:
         """Ask the terminal for its background color through prompt_toolkit IO."""
         self._write_control_sequence(OSC11_QUERY)
 
-    def apply_theme(self, *, detect_terminal: bool = False) -> None:
-        """Re-resolve and apply the current theme setting."""
-        if detect_terminal:
-            self.request_terminal_background_refresh()
-        theme = resolve_theme(self._app_settings.tui.theme, self._terminal_background)
-        if self._app:
-            self._app.style = get_tui_style(theme)
-        self.layout.renderer.set_theme(theme)
-        self.layout.chat_area.clear_caches()
-
     def _request_initial_terminal_background_refresh(self, app: Application[None]) -> None:
         app.after_render -= self._request_initial_terminal_background_refresh
-        if self._app_settings.tui.theme == "auto":
-            self.request_terminal_background_refresh()
+        self.request_terminal_background_refresh()
 
     def handle_terminal_background_response(self, response: str) -> None:
-        """Apply an OSC 11 background response received by prompt_toolkit."""
+        """Store an OSC 11 background response received by prompt_toolkit."""
         terminal_background = parse_osc11(response)
-        if terminal_background is None or self._app_settings.tui.theme != "auto":
+        if terminal_background is None:
             return
         self._terminal_background = terminal_background
-        self.apply_theme()
         self.invalidate()
 
-    def refresh_theme(self, *, detect_terminal: bool = False) -> None:
-        """Reapply the current theme setting and redraw."""
-        self.apply_theme(detect_terminal=detect_terminal)
+    def refresh_theme(self) -> None:
+        """Re-detect the terminal background and redraw with the current theme."""
+        self.request_terminal_background_refresh()
         self.invalidate()
 
     def handle_terminal_focus_in(self) -> None:
-        """Refresh auto theme detection after the terminal regains focus."""
-        if self._app_settings.tui.theme == "auto":
-            self.refresh_theme(detect_terminal=True)
+        """Re-detect the terminal background, which may have changed while unfocused."""
+        self.request_terminal_background_refresh()
 
     def _apply_ui_setting_changes(self, change_names: set[str]) -> bool:
         should_invalidate = False
@@ -207,7 +194,6 @@ class KodaTuiApp:
             self.state.queue_inputs = self._app_settings.tui.queue_inputs
             should_invalidate = True
         if "theme" in change_names:
-            self.apply_theme(detect_terminal=self._app_settings.tui.theme == "auto")
             should_invalidate = True
         return should_invalidate
 

@@ -39,7 +39,7 @@ def _make_tui_settings_mock(unsubscribe: Mock) -> Mock:
     )
     settings.show_scrollbar = True
     settings.queue_inputs = True
-    settings.theme = "dark"
+    settings.theme = "terminal-dark"
     settings.subscribe.return_value = unsubscribe
     return settings
 
@@ -119,44 +119,52 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
     assert app.state.context_window == 128_000
 
 
-def test_theme_change_to_auto_requeries_terminal_background(
+def test_theme_change_redraws_without_requerying_terminal_background(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
     request_refresh = Mock()
+    invalidate = Mock()
     monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
+    monkeypatch.setattr(app, "invalidate", invalidate)
     on_tui_settings_changed = tui_settings.subscribe.call_args.args[0]
 
     tui_settings.theme = "auto"
-    on_tui_settings_changed((SettingChange(name="theme", old_value="dark", new_value="auto"),))
-
-    request_refresh.assert_called_once_with()
-
-
-def test_terminal_focus_in_requeries_terminal_background_in_auto_theme(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
-    request_refresh = Mock()
-    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
-
-    tui_settings.theme = "auto"
-    app.handle_terminal_focus_in()
-
-    request_refresh.assert_called_once_with()
-
-
-def test_terminal_focus_in_ignores_manual_theme(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
-    request_refresh = Mock()
-    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
-
-    tui_settings.theme = "light"
-    app.handle_terminal_focus_in()
+    on_tui_settings_changed(
+        (SettingChange(name="theme", old_value="terminal-dark", new_value="auto"),)
+    )
 
     request_refresh.assert_not_called()
+    invalidate.assert_called_once_with()
+
+
+@pytest.mark.parametrize("theme", ["auto", "terminal-light"])
+def test_terminal_focus_in_requeries_terminal_background(
+    monkeypatch: pytest.MonkeyPatch,
+    theme: str,
+) -> None:
+    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    request_refresh = Mock()
+    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
+
+    tui_settings.theme = theme
+    app.handle_terminal_focus_in()
+
+    request_refresh.assert_called_once_with()
+
+
+def test_terminal_background_response_is_stored_for_any_theme(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    invalidate = Mock()
+    monkeypatch.setattr(app, "invalidate", invalidate)
+
+    tui_settings.theme = "terminal-dark"
+    app.handle_terminal_background_response("\x1b]11;rgb:0000/0000/8080\x1b\\")
+
+    assert app._terminal_background == (0, 0, 128)  # noqa: SLF001
+    invalidate.assert_called_once_with()
 
 
 @pytest.mark.asyncio
