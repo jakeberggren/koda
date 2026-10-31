@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.filters import Condition, has_focus
-from prompt_toolkit.input.ansi_escape_sequences import ANSI_SEQUENCES
 from prompt_toolkit.key_binding import (
     ConditionalKeyBindings,
     KeyBindings,
@@ -13,93 +12,11 @@ from prompt_toolkit.key_binding import (
 )
 from prompt_toolkit.keys import Keys
 
-from koda_tui.app.input import FOCUS_IN_KEY, FOCUS_OUT_KEY, OSC11_RESPONSE_KEY
-
-ALT_ENTER_KEY = (Keys.Escape, Keys.Enter)
-ALT_UP_KEY = (Keys.Escape, Keys.Up)
-ALT_DOWN_KEY = (Keys.Escape, Keys.Down)
-COMMAND_UP_KEY = (Keys.Escape, Keys.Escape, Keys.Up)
-COMMAND_DOWN_KEY = (Keys.Escape, Keys.Escape, Keys.Down)
+from koda_tui.terminal.keys import ALT_DOWN, ALT_ENTER, ALT_UP, COMMAND_DOWN, COMMAND_UP
 
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
     from koda_tui.app.application import KodaTuiApp
-
-_CTRL_LETTER_KEYS = {
-    "a": Keys.ControlA,
-    "b": Keys.ControlB,
-    "c": Keys.ControlC,
-    "d": Keys.ControlD,
-    "e": Keys.ControlE,
-    "f": Keys.ControlF,
-    "g": Keys.ControlG,
-    "h": Keys.ControlH,
-    "i": Keys.ControlI,
-    "j": Keys.ControlJ,
-    "k": Keys.ControlK,
-    "l": Keys.ControlL,
-    "m": Keys.ControlM,
-    "n": Keys.ControlN,
-    "o": Keys.ControlO,
-    "p": Keys.ControlP,
-    "q": Keys.ControlQ,
-    "r": Keys.ControlR,
-    "s": Keys.ControlS,
-    "t": Keys.ControlT,
-    "u": Keys.ControlU,
-    "v": Keys.ControlV,
-    "w": Keys.ControlW,
-    "x": Keys.ControlX,
-    "y": Keys.ControlY,
-    "z": Keys.ControlZ,
-}
-
-
-def _register_terminal_sequences() -> None:
-    """Register terminal-specific escape sequences for modified keys."""
-    # Ctrl+letter keys - kitty keyboard protocol / CSI u.
-    for letter, key in _CTRL_LETTER_KEYS.items():
-        ANSI_SEQUENCES[f"\x1b[{ord(letter)};5u"] = key
-
-    # Escape - kitty keyboard protocol / CSI u.
-    ANSI_SEQUENCES["\x1b[27u"] = Keys.Escape
-    ANSI_SEQUENCES["\x1b[27;1u"] = Keys.Escape
-
-    # Word delete / modified Backspace.
-    ANSI_SEQUENCES["\x1b\x7f"] = Keys.ControlW
-    ANSI_SEQUENCES["\x1b\b"] = Keys.ControlW
-    ANSI_SEQUENCES["\x1b[127;3u"] = Keys.ControlW
-    ANSI_SEQUENCES["\x1b[8;3u"] = Keys.ControlW
-    ANSI_SEQUENCES["\x1b[127;5u"] = Keys.ControlW
-    ANSI_SEQUENCES["\x1b[8;5u"] = Keys.ControlW
-
-    # Modified Enter - kitty keyboard protocol / CSI u.
-    # Shift/Ctrl+Enter insert newlines; Alt+Enter is alternate submit.
-    ANSI_SEQUENCES["\x1b[13;5u"] = Keys.ControlJ
-    ANSI_SEQUENCES["\x1b[10;5u"] = Keys.ControlJ
-    ANSI_SEQUENCES["\x1b[13;2u"] = Keys.ControlJ
-    ANSI_SEQUENCES["\x1b[10;2u"] = Keys.ControlJ
-    ANSI_SEQUENCES["\x1b[13;3u"] = ALT_ENTER_KEY
-    ANSI_SEQUENCES["\x1b[10;3u"] = ALT_ENTER_KEY
-
-    # Modified Enter - legacy terminal sequences.
-    ANSI_SEQUENCES["\x1b[27;2;13~"] = Keys.ControlJ  # Shift+Enter - xterm
-
-    # Alt+Enter - ESC+CR/LF (terminals that send literal escape + enter)
-    ANSI_SEQUENCES["\x1b[27;3;13~"] = ALT_ENTER_KEY
-    ANSI_SEQUENCES["\x1b\r"] = ALT_ENTER_KEY
-    ANSI_SEQUENCES["\x1b\n"] = ALT_ENTER_KEY
-
-    # Alt+Up/Down - common modified-arrow encodings. Do not map plain ESC+[A/B.
-    ANSI_SEQUENCES["\x1b[1;3A"] = ALT_UP_KEY
-    ANSI_SEQUENCES["\x1b[65;3u"] = ALT_UP_KEY
-    ANSI_SEQUENCES["\x1b[1;3B"] = ALT_DOWN_KEY
-    ANSI_SEQUENCES["\x1b[66;3u"] = ALT_DOWN_KEY
-
-    # Command+Up/Down in some terminals emits CSI 1;1 A/B, which prompt_toolkit
-    # does not recognize. Swallow these so they don't leak into the input buffer.
-    ANSI_SEQUENCES["\x1b[1;1A"] = COMMAND_UP_KEY
-    ANSI_SEQUENCES["\x1b[1;1B"] = COMMAND_DOWN_KEY
 
 
 async def _submit_buffer(
@@ -174,7 +91,7 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
     async def _submit(_event: KeyPressEvent) -> None:
         await _submit_buffer(app, cancel_current_if_streaming=not app.app_settings.tui.queue_inputs)
 
-    @kb.add(*ALT_ENTER_KEY)
+    @kb.add(*ALT_ENTER)
     async def _alternate_submit(_event: KeyPressEvent) -> None:
         await _submit_buffer(app, cancel_current_if_streaming=app.app_settings.tui.queue_inputs)
 
@@ -182,22 +99,22 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
     def _newline(event: KeyPressEvent) -> None:
         event.current_buffer.insert_text("\n")
 
-    @kb.add(*ALT_UP_KEY)
+    @kb.add(*ALT_UP)
     def _edit_last_queued(_event: KeyPressEvent) -> None:
         text = app.pop_last_queued_message()
         if text is not None:
             app.screen.composer.text = text
             app.invalidate()
 
-    @kb.add(*ALT_DOWN_KEY)
+    @kb.add(*ALT_DOWN)
     def _ignore_alt_down(_event: KeyPressEvent) -> None:
         return None
 
-    @kb.add(*COMMAND_UP_KEY)
+    @kb.add(*COMMAND_UP)
     def _ignore_command_up(_event: KeyPressEvent) -> None:
         return None
 
-    @kb.add(*COMMAND_DOWN_KEY)
+    @kb.add(*COMMAND_DOWN)
     def _ignore_command_down(_event: KeyPressEvent) -> None:
         return None
 
@@ -224,18 +141,6 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
     @kb.add(Keys.ControlT)
     def _cycle_thinking(_event: KeyPressEvent) -> None:
         _handle_cycle_thinking(app)
-
-    @kb.add(FOCUS_IN_KEY, eager=True, record_in_macro=False)
-    def _terminal_focus_in(_event: KeyPressEvent) -> None:
-        app.handle_terminal_focus_in()
-
-    @kb.add(FOCUS_OUT_KEY, eager=True, record_in_macro=False)
-    def _terminal_focus_out(_event: KeyPressEvent) -> None:
-        return None
-
-    @kb.add(OSC11_RESPONSE_KEY, eager=True, record_in_macro=False)
-    def _terminal_background_response(event: KeyPressEvent) -> None:
-        app.handle_terminal_background_response(event.key_sequence[0].data)
 
     @kb.add(Keys.Up, eager=True, filter=has_focus(app.screen.composer.buffer))
     def _move_up(event: KeyPressEvent) -> None:
@@ -288,7 +193,6 @@ def _create_suggestion_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C90
 
 def create_keybindings(app: KodaTuiApp) -> KeyBindingsBase:
     """Create key bindings for the TUI."""
-    _register_terminal_sequences()
 
     return merge_key_bindings(
         [

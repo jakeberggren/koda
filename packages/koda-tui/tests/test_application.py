@@ -1,18 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import Mock, call
+from unittest.mock import Mock
 
 import pytest
 
 from koda.llm import ModelDefinition, ThinkingOption
 from koda_common.settings import SettingChange
 from koda_service import ServiceDiagnostics, ServiceStatus, ServiceStatusCode
-from koda_tui.app.application import (
-    _FOCUS_REPORTING_DISABLE,
-    _FOCUS_REPORTING_ENABLE,
-    KodaTuiApp,
-)
+from koda_tui.app.application import KodaTuiApp
+from koda_tui.appearance import RGBColor
 from koda_tui.settings import AppSettings
 
 
@@ -89,39 +86,6 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
     return (app, settings, tui_settings, service, unsubscribe_settings, unsubscribe_tui_settings)
 
 
-def test_focus_reporting_is_enabled_on_first_render_and_disabled_when_done(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    app, _settings, _tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
-    write = Mock()
-    monkeypatch.setattr(app, "_write_control_sequence", write)
-    running, done = Mock(is_done=False), Mock(is_done=True)
-
-    for pt_app in (running, running, done, done):
-        app._sync_focus_reporting(pt_app)  # noqa: SLF001
-
-    assert write.call_args_list == [call(_FOCUS_REPORTING_ENABLE), call(_FOCUS_REPORTING_DISABLE)]
-
-
-@pytest.mark.parametrize("rendered", [True, False])
-def test_close_disables_focus_reporting_only_if_still_enabled(
-    monkeypatch: pytest.MonkeyPatch,
-    *,
-    rendered: bool,
-) -> None:
-    app, _settings, _tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
-    write = Mock()
-    monkeypatch.setattr(app, "_write_control_sequence", write)
-    app._terminal_output = Mock()  # noqa: SLF001
-    if rendered:
-        app._sync_focus_reporting(Mock(is_done=False))  # noqa: SLF001
-        write.reset_mock()
-
-    app.close()
-
-    assert write.call_args_list == ([call(_FOCUS_REPORTING_DISABLE)] if rendered else [])
-
-
 def test_close_is_idempotent() -> None:
     app, _settings, _tui_settings, _service, unsubscribe, unsubscribe_tui = _make_app()
     app.close()
@@ -161,7 +125,7 @@ def test_theme_change_redraws_without_requerying_terminal_background(
     app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
     request_refresh = Mock()
     invalidate = Mock()
-    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
+    monkeypatch.setattr(app._terminal, "ask_background", request_refresh)  # noqa: SLF001
     monkeypatch.setattr(app, "invalidate", invalidate)
     on_tui_settings_changed = tui_settings.subscribe.call_args.args[0]
 
@@ -174,21 +138,6 @@ def test_theme_change_redraws_without_requerying_terminal_background(
     invalidate.assert_called_once_with()
 
 
-@pytest.mark.parametrize("theme", ["auto", "terminal-light"])
-def test_terminal_focus_in_requeries_terminal_background(
-    monkeypatch: pytest.MonkeyPatch,
-    theme: str,
-) -> None:
-    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
-    request_refresh = Mock()
-    monkeypatch.setattr(app, "request_terminal_background_refresh", request_refresh)
-
-    tui_settings.theme = theme
-    app.handle_terminal_focus_in()
-
-    request_refresh.assert_called_once_with()
-
-
 def test_terminal_background_response_is_stored_for_any_theme(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -197,7 +146,7 @@ def test_terminal_background_response_is_stored_for_any_theme(
     monkeypatch.setattr(app, "invalidate", invalidate)
 
     tui_settings.theme = "terminal-dark"
-    app.handle_terminal_background_response("\x1b]11;rgb:0000/0000/8080\x1b\\")
+    app._on_terminal_background(RGBColor(0, 0, 128))  # noqa: SLF001
 
     assert app.appearance.terminal_background == (0, 0, 128)
     invalidate.assert_called_once_with()

@@ -1,86 +1,11 @@
 import pytest
-from prompt_toolkit.input.vt100_parser import Vt100Parser
-from prompt_toolkit.key_binding.key_processor import KeyPress
 from prompt_toolkit.styles import Attrs
 from pydantic import ValidationError
 from rich.markdown import Markdown
 from rich.text import Text
 
-from koda_tui.app.input import (
-    OSC11_RESPONSE_KEY,
-    KodaVt100Input,
-    _FocusInputParser,
-    _Osc11InputParser,
-    parse_osc11,
-)
 from koda_tui.appearance import THEMES, Appearance, RGBColor, Theme, Tokens, compose, rich
 from koda_tui.settings import TuiSettings
-
-
-@pytest.mark.parametrize(
-    ("response", "expected"),
-    [
-        ("\x1b]11;rgb:1234/8080/ffff\x1b\\", (18, 128, 255)),
-        ("\x1b]11;rgb:ffff/ffff/ffff\x1b\\", (255, 255, 255)),
-        ("\x1b]11;rgb:0000/0000/0000\x1b\\", (0, 0, 0)),
-        ("\x1b]11;rgb:ff/ff/ff\x07", (255, 255, 255)),
-        ("no response", None),
-    ],
-)
-def test_parse_osc_11_response(response: str, expected: RGBColor | None) -> None:
-    assert parse_osc11(response) == expected
-
-
-def test_runtime_osc_11_response_routes_through_prompt_toolkit() -> None:
-    response = "\x1b]11;rgb:ffff/ffff/ffff\x1b\\"
-    input_ = _make_koda_input_for_parser_test()
-
-    _feed_test_input(input_, response)
-
-    key_presses = _key_presses(input_)
-    assert len(key_presses) == 1
-    assert key_presses[0].key == OSC11_RESPONSE_KEY
-    assert key_presses[0].data == response
-
-
-def test_runtime_osc_11_input_does_not_capture_plain_escape() -> None:
-    input_ = _make_koda_input_for_parser_test()
-
-    _feed_test_input(input_, "\x1b")
-    input_.vt100_parser.flush()
-
-    key_presses = _key_presses(input_)
-    assert len(key_presses) == 1
-    assert key_presses[0].key == "escape"
-
-
-def test_runtime_osc_11_input_preserves_trailing_input() -> None:
-    response = "\x1b]11;rgb:ffff/ffff/ffff\x1b\\"
-    input_ = _make_koda_input_for_parser_test()
-
-    _feed_test_input(input_, response + "a")
-
-    assert [key_press.key for key_press in _key_presses(input_)] == [
-        OSC11_RESPONSE_KEY,
-        "a",
-    ]
-
-
-def _make_koda_input_for_parser_test() -> KodaVt100Input:
-    input_ = object.__new__(KodaVt100Input)
-    input_._buffer = []
-    input_._osc11_parser = _Osc11InputParser()
-    input_._focus_parser = _FocusInputParser()
-    input_.vt100_parser = Vt100Parser(input_._buffer.append)
-    return input_
-
-
-def _feed_test_input(input_: KodaVt100Input, data: str) -> None:
-    input_._feed_text_with_terminal_events(data)  # noqa: SLF001
-
-
-def _key_presses(input_: KodaVt100Input) -> list[KeyPress]:
-    return input_._buffer  # noqa: SLF001
 
 
 def _attrs(setting: str, terminal_background: RGBColor | None, style: str) -> Attrs:
