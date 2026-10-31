@@ -11,12 +11,12 @@ from prompt_toolkit.layout import HSplit, VSplit, Window
 from prompt_toolkit.utils import get_cwidth
 
 from koda_tui.appearance import Spacing
+from koda_tui.rendering import render_message, render_streaming, render_thinking
 from koda_tui.ui.primitives import Scroll, ScrollState, Spacer
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-    from koda_tui.rendering import MessageRenderer
     from koda_tui.state import AppState, Message
 
 
@@ -26,9 +26,8 @@ class Chat:
     Rendered lines are cached per message until the message or the width changes.
     """
 
-    def __init__(self, state: AppState, renderer: MessageRenderer) -> None:
+    def __init__(self, state: AppState) -> None:
         self._state = state
-        self._renderer = renderer
         self._width = 0
         self._cache: dict[int, tuple[tuple, list[StyleAndTextTuples]]] = {}
         self._container = HSplit(
@@ -56,7 +55,6 @@ class Chat:
 
     def _lines(self, width: int) -> list[StyleAndTextTuples]:
         if width != self._width:
-            self._renderer.set_width(width)
             self.clear_caches()
             self._width = width
         self._drop_stale()
@@ -67,12 +65,12 @@ class Chat:
             lines.append([])  # A blank line between messages.
 
         if self._state.is_streaming and self._state.current_thinking_content:
-            thinking = self._renderer.render_thinking_content(self._state.current_thinking_content)
+            thinking = render_thinking(self._state.current_thinking_content, width)
             lines.extend(_fit(thinking, width))
             lines.append([])
 
         if self._state.is_streaming and self._state.current_streaming_content:
-            reply = self._renderer.render_streaming_content(self._state.current_streaming_content)
+            reply = render_streaming(self._state.current_streaming_content, width)
             lines.extend(_fit(reply, width))
 
         return lines or [[]]
@@ -82,7 +80,7 @@ class Chat:
         cached = self._cache.get(id(message))
         if cached is not None and cached[0] == key:
             return cached[1]
-        lines = _fit(self._renderer.render_message(message), width)
+        lines = _fit(render_message(message, width), width)
         self._cache[id(message)] = (key, lines)
         return lines
 

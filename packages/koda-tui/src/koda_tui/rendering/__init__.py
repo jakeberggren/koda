@@ -1,5 +1,8 @@
-"""Rendering package for Koda TUI."""
+"""Rendering: content (messages, markdown, tool calls, diffs) as styled fragments.
 
-from koda_tui.rendering.renderer import MessageRenderer
+Rendering only produces fragments; views lay them out.
+"""
 
-__all__ = ["MessageRenderer"]
+from koda_tui.rendering.messages import render_message, render_streaming, render_thinking
+
+__all__ = ["render_message", "render_streaming", "render_thinking"]
