@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -58,17 +58,27 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
+      - name: Read current version
+        id: current
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_version="$(uv run bump-my-version show current_version)"
+          echo "version=${current_version}" >> "${GITHUB_OUTPUT}"
+
       - name: Compute version
         id: version
         shell: bash
         env:
           BUMP: ${{ inputs.bump }}
           EXPLICIT_VERSION: ${{ inputs.version }}
+          CURRENT_VERSION: ${{ steps.current.outputs.version }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
 
-          current_version="$(uv run bump-my-version show current_version)"
+          current_version="${CURRENT_VERSION}"
           [[ -n "${current_version}" ]] || {
             echo "Could not read current version" >&2
             exit 1
@@ -249,7 +259,8 @@ jobs:
         shell: bash
         env:
           BRANCH: ${{ steps.version.outputs.branch }}
-        run: git push --set-upstream origin "${BRANCH}"
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
 
       - name: Open release PR
         shell: bash
