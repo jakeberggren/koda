@@ -4,13 +4,14 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 import pytest
+from prompt_toolkit.keys import Keys
 
-from koda_tui.palette.items import ListItem
 from koda_tui.palette.overlay import PaletteOverlay
+from koda_tui.ui.components import Panel
+from koda_tui.ui.primitives import ListItem
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -58,20 +59,6 @@ class TestConstruction:
     def test_with_items(self, palette_factory) -> None:
         p, _ = palette_factory(items=_items(["Apple", "Banana"]))
         assert len(p._state.filtered_items) == 2
-
-    def test_calculates_size_from_terminal(self, monkeypatch, palette_factory) -> None:
-        monkeypatch.setattr(
-            "koda_tui.palette.overlay.shutil.get_terminal_size",
-            lambda *_, **__: os.terminal_size((140, 50)),
-        )
-        p, _ = palette_factory(items=_items(["Apple"]))
-        assert p.preferred_width == 70
-        assert p._height == 20
-
-    def test_explicit_size_overrides_terminal_size(self, palette_factory) -> None:
-        p, _ = palette_factory(items=_items(["Apple"]), width=42, height=7)
-        assert p.preferred_width == 42
-        assert p._height == 7
 
 
 class TestSearch:
@@ -140,10 +127,9 @@ class TestCallbacks:
 
 
 class TestContainer:
-    def test_returns_frame(self, palette_factory) -> None:
+    def test_returns_panel(self, palette_factory) -> None:
         p, _ = palette_factory(items=_items(["Apple"]))
-        container = p.__pt_container__()
-        assert container.__class__.__name__ == "Frame"
+        assert isinstance(p.__pt_container__(), Panel)
 
     def test_shortcuts_registered(self, palette_factory) -> None:
         p, _ = palette_factory(
@@ -160,7 +146,7 @@ class TestKeybindings:
             items=_items(["Apple"]),
             on_close=lambda: closed.append(None),
         )
-        p._on_escape(None)
+        p.__pt_container__().key_bindings.get_bindings_for_keys((Keys.Escape,))[-1].handler(None)
         assert len(closed) == 1
 
     def test_enter_calls_select(self, palette_factory) -> None:

@@ -2,27 +2,16 @@
 
 from __future__ import annotations
 
-import shutil
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
-from prompt_toolkit.layout import (
-    BufferControl,
-    FormattedTextControl,
-    HSplit,
-    VSplit,
-    Window,
-    WindowAlign,
-)
-from prompt_toolkit.widgets import Box, Frame
+from prompt_toolkit.layout import Dimension, VSplit
 
-from koda_tui.appearance import Tokens, compose
-from koda_tui.overlays.controls.list import ListControl
-from koda_tui.overlays.controls.wrapped import WrappedTextControl
-from koda_tui.overlays.list.renderer import ListRenderer, RenderOptions
-from koda_tui.overlays.list.state import ListState
+from koda_tui.appearance import Tokens, Width, compose
+from koda_tui.ui.components import Panel
+from koda_tui.ui.primitives import Input, List, ListState, Spacer, Text
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -31,7 +20,7 @@ if TYPE_CHECKING:
     from prompt_toolkit.key_binding import KeyPressEvent
     from prompt_toolkit.layout import AnyContainer
 
-    from koda_tui.palette.items import ListItem
+    from koda_tui.ui.primitives import ListItem
 
 
 _PROMPT_STYLE = compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)
@@ -55,39 +44,19 @@ class PaletteOverlay:
         footer: StyleAndTextTuples | None = None,
         list_heading: str | None = None,
         shortcuts: dict[str, Callable[[ListItem | None], None]] | None = None,
-        width: int | None = None,
-        height: int | None = None,
     ) -> None:
         self._title = title
         self._on_select = on_select
         self._on_close = on_close
         self._invalidate = invalidate
         self._shortcuts = shortcuts or {}
-        calculated_width, calculated_height = self._calculate_size()
-        self.preferred_width = width if width is not None else calculated_width
-        self._height = height if height is not None else calculated_height
-
-        self._state = ListState(items=items)
-        self._renderer = ListRenderer(
-            RenderOptions(list_heading=list_heading) if list_heading else None
+        self._state = ListState(items)
+        self._list = List(
+            self._state, heading=list_heading, height=Dimension(min=5, max=20, preferred=20)
         )
         self.search_buffer = Buffer(on_text_changed=self._on_search_changed)
-        self._list_control = ListControl(self._state, self._renderer)
         self._kb = self._create_keybindings()
         self._container = self._build_container(footer)
-
-    @staticmethod
-    def _calculate_size() -> tuple[int, int]:
-        """Return palette width and list height based on terminal size."""
-        size = shutil.get_terminal_size(fallback=(80, 24))
-        width = max(60, min(80, size.columns // 2))
-        height = max(5, min(20, size.lines // 2))
-        return width, height
-
-    @property
-    def focus_target(self) -> Buffer:
-        """Return the prompt_toolkit target to focus when opened."""
-        return self.search_buffer
 
     def _on_search_changed(self, _buffer: Buffer) -> None:
         """Filter items when search text changes."""
@@ -108,9 +77,6 @@ class PaletteOverlay:
         item = self._selected_item
         if item is not None:
             self._on_select(item)
-
-    def _on_escape(self, _event: KeyPressEvent) -> None:
-        self._on_close()
 
     def _on_enter(self, _event: KeyPressEvent) -> None:
         self._execute_selected()
@@ -134,7 +100,6 @@ class PaletteOverlay:
     def _create_keybindings(self) -> KeyBindings:
         """Create key bindings for palette navigation."""
         kb = KeyBindings()
-        kb.add(Keys.Escape, eager=True)(self._on_escape)
         kb.add(Keys.Enter, eager=True)(self._on_enter)
         kb.add(Keys.Up, eager=True)(self._on_up)
         kb.add(Keys.Down, eager=True)(self._on_down)
@@ -144,68 +109,24 @@ class PaletteOverlay:
 
         return kb
 
-    def _build_container(self, footer: StyleAndTextTuples | None) -> Frame:
+    def _build_container(self, footer: StyleAndTextTuples | None) -> Panel:
         """Build the palette UI container."""
-        title_text = Window(
-            content=FormattedTextControl(text=[(Tokens.Text.STRONG, self._title)]),
-            height=1,
-            align=WindowAlign.LEFT,
-            dont_extend_height=True,
+        search_row = VSplit(
+            [
+                Text("\u276f ", style=_PROMPT_STYLE, fit=True),
+                Input(self.search_buffer),
+            ]
         )
-
-        esc_hint = Window(
-            content=FormattedTextControl(text=[(Tokens.Text.MUTED, "esc")]),
-            height=1,
-            width=3,
-            dont_extend_height=True,
-            dont_extend_width=True,
-            align=WindowAlign.RIGHT,
-        )
-
-        title_row = VSplit([title_text, esc_hint])
-        separator = Window(height=1, style=Tokens.BORDER)
-
-        search_prompt = Window(
-            content=FormattedTextControl(text=[(_PROMPT_STYLE, "\u276f ")]),
-            width=2,
-            dont_extend_width=True,
-        )
-
-        search_input = Window(
-            content=BufferControl(
-                buffer=self.search_buffer,
-                key_bindings=self._kb,
-            ),
-            height=1,
-            dont_extend_height=True,
-        )
-
-        search_row = VSplit([search_prompt, search_input])
-        item_list = Window(
-            content=self._list_control,
-            height=self._height,
-            dont_extend_height=True,
-        )
-
-        children = [title_row, separator, search_row, separator, item_list]
-
+        body: list[AnyContainer] = [search_row, Spacer(), self._list]
         if footer:
-            footer_row = Window(
-                content=WrappedTextControl(footer),
-                dont_extend_height=True,
-                align=WindowAlign.LEFT,
-            )
-            children.extend([separator, footer_row])
-
-        body = HSplit(children)
-        box = Box(
+            body += [Spacer(), Text(footer, wrap=True)]
+        return Panel(
+            self._title,
             body,
-            padding_left=2,
-            padding_right=2,
-            padding_top=1,
-            padding_bottom=1,
+            on_close=self._on_close,
+            key_bindings=self._kb,
+            width=Width.LARGE,
         )
-        return Frame(body=box)
 
     def __pt_container__(self) -> AnyContainer:
         return self._container

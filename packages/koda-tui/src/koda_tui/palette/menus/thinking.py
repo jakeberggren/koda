@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_tui.overlays.list.renderer import CURRENT_STYLE
-from koda_tui.palette.items import ListItem
+from koda_tui.ui.primitives import ListItem
 
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
@@ -35,8 +34,7 @@ class ThinkingMenu:
                 id=f"select_thinking:{option.id}",
                 label=option.label,
                 detail=option.description or "",
-                marker="*" if self._settings.core.thinking == option.id else None,
-                marker_style=(CURRENT_STYLE if self._settings.core.thinking == option.id else None),
+                current=self._settings.core.thinking == option.id,
                 data=option.id,
             )
             for option in options

@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING
 from koda.llm.auth.protocols import OAuthLoginCallbacks
 from koda_common.logging import get_logger
 from koda_common.settings.credentials import ApiKeyCredential
-from koda_tui.overlays.dialogs import DialogChoice
-from koda_tui.palette.items import ListItem
+from koda_tui.ui.components import DialogChoice
+from koda_tui.ui.primitives import ListItem
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples

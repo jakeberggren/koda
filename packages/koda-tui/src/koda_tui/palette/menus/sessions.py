@@ -8,8 +8,7 @@ from koda_common.logging import get_logger
 from koda_service.exceptions import ServiceSessionNotFoundError
 from koda_tui.appearance import Tokens
 from koda_tui.converters import convert_messages
-from koda_tui.overlays.list.renderer import CURRENT_STYLE
-from koda_tui.palette.items import ListItem
+from koda_tui.ui.primitives import ListItem
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -47,8 +46,7 @@ class SessionMenu:
                 id=f"switch_session:{session.session_id}",
                 label=_format_session_label(session),
                 data=session,
-                marker="*" if session.session_id == active_id else None,
-                marker_style=CURRENT_STYLE if session.session_id == active_id else None,
+                current=session.session_id == active_id,
             )
             for session in self._service.list_sessions()
         ]
