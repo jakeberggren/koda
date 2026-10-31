@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from functools import cache
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.styles import DynamicStyle, Style
@@ -11,11 +10,7 @@ from koda_tui.appearance.themes import AUTO_THEME, TERMINAL_DARK, TERMINAL_LIGHT
 from koda_tui.appearance.tokens import Tokens
 
 if TYPE_CHECKING:
-    from koda_tui.appearance.themes import Theme
-    from koda_tui.osc import RGBColor
-
-_LUMINANCE_LIGHT_THRESHOLD = 0.5
-_SURFACE_BLEND_AMOUNT = 0.125
+    from koda_tui.appearance.themes import RGBColor, Theme
 
 
 class Appearance:
@@ -25,42 +20,44 @@ class Appearance:
     """
 
     def __init__(self, theme: str) -> None:
-        self.theme = theme
-        self.terminal_background: RGBColor | None = None
-        self.style = DynamicStyle(lambda: _stylesheet(self.theme, self.terminal_background))
+        self._theme = theme
+        self._terminal_background: RGBColor | None = None
+        self._stylesheet = self._build()
+        self.style = DynamicStyle(lambda: self._stylesheet)
+
+    @property
+    def theme(self) -> str:
+        """The theme setting: ``"auto"`` or a theme name."""
+        return self._theme
+
+    @theme.setter
+    def theme(self, theme: str) -> None:
+        self._theme = theme
+        self._stylesheet = self._build()
+
+    @property
+    def terminal_background(self) -> RGBColor | None:
+        """The detected terminal background, if the terminal reported one."""
+        return self._terminal_background
+
+    @terminal_background.setter
+    def terminal_background(self, background: RGBColor | None) -> None:
+        self._terminal_background = background
+        self._stylesheet = self._build()
+
+    def _current_theme(self) -> Theme:
+        if self._theme != AUTO_THEME:
+            return THEMES[self._theme]
+        background = self._terminal_background
+        return TERMINAL_LIGHT if background is not None and background.is_light else TERMINAL_DARK
+
+    def _build(self) -> Style:
+        theme = self._current_theme()
+        return _stylesheet(theme, theme.surface_on(self._terminal_background))
 
 
-def _is_light(color: RGBColor) -> bool:
-    red, green, blue = color
-    # Relative luminance in sRGB space is enough for light/dark background choice.
-    luminance = (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255
-    return luminance >= _LUMINANCE_LIGHT_THRESHOLD
-
-
-def _select_theme(setting: str, terminal_background: RGBColor | None) -> Theme:
-    if setting != AUTO_THEME:
-        return THEMES[setting]
-    if terminal_background is not None and _is_light(terminal_background):
-        return TERMINAL_LIGHT
-    return TERMINAL_DARK
-
-
-def _surface(theme: Theme, terminal_background: RGBColor | None) -> str:
-    """Nudge a matching terminal background toward contrast, else use the theme's surface."""
-    if terminal_background is None or _is_light(terminal_background) == theme.dark:
-        return theme.surface
-    target = 0 if _is_light(terminal_background) else 255
-    red, green, blue = (
-        round(channel + (target - channel) * _SURFACE_BLEND_AMOUNT)
-        for channel in terminal_background
-    )
-    return f"#{red:02x}{green:02x}{blue:02x}"
-
-
-@cache
-def _stylesheet(setting: str, terminal_background: RGBColor | None) -> Style:
-    theme = _select_theme(setting, terminal_background)
-    surface = _surface(theme, terminal_background)
+def _stylesheet(theme: Theme, surface: str) -> Style:
+    """Give every token its rule from the theme."""
     rules = {
         Tokens.Text.DEFAULT: "",
         Tokens.Text.MUTED: theme.muted,

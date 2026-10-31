@@ -11,12 +11,9 @@ from koda_tui.app.input import (
     KodaVt100Input,
     _FocusInputParser,
     _Osc11InputParser,
-)
-from koda_tui.appearance import THEMES, Appearance, Theme, Tokens, compose, rich
-from koda_tui.osc import (
-    RGBColor,
     parse_osc11,
 )
+from koda_tui.appearance import THEMES, Appearance, RGBColor, Theme, Tokens, compose, rich
 from koda_tui.settings import TuiSettings
 
 
@@ -93,13 +90,13 @@ def _attrs(setting: str, terminal_background: RGBColor | None, style: str) -> At
 
 
 def test_auto_theme_derives_surface_from_dark_terminal_background() -> None:
-    assert _attrs("auto", (0, 0, 128), Tokens.Surface.RAISED).bgcolor == "202090"
-    assert _attrs("auto", (0, 0, 128), "class:pygments.keyword").color == "ansibrightblue"
+    assert _attrs("auto", RGBColor(0, 0, 128), Tokens.Surface.RAISED).bgcolor == "202090"
+    assert _attrs("auto", RGBColor(0, 0, 128), "class:pygments.keyword").color == "ansibrightblue"
 
 
 def test_auto_theme_switches_to_light_theme_on_light_terminal_background() -> None:
-    assert _attrs("auto", (250, 250, 240), Tokens.Surface.RAISED).bgcolor == "dbdbd2"
-    assert _attrs("auto", (250, 250, 240), "class:pygments.keyword").color == "ansiblue"
+    assert _attrs("auto", RGBColor(250, 250, 240), Tokens.Surface.RAISED).bgcolor == "dbdbd2"
+    assert _attrs("auto", RGBColor(250, 250, 240), "class:pygments.keyword").color == "ansiblue"
 
 
 def test_auto_theme_falls_back_to_dark_without_osc_11() -> None:
@@ -109,9 +106,9 @@ def test_auto_theme_falls_back_to_dark_without_osc_11() -> None:
 @pytest.mark.parametrize(
     ("setting", "terminal_background", "surface"),
     [
-        ("terminal-dark", (255, 255, 255), "434343"),
-        ("terminal-light", (0, 0, 0), "dcdcdc"),
-        ("terminal-dark", (0, 0, 128), "202090"),
+        ("terminal-dark", RGBColor(255, 255, 255), "434343"),
+        ("terminal-light", RGBColor(0, 0, 0), "dcdcdc"),
+        ("terminal-dark", RGBColor(0, 0, 128), "202090"),
     ],
 )
 def test_terminal_theme_derives_surface_only_from_matching_background(
@@ -186,3 +183,16 @@ def test_rich_resolves_composed_tokens() -> None:
     fragments = rich.render(Text("x", style=muted_emphasis), width=10)
 
     assert list(fragments) == [(muted_emphasis, "x")]
+
+
+def test_rgb_color_blends_toward_a_target() -> None:
+    assert RGBColor(0, 0, 128).blend(RGBColor(255, 255, 255), 0.125) == RGBColor(32, 32, 144)
+    assert RGBColor(32, 32, 144).hex == "#202090"
+
+
+@pytest.mark.parametrize(
+    ("color", "is_light"),
+    [(RGBColor(0, 0, 0), False), (RGBColor(0, 0, 128), False), (RGBColor(250, 250, 240), True)],
+)
+def test_rgb_color_reads_as_light_or_dark(color: RGBColor, *, is_light: bool) -> None:
+    assert color.is_light is is_light

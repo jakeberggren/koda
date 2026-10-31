@@ -9,13 +9,12 @@ from prompt_toolkit.input.vt100 import Vt100Input
 from prompt_toolkit.output import ColorDepth, Output
 
 from koda.llm import ThinkingOption
-from koda_tui.app.input import KodaVt100Input
+from koda_tui.app.input import OSC11_QUERY, KodaVt100Input, parse_osc11
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
 from koda_tui.appearance import Appearance
 from koda_tui.layout import TUILayout
-from koda_tui.osc import OSC11_QUERY, parse_osc11
 from koda_tui.palette.palette import Palette
 from koda_tui.state import AppState
 

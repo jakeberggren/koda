@@ -6,7 +6,16 @@
 """
 
 from koda_tui.appearance.appearance import Appearance
-from koda_tui.appearance.themes import AUTO_THEME, THEMES, Theme, ThemeSetting
+from koda_tui.appearance.themes import AUTO_THEME, THEMES, RGBColor, Theme, ThemeSetting
 from koda_tui.appearance.tokens import Tokens, compose
 
-__all__ = ["AUTO_THEME", "THEMES", "Appearance", "Theme", "ThemeSetting", "Tokens", "compose"]
+__all__ = [
+    "AUTO_THEME",
+    "THEMES",
+    "Appearance",
+    "RGBColor",
+    "Theme",
+    "ThemeSetting",
+    "Tokens",
+    "compose",
+]

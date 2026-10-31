@@ -1,15 +1,53 @@
-"""Theme data: the built-in themes and the theme setting."""
+"""Theme data: colors, the built-in themes, and the theme setting."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, NamedTuple
 
 from pydantic import AfterValidator
 from pydantic_core import PydanticCustomError
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+# Relative luminance at or above which a background reads as light.
+_LIGHT_LUMINANCE = 0.5
+
+
+class RGBColor(NamedTuple):
+    """An 8-bit RGB color, such as a detected terminal background."""
+
+    red: int
+    green: int
+    blue: int
+
+    @property
+    def is_light(self) -> bool:
+        """Whether the color reads as a light background."""
+        # Relative luminance in sRGB space is enough for light/dark background choice.
+        luminance = (0.2126 * self.red + 0.7152 * self.green + 0.0722 * self.blue) / 255
+        return luminance >= _LIGHT_LUMINANCE
+
+    @property
+    def hex(self) -> str:
+        """The color as ``#rrggbb``."""
+        return f"#{self.red:02x}{self.green:02x}{self.blue:02x}"
+
+    def blend(self, target: RGBColor, amount: float) -> RGBColor:
+        """Move ``amount`` (0 to 1) of the way toward ``target``."""
+        red, green, blue = (
+            round(channel + (goal - channel) * amount)
+            for channel, goal in zip(self, target, strict=True)
+        )
+        return RGBColor(red, green, blue)
+
+
+BLACK = RGBColor(0, 0, 0)
+WHITE = RGBColor(255, 255, 255)
+
+# How far a derived surface moves from the terminal background toward contrast.
+_SURFACE_CONTRAST = 0.125
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +77,13 @@ class Theme:
     diff_remove: str
     # prompt_toolkit styles for ``pygments.*`` token classes.
     syntax: Mapping[str, str]
+
+    def surface_on(self, background: RGBColor | None) -> str:
+        """This theme's surface, derived from a matching terminal background when known."""
+        if background is None or background.is_light == self.dark:
+            return self.surface
+        contrast = BLACK if background.is_light else WHITE
+        return background.blend(contrast, _SURFACE_CONTRAST).hex
 
 
 # Rich's ANSI syntax themes as stylesheet entries. Classes inherit from their dotted
