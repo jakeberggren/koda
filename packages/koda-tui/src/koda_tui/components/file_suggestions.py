@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from prompt_toolkit.layout import FormattedTextControl, Window
 from prompt_toolkit.layout.dimension import Dimension
 
+from koda_tui.appearance import Tokens, compose
+
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
@@ -28,14 +30,14 @@ class FileSuggestions:
 
         results = self._input_area.file_discovery_results[: self.MAX_LINES]
         if not results:
-            return [("class:file-discovery.empty", "  no matches")]
+            return [(compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS), "  no matches")]
 
         fragments: StyleAndTextTuples = []
         for index, path in enumerate(results):
             style = (
-                "class:file-discovery.selected"
+                Tokens.Surface.SELECTED
                 if index == self._input_area.file_discovery_selected_index
-                else "class:file-discovery.item"
+                else compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS)
             )
             if fragments:
                 fragments.append(("", "\n"))
@@ -58,5 +60,4 @@ class FileSuggestions:
             height=self.get_height,
             wrap_lines=True,
             dont_extend_height=True,
-            style="class:file-discovery",
         )

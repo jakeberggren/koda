@@ -7,14 +7,13 @@ from prompt_toolkit import Application
 from prompt_toolkit.application.current import get_app_session
 from prompt_toolkit.input.vt100 import Vt100Input
 from prompt_toolkit.output import ColorDepth, Output
-from prompt_toolkit.styles import DynamicStyle
 
 from koda.llm import ThinkingOption
 from koda_tui.app.input import KodaVt100Input
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
-from koda_tui.design import style_for
+from koda_tui.appearance import Appearance
 from koda_tui.layout import TUILayout
 from koda_tui.osc import OSC11_QUERY, parse_osc11
 from koda_tui.palette.palette import Palette
@@ -68,7 +67,7 @@ class KodaTuiApp:
         )
         self._closed = False
 
-        self._terminal_background = None
+        self.appearance = Appearance(self._app_settings.tui.theme)
 
         # Initialize state
         self.state = AppState(
@@ -125,9 +124,7 @@ class KodaTuiApp:
         app = _KodaApplication(
             layout=self.layout.create_layout(),
             key_bindings=create_keybindings(self),
-            style=DynamicStyle(
-                lambda: style_for(self._app_settings.tui.theme, self._terminal_background)
-            ),
+            style=self.appearance.style,
             full_screen=True,
             color_depth=ColorDepth.TRUE_COLOR,
             mouse_support=True,
@@ -172,7 +169,7 @@ class KodaTuiApp:
         terminal_background = parse_osc11(response)
         if terminal_background is None:
             return
-        self._terminal_background = terminal_background
+        self.appearance.terminal_background = terminal_background
         self.invalidate()
 
     def refresh_theme(self) -> None:
@@ -194,6 +191,7 @@ class KodaTuiApp:
             self.state.queue_inputs = self._app_settings.tui.queue_inputs
             should_invalidate = True
         if "theme" in change_names:
+            self.appearance.theme = self._app_settings.tui.theme
             should_invalidate = True
         return should_invalidate
 

@@ -1,6 +1,7 @@
 from rich.text import Text
 
 from koda.tools import ToolCall
+from koda_tui.appearance import Tokens
 from koda_tui.rendering import MessageRenderer
 from koda_tui.state import Message, MessageRole
 
@@ -34,7 +35,7 @@ class TestMessageRendererMessages:
         result = converter.render_message(message)
         content = "".join(t[1] for t in result)
         assert "Hello" in content
-        assert any("class:message.user" in fragment[0] for fragment in result)
+        assert any(Tokens.Surface.RAISED in fragment[0] for fragment in result)
 
     def test_render_assistant_message(self, converter: MessageRenderer) -> None:
         """render_message() should render assistant messages as markdown."""
@@ -274,6 +275,6 @@ class TestMessageRendererStyleClasses:
     def test_diff_lines_emit_full_width_diff_classes(self, converter: MessageRenderer) -> None:
         diff = "--- a/foo.py\n+++ b/foo.py\n@@ -1 +1 @@\n-x = 1\n+x = 2\n"
         result = converter.convert(converter._render_diff(diff))  # noqa: SLF001
-        added = "".join(fragment[1] for fragment in result if "class:diff.add" in fragment[0])
-        assert any("class:diff.remove" in fragment[0] for fragment in result)
+        added = "".join(fragment[1] for fragment in result if Tokens.Diff.ADD in fragment[0])
+        assert any(Tokens.Diff.REMOVE in fragment[0] for fragment in result)
         assert added.rstrip("\n").endswith(" ")

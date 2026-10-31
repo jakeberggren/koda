@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from koda_tui.appearance import Tokens, compose
 from koda_tui.overlays.dialogs.confirm import ConfirmDialog
 
 
@@ -67,10 +68,10 @@ class TestToggle:
     def test_button_text_reflects_selection(self, dialog_factory) -> None:
         d, _ = dialog_factory()
         text = d._button_text()
-        assert text[0] == ("class:dialog.selected", " Yes ")
-        assert text[2] == ("class:dialog.button", " No ")
+        assert text[0] == (compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG), " Yes ")
+        assert text[2] == (Tokens.Text.MUTED, " No ")
 
         d._selected = False
         text = d._button_text()
-        assert text[0] == ("class:dialog.button", " Yes ")
-        assert text[2] == ("class:dialog.selected", " No ")
+        assert text[0] == (Tokens.Text.MUTED, " Yes ")
+        assert text[2] == (compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG), " No ")

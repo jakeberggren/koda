@@ -5,7 +5,6 @@ from typing import Any, ClassVar, Literal
 
 from prompt_toolkit.formatted_text import FormattedText, merge_formatted_text, to_formatted_text
 from rich.cells import cell_len
-from rich.color import Color, ColorType
 from rich.console import Console, ConsoleOptions, Group, RenderResult
 from rich.markdown import CodeBlock, Heading, Markdown
 from rich.segment import Segment
@@ -14,12 +13,8 @@ from rich.syntax import Syntax
 from rich.text import Text
 
 from koda.tools import ToolCall
-from koda_tui.rendering.style_classes import (
-    SYNTAX_THEME,
-    StyleClassBlock,
-    style_class,
-    style_classes,
-)
+from koda_tui.appearance import Tokens, compose
+from koda_tui.appearance.rich import SYNTAX_THEME, StyleBlock, render
 from koda_tui.state import Message, MessageRole
 
 type DiffBlockType = Literal["add", "del", "context"]
@@ -28,88 +23,12 @@ BASH_PREVIEW_LINES = 6
 BASH_PREVIEW_CHARS = 600
 BASH_COMMAND_PREVIEW_CHARS = 120
 
-# Rich standard color number → prompt_toolkit color name.
-# Note: Rich "white" (7) maps to PT "ansigray", Rich "bright_white" (15) to PT "ansiwhite".
-_STANDARD_COLOR_TO_PT = {
-    0: "ansiblack",
-    1: "ansired",
-    2: "ansigreen",
-    3: "ansiyellow",
-    4: "ansiblue",
-    5: "ansimagenta",
-    6: "ansicyan",
-    7: "ansigray",
-    8: "ansibrightblack",
-    9: "ansibrightred",
-    10: "ansibrightgreen",
-    11: "ansibrightyellow",
-    12: "ansibrightblue",
-    13: "ansibrightmagenta",
-    14: "ansibrightcyan",
-    15: "ansiwhite",
-}
-
-
-def _rich_color_to_pt(color: Color | None) -> str:
-    """Convert a Rich Color to a prompt_toolkit color string."""
-    if color is None or color.is_default:
-        return ""
-    if color.type == ColorType.STANDARD and color.number is not None:
-        return _STANDARD_COLOR_TO_PT.get(color.number, "")
-    if color.triplet is not None:
-        r, g, b = color.triplet
-        return f"#{r:02x}{g:02x}{b:02x}"
-    if color.type == ColorType.EIGHT_BIT:
-        triplet = color.get_truecolor()
-        return f"#{triplet.red:02x}{triplet.green:02x}{triplet.blue:02x}"
-    return ""
-
-
-_RICH_ATTR_TO_PT = (
-    ("bold", "bold"),
-    ("dim", "dim"),
-    ("italic", "italic"),
-    ("underline", "underline"),
-    ("blink", "blink"),
-    ("blink2", "blink"),
-    ("reverse", "reverse"),
-    ("conceal", "hidden"),
-    ("strike", "strike"),
-)
-
-
-def _rich_attrs_to_pt(style: Style) -> list[str]:
-    """Extract active boolean attributes from a Rich Style as PT keywords."""
-    return [pt for attr, pt in _RICH_ATTR_TO_PT if getattr(style, attr)]
-
-
-def _rich_style_to_pt(style: Style | None) -> str:
-    """Convert a Rich Style to a prompt_toolkit style string."""
-    if style is None:
-        return ""
-
-    # Classes first so inline attributes take precedence over the stylesheet.
-    parts = style_classes(style)
-
-    fg = _rich_color_to_pt(style.color)
-    if fg:
-        parts.append(fg)
-
-    bg = _rich_color_to_pt(style.bgcolor)
-    if bg:
-        parts.append(f"bg:{bg}")
-
-    parts.extend(_rich_attrs_to_pt(style))
-
-    return " ".join(parts)
-
-
 DIFF_HEADER_FILENAME_RE = re.compile(r"^---\s+\S+?([^/\s]+)$", re.MULTILINE)
 DIFF_HUNK_RE = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 DIFF_ADDITION_RE = re.compile(r"^\+(?!\+\+)", re.MULTILINE)
 DIFF_DELETION_RE = re.compile(r"^-(?!--)", re.MULTILINE)
 
-_DIFF_STYLE_CLASSES: dict[DiffBlockType | None, str] = {"add": "diff.add", "del": "diff.remove"}
+_DIFF_STYLES: dict[DiffBlockType | None, str] = {"add": Tokens.Diff.ADD, "del": Tokens.Diff.REMOVE}
 
 
 @dataclass
@@ -135,9 +54,9 @@ class DiffBlockAccumulator:
             line_numbers=True,
             start_line=self.start_line or 1,
         )
-        style_name = _DIFF_STYLE_CLASSES.get(self.block_type)
-        if style_name is not None:
-            syntax = StyleClassBlock(syntax, style_name)
+        style = _DIFF_STYLES.get(self.block_type)
+        if style is not None:
+            syntax = StyleBlock(syntax, style)
         self.renderables.append(syntax)
         self.lines = []
         self.block_type = None
@@ -173,21 +92,22 @@ class _Markdown(Markdown):
 
 
 class BlockContent:
-    """Wraps a renderable with a full-width background from a style class."""
+    """Wraps a renderable with a full-width background from a token."""
 
     _LEFT_PADDING = 1
 
-    def __init__(self, renderable, *, style_name: str) -> None:
+    def __init__(self, renderable, *, style: str) -> None:
         self.renderable = renderable
-        # Reset inline backgrounds so the class background covers the whole block.
-        self._bg_style = Style(bgcolor="default") + style_class(style_name)
+        self._style = style
 
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
+        # Reset inline backgrounds so the style's background covers the whole block.
+        bg_style = Style(bgcolor="default") + console.get_style(self._style)
         render_options = options.update(width=max(1, options.max_width - self._LEFT_PADDING))
         lines = console.render_lines(self.renderable, render_options)
         new_line = Segment("\n")
-        full_width_padding = Segment(" " * options.max_width, self._bg_style)
-        left_padding = Segment(" " * self._LEFT_PADDING, self._bg_style)
+        full_width_padding = Segment(" " * options.max_width, bg_style)
+        left_padding = Segment(" " * self._LEFT_PADDING, bg_style)
 
         # One full-width blank row above the message.
         yield full_width_padding
@@ -198,12 +118,12 @@ class BlockContent:
             line_width = self._LEFT_PADDING
             for seg in line:
                 if seg.text:
-                    style = seg.style + self._bg_style if seg.style else self._bg_style
+                    style = seg.style + bg_style if seg.style else bg_style
                     yield Segment(seg.text, style)
                     line_width += cell_len(seg.text)
             padding = options.max_width - line_width
             if padding > 0:
-                yield Segment(" " * padding, self._bg_style)
+                yield Segment(" " * padding, bg_style)
             yield new_line
 
         # One full-width blank row below the message.
@@ -226,37 +146,9 @@ class MessageRenderer:
         """Update the rendering width."""
         self._width = width
 
-    @staticmethod
-    def _trim_leading_newline_fragments(fragments: list[tuple[str, str]]) -> None:
-        """Trim leading newline-only fragments in place."""
-        while fragments and fragments[0][1] == "\n":
-            fragments.pop(0)
-
-    @staticmethod
-    def _trim_trailing_newline_fragments(fragments: list[tuple[str, str]]) -> None:
-        """Trim trailing newline-only fragments in place."""
-        while fragments and fragments[-1][1] == "\n":
-            fragments.pop()
-
     def convert(self, renderable) -> FormattedText:
-        """Convert Rich renderable directly to prompt_toolkit FormattedText."""
-        console = Console(width=self._width, force_terminal=True, no_color=False)
-        segments = console.render(renderable)
-        cropped = Segment.split_and_crop_lines(segments, self._width, pad=False)
-
-        result: list[tuple[str, str]] = []
-        for line in cropped:
-            result.extend(
-                (_rich_style_to_pt(seg.style), seg.text)
-                for seg in line
-                if not seg.control and seg.text
-            )
-
-        # Strip incidental line breaks emitted by Rich renderables.
-        self._trim_leading_newline_fragments(result)
-        self._trim_trailing_newline_fragments(result)
-
-        return FormattedText(result)
+        """Convert a Rich renderable to prompt_toolkit FormattedText."""
+        return render(renderable, self._width)
 
     def _get_lexer_from_diff(self, diff: str) -> str:
         """Extract lexer from diff header filename."""
@@ -400,7 +292,9 @@ class MessageRenderer:
         *,
         add_spacing: bool = False,
     ) -> FormattedText:
-        fragment = self.convert(_Markdown(content, style=Style(dim=True, italic=True)))
+        fragment = self.convert(
+            _Markdown(content, style=compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS))
+        )
         if not add_spacing:
             return fragment
         return self._combine_formatted_text(fragment, FormattedText([("", "\n\n")]))
@@ -427,7 +321,9 @@ class MessageRenderer:
         """Render a single message to FormattedText."""
         match message.role:
             case MessageRole.USER:
-                block_content = BlockContent(_Markdown(message.content), style_name="message.user")
+                block_content = BlockContent(
+                    _Markdown(message.content), style=Tokens.Surface.RAISED
+                )
                 return self.convert(block_content)
             case MessageRole.ASSISTANT:
                 return self._render_assistant_message(message)
@@ -495,10 +391,10 @@ class MessageRenderer:
     def _tool_status_indicator(*, running: bool, error: bool) -> tuple[str, str]:
         """Return (symbol, style) for the tool call status."""
         if running:
-            return ("● ", "yellow")
+            return ("● ", Tokens.Text.WARNING)
         if error:
-            return ("✕ ", "red")
-        return ("✓ ", "green")
+            return ("✕ ", Tokens.Text.ERROR)
+        return ("✓ ", Tokens.Text.SUCCESS)
 
     def _build_tool_call_text(
         self,
@@ -511,11 +407,11 @@ class MessageRenderer:
         symbol, style = self._tool_status_indicator(running=running, error=error)
         text = Text()
         text.append(symbol, style=style)
-        text.append(tool_call.tool_name, style="italic")
+        text.append(tool_call.tool_name, style=Tokens.Text.EMPHASIS)
 
         arguments = self._format_tool_args(tool_call.tool_name, tool_call.arguments)
         if arguments:
-            text.append(f" {arguments}", style="dim")
+            text.append(f" {arguments}", style=Tokens.Text.MUTED)
         return text
 
     def _render_bash_tool_result(
@@ -528,7 +424,7 @@ class MessageRenderer:
         if not bash_details:
             return None
 
-        text.append(f"\n  └ {bash_details}", style="dim")
+        text.append(f"\n  └ {bash_details}", style=Tokens.Text.MUTED)
         return self.convert(text)
 
     def _render_tool_result_display(
@@ -543,11 +439,11 @@ class MessageRenderer:
 
         if tool_call.tool_name == "edit_file" and result_display.startswith("---"):
             summary = self._summarize_diff(result_display)
-            summary_text = Text(f"  └ {summary}", style="dim")
+            summary_text = Text(f"  └ {summary}", style=Tokens.Text.MUTED)
             diff_renderable = self._render_diff(result_display)
             return self.convert(Group(text, summary_text, diff_renderable))
 
-        text.append(f"\n  └ {result_display}", style="dim")
+        text.append(f"\n  └ {result_display}", style=Tokens.Text.MUTED)
         return self.convert(text)
 
     def render_tool_call(

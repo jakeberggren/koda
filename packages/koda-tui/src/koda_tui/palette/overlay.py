@@ -18,6 +18,7 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.widgets import Box, Frame
 
+from koda_tui.appearance import Tokens, compose
 from koda_tui.overlays.controls.list import ListControl
 from koda_tui.overlays.controls.wrapped import WrappedTextControl
 from koda_tui.overlays.list.renderer import ListRenderer, RenderOptions
@@ -31,6 +32,9 @@ if TYPE_CHECKING:
     from prompt_toolkit.layout import AnyContainer
 
     from koda_tui.palette.items import ListItem
+
+
+_PROMPT_STYLE = compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)
 
 
 class PaletteOverlay:
@@ -143,14 +147,14 @@ class PaletteOverlay:
     def _build_container(self, footer: StyleAndTextTuples | None) -> Frame:
         """Build the palette UI container."""
         title_text = Window(
-            content=FormattedTextControl(text=[("class:palette.title", self._title)]),
+            content=FormattedTextControl(text=[(Tokens.Text.STRONG, self._title)]),
             height=1,
             align=WindowAlign.LEFT,
             dont_extend_height=True,
         )
 
         esc_hint = Window(
-            content=FormattedTextControl(text=[("class:palette.hint", "esc")]),
+            content=FormattedTextControl(text=[(Tokens.Text.MUTED, "esc")]),
             height=1,
             width=3,
             dont_extend_height=True,
@@ -159,10 +163,10 @@ class PaletteOverlay:
         )
 
         title_row = VSplit([title_text, esc_hint])
-        separator = Window(height=1, style="class:palette.separator")
+        separator = Window(height=1, style=Tokens.BORDER)
 
         search_prompt = Window(
-            content=FormattedTextControl(text=[("class:palette.prompt", "\u276f ")]),
+            content=FormattedTextControl(text=[(_PROMPT_STYLE, "\u276f ")]),
             width=2,
             dont_extend_width=True,
         )
@@ -200,9 +204,8 @@ class PaletteOverlay:
             padding_right=2,
             padding_top=1,
             padding_bottom=1,
-            style="class:palette.box",
         )
-        return Frame(body=box, style="class:palette.frame")
+        return Frame(body=box)
 
     def __pt_container__(self) -> AnyContainer:
         return self._container

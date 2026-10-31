@@ -3,6 +3,8 @@ from prompt_toolkit.input.vt100_parser import Vt100Parser
 from prompt_toolkit.key_binding.key_processor import KeyPress
 from prompt_toolkit.styles import Attrs
 from pydantic import ValidationError
+from rich.markdown import Markdown
+from rich.text import Text
 
 from koda_tui.app.input import (
     OSC11_RESPONSE_KEY,
@@ -10,7 +12,7 @@ from koda_tui.app.input import (
     _FocusInputParser,
     _Osc11InputParser,
 )
-from koda_tui.design import THEMES, Theme, style_for
+from koda_tui.appearance import THEMES, Appearance, Theme, Tokens, compose, rich
 from koda_tui.osc import (
     RGBColor,
     parse_osc11,
@@ -84,22 +86,24 @@ def _key_presses(input_: KodaVt100Input) -> list[KeyPress]:
     return input_._buffer  # noqa: SLF001
 
 
-def _attrs(setting: str, terminal_background: RGBColor | None, style_class: str) -> Attrs:
-    return style_for(setting, terminal_background).get_attrs_for_style_str(f"class:{style_class}")
+def _attrs(setting: str, terminal_background: RGBColor | None, style: str) -> Attrs:
+    appearance = Appearance(setting)
+    appearance.terminal_background = terminal_background
+    return appearance.style.get_attrs_for_style_str(style)
 
 
 def test_auto_theme_derives_surface_from_dark_terminal_background() -> None:
-    assert _attrs("auto", (0, 0, 128), "message.user").bgcolor == "202090"
-    assert _attrs("auto", (0, 0, 128), "pygments.keyword").color == "ansibrightblue"
+    assert _attrs("auto", (0, 0, 128), Tokens.Surface.RAISED).bgcolor == "202090"
+    assert _attrs("auto", (0, 0, 128), "class:pygments.keyword").color == "ansibrightblue"
 
 
 def test_auto_theme_switches_to_light_theme_on_light_terminal_background() -> None:
-    assert _attrs("auto", (250, 250, 240), "message.user").bgcolor == "dbdbd2"
-    assert _attrs("auto", (250, 250, 240), "pygments.keyword").color == "ansiblue"
+    assert _attrs("auto", (250, 250, 240), Tokens.Surface.RAISED).bgcolor == "dbdbd2"
+    assert _attrs("auto", (250, 250, 240), "class:pygments.keyword").color == "ansiblue"
 
 
 def test_auto_theme_falls_back_to_dark_without_osc_11() -> None:
-    assert _attrs("auto", None, "input-area").bgcolor == "434343"
+    assert _attrs("auto", None, Tokens.Surface.RAISED).bgcolor == "434343"
 
 
 @pytest.mark.parametrize(
@@ -115,34 +119,70 @@ def test_terminal_theme_derives_surface_only_from_matching_background(
     terminal_background: RGBColor,
     surface: str,
 ) -> None:
-    assert _attrs(setting, terminal_background, "input-area").bgcolor == surface
+    assert _attrs(setting, terminal_background, Tokens.Surface.RAISED).bgcolor == surface
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [
-        ("auto", "auto"),
-        ("terminal-dark", "terminal-dark"),
-        ("dark", "terminal-dark"),
-        ("light", "terminal-light"),
-    ],
-)
-def test_theme_setting_accepts_registered_and_legacy_names(value: str, expected: str) -> None:
-    assert TuiSettings(theme=value).theme == expected
+def test_appearance_style_follows_theme_changes() -> None:
+    appearance = Appearance("terminal-dark")
+    appearance.theme = "terminal-light"
+
+    assert appearance.style.get_attrs_for_style_str(Tokens.Surface.RAISED).bgcolor == "dcdcdc"
 
 
-def test_theme_setting_rejects_unknown_theme() -> None:
+@pytest.mark.parametrize("value", ["auto", "terminal-dark", "terminal-light"])
+def test_theme_setting_accepts_auto_and_registered_themes(value: str) -> None:
+    assert TuiSettings(theme=value).theme == value
+
+
+@pytest.mark.parametrize("value", ["solarized", "dark"])
+def test_theme_setting_rejects_unknown_theme(value: str) -> None:
     with pytest.raises(ValidationError, match="Input should be one of 'auto', 'terminal-dark'"):
-        TuiSettings(theme="solarized")
+        TuiSettings(theme=value)
 
 
 @pytest.mark.parametrize("theme", THEMES.values(), ids=lambda theme: theme.name)
 def test_selection_uses_theme_accent(theme: Theme) -> None:
-    attrs = _attrs(theme.name, None, "palette.selected")
+    attrs = _attrs(theme.name, None, Tokens.Surface.SELECTED)
 
     assert (attrs.bgcolor, attrs.color) == (theme.accent, theme.on_accent)
 
 
+def _tokens(namespace: type = Tokens) -> list[str]:
+    tokens: list[str] = []
+    for value in vars(namespace).values():
+        if isinstance(value, str) and value.startswith("class:"):
+            tokens.append(value)
+        elif isinstance(value, type):
+            tokens.extend(_tokens(value))
+    return tokens
+
+
+@pytest.mark.parametrize("theme", THEMES)
+def test_every_token_has_a_rule(theme: str) -> None:
+    rules = {name for name, _ in Appearance(theme).style.style_rules}
+
+    assert {token.removeprefix("class:") for token in _tokens()} <= rules
+
+
 def test_syntax_child_classes_reset_inherited_dim() -> None:
-    assert _attrs("terminal-dark", None, "pygments.comment").dim
-    assert not _attrs("terminal-dark", None, "pygments.comment.preproc").dim
+    assert _attrs("terminal-dark", None, "class:pygments.comment").dim
+    assert not _attrs("terminal-dark", None, "class:pygments.comment.preproc").dim
+
+
+def test_rich_and_prompt_toolkit_share_style_names() -> None:
+    fragments = rich.render(Text("x", style=Tokens.Text.MUTED), width=10)
+
+    assert list(fragments) == [(Tokens.Text.MUTED, "x")]
+
+
+def test_rich_markdown_styles_render_as_style_names() -> None:
+    fragments = rich.render(Markdown("`code`"), width=10)
+
+    assert (Tokens.Code.INLINE, "code") in fragments
+
+
+def test_rich_resolves_composed_tokens() -> None:
+    muted_emphasis = compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS)
+    fragments = rich.render(Text("x", style=muted_emphasis), width=10)
+
+    assert list(fragments) == [(muted_emphasis, "x")]

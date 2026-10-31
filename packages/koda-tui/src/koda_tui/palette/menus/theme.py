@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_tui.design import AUTO_THEME, THEMES
+from koda_tui.appearance import AUTO_THEME, THEMES
+from koda_tui.overlays.list.renderer import CURRENT_STYLE
 from koda_tui.palette.items import ListItem
 
 if TYPE_CHECKING:
@@ -43,7 +44,7 @@ class ThemeMenu:
                 label=label,
                 detail=detail,
                 marker="*" if current == theme else None,
-                marker_style="class:palette.current" if current == theme else None,
+                marker_style=CURRENT_STYLE if current == theme else None,
                 data=theme,
             )
             for theme, label, detail in _theme_options()

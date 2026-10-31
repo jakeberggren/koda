@@ -11,7 +11,7 @@ from koda_common.settings import (
     SettingsUnknownKeysError,
     SettingsValidationError,
 )
-from koda_tui.design import ThemeSetting  # noqa: TC001 - pydantic resolves this at runtime
+from koda_tui.appearance import ThemeSetting  # noqa: TC001 - pydantic resolves this at runtime
 
 if TYPE_CHECKING:
     from koda_common.settings.protocols import JsonObject, SettingsStore

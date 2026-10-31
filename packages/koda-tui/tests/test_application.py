@@ -163,7 +163,7 @@ def test_terminal_background_response_is_stored_for_any_theme(
     tui_settings.theme = "terminal-dark"
     app.handle_terminal_background_response("\x1b]11;rgb:0000/0000/8080\x1b\\")
 
-    assert app._terminal_background == (0, 0, 128)  # noqa: SLF001
+    assert app.appearance.terminal_background == (0, 0, 128)
     invalidate.assert_called_once_with()
 
 

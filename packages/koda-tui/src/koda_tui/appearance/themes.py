@@ -1,4 +1,4 @@
-"""Built-in color themes and theme setting resolution."""
+"""Theme data: the built-in themes and the theme setting."""
 
 from __future__ import annotations
 
@@ -8,12 +8,8 @@ from typing import TYPE_CHECKING, Annotated
 from pydantic import AfterValidator
 from pydantic_core import PydanticCustomError
 
-from koda_tui.design.terminal import is_light_background
-
 if TYPE_CHECKING:
     from collections.abc import Mapping
-
-    from koda_tui.osc import RGBColor
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,8 +23,14 @@ class Theme:
     name: str
     label: str
     dark: bool
+    muted: str
+    border: str
     accent: str
     on_accent: str
+    link: str
+    # Full style for inline code, e.g. "ansicyan bg:ansiblack bold".
+    code: str
+    success: str
     warning: str
     error: str
     info: str
@@ -97,8 +99,13 @@ TERMINAL_DARK = Theme(
     name="terminal-dark",
     label="Terminal Dark",
     dark=True,
+    muted="dim",
+    border="dim",
     accent="ansimagenta",
     on_accent="ansiwhite",
+    link="ansiblue underline",
+    code="ansicyan bg:ansiblack bold",
+    success="ansigreen",
     warning="ansiyellow",
     error="ansired",
     info="ansicyan",
@@ -114,8 +121,13 @@ TERMINAL_LIGHT = Theme(
     name="terminal-light",
     label="Terminal Light",
     dark=False,
+    muted="dim",
+    border="dim",
     accent="ansimagenta",
     on_accent="ansiwhite",
+    link="ansiblue underline",
+    code="ansicyan bg:ansiblack bold",
+    success="ansigreen",
     warning="ansiyellow",
     error="ansired",
     info="ansicyan",
@@ -130,14 +142,9 @@ TERMINAL_LIGHT = Theme(
 THEMES: dict[str, Theme] = {theme.name: theme for theme in (TERMINAL_DARK, TERMINAL_LIGHT)}
 
 AUTO_THEME = "auto"
-_DEFAULT_DARK_THEME = TERMINAL_DARK
-_DEFAULT_LIGHT_THEME = TERMINAL_LIGHT
-# Theme setting values from before named themes existed.
-_LEGACY_THEME_NAMES = {"dark": TERMINAL_DARK.name, "light": TERMINAL_LIGHT.name}
 
 
 def _validate_theme_setting(value: str) -> str:
-    value = _LEGACY_THEME_NAMES.get(value, value)
     if value != AUTO_THEME and value not in THEMES:
         choices = ", ".join(f"'{name}'" for name in (AUTO_THEME, *THEMES))
         raise PydanticCustomError("theme", "Input should be one of {choices}", {"choices": choices})
@@ -145,12 +152,3 @@ def _validate_theme_setting(value: str) -> str:
 
 
 ThemeSetting = Annotated[str, AfterValidator(_validate_theme_setting)]
-
-
-def select_theme(setting: str, terminal_background: RGBColor | None) -> Theme:
-    """Return the theme for a setting, picking a light or dark theme in auto mode."""
-    if setting != AUTO_THEME:
-        return THEMES[setting]
-    if terminal_background is not None and is_light_background(terminal_background):
-        return _DEFAULT_LIGHT_THEME
-    return _DEFAULT_DARK_THEME

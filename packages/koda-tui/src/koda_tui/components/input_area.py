@@ -28,6 +28,8 @@ from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from prompt_toolkit.search import SearchState
 from wcwidth import wcswidth, wrap
 
+from koda_tui.appearance import Tokens, compose
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -101,9 +103,9 @@ class _InputPaddingMargin(Margin):
         fragments: StyleAndTextTuples = []
         for row in range(window_render_info.window_height):
             if row == 0:
-                fragments.append(("class:prompt", " ❯ \n"))  # noqa: RUF001
+                fragments.append((compose(Tokens.Text.ACCENT, Tokens.Text.STRONG), " ❯ \n"))  # noqa: RUF001
             else:
-                fragments.append(("class:prompt", "   \n"))
+                fragments.append((compose(Tokens.Text.ACCENT, Tokens.Text.STRONG), "   \n"))
         return fragments
 
 
@@ -740,11 +742,11 @@ class InputArea:
             height=self.get_height,
             wrap_lines=False,
             dont_extend_height=True,
-            style="class:input-area",
+            style=Tokens.Surface.RAISED,
             left_margins=[_InputPaddingMargin()],
         )
-        top_padding = Window(height=1, char=" ", style="class:input-area")
-        bottom_padding = Window(height=1, char=" ", style="class:input-area")
+        top_padding = Window(height=1, char=" ", style=Tokens.Surface.RAISED)
+        bottom_padding = Window(height=1, char=" ", style=Tokens.Surface.RAISED)
         return HSplit([top_padding, self._window, bottom_padding])
 
     def get_text(self) -> str:

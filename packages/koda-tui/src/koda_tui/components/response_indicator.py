@@ -5,6 +5,7 @@ import time
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.layout import UIContent, UIControl
 
+from koda_tui.appearance import Tokens
 from koda_tui.state import AppState
 
 _SPINNER_FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
@@ -28,8 +29,8 @@ class ResponseIndicatorControl(UIControl):
 
     def _render_line(self) -> FormattedText:
         """Render the response indicator."""
-        spinner = ("class:status-bar.spinner", self._spinner_frame())
-        text = ("class:status-bar.muted", f" {self._get_text()}")
+        spinner = (Tokens.Text.INFO, self._spinner_frame())
+        text = (Tokens.Text.MUTED, f" {self._get_text()}")
         return FormattedText([spinner, text])
 
     def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002
