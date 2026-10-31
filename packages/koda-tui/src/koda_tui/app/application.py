@@ -202,7 +202,7 @@ class KodaTuiApp:
         should_invalidate = False
         if "show_scrollbar" in change_names:
             self.state.show_scrollbar = self._app_settings.tui.show_scrollbar
-            self.layout.chat_area.clear_caches()
+            self.layout.chat.clear_caches()
             should_invalidate = True
         if "queue_inputs" in change_names:
             self.state.queue_inputs = self._app_settings.tui.queue_inputs

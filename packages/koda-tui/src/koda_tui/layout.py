@@ -8,13 +8,11 @@ from prompt_toolkit.layout import (
     Layout,
     Window,
 )
-from prompt_toolkit.widgets import Box
 
 from koda_tui.appearance import Tokens
 from koda_tui.components import (
     ActivityIndicator,
-    ChatAreaControl,
-    ChatScrollbarMargin,
+    Chat,
     Composer,
     PendingMessages,
     StatusBar,
@@ -34,7 +32,7 @@ class TUILayout:
         self.renderer = MessageRenderer()
 
         # Initialize components
-        self.chat_area = ChatAreaControl(state, self.renderer)
+        self.chat = Chat(state, self.renderer)
         self.activity = ActivityIndicator()
         self.pending = PendingMessages(state)
         self.composer = Composer(state)
@@ -43,10 +41,6 @@ class TUILayout:
 
     def create_layout(self) -> Layout:
         """Create the full-screen layout."""
-        chat_area = Window(
-            content=self.chat_area,
-            right_margins=[ChatScrollbarMargin(self.chat_area, self._state)],
-        )
         activity = ConditionalContainer(
             content=HSplit([self.activity, Spacer()]),
             filter=Condition(lambda: self._state.is_streaming),
@@ -61,7 +55,7 @@ class TUILayout:
         root_container = FloatContainer(
             content=HSplit(
                 [
-                    Box(chat_area, padding=0, padding_left=1, padding_top=1),
+                    self.chat,
                     separator,
                     activity,
                     self.pending,
