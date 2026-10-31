@@ -68,6 +68,13 @@ class Outbox:
         self._invalidate()
         return text
 
+    def stop(self) -> None:
+        """Stop the response in flight and drop what's queued, as when the session
+        changes and they belonged to the one left behind."""
+        self._state.pending_inputs.clear()
+        self.cancel()
+        self._invalidate()
+
     def cancel(self) -> None:
         """Stop the response in flight."""
         if self._response and not self._response.done():

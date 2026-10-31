@@ -72,14 +72,14 @@ class SessionMenu:
 
     def new(self) -> None:
         """Create and switch to a new session."""
-        self._outbox.cancel()
+        self._outbox.stop()
         self._service.create_session()
         self._conversation.clear()
         self._overlays.close_all()
 
     def switch(self, session: Session) -> None:
         """Switch to an existing session."""
-        self._outbox.cancel()
+        self._outbox.stop()
         try:
             switched = self._service.switch_session(session.session_id)
         except ServiceSessionNotFoundError:
@@ -109,7 +109,7 @@ class SessionMenu:
         active = self._service.active_session()
         removed_active = active is not None and active.session_id == session.session_id
         if removed_active:
-            self._outbox.cancel()
+            self._outbox.stop()
 
         try:
             self._service.delete_session(session.session_id)

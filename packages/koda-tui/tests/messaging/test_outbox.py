@@ -172,6 +172,27 @@ async def test_cancelling_the_sending_stops_it_without_sending_the_queue(
     assert _queue(state) == ["queued"]
 
 
+async def test_stop_interrupts_and_drops_the_queue(
+    state: AppState,
+    agent: _Agent,
+    outbox: Outbox,
+) -> None:
+    outbox.submit("first", steer=False)
+    await _until(lambda: state.responding)
+    outbox.submit("queued", steer=False)
+    outbox.submit("steer", steer=True)
+
+    outbox.stop()
+
+    await _until(lambda: not state.responding)
+    assert _queue(state) == []
+    assert agent.sent == ["first"]
+
+    agent.released.set()
+    outbox.submit("next", steer=False)
+    await _until(lambda: agent.sent == ["first", "next"])
+
+
 def _tool(message: Message) -> ToolMessage:
     assert isinstance(message, ToolMessage)
     return message
