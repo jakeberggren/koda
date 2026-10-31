@@ -41,7 +41,6 @@ class Conversation:
 
     def start(self, user_message: str) -> None:
         """Start a response to ``user_message``."""
-        self._state.exit_requested = False
         self._state.messages.append(UserMessage(user_message))
         self._state.responding = True
 

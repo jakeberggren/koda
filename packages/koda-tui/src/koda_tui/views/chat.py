@@ -44,13 +44,9 @@ class Chat:
     def __pt_container__(self) -> HSplit:
         return self._container
 
-    def clear_caches(self) -> None:
-        """Render every message again on the next frame."""
-        self._rendered.clear()
-
     def _blocks(self, width: int) -> list[StyleAndTextTuples]:
         if width != self._width:
-            self.clear_caches()
+            self._rendered.clear()
             self._width = width
         messages = self._state.messages
         for stale in self._rendered.keys() - {id(message) for message in messages}:

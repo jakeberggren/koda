@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -9,6 +10,7 @@ from prompt_toolkit.keys import Keys
 from koda.llm import ModelDefinition, ThinkingOption
 from koda_common.settings import SettingChange
 from koda_service import ServiceDiagnostics, ServiceStatus, ServiceStatusCode
+from koda_tui.app import application
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import RGBColor
@@ -241,3 +243,67 @@ def test_escape_with_nothing_queued_interrupts_the_response() -> None:
 def test_escape_is_free_for_others_while_idle() -> None:
     app, *_ = _make_app()
     assert not _escape(app).filter()
+
+
+def test_every_core_setting_change_reaches_the_service() -> None:
+    app, settings, _tui_settings, service, *_ = _make_app()
+    app.invalidate = Mock()
+    on_settings_changed = settings.subscribe.call_args.args[0]
+
+    change = SettingChange(name="bash_execution_sandbox", old_value="host", new_value="docker")
+    on_settings_changed((change,))
+
+    service.update_settings.assert_called_once_with(settings)
+    app.invalidate.assert_called_once_with()
+
+
+def test_any_tui_setting_change_redraws() -> None:
+    app, _settings, tui_settings, *_ = _make_app()
+    app.invalidate = Mock()
+    on_tui_settings_changed = tui_settings.subscribe.call_args.args[0]
+
+    on_tui_settings_changed((SettingChange(name="queue_inputs", old_value=True, new_value=False),))
+
+    app.invalidate.assert_called_once_with()
+
+
+def test_writing_a_message_takes_back_a_press_of_ctrl_c() -> None:
+    app, *_ = _make_app()
+    app.outbox = Mock()
+    app.confirm_exit()
+
+    app._submit("hello", alternate=False)  # noqa: SLF001 - the composer's submit callback
+
+    assert not app.state.exit_requested
+    app.outbox.submit.assert_called_once_with("hello", steer=False)
+
+
+def test_first_ctrl_c_asks_and_second_confirms() -> None:
+    app, *_ = _make_app()
+    assert app.confirm_exit() is False
+    assert app.state.exit_requested
+    assert app.confirm_exit() is True
+    assert not app.state.exit_requested
+
+
+async def test_the_exit_prompt_goes_away_after_the_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(application, "EXIT_TIMEOUT", 0.01)
+    app, *_ = _make_app()
+    app.confirm_exit()
+
+    await asyncio.sleep(0.02)
+
+    assert not app.state.exit_requested
+    assert app.confirm_exit() is False
+
+
+async def test_a_confirmed_exit_cancels_the_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(application, "EXIT_TIMEOUT", 0.01)
+    app, *_ = _make_app()
+    app.confirm_exit()
+    assert app.confirm_exit() is True
+    app.state.exit_requested = True  # As if asked again after confirming.
+    await asyncio.sleep(0.02)
+    assert app.state.exit_requested  # The old timer didn't fire.
