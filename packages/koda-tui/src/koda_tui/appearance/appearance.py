@@ -53,40 +53,10 @@ class Appearance:
 
     def _build(self) -> Style:
         theme = self._current_theme()
-        return _stylesheet(theme, theme.surface_on(self._terminal_background))
-
-
-def _stylesheet(theme: Theme, surface: str) -> Style:
-    """Give every token its rule from the theme."""
-    rules = {
-        Tokens.Text.DEFAULT: "",
-        Tokens.Text.MUTED: theme.muted,
-        Tokens.Text.STRONG: "bold",
-        Tokens.Text.EMPHASIS: "italic",
-        Tokens.Text.STRIKE: "strike",
-        Tokens.Text.ACCENT: theme.accent,
-        Tokens.Text.LINK: theme.link,
-        Tokens.Text.SUCCESS: theme.success,
-        Tokens.Text.WARNING: theme.warning,
-        Tokens.Text.ERROR: theme.error,
-        Tokens.Text.INFO: theme.info,
-        Tokens.Surface.RAISED: f"bg:{surface}",
-        Tokens.Surface.SELECTED: f"bg:{theme.accent} fg:{theme.on_accent}",
-        Tokens.BORDER: theme.border,
-        Tokens.Heading.H1: "bold underline",
-        Tokens.Heading.H2: f"{theme.accent} underline",
-        Tokens.Heading.H3: f"{theme.accent} bold",
-        Tokens.Heading.H4: f"{theme.accent} italic",
-        Tokens.Heading.H5: "italic",
-        Tokens.Heading.H6: theme.muted,
-        Tokens.Code.INLINE: theme.code,
-        Tokens.Diff.ADD: f"bg:{theme.diff_add}",
-        Tokens.Diff.REMOVE: f"bg:{theme.diff_remove}",
-    }
-    # prompt_toolkit's own widget classes.
-    widgets = {"frame.border": theme.border}
-    return Style.from_dict(
-        {name.removeprefix("class:"): rule for name, rule in rules.items()}
-        | widgets
-        | dict(theme.syntax)
-    )
+        rules = {
+            **theme.rules,
+            Tokens.Surface.RAISED: f"bg:{theme.surface_on(self._terminal_background)}",
+            # prompt_toolkit's own widget classes.
+            "frame.border": theme.rules[Tokens.BORDER],
+        }
+        return Style.from_dict({name.removeprefix("class:"): rule for name, rule in rules.items()})

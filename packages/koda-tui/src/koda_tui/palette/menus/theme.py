@@ -21,10 +21,7 @@ _AUTO_OPTION = (AUTO_THEME, "Auto", "Follow terminal theme when detectable")
 def _theme_options() -> list[tuple[str, str, str]]:
     return [
         _AUTO_OPTION,
-        *(
-            (theme.name, theme.label, "Dark" if theme.dark else "Light")
-            for theme in THEMES.values()
-        ),
+        *((theme.name, theme.label, theme.description) for theme in THEMES.values()),
     ]
 
 

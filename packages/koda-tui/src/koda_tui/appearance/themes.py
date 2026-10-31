@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Annotated, NamedTuple
 from pydantic import AfterValidator
 from pydantic_core import PydanticCustomError
 
+from koda_tui.appearance.tokens import Tokens
+
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
@@ -52,7 +54,7 @@ _SURFACE_CONTRAST = 0.125
 
 @dataclass(frozen=True, slots=True)
 class Theme:
-    """A named color theme.
+    """A named theme: the prompt_toolkit style rule for every token.
 
     Colors use prompt_toolkit syntax: an ANSI name such as ``ansimagenta`` (resolved
     by the user's terminal palette) or a ``#rrggbb`` hex value.
@@ -60,23 +62,10 @@ class Theme:
 
     name: str
     label: str
+    description: str
     dark: bool
-    muted: str
-    border: str
-    accent: str
-    on_accent: str
-    link: str
-    # Full style for inline code, e.g. "ansicyan bg:ansiblack bold".
-    code: str
-    success: str
-    warning: str
-    error: str
-    info: str
-    surface: str
-    diff_add: str
-    diff_remove: str
-    # prompt_toolkit styles for ``pygments.*`` token classes.
-    syntax: Mapping[str, str]
+    surface: str  # Fallback background for ``Tokens.Surface.RAISED``.
+    rules: Mapping[str, str]  # Token (or ``pygments.*`` class) to style rule.
 
     def surface_on(self, background: RGBColor | None) -> str:
         """This theme's surface, derived from a matching terminal background when known."""
@@ -86,95 +75,122 @@ class Theme:
         return background.blend(contrast, _SURFACE_CONTRAST).hex
 
 
-# Rich's ANSI syntax themes as stylesheet entries. Classes inherit from their dotted
-# parents, so children of dim tokens reset with ``nodim``.
-_ANSI_DARK_SYNTAX = {
-    "pygments.text.whitespace": "ansibrightblack",
-    "pygments.comment": "dim",
-    "pygments.comment.preproc": "nodim ansibrightcyan",
-    "pygments.keyword": "ansibrightblue",
-    "pygments.keyword.type": "ansibrightcyan",
-    "pygments.operator.word": "ansibrightmagenta",
-    "pygments.name.builtin": "ansibrightcyan",
-    "pygments.name.function": "ansibrightgreen",
-    "pygments.name.namespace": "ansibrightcyan underline",
-    "pygments.name.class": "ansibrightgreen underline",
-    "pygments.name.exception": "ansibrightcyan",
-    "pygments.name.decorator": "ansibrightmagenta bold",
-    "pygments.name.variable": "ansibrightred",
-    "pygments.name.constant": "ansibrightred",
-    "pygments.name.attribute": "ansibrightcyan",
-    "pygments.name.tag": "ansibrightblue",
-    "pygments.literal.string": "ansiyellow",
-    "pygments.literal.number": "ansibrightblue",
-    "pygments.generic.deleted": "ansibrightred",
-    "pygments.generic.inserted": "ansibrightgreen",
-    "pygments.generic.heading": "bold",
-    "pygments.generic.subheading": "ansibrightmagenta bold",
-    "pygments.generic.prompt": "bold",
-    "pygments.generic.error": "ansibrightred",
-    "pygments.error": "ansired underline",
-}
-
-_ANSI_LIGHT_SYNTAX = {
-    **_ANSI_DARK_SYNTAX,
-    "pygments.text.whitespace": "ansigray",
-    "pygments.comment.preproc": "nodim ansicyan",
-    "pygments.keyword": "ansiblue",
-    "pygments.keyword.type": "ansicyan",
-    "pygments.operator.word": "ansimagenta",
-    "pygments.name.builtin": "ansicyan",
-    "pygments.name.function": "ansigreen",
-    "pygments.name.namespace": "ansicyan underline",
-    "pygments.name.class": "ansigreen underline",
-    "pygments.name.exception": "ansicyan",
-    "pygments.name.decorator": "ansimagenta bold",
-    "pygments.name.variable": "ansired",
-    "pygments.name.constant": "ansired",
-    "pygments.name.attribute": "ansicyan",
-    "pygments.literal.number": "ansiblue",
-    "pygments.generic.inserted": "ansigreen",
-    "pygments.generic.subheading": "ansimagenta bold",
-}
-
 TERMINAL_DARK = Theme(
     name="terminal-dark",
     label="Terminal Dark",
+    description="Terminal colors for dark backgrounds",
     dark=True,
-    muted="dim",
-    border="dim",
-    accent="ansimagenta",
-    on_accent="ansiwhite",
-    link="ansiblue underline",
-    code="ansicyan bg:ansiblack bold",
-    success="ansigreen",
-    warning="ansiyellow",
-    error="ansired",
-    info="ansicyan",
     surface="#434343",
-    diff_add="#005f00",
-    diff_remove="#870000",
-    syntax=_ANSI_DARK_SYNTAX,
+    rules={
+        Tokens.Text.DEFAULT: "",
+        Tokens.Text.MUTED: "dim",
+        Tokens.Text.STRONG: "bold",
+        Tokens.Text.EMPHASIS: "italic",
+        Tokens.Text.STRIKE: "strike",
+        Tokens.Text.ACCENT: "ansimagenta",
+        Tokens.Text.LINK: "ansiblue underline",
+        Tokens.Text.SUCCESS: "ansigreen",
+        Tokens.Text.WARNING: "ansiyellow",
+        Tokens.Text.ERROR: "ansired",
+        Tokens.Text.INFO: "ansicyan",
+        Tokens.Surface.SELECTED: "bg:ansimagenta fg:ansiwhite",
+        Tokens.BORDER: "dim",
+        Tokens.Heading.H1: "bold underline",
+        Tokens.Heading.H2: "ansimagenta underline",
+        Tokens.Heading.H3: "ansimagenta bold",
+        Tokens.Heading.H4: "ansimagenta italic",
+        Tokens.Heading.H5: "italic",
+        Tokens.Heading.H6: "dim",
+        Tokens.Code.INLINE: "ansicyan bg:ansiblack bold",
+        Tokens.Diff.ADD: "bg:#005f00",
+        Tokens.Diff.REMOVE: "bg:#870000",
+        # Syntax highlighting, matching Rich's ANSI themes. Classes inherit from their
+        # dotted parents, so children of dim tokens reset with nodim.
+        "pygments.text.whitespace": "ansibrightblack",
+        "pygments.comment": "dim",
+        "pygments.comment.preproc": "nodim ansibrightcyan",
+        "pygments.keyword": "ansibrightblue",
+        "pygments.keyword.type": "ansibrightcyan",
+        "pygments.operator.word": "ansibrightmagenta",
+        "pygments.name.builtin": "ansibrightcyan",
+        "pygments.name.function": "ansibrightgreen",
+        "pygments.name.namespace": "ansibrightcyan underline",
+        "pygments.name.class": "ansibrightgreen underline",
+        "pygments.name.exception": "ansibrightcyan",
+        "pygments.name.decorator": "ansibrightmagenta bold",
+        "pygments.name.variable": "ansibrightred",
+        "pygments.name.constant": "ansibrightred",
+        "pygments.name.attribute": "ansibrightcyan",
+        "pygments.name.tag": "ansibrightblue",
+        "pygments.literal.string": "ansiyellow",
+        "pygments.literal.number": "ansibrightblue",
+        "pygments.generic.deleted": "ansibrightred",
+        "pygments.generic.inserted": "ansibrightgreen",
+        "pygments.generic.heading": "bold",
+        "pygments.generic.subheading": "ansibrightmagenta bold",
+        "pygments.generic.prompt": "bold",
+        "pygments.generic.error": "ansibrightred",
+        "pygments.error": "ansired underline",
+    },
 )
 
 TERMINAL_LIGHT = Theme(
     name="terminal-light",
     label="Terminal Light",
+    description="Terminal colors for light backgrounds",
     dark=False,
-    muted="dim",
-    border="dim",
-    accent="ansimagenta",
-    on_accent="ansiwhite",
-    link="ansiblue underline",
-    code="ansicyan bg:ansiblack bold",
-    success="ansigreen",
-    warning="ansiyellow",
-    error="ansired",
-    info="ansicyan",
     surface="#dcdcdc",
-    diff_add="#d4edda",
-    diff_remove="#f8d7da",
-    syntax=_ANSI_LIGHT_SYNTAX,
+    rules={
+        Tokens.Text.DEFAULT: "",
+        Tokens.Text.MUTED: "dim",
+        Tokens.Text.STRONG: "bold",
+        Tokens.Text.EMPHASIS: "italic",
+        Tokens.Text.STRIKE: "strike",
+        Tokens.Text.ACCENT: "ansimagenta",
+        Tokens.Text.LINK: "ansiblue underline",
+        Tokens.Text.SUCCESS: "ansigreen",
+        Tokens.Text.WARNING: "ansiyellow",
+        Tokens.Text.ERROR: "ansired",
+        Tokens.Text.INFO: "ansicyan",
+        Tokens.Surface.SELECTED: "bg:ansimagenta fg:ansiwhite",
+        Tokens.BORDER: "dim",
+        Tokens.Heading.H1: "bold underline",
+        Tokens.Heading.H2: "ansimagenta underline",
+        Tokens.Heading.H3: "ansimagenta bold",
+        Tokens.Heading.H4: "ansimagenta italic",
+        Tokens.Heading.H5: "italic",
+        Tokens.Heading.H6: "dim",
+        Tokens.Code.INLINE: "ansicyan bg:ansiblack bold",
+        Tokens.Diff.ADD: "bg:#d4edda",
+        Tokens.Diff.REMOVE: "bg:#f8d7da",
+        # Syntax highlighting, matching Rich's ANSI themes. Classes inherit
+        # from their dotted parents, so children of dim tokens reset with nodim.
+        "pygments.text.whitespace": "ansigray",
+        "pygments.comment": "dim",
+        "pygments.comment.preproc": "nodim ansicyan",
+        "pygments.keyword": "ansiblue",
+        "pygments.keyword.type": "ansicyan",
+        "pygments.operator.word": "ansimagenta",
+        "pygments.name.builtin": "ansicyan",
+        "pygments.name.function": "ansigreen",
+        "pygments.name.namespace": "ansicyan underline",
+        "pygments.name.class": "ansigreen underline",
+        "pygments.name.exception": "ansicyan",
+        "pygments.name.decorator": "ansimagenta bold",
+        "pygments.name.variable": "ansired",
+        "pygments.name.constant": "ansired",
+        "pygments.name.attribute": "ansicyan",
+        "pygments.name.tag": "ansibrightblue",
+        "pygments.literal.string": "ansiyellow",
+        "pygments.literal.number": "ansiblue",
+        "pygments.generic.deleted": "ansibrightred",
+        "pygments.generic.inserted": "ansigreen",
+        "pygments.generic.heading": "bold",
+        "pygments.generic.subheading": "ansimagenta bold",
+        "pygments.generic.prompt": "bold",
+        "pygments.generic.error": "ansibrightred",
+        "pygments.error": "ansired underline",
+    },
 )
 
 THEMES: dict[str, Theme] = {theme.name: theme for theme in (TERMINAL_DARK, TERMINAL_LIGHT)}

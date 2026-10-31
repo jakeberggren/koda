@@ -138,10 +138,11 @@ def test_theme_setting_rejects_unknown_theme(value: str) -> None:
 
 
 @pytest.mark.parametrize("theme", THEMES.values(), ids=lambda theme: theme.name)
-def test_selection_uses_theme_accent(theme: Theme) -> None:
-    attrs = _attrs(theme.name, None, Tokens.Surface.SELECTED)
+def test_stylesheet_applies_every_theme_rule(theme: Theme) -> None:
+    applied = dict(Appearance(theme.name).style.style_rules)
 
-    assert (attrs.bgcolor, attrs.color) == (theme.accent, theme.on_accent)
+    for name, rule in theme.rules.items():
+        assert applied[name.removeprefix("class:")] == rule
 
 
 def _tokens(namespace: type = Tokens) -> list[str]:
