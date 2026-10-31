@@ -36,9 +36,6 @@ class ModelMenu:
         self._service = context.service
         self._settings = context.settings
 
-    def _is_proxy_managed(self) -> bool:
-        return self._settings.core.credential_mode == "proxy-managed"
-
     def items(self) -> list[ListItem[ModelDefinition]]:
         """Build model selection items and footer."""
         provider_names = {p.id: p.name for p in self._service.list_providers()}
@@ -50,8 +47,7 @@ class ModelMenu:
 
     def open(self) -> None:
         """Open the model selection submenu."""
-        proxy_managed = self._is_proxy_managed()
-        footer = _PROXY_MANAGED_MODEL_FOOTER if proxy_managed else None
+        footer = _PROXY_MANAGED_MODEL_FOOTER if self._settings.proxy_managed else None
         self._overlays.open(
             Picker(
                 _TITLE,
