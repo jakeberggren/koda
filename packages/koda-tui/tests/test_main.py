@@ -14,7 +14,7 @@ from koda_common.settings.errors import (
 from koda_common.settings.store import JsonObject, SecretsStore
 from koda_service import LocalRuntimeConfig
 from koda_service.exceptions import StartupConfigurationError
-from koda_tui import _report_startup_error, build_app, main
+from koda_tui.main import _report_startup_error, build_app, main
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -79,12 +79,12 @@ def _run_main_with_error(
     reported: list[StartupConfigurationError] = []
 
     monkeypatch.setattr(
-        "koda_tui.build_app",
+        "koda_tui.main.build_app",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(error),
     )
-    monkeypatch.setattr("koda_tui.configure_logging", lambda _config: None)
+    monkeypatch.setattr("koda_tui.main.configure_logging", lambda _config: None)
     monkeypatch.setattr(
-        "koda_tui._report_startup_error",
+        "koda_tui.main._report_startup_error",
         lambda raised, _logger: reported.append(raised),
     )
 

@@ -3,8 +3,8 @@ from pathlib import Path
 import pytest
 
 from koda_service import ServiceStatus, ServiceStatusCode
-from koda_tui import AppState
 from koda_tui.messaging import Conversation
+from koda_tui.state import AppState
 
 READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 
