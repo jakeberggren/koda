@@ -39,7 +39,7 @@ class Overflow(Enum):
 
 
 class Text:
-    """Styled text: one line, unless ``overflow`` wraps it.
+    """Styled text, as many lines as its content (or its wrapping) needs.
 
     ``content`` is a string, fragments, or a callable returning fragments for text
     that changes between renders. ``fit=True`` makes it only as wide as its text.
@@ -67,7 +67,6 @@ class Text:
             style=style,
             align=align,
             width=Dimension(weight=weight),
-            height=None if overflow is Overflow.WRAP else 1,
             dont_extend_width=fit,
             dont_extend_height=True,
         )
@@ -158,6 +157,16 @@ class TruncateControl(UIControl):
 
     def preferred_width(self, max_available_width: int) -> int:  # noqa: ARG002
         return fragment_list_width(to_formatted_text(self._content))
+
+    @override
+    def preferred_height(
+        self,
+        width: int,
+        max_available_height: int,
+        wrap_lines: bool,
+        get_line_prefix: GetLinePrefixCallable | None,
+    ) -> int:
+        return 1
 
     def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002
         fragments = to_formatted_text(self._content)

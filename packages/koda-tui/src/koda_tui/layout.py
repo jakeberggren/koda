@@ -17,7 +17,7 @@ from koda_tui.components import (
     ChatScrollbarMargin,
     FileSuggestions,
     InputArea,
-    QueuedInputs,
+    PendingMessages,
     StatusBar,
 )
 from koda_tui.rendering import MessageRenderer
@@ -37,7 +37,7 @@ class TUILayout:
         # Initialize components
         self.chat_area = ChatAreaControl(state, self.renderer)
         self.activity = ActivityIndicator()
-        self.queued_inputs = QueuedInputs(state)
+        self.pending = PendingMessages(state)
         self.input_area = InputArea(state)
         self.file_suggestions = FileSuggestions(self.input_area)
         self.status_bar = StatusBar(state)
@@ -58,7 +58,6 @@ class TUILayout:
             char="",
             style=Tokens.BORDER,
         )
-        queued_inputs = self.queued_inputs.create_window()
         file_suggestions = self.file_suggestions.create_window()
         input = self.input_area.create_window()
 
@@ -69,7 +68,7 @@ class TUILayout:
                     Box(chat_area, padding=0, padding_left=1, padding_top=1),
                     separator,
                     activity,
-                    queued_inputs,
+                    self.pending,
                     file_suggestions,
                     input,  # Dynamic height 1-10 lines
                     separator,
