@@ -14,7 +14,7 @@ from koda.messages import TokenUsage
 from koda.sessions import Session
 from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda_service import ServiceStatus, ServiceStatusCode
-from koda_tui.app.conversation import Conversation
+from koda_tui.messaging import Conversation
 from koda_tui.state import (
     AppState,
     AssistantMessage,

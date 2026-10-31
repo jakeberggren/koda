@@ -21,7 +21,7 @@ class ThemeMenu:
 
     def __init__(self, context: PaletteContext) -> None:
         self._overlays = context.overlays
-        self._refresh_theme = context.refresh_theme
+        self._terminal = context.terminal
         self._settings = context.settings
 
     def items(self) -> list[ListItem[str]]:
@@ -52,7 +52,7 @@ class ThemeMenu:
     def select(self, theme: str) -> None:
         """Handle theme selection."""
         if self._settings.tui.theme == theme:
-            self._refresh_theme()
+            self._terminal.ask_background()
         else:
             self._settings.tui.set("theme", theme)
         self._overlays.close_all()

@@ -57,7 +57,7 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
 
     @kb.add(*ALT_UP)
     def _edit_last_queued(_event: KeyPressEvent) -> None:
-        text = app.pop_last_queued_message()
+        text = app.outbox.take_last()
         if text is not None:
             app.screen.composer.text = text
             app.invalidate()
@@ -84,7 +84,7 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
     @kb.add(Keys.Escape, filter=_cancelable(app))
     def _escape(_event: KeyPressEvent) -> None:
         if app.state.responding:
-            app.cancel_streaming()
+            app.outbox.cancel()
 
     @kb.add(Keys.ControlP)
     def _toggle_palette(_event: KeyPressEvent) -> None:
@@ -107,7 +107,7 @@ def _create_queue_keybindings(app: KodaTuiApp) -> KeyBindings:
 
     @kb.add(Keys.Escape)
     def _send_queue_now(_event: KeyPressEvent) -> None:
-        app.steer_and_send_queue()
+        app.outbox.send_now()
 
     return kb
 

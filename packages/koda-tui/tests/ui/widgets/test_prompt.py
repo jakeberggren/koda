@@ -17,13 +17,13 @@ READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 WIDTH = 30
 
 
-async def _ignore(_text: str) -> None:
+def _ignore(_text: str, *, alternate: bool) -> None:
     pass
 
 
 def _composer() -> Composer:
     state = AppState(workspace=Path(), service_status=READY)
-    return Composer(state, on_submit=_ignore, on_alternate_submit=_ignore)
+    return Composer(state, on_submit=_ignore)
 
 
 def _screen(composer: Composer) -> tuple[Screen, int]:
@@ -45,7 +45,6 @@ async def test_prompt_column_keeps_the_surface_beside_several_lines() -> None:
     composer = Composer(
         AppState(workspace=Path(), service_status=READY),
         on_submit=_ignore,
-        on_alternate_submit=_ignore,
     )
     composer.buffer.text = "first\nsecond\nthird"
 
@@ -60,7 +59,6 @@ async def test_prompt_stays_one_column_wide() -> None:
     composer = Composer(
         AppState(workspace=Path(), service_status=READY),
         on_submit=_ignore,
-        on_alternate_submit=_ignore,
     )
     composer.buffer.text = "hello"
 

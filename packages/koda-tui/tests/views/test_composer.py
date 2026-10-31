@@ -26,19 +26,15 @@ def composer(tmp_path: Path) -> Composer:
         (tmp_path / path).write_text("")
     return Composer(
         AppState(workspace=tmp_path, service_status=READY),
-        on_submit=_record("submit"),
-        on_alternate_submit=_record("alternate"),
+        on_submit=_record,
     )
 
 
 SUBMITTED: list[tuple[str, str]] = []
 
 
-def _record(kind: str):
-    async def submit(text: str) -> None:
-        SUBMITTED.append((kind, text))
-
-    return submit
+def _record(text: str, *, alternate: bool) -> None:
+    SUBMITTED.append(("alternate" if alternate else "submit", text))
 
 
 @pytest.fixture(autouse=True)
