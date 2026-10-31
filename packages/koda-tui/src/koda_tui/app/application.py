@@ -241,6 +241,18 @@ class KodaTuiApp:
         round when the input mode prefers steering."""
         self.outbox.submit(text, steer=alternate == self._app_settings.tui.queue_inputs)
 
+    def cycle_thinking(self) -> None:
+        """Move to the active model's next thinking level, wrapping around."""
+        model = self.state.active_model
+        if not self.state.service_status.is_ready or model is None:
+            return
+        options = [option.id for option in model.effective_thinking_options]
+        if not options:
+            return
+        current = self.state.thinking.id
+        index = options.index(current) if current in options else -1
+        self._app_settings.core.set("thinking", options[(index + 1) % len(options)])
+
     def toggle_palette(self) -> None:
         """Open the command palette, or close it and any dialogs it opened."""
         if self.overlays.is_open:
