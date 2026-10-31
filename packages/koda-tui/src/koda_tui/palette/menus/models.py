@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
+from koda_tui.overlays.list.renderer import CURRENT_STYLE
 from koda_tui.palette.items import ListItem
 
 if TYPE_CHECKING:
@@ -79,6 +80,6 @@ class ModelMenu:
             detail=model.detail or "",
             group=provider_name,
             marker="*" if is_active else None,
-            marker_style="class:palette.current" if is_active else None,
+            marker_style=CURRENT_STYLE if is_active else None,
             data=model,
         )

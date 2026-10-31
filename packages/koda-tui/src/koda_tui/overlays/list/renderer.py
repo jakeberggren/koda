@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit.formatted_text import FormattedText
 
+from koda_tui.appearance import Tokens, compose
+
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
@@ -34,17 +36,24 @@ class Row:
     item: ListItem | None = None
 
 
+SELECTED_STYLE = compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG)
+# Marks the item that is currently active, e.g. the selected model.
+CURRENT_STYLE = compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)
+_GROUP_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.STRONG)
+_EMPTY_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS)
+
+
 @dataclass(frozen=True, slots=True)
 class RenderOptions:
     """Options that affect how rows are rendered."""
 
     list_heading: str | None = None
     empty_message: str = "No results found"
-    selected_style: str = "class:palette.selected"
-    item_style: str = "class:palette.item"
-    dim_style: str = "class:palette.dim"
-    marker_style: str = "class:palette.marker"
-    group_style: str = "class:palette.group"
+    selected_style: str = SELECTED_STYLE
+    item_style: str = Tokens.Text.DEFAULT
+    dim_style: str = Tokens.Text.MUTED
+    marker_style: str = CURRENT_STYLE
+    group_style: str = _GROUP_STYLE
 
 
 class ListRenderer:
@@ -99,14 +108,14 @@ class ListRenderer:
     def _heading_row(text: str) -> Row:
         return Row(
             kind=RowKind.HEADING,
-            text=FormattedText([("class:palette.group", text)]),
+            text=FormattedText([(_GROUP_STYLE, text)]),
         )
 
     @staticmethod
     def _empty_row(message: str) -> Row:
         return Row(
             kind=RowKind.EMPTY,
-            text=FormattedText([("class:palette.empty", f"  {message}")]),
+            text=FormattedText([(_EMPTY_STYLE, f"  {message}")]),
         )
 
     def _group_rows(self, group: str | None, *, needs_spacer: bool) -> list[Row]:

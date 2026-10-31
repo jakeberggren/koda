@@ -10,6 +10,7 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.widgets import Box
 
+from koda_tui.appearance import Tokens
 from koda_tui.components import (
     ChatAreaControl,
     ChatScrollbarMargin,
@@ -21,7 +22,6 @@ from koda_tui.components import (
 )
 from koda_tui.rendering import MessageRenderer
 from koda_tui.state import AppState
-from koda_tui.theme import TerminalTheme
 
 SEPARATOR_HEIGHT = 1
 RESPONSE_INDICATOR_HEIGHT = 2
@@ -31,9 +31,9 @@ STATUS_BAR_HEIGHT = 1
 class TUILayout:
     """Manages the TUI layout composition."""
 
-    def __init__(self, state: AppState, theme: TerminalTheme) -> None:
+    def __init__(self, state: AppState) -> None:
         self._state = state
-        self.renderer = MessageRenderer(theme)
+        self.renderer = MessageRenderer()
 
         # Initialize components
         self.chat_area = ChatAreaControl(state, self.renderer)
@@ -48,21 +48,19 @@ class TUILayout:
         """Create the full-screen layout."""
         chat_area = Window(
             content=self.chat_area,
-            style="class:chat-area",
             right_margins=[ChatScrollbarMargin(self.chat_area, self._state)],
         )
         response_indicator = ConditionalContainer(
             content=Window(
                 content=self.response_indicator,
                 height=RESPONSE_INDICATOR_HEIGHT,
-                style="class:status-bar",
             ),
             filter=Condition(lambda: self._state.is_streaming),
         )
         separator = Window(
             height=SEPARATOR_HEIGHT,
             char="",
-            style="class:separator",
+            style=Tokens.BORDER,
         )
         queued_inputs = self.queued_inputs.create_window()
         file_suggestions = self.file_suggestions.create_window()
@@ -70,7 +68,6 @@ class TUILayout:
         status_bar = Window(
             content=self.status_bar,
             height=STATUS_BAR_HEIGHT,
-            style="class:status-bar",
         )
 
         # Main layout body. Wrapped in FloatContainer for command palette support

@@ -1,7 +1,11 @@
+from rich.padding import Padding
 from rich.text import Text
 
 from koda.tools import ToolCall
+from koda_tui.appearance import Tokens
+from koda_tui.appearance import rich as rich_bridge
 from koda_tui.rendering import MessageRenderer
+from koda_tui.rendering.renderer import _Markdown
 from koda_tui.state import Message, MessageRole
 
 
@@ -34,7 +38,7 @@ class TestMessageRendererMessages:
         result = converter.render_message(message)
         content = "".join(t[1] for t in result)
         assert "Hello" in content
-        assert any("bg:#123456" in fragment[0] for fragment in result)
+        assert any(Tokens.Surface.RAISED in fragment[0] for fragment in result)
 
     def test_render_assistant_message(self, converter: MessageRenderer) -> None:
         """render_message() should render assistant messages as markdown."""
@@ -261,3 +265,47 @@ class TestMessageRendererStreaming:
         content = "".join(t[1] for t in result)
         assert "Exploring the meaning of 42" in content
         assert "**Exploring the meaning of 42**" not in content
+
+
+class TestMessageRendererStyleClasses:
+    """Theme-dependent styling is emitted as style classes, not baked-in colors."""
+
+    def test_code_block_emits_pygments_classes(self, converter: MessageRenderer) -> None:
+        message = Message(role=MessageRole.ASSISTANT, content="```python\nimport os\n```")
+        result = converter.render_message(message)
+        assert ("class:pygments.keyword.namespace", "import") in result
+
+    def test_diff_lines_emit_full_width_diff_classes(self, converter: MessageRenderer) -> None:
+        diff = "--- a/foo.py\n+++ b/foo.py\n@@ -1 +1 @@\n-x = 1\n+x = 2\n"
+        result = converter.convert(converter._render_diff(diff))  # noqa: SLF001
+        added = "".join(fragment[1] for fragment in result if Tokens.Diff.ADD in fragment[0])
+        assert any(Tokens.Diff.REMOVE in fragment[0] for fragment in result)
+        assert added.rstrip("\n").endswith(" ")
+
+
+def test_rich_emits_no_colors_so_every_color_comes_from_a_token(
+    converter: MessageRenderer,
+) -> None:
+    markdown = (
+        "# H1\n## H2 *em* **strong** ~~s~~ `code`\n> [link](https://example.com)\n\n"
+        "- item\n1. item\n\n| a | b |\n|---|---|\n| c | d |\n\n---\n"
+        "```python\nclass A: pass\n```\n\n    indented = True\n"
+    )
+    diff = "--- a/foo.py\n+++ b/foo.py\n@@ -1 +1 @@\n-x = 1\n+x = 2\n"
+    renderables = [
+        Padding(_Markdown(markdown), 1, style=Tokens.Surface.RAISED),
+        converter._render_diff(diff),  # noqa: SLF001
+    ]
+    console = rich_bridge._Console(width=60)  # noqa: SLF001
+
+    colored = [
+        segment
+        for renderable in renderables
+        for segment in console.render(renderable)
+        if segment.style
+        and any(
+            color and not color.is_default for color in (segment.style.color, segment.style.bgcolor)
+        )
+    ]
+
+    assert colored == []

@@ -5,6 +5,7 @@ from pathlib import Path
 from prompt_toolkit.formatted_text import FormattedText
 from prompt_toolkit.layout import UIContent, UIControl
 
+from koda_tui.appearance import Tokens
 from koda_tui.state import AppState, ResponsePhase
 
 _DIVIDER = " · "
@@ -87,7 +88,7 @@ class StatusBarControl(UIControl):
         usage_text = self._get_usage_text()
         if not usage_text:
             return [], ""
-        return [("class:status-bar.left", usage_text)], usage_text
+        return [(Tokens.Text.MUTED, usage_text)], usage_text
 
     def _get_footer_fragments(self) -> tuple[list[tuple[str, str]], str]:
         """Return styled footer binding fragments and their plain-text representation."""
@@ -99,11 +100,11 @@ class StatusBarControl(UIControl):
 
         for index, (keybinding, label) in enumerate(footer_bindings):
             if index > 0:
-                fragments.append(("class:status-bar.muted", _DIVIDER))
+                fragments.append((Tokens.Text.MUTED, _DIVIDER))
                 text_parts.append(_DIVIDER)
 
-            fragments.append(("class:status-bar.keybinding", keybinding))
-            fragments.append(("class:status-bar.muted", f" {label}"))
+            fragments.append((Tokens.Text.DEFAULT, keybinding))
+            fragments.append((Tokens.Text.MUTED, f" {label}"))
             text_parts.append(f"{keybinding} {label}")
 
         return fragments, "".join(text_parts)
@@ -111,17 +112,17 @@ class StatusBarControl(UIControl):
     def _get_left_segments(self) -> list[tuple[list[tuple[str, str]], str]]:
         path = self._workspace_path()
         segments: list[tuple[list[tuple[str, str]], str]] = [
-            ([("class:status-bar.left", path)], path),
+            ([(Tokens.Text.MUTED, path)], path),
         ]
 
         active_model = self._state.active_model
         if active_model is not None:
             provider_model = f"{active_model.provider}{_DIVIDER}{active_model.name}"
-            segments.append(([("class:status-bar.left", provider_model)], provider_model))
+            segments.append(([(Tokens.Text.MUTED, provider_model)], provider_model))
 
         if self._state.thinking.id != "none":
             thinking_label = self._state.thinking.label.lower()
-            segments.append(([("class:status-bar.thinking", thinking_label)], thinking_label))
+            segments.append(([(Tokens.Text.WARNING, thinking_label)], thinking_label))
 
         usage_fragments, usage_text = self._get_usage_fragments()
         if usage_fragments:
@@ -138,20 +139,20 @@ class StatusBarControl(UIControl):
         warning_plain = ""
         if warning_text:
             warning_fragments = [
-                ("class:status-bar.muted", _DIVIDER),
-                ("class:status-bar.warning", warning_text),
+                (Tokens.Text.MUTED, _DIVIDER),
+                (Tokens.Text.WARNING, warning_text),
             ]
             warning_plain = f"{_DIVIDER}{warning_text}"
         status_style = (
-            "class:status-bar.warning"
+            Tokens.Text.WARNING
             if not self._state.service_status.is_ready and not self._state.exit_requested
-            else "class:status-bar.right"
+            else Tokens.Text.ACCENT
         )
         return (
             [
                 *footer_fragments,
                 *warning_fragments,
-                ("class:status-bar.muted", _DIVIDER),
+                (Tokens.Text.MUTED, _DIVIDER),
                 (status_style, status_text),
             ],
             f"{footer_text}{warning_plain}{_DIVIDER}{status_text}",
@@ -166,7 +167,7 @@ class StatusBarControl(UIControl):
 
         for index, (segment_fragments, segment_text) in enumerate(segments):
             if index > 0:
-                fragments.append(("class:status-bar.muted", _DIVIDER))
+                fragments.append((Tokens.Text.MUTED, _DIVIDER))
                 text_parts.append(_DIVIDER)
             fragments.extend(segment_fragments)
             text_parts.append(segment_text)
@@ -186,9 +187,9 @@ class StatusBarControl(UIControl):
             return fragments
 
         if max_width <= len(_ELLIPSIS):
-            return [("class:status-bar.muted", _ELLIPSIS[:max_width])]
+            return [(Tokens.Text.MUTED, _ELLIPSIS[:max_width])]
 
-        return [("class:status-bar.left", plain_text[: max_width - len(_ELLIPSIS)] + _ELLIPSIS)]
+        return [(Tokens.Text.MUTED, plain_text[: max_width - len(_ELLIPSIS)] + _ELLIPSIS)]
 
     def create_content(self, width: int, height: int) -> UIContent:  # noqa: ARG002 - unused argument
         """Create the status bar content."""
@@ -198,11 +199,11 @@ class StatusBarControl(UIControl):
         padding = width - len(left_text) - len(right_text)
 
         if padding >= _MIN_PLAIN_SECTION_PADDING:
-            gap_fragments: list[tuple[str, str]] = [("class:status-bar", " " * padding)]
+            gap_fragments: list[tuple[str, str]] = [(Tokens.Text.DEFAULT, " " * padding)]
         else:
             available_left_width = max(0, width - len(right_text) - len(_DIVIDER))
             left_fragments = self._truncate_fragments(left_fragments, available_left_width)
-            gap_fragments = [("class:status-bar.muted", _DIVIDER)]
+            gap_fragments = [(Tokens.Text.MUTED, _DIVIDER)]
 
         line = FormattedText(
             [

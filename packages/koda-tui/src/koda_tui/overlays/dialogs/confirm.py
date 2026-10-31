@@ -18,12 +18,18 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.widgets import Box, Frame
 
+from koda_tui.appearance import Tokens, compose
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from prompt_toolkit.formatted_text import StyleAndTextTuples
     from prompt_toolkit.key_binding import KeyPressEvent
     from prompt_toolkit.layout import AnyContainer
+
+
+_BUTTON = Tokens.Text.MUTED
+_SELECTED_BUTTON = compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG)
 
 
 def _calculate_dialog_width() -> int:
@@ -91,43 +97,40 @@ class ConfirmDialog:
         self._on_cancel()
 
     def _button_text(self) -> StyleAndTextTuples:
-        yes_style = "class:dialog.selected" if self._selected else "class:dialog.button"
-        no_style = "class:dialog.button" if self._selected else "class:dialog.selected"
+        yes_style = _SELECTED_BUTTON if self._selected else _BUTTON
+        no_style = _BUTTON if self._selected else _SELECTED_BUTTON
         return [
             (yes_style, " Yes "),
-            ("class:dialog.box", " "),
+            ("", " "),
             (no_style, " No "),
         ]
 
     def _build_container(self) -> Frame:
         title_text = Window(
             content=FormattedTextControl(
-                text=[("class:dialog.title", self._message)],
+                text=[(Tokens.Text.STRONG, self._message)],
             ),
             height=1,
             dont_extend_height=True,
-            style="class:dialog.box",
         )
 
         esc_hint = Window(
-            content=FormattedTextControl(text=[("class:dialog.hint", "esc")]),
+            content=FormattedTextControl(text=[(Tokens.Text.MUTED, "esc")]),
             height=1,
             width=3,
             dont_extend_height=True,
             dont_extend_width=True,
             align=WindowAlign.RIGHT,
-            style="class:dialog.box",
         )
 
-        title_row = VSplit([title_text, esc_hint], style="class:dialog.box")
-        separator = Window(height=1, style="class:dialog.box")
+        title_row = VSplit([title_text, esc_hint])
+        separator = Window(height=1)
 
         buttons = Window(
             content=FormattedTextControl(text=self._button_text),
             height=1,
             dont_extend_height=True,
             align=WindowAlign.CENTER,
-            style="class:dialog.box",
         )
 
         # Hidden buffer for focus (keybindings need a focused BufferControl)
@@ -147,6 +150,5 @@ class ConfirmDialog:
             padding_right=2,
             padding_top=1,
             padding_bottom=1,
-            style="class:dialog.box",
         )
-        return Frame(body=box, style="class:dialog.frame")
+        return Frame(body=box)

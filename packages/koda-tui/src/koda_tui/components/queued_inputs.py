@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 from prompt_toolkit.layout import FormattedTextControl, Window
 from prompt_toolkit.layout.dimension import Dimension
 
+from koda_tui.appearance import Tokens, compose
+
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
@@ -29,13 +31,13 @@ class QueuedInputs:
         s = "s" if n != 1 else ""
         fragments: StyleAndTextTuples = [
             (
-                "class:queued-inputs.title",
+                compose(Tokens.Text.MUTED, Tokens.Text.STRONG),
                 f"  {n} message{s} queued (esc to send now, alt/option-up to edit)",
             ),
         ]
         for item in self._state.pending_inputs[-self.MAX_LINES :]:
             fragments.append(("", "\n"))
-            fragments.append(("", f"  {item}"))
+            fragments.append((compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS), f"  {item}"))
         return fragments
 
     def get_height(self) -> Dimension:
@@ -50,5 +52,4 @@ class QueuedInputs:
             height=self.get_height,
             wrap_lines=True,
             dont_extend_height=True,
-            style="class:queued-inputs",
         )

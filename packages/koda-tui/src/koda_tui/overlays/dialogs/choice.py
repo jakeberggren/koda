@@ -20,11 +20,17 @@ from prompt_toolkit.layout import (
 )
 from prompt_toolkit.widgets import Box, Frame
 
+from koda_tui.appearance import Tokens, compose
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from prompt_toolkit.key_binding import KeyPressEvent
     from prompt_toolkit.layout import AnyContainer
+
+
+_BUTTON = Tokens.Text.MUTED
+_SELECTED_BUTTON = compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG)
 
 
 def _calculate_dialog_width() -> int:
@@ -102,39 +108,36 @@ class ChoiceDialog:
         result: list[tuple[str, str]] = []
         for index, choice in enumerate(self._choices):
             if index:
-                result.append(("class:dialog.box", "  "))
-            style = "class:dialog.selected" if index == self._selected else "class:dialog.button"
+                result.append(("", "  "))
+            style = _SELECTED_BUTTON if index == self._selected else _BUTTON
             result.append((style, f" {choice.label} "))
         return FormattedText(result)
 
     def _build_container(self) -> Frame:
         title_text = Window(
             content=FormattedTextControl(
-                text=[("class:dialog.title", self._message)],
+                text=[(Tokens.Text.STRONG, self._message)],
             ),
             height=1,
             dont_extend_height=True,
-            style="class:dialog.box",
         )
 
         esc_hint = Window(
-            content=FormattedTextControl(text=[("class:dialog.hint", "esc")]),
+            content=FormattedTextControl(text=[(Tokens.Text.MUTED, "esc")]),
             height=1,
             width=3,
             dont_extend_height=True,
             dont_extend_width=True,
             align=WindowAlign.RIGHT,
-            style="class:dialog.box",
         )
 
-        title_row = VSplit([title_text, esc_hint], style="class:dialog.box")
-        separator = Window(height=1, style="class:dialog.box")
+        title_row = VSplit([title_text, esc_hint])
+        separator = Window(height=1)
         choices = Window(
             content=FormattedTextControl(text=self._choice_text),
             height=1,
             dont_extend_height=True,
             align=WindowAlign.CENTER,
-            style="class:dialog.box",
         )
 
         # Hidden buffer for focus (keybindings need a focused BufferControl).
@@ -154,6 +157,5 @@ class ChoiceDialog:
             padding_right=2,
             padding_top=1,
             padding_bottom=1,
-            style="class:dialog.box",
         )
-        return Frame(body=box, style="class:dialog.frame")
+        return Frame(body=box)

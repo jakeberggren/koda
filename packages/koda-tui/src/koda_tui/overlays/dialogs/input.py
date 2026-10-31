@@ -19,6 +19,7 @@ from prompt_toolkit.layout import (
 from prompt_toolkit.layout.processors import PasswordProcessor, Processor
 from prompt_toolkit.widgets import Box, Frame
 
+from koda_tui.appearance import Tokens
 from koda_tui.overlays.controls.wrapped import WrappedTextControl
 
 if TYPE_CHECKING:
@@ -84,25 +85,23 @@ class TextInputDialog:
     def _build_container(self) -> Frame:
         title_text = Window(
             content=FormattedTextControl(
-                text=[("class:dialog.title", self._title)],
+                text=[(Tokens.Text.STRONG, self._title)],
             ),
             height=1,
             dont_extend_height=True,
-            style="class:dialog.box",
         )
 
         esc_hint = Window(
-            content=FormattedTextControl(text=[("class:dialog.hint", "esc")]),
+            content=FormattedTextControl(text=[(Tokens.Text.MUTED, "esc")]),
             height=1,
             width=3,
             dont_extend_height=True,
             dont_extend_width=True,
             align=WindowAlign.RIGHT,
-            style="class:dialog.box",
         )
 
-        title_row = VSplit([title_text, esc_hint], style="class:dialog.box")
-        separator = Window(height=1, style="class:dialog.box")
+        title_row = VSplit([title_text, esc_hint])
+        separator = Window(height=1)
 
         processors: list[Processor] = [PasswordProcessor()] if self._mask_input else []
         input_row = Window(
@@ -113,17 +112,15 @@ class TextInputDialog:
             ),
             height=1,
             dont_extend_height=True,
-            style="class:dialog.box",
         )
 
         detail_rows = []
         if self._detail:
-            detail_text: StyleAndTextTuples = [("class:dialog.hint", self._detail)]
+            detail_text: StyleAndTextTuples = [(Tokens.Text.MUTED, self._detail)]
             detail_rows = [
                 Window(
                     content=WrappedTextControl(detail_text),
                     dont_extend_height=True,
-                    style="class:dialog.box",
                 ),
                 separator,
             ]
@@ -135,6 +132,5 @@ class TextInputDialog:
             padding_right=2,
             padding_top=1,
             padding_bottom=1,
-            style="class:dialog.box",
         )
-        return Frame(body=box, style="class:dialog.frame")
+        return Frame(body=box)

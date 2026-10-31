@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from koda_tui.appearance import Tokens, compose
 from koda_tui.overlays.list.renderer import ListRenderer, RenderOptions, Row, RowKind
 from koda_tui.overlays.list.state import ListState
 from koda_tui.palette.items import ListItem
@@ -30,22 +31,30 @@ class TestBasics:
         state.move_selection(1)
         rows = ListRenderer().render(state)
         item_rows = [r for r in rows if r.kind == RowKind.ITEM]
-        assert item_rows[0].text[0] == ("class:palette.item", "  ")
-        assert item_rows[1].text[0] == ("class:palette.selected", "- ")
+        assert item_rows[0].text[0] == (Tokens.Text.DEFAULT, "  ")
+        assert item_rows[1].text[0] == (compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG), "- ")
 
     @pytest.mark.parametrize("selected", [True, False])
     def test_marker_style(self, selected) -> None:
         items = [
             _item("A"),
-            _item("B", marker="*", marker_style="class:palette.current"),
+            _item("B", marker="*", marker_style=compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)),
         ]
         state = ListState(items=items)
         if selected:
             state.move_selection(1)
         rows = ListRenderer().render(state)
         item_rows = [r for r in rows if r.kind == RowKind.ITEM]
-        expected_marker_style = "class:palette.selected" if selected else "class:palette.marker"
-        expected_label_style = "class:palette.selected" if selected else "class:palette.current"
+        expected_marker_style = (
+            compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG)
+            if selected
+            else compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)
+        )
+        expected_label_style = (
+            compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG)
+            if selected
+            else compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)
+        )
         assert item_rows[1].text[0][0] == expected_marker_style
         assert item_rows[1].text[1][0] == expected_label_style
 

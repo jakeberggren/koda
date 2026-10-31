@@ -15,6 +15,8 @@ from prompt_toolkit.layout.margins import Margin
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 from wcwidth import wcwidth
 
+from koda_tui.appearance import Tokens
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -310,13 +312,10 @@ class ChatScrollbarMargin(Margin):
         thumb_pos = (height - thumb_size) * offset // max_offset if max_offset > 0 else 0
 
         for i in range(height):
-            style = (
-                "class:scrollbar.thumb"
-                if thumb_pos <= i < thumb_pos + thumb_size
-                else "class:scrollbar.track"
-            )
+            thumb = (Tokens.Text.DEFAULT, self.SCROLLBAR_CHAR)
+            track = (Tokens.Surface.RAISED, " ")
             result.append(("", self.SCROLLBAR_LEFT_PADDING))
-            result.append((style, self.SCROLLBAR_CHAR))
+            result.append(thumb if thumb_pos <= i < thumb_pos + thumb_size else track)
             result.append(("", "\n"))
 
         return result

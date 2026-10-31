@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
 from koda_service.exceptions import ServiceSessionNotFoundError
+from koda_tui.appearance import Tokens
 from koda_tui.converters import convert_messages
+from koda_tui.overlays.list.renderer import CURRENT_STYLE
 from koda_tui.palette.items import ListItem
 
 if TYPE_CHECKING:
@@ -21,10 +23,10 @@ log = get_logger(__name__)
 _TITLE = "List Sessions"
 _LIST_HEADING = "Select New Session"
 _FOOTER: StyleAndTextTuples = [
-    ("class:palette.item", "ctrl-n"),
-    ("class:palette.hint", " new · "),
-    ("class:palette.item", "ctrl-d"),
-    ("class:palette.hint", " delete"),
+    (Tokens.Text.DEFAULT, "ctrl-n"),
+    (Tokens.Text.MUTED, " new · "),
+    (Tokens.Text.DEFAULT, "ctrl-d"),
+    (Tokens.Text.MUTED, " delete"),
 ]
 
 
@@ -46,7 +48,7 @@ class SessionMenu:
                 label=_format_session_label(session),
                 data=session,
                 marker="*" if session.session_id == active_id else None,
-                marker_style="class:palette.current" if session.session_id == active_id else None,
+                marker_style=CURRENT_STYLE if session.session_id == active_id else None,
             )
             for session in self._service.list_sessions()
         ]
