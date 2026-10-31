@@ -78,6 +78,8 @@ class KodaTuiApp:
 
         self.screen = Screen(
             self.state,
+            on_submit=self._submit,
+            on_alternate_submit=self._alternate_submit,
             show_scrollbar=Condition(lambda: self._app_settings.tui.show_scrollbar),
         )
 
@@ -249,6 +251,23 @@ class KodaTuiApp:
             if self.state.active_model is not None
             else ThinkingOption.none()
         )
+
+    async def _submit(self, text: str) -> None:
+        """Enter: steer or queue while responding, by the input mode."""
+        await self._send(text, steer=not self._app_settings.tui.queue_inputs)
+
+    async def _alternate_submit(self, text: str) -> None:
+        """Alt+Enter: the other of steer or queue."""
+        await self._send(text, steer=self._app_settings.tui.queue_inputs)
+
+    async def _send(self, text: str, *, steer: bool) -> None:
+        """Send ``text`` now if idle; while responding, steer with it or queue it."""
+        if not self.state.responding:
+            await self.send_message(text)
+        elif steer:
+            self.steer_message(text)
+        else:
+            self.enqueue_message(text)
 
     def enqueue_message(self, text: str) -> None:
         """Queue a message to be sent after the current stream completes."""
