@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from prompt_toolkit.filters import FilterOrBool
 
     from koda_tui.state import AppState
+    from koda_tui.views.composer import Submit
 
 
 class Screen:
@@ -24,9 +25,20 @@ class Screen:
     ``root`` hosts overlays as floats.
     """
 
-    def __init__(self, state: AppState, *, show_scrollbar: FilterOrBool = True) -> None:
+    def __init__(
+        self,
+        state: AppState,
+        *,
+        on_submit: Submit,
+        on_alternate_submit: Submit,
+        show_scrollbar: FilterOrBool = True,
+    ) -> None:
         self.chat = Chat(state, scrollbar=show_scrollbar)
-        self.composer = Composer(state)
+        self.composer = Composer(
+            state,
+            on_submit=on_submit,
+            on_alternate_submit=on_alternate_submit,
+        )
         self.root = FloatContainer(
             HSplit(
                 [

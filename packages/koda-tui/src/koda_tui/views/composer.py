@@ -7,15 +7,24 @@ from typing import TYPE_CHECKING
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.document import Document
 from prompt_toolkit.filters import Condition
+from prompt_toolkit.key_binding import ConditionalKeyBindings, KeyBindings, merge_key_bindings
+from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit, Window
 
 from koda_tui.appearance import Spacing, Tokens
+from koda_tui.terminal.keys import ALT_ENTER
 from koda_tui.ui.primitives import Editor, List, ListItem, ListState, Spacer
 from koda_tui.ui.widgets import Prompt
 from koda_tui.workspace import WorkspaceFiles
 
 if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
+
+    from prompt_toolkit.key_binding import KeyBindingsBase, KeyPressEvent
+
     from koda_tui.state import AppState
+
+    type Submit = Callable[[str], Awaitable[None]]
 
 MAX_ROWS = 10  # The composer grows with its text up to this many rows.
 SUGGESTIONS = 10  # Most files suggested for an @ mention.
@@ -25,10 +34,12 @@ class Composer:
     """An editor with a prompt on a raised surface. Typing ``@`` and part of a path
     suggests workspace files; accepting one replaces the mention with its path.
 
-    ``suggestions`` is a separate container, so the layout can place it above.
+    Enter submits the text to ``on_submit``, Alt+Enter to ``on_alternate_submit``;
+    Ctrl+J starts a new line. ``suggestions`` is a separate container, so the layout
+    can place it above.
     """
 
-    def __init__(self, state: AppState) -> None:
+    def __init__(self, state: AppState, *, on_submit: Submit, on_alternate_submit: Submit) -> None:
         self._files = WorkspaceFiles(state.workspace)
         self._suggestions: ListState[str] = ListState([])
         self._mention: tuple[int, int] | None = None  # Text range of the @ mention.
@@ -57,6 +68,7 @@ class Composer:
                 Spacer(),
             ],
             style=Tokens.Surface.RAISED,
+            key_bindings=self._key_bindings(on_submit, on_alternate_submit),
         )
 
     def __pt_container__(self) -> HSplit:
@@ -115,6 +127,72 @@ class Composer:
         )
         self._close_suggestions()
         return True
+
+    def _key_bindings(self, on_submit: Submit, on_alternate_submit: Submit) -> KeyBindingsBase:
+        """Writing keys, then the suggestion keys, which take over while suggesting."""
+        suggesting = Condition(lambda: self.has_suggestion)
+        return merge_key_bindings(
+            [
+                self._writing_keys(on_submit, on_alternate_submit),
+                ConditionalKeyBindings(self._suggestion_keys(), suggesting),
+            ],
+        )
+
+    def _writing_keys(  # noqa: C901 - one handler per key
+        self,
+        on_submit: Submit,
+        on_alternate_submit: Submit,
+    ) -> KeyBindings:
+        kb = KeyBindings()
+
+        @kb.add(Keys.Enter)
+        async def _submit(_event: KeyPressEvent) -> None:
+            if text := self._take_text():
+                await on_submit(text)
+
+        @kb.add(*ALT_ENTER)
+        async def _alternate_submit(_event: KeyPressEvent) -> None:
+            if text := self._take_text():
+                await on_alternate_submit(text)
+
+        @kb.add(Keys.ControlJ)
+        def _newline(_event: KeyPressEvent) -> None:
+            self.buffer.insert_text("\n")
+
+        @kb.add(Keys.Up, eager=True)
+        def _up(event: KeyPressEvent) -> None:
+            self.move_cursor_up(event.arg)
+
+        @kb.add(Keys.Down, eager=True)
+        def _down(event: KeyPressEvent) -> None:
+            self.move_cursor_down(event.arg)
+
+        return kb
+
+    def _suggestion_keys(self) -> KeyBindings:
+        kb = KeyBindings()
+
+        @kb.add(Keys.Up, eager=True)
+        def _previous(_event: KeyPressEvent) -> None:
+            self.move_suggestion(-1)
+
+        @kb.add(Keys.Down, eager=True)
+        def _next(_event: KeyPressEvent) -> None:
+            self.move_suggestion(1)
+
+        @kb.add(Keys.Enter, eager=True)
+        @kb.add(Keys.Tab, eager=True)
+        def _accept(_event: KeyPressEvent) -> None:
+            self.accept_suggestion()
+
+        return kb
+
+    def _take_text(self) -> str:
+        """The text, trimmed, clearing the composer if there is any."""
+        text = self.text.strip()
+        if text:
+            self.clear()
+        return text
 
     def _update_mention(self, buffer: Buffer) -> None:
         """Follow the @ mention at the cursor, refreshing the suggested files."""
