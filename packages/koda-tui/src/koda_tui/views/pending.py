@@ -1,4 +1,4 @@
-"""Pending: messages queued while a response is running."""
+"""Pending: messages waiting while a response is running, steering or queued."""
 
 from __future__ import annotations
 
@@ -11,15 +11,17 @@ from koda_tui.appearance import Spacing, Tokens, compose
 from koda_tui.ui.primitives import Overflow, Text
 
 if TYPE_CHECKING:
-    from koda_tui.state import AppState
+    from koda_tui.state import AppState, PendingInput
 
 SHOWN = 3  # Most recent queued messages shown under the count.
+STEERING = "steering: "
 TITLE_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.STRONG)
 MESSAGE_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS)
 
 
 class PendingMessages:
-    """While messages are queued: how many, then the latest few, word-wrapped."""
+    """While messages wait: each steer, then how many are queued and the latest few,
+    word-wrapped."""
 
     def __init__(self, state: AppState) -> None:
         self._container = ConditionalContainer(
@@ -36,16 +38,19 @@ class PendingMessages:
         return self._container
 
 
-def _rows(pending: list[str]) -> HSplit:
-    return HSplit(
-        [
-            Text(_title(len(pending)), style=TITLE_STYLE, overflow=Overflow.WRAP),
-            *(
-                Text(message, style=MESSAGE_STYLE, overflow=Overflow.WRAP)
-                for message in pending[-SHOWN:]
-            ),
-        ],
-    )
+def _rows(pending: list[PendingInput]) -> HSplit:
+    steering = [item.text for item in pending if item.steer]
+    queued = [item.text for item in pending if not item.steer]
+    rows = [
+        Text([(TITLE_STYLE, STEERING), (MESSAGE_STYLE, text)], overflow=Overflow.WRAP)
+        for text in steering
+    ]
+    if queued:
+        rows.append(Text(_title(len(queued)), style=TITLE_STYLE, overflow=Overflow.WRAP))
+        rows += [
+            Text(text, style=MESSAGE_STYLE, overflow=Overflow.WRAP) for text in queued[-SHOWN:]
+        ]
+    return HSplit(rows)
 
 
 def _title(count: int) -> str:

@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from koda.messages import TokenUsage
     from koda.sessions import Session
     from koda.tools import ToolCall
-    from koda_tui.state import AppState, Message
+    from koda_tui.state import AppState, ErrorMessage, Message
 
 
 class Conversation:
@@ -45,13 +45,13 @@ class Conversation:
         self._state.messages.append(UserMessage(user_message))
         self._state.responding = True
 
-    def end(self, error: str | None = None) -> None:
-        """End the response, after ``error`` if it failed, stopping any tools still
-        running."""
-        if error:
-            self._stream(text=error)
+    def end(self, error: ErrorMessage | None = None) -> None:
+        """End the response, with ``error`` after it if it failed, stopping any tools
+        still running."""
         self._drop_blank_reply()
         messages = self._state.messages
+        if error:
+            messages.append(error)
         response = self._state.response()
         for index, message in enumerate(response, len(messages) - len(response)):
             if isinstance(message, ToolMessage) and message.result is None:

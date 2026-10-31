@@ -9,7 +9,7 @@ from koda_tui.appearance.rich import render
 from koda_tui.rendering import render_message
 from koda_tui.rendering.diff import diff_blocks
 from koda_tui.rendering.markdown import Markdown
-from koda_tui.state import AssistantMessage, ToolMessage, UserMessage
+from koda_tui.state import AssistantMessage, ErrorMessage, ToolMessage, UserMessage
 
 WIDTH = 80
 
@@ -61,6 +61,19 @@ class TestMessages:
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "search" in content
+
+    def test_render_error_message(self) -> None:
+        """An error shows its summary in bold above its detail."""
+        result = render_message(ErrorMessage("Rate limit exceeded.", "Try again later."), WIDTH)
+        lines = [line.rstrip() for line in "".join(t[1] for t in result).splitlines()]
+        assert lines == ["Rate limit exceeded.", "", "Try again later."]
+        assert any(
+            "Rate limit" in text and Tokens.Text.STRONG in style for style, text, *_ in result
+        )
+
+    def test_render_error_without_detail_says_what_to_do(self) -> None:
+        result = render_message(ErrorMessage("Not set up."), WIDTH)
+        assert "Complete the required setup and try again." in "".join(t[1] for t in result)
 
 
 class TestStyleClasses:
