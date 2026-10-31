@@ -2,66 +2,38 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from prompt_toolkit.layout import to_container
+from prompt_toolkit.layout import FormattedTextControl, VSplit, Window, to_container
 from prompt_toolkit.layout.mouse_handlers import MouseHandlers
 from prompt_toolkit.layout.screen import Screen, WritePosition
 
-from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui.appearance import Tokens
-from koda_tui.state import AppState
-from koda_tui.views.composer import Composer
-
-READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
-WIDTH = 30
+from koda_tui.ui.widgets import Prompt
+from koda_tui.ui.widgets.prompt import GLYPH
 
 
-def _ignore(_text: str, *, alternate: bool) -> None:
-    pass
-
-
-def _composer() -> Composer:
-    state = AppState(workspace=Path(), service_status=READY)
-    return Composer(state, on_submit=_ignore)
-
-
-def _screen(composer: Composer) -> tuple[Screen, int]:
-    container = to_container(composer)
-    height = container.preferred_height(WIDTH, 20).preferred
+def _screen(row: VSplit, width: int, height: int) -> Screen:
     screen = Screen()
-    container.write_to_screen(
+    to_container(row).write_to_screen(
         screen,
         MouseHandlers(),
-        WritePosition(0, 0, WIDTH, height),
+        WritePosition(0, 0, width, height),
         "",
         erase_bg=False,
         z_index=None,
     )
-    return screen, height
+    return screen
 
 
-async def test_prompt_column_keeps_the_surface_beside_several_lines() -> None:
-    composer = Composer(
-        AppState(workspace=Path(), service_status=READY),
-        on_submit=_ignore,
-    )
-    composer.buffer.text = "first\nsecond\nthird"
+def test_prompt_column_keeps_the_surrounding_style_beside_taller_content() -> None:
+    row = VSplit([Prompt(), Window(height=3)], style=Tokens.Surface.RAISED)
+    screen = _screen(row, width=10, height=3)
 
-    screen, height = _screen(composer)
-    prompt_rows = [screen.data_buffer[y] for y in range(height)]
-
-    assert prompt_rows[1][1].char == "❯"  # noqa: RUF001 - the prompt glyph
-    assert all(Tokens.Surface.RAISED in row[1].style for row in prompt_rows)
+    assert screen.data_buffer[0][0].char == GLYPH
+    assert all(Tokens.Surface.RAISED in screen.data_buffer[y][0].style for y in range(3))
 
 
-async def test_prompt_stays_one_column_wide() -> None:
-    composer = Composer(
-        AppState(workspace=Path(), service_status=READY),
-        on_submit=_ignore,
-    )
-    composer.buffer.text = "hello"
+def test_prompt_is_as_wide_as_its_glyph() -> None:
+    row = VSplit([Prompt(), Window(FormattedTextControl("hello"))])
+    screen = _screen(row, width=10, height=1)
 
-    screen, _ = _screen(composer)
-
-    assert "".join(screen.data_buffer[1][x].char for x in range(9)) == " ❯ hello "  # noqa: RUF001
+    assert "".join(screen.data_buffer[0][x].char for x in range(6)) == f"{GLYPH}hello"

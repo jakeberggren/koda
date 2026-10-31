@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 import pytest
 from prompt_toolkit.keys import Keys
 
-from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui.state import AppState
 from koda_tui.terminal.keys import ALT_ENTER
 from koda_tui.views import Composer
@@ -16,16 +15,16 @@ from koda_tui.views import Composer
 if TYPE_CHECKING:
     from pathlib import Path
 
-READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
+    from koda_service import ServiceStatus
 
 
 @pytest.fixture
-def composer(tmp_path: Path) -> Composer:
+def composer(tmp_path: Path, ready: ServiceStatus) -> Composer:
     for path in ["README.md", "src/app.py", "src/apply.py", "src/appearance/theme.py"]:
         (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / path).write_text("")
     return Composer(
-        AppState(workspace=tmp_path, service_status=READY),
+        AppState(workspace=tmp_path, service_status=ready),
         on_submit=_record,
     )
 

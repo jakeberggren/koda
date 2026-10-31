@@ -2,25 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from prompt_toolkit.layout import to_container
 from prompt_toolkit.layout.mouse_handlers import MouseHandlers
 from prompt_toolkit.layout.screen import Screen, WritePosition
 
-from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui.state import AppState, PendingInput
 from koda_tui.views import PendingMessages
 
-READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 
-
-def _rows(pending: list[PendingInput], width: int = 40) -> list[str]:
-    container = to_container(
-        PendingMessages(
-            AppState(workspace=Path("/tmp"), service_status=READY, pending_inputs=pending)
-        ),
-    )
+def _rows(state: AppState, pending: list[PendingInput], width: int = 40) -> list[str]:
+    state.pending_inputs = pending
+    container = to_container(PendingMessages(state))
     height = container.preferred_height(width, 20).preferred
     screen = Screen()
     if height:
@@ -37,12 +29,12 @@ def _rows(pending: list[PendingInput], width: int = 40) -> list[str]:
     ]
 
 
-def test_hidden_when_nothing_is_queued() -> None:
-    assert _rows([]) == []
+def test_hidden_when_nothing_is_queued(state: AppState) -> None:
+    assert _rows(state, []) == []
 
 
-def test_shows_the_count_then_the_latest_three_indented() -> None:
-    rows = _rows([PendingInput(text) for text in ["one", "two", "three", "four"]], width=80)
+def test_shows_the_count_then_the_latest_three_indented(state: AppState) -> None:
+    rows = _rows(state, [PendingInput(text) for text in ["one", "two", "three", "four"]], width=80)
     assert rows == [
         "  4 messages queued (esc to send now, alt/option-up to edit)",
         "  two",
@@ -51,19 +43,19 @@ def test_shows_the_count_then_the_latest_three_indented() -> None:
     ]
 
 
-def test_long_messages_wrap_by_word() -> None:
-    rows = _rows([PendingInput("keep the tests green while refactoring")], width=24)
+def test_long_messages_wrap_by_word(state: AppState) -> None:
+    rows = _rows(state, [PendingInput("keep the tests green while refactoring")], width=24)
     assert rows[-2:] == ["  keep the tests green", "  while refactoring"]
 
 
-def test_steers_are_labelled_above_the_queue() -> None:
+def test_steers_are_labelled_above_the_queue(state: AppState) -> None:
     pending = [PendingInput("fix it", steer=True), PendingInput("then this")]
-    assert _rows(pending, width=80) == [
+    assert _rows(state, pending, width=80) == [
         "  steering: fix it",
         "  1 message queued (esc to send now, alt/option-up to edit)",
         "  then this",
     ]
 
 
-def test_only_steers_shows_no_queue_count() -> None:
-    assert _rows([PendingInput("fix it", steer=True)]) == ["  steering: fix it"]
+def test_only_steers_shows_no_queue_count(state: AppState) -> None:
+    assert _rows(state, [PendingInput("fix it", steer=True)]) == ["  steering: fix it"]
