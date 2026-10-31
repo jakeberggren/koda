@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import re
 from enum import Enum, auto
-from textwrap import wrap
 from typing import TYPE_CHECKING, override
 
 from prompt_toolkit.formatted_text import FormattedText, fragment_list_width, to_formatted_text
@@ -18,13 +18,14 @@ from prompt_toolkit.layout import (
 from prompt_toolkit.utils import get_cwidth
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     from prompt_toolkit.formatted_text import StyleAndTextTuples
     from prompt_toolkit.layout.containers import GetLinePrefixCallable
 
 
 ELLIPSIS = "..."
+WORDS = re.compile(r"\s+|\S+")
 
 # What cut text ends with: a string takes the cut text's style; fragments keep their own.
 type Ending = str | StyleAndTextTuples
@@ -34,7 +35,7 @@ class Overflow(Enum):
     """What a Text does when it doesn't fit its width."""
 
     CLIP = auto()  # Cut off at the edge.
-    WRAP = auto()  # Wrap onto more lines, by word (a single fragment only).
+    WRAP = auto()  # Wrap onto more lines, by word.
     ELLIPSIS = auto()  # Cut short, ending in the Text's ellipsis ("..." by default).
 
 
@@ -93,7 +94,7 @@ def _control(
 
 
 class WordWrapControl(UIControl):
-    """Wraps a single fragment by word; several fragments are shown as one line."""
+    """Wraps fragments by word, keeping their styles."""
 
     def __init__(
         self,
@@ -114,13 +115,7 @@ class WordWrapControl(UIControl):
         fragments = self._fragments()
         if not fragments:
             return [[("", "")]]
-        if len(fragments) > 1 or sum(len(fragment[1]) for fragment in fragments) <= width:
-            return [fragments]
-        style, text, *_ = fragments[0]
-        return [
-            [(style, line)]
-            for line in wrap(text, width=max(1, width), break_long_words=False) or [""]
-        ]
+        return wrap(fragments, max(1, width))
 
     @override
     def preferred_height(
@@ -172,6 +167,40 @@ class TruncateControl(UIControl):
         fragments = to_formatted_text(self._content)
         line = FormattedText(truncate(fragments, width, self._ellipsis, self._tail))
         return UIContent(get_line=lambda i: line if i == 0 else FormattedText([]), line_count=1)
+
+
+def wrap(fragments: StyleAndTextTuples, width: int) -> list[StyleAndTextTuples]:
+    """``fragments`` broken into lines at most ``width`` cells wide, between words.
+
+    Whitespace becomes spaces and is dropped where a line breaks; words wider than
+    ``width`` get a line of their own and run past it.
+    """
+    lines: list[StyleAndTextTuples] = [[]]
+    used = 0
+    space = ("", "")  # Whitespace waiting to see if the next word fits.
+    for style, token in _tokens(fragments):
+        if token.isspace():
+            # Leading whitespace shows only on the first line.
+            space = (style, token) if used or len(lines) == 1 else ("", "")
+            continue
+        if used and used + len(space[1]) + get_cwidth(token) > width:
+            lines.append([])
+            used = 0
+        else:
+            lines[-1].append(space)
+            used += len(space[1])
+        space = ("", "")
+        lines[-1].append((style, token))
+        used += get_cwidth(token)
+    return [_tidy(line) for line in lines]
+
+
+def _tokens(fragments: StyleAndTextTuples) -> Iterator[tuple[str, str]]:
+    """Each word and run of whitespace in ``fragments``, with its style; whitespace
+    becomes spaces."""
+    for style, text, *_ in fragments:
+        for token in WORDS.findall(text):
+            yield style, " " * len(token) if token.isspace() else token
 
 
 def truncate(

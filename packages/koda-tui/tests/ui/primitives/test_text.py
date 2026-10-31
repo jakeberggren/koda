@@ -1,4 +1,4 @@
-"""Tests for the Text primitive's truncation."""
+"""Tests for the Text primitive's truncation and wrapping."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from koda_tui.ui.primitives.text import truncate
+from koda_tui.ui.primitives.text import truncate, wrap
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -45,3 +45,27 @@ def test_truncate_ends_crowded_text_with_its_tail(width: int, expected: list) ->
     ellipsis: StyleAndTextTuples = [("m", "...")]
     tail: StyleAndTextTuples = [("m", " ·")]
     assert truncate([("a", "hello")], width, ellipsis=ellipsis, tail=tail) == expected
+
+
+def test_wrap_breaks_between_words_across_styles() -> None:
+    fragments: StyleAndTextTuples = [("a", "steering: "), ("b", "keep the tests green")]
+    assert wrap(fragments, 20) == [
+        [("a", "steering: "), ("b", "keep the")],
+        [("b", "tests green")],
+    ]
+
+
+def test_wrap_measures_cells_not_characters() -> None:
+    assert wrap([("", "日本 語")], 4) == [[("", "日本")], [("", "語")]]
+
+
+def test_wrap_gives_long_words_their_own_line() -> None:
+    assert wrap([("", "a supercalifragilistic b")], 6) == [
+        [("", "a")],
+        [("", "supercalifragilistic")],
+        [("", "b")],
+    ]
+
+
+def test_wrap_keeps_text_that_fits_on_one_line() -> None:
+    assert wrap([("", "  indented  text")], 40) == [[("", "  indented  text")]]

@@ -22,6 +22,7 @@ PHASES = {
     ResponsePhase.THINKING: "thinking",
     ResponsePhase.RESPONDING: "responding",
     ResponsePhase.WORKING: "working",
+    ResponsePhase.TOOLS: "running tools",
 }
 
 
@@ -66,11 +67,10 @@ def _right(state: AppState) -> list[Segment]:
 def _location(state: AppState) -> Segment:
     """The workspace, relative to the home directory when it is inside it."""
     root = state.workspace
-    try:
-        path = f"~/{root.relative_to(Path.home())}"
-    except ValueError:
-        path = f"~/{root.name}"
-    return [(Tokens.Text.MUTED, path)]
+    if not root.is_relative_to(Path.home()):
+        return [(Tokens.Text.MUTED, str(root))]
+    relative = root.relative_to(Path.home())
+    return [(Tokens.Text.MUTED, "~" if relative == Path() else f"~/{relative}")]
 
 
 def _model(state: AppState) -> list[Segment]:

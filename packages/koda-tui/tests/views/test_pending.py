@@ -59,3 +59,8 @@ def test_steers_are_labelled_above_the_queue(state: AppState) -> None:
 
 def test_only_steers_shows_no_queue_count(state: AppState) -> None:
     assert _rows(state, [PendingInput("fix it", steer=True)]) == ["  steering: fix it"]
+
+
+def test_long_steers_wrap_by_word(state: AppState) -> None:
+    rows = _rows(state, [PendingInput("keep the tests green please", steer=True)], width=24)
+    assert rows == ["  steering: keep the", "  tests green please"]

@@ -12,10 +12,13 @@ from prompt_toolkit.formatted_text import fragment_list_to_text
 
 from koda.llm import ModelDefinition, ThinkingOption
 from koda.messages import TokenUsage
+from koda.tools import ToolCall
 from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui.appearance import Tokens
-from koda_tui.state import AppState, AssistantMessage, Usage, UserMessage
+from koda_tui.state import AppState, AssistantMessage, ToolMessage, Usage, UserMessage
 from koda_tui.views import status
+
+_CALL = ToolCall(tool_name="bash", arguments={}, call_id="call_1")
 
 
 def _texts(segments) -> list[str]:
@@ -52,8 +55,12 @@ def test_left_shows_workspace_model_thinking_and_usage(state: AppState) -> None:
     ]
 
 
-def test_workspace_outside_home_shows_its_name(state: AppState) -> None:
-    assert _texts([status._location(replace(state, workspace=Path("/srv/app")))]) == ["~/app"]
+def test_workspace_outside_home_shows_its_full_path(state: AppState) -> None:
+    assert _texts([status._location(replace(state, workspace=Path("/srv/app")))]) == ["/srv/app"]
+
+
+def test_home_workspace_shows_a_tilde(state: AppState) -> None:
+    assert _texts([status._location(replace(state, workspace=Path.home()))]) == ["~"]
 
 
 def test_right_shows_hints_warning_and_activity(state: AppState) -> None:
@@ -79,6 +86,10 @@ def test_right_shows_hints_warning_and_activity(state: AppState) -> None:
         ({"responding": True, "messages": [AssistantMessage("", "hmm")]}, "thinking"),
         ({"responding": True, "messages": [AssistantMessage("Hi")]}, "responding"),
         ({"responding": True, "messages": [UserMessage("hi")]}, "working"),
+        (
+            {"responding": True, "messages": [UserMessage("hi"), ToolMessage(_CALL)]},
+            "running tools",
+        ),
         ({}, "ready"),
     ],
 )

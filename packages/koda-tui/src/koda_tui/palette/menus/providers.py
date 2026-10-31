@@ -253,7 +253,7 @@ class ProviderMenu:
 
         self._overlays.open(
             ChoiceDialog(
-                "Connect OpenAI using:",
+                f"Connect {provider.name} using:",
                 [
                     DialogChoice(
                         label=oauth_selection.label,
