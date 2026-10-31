@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from koda_tui import workspace as workspace_module
 from koda_tui.workspace import WorkspaceFiles
 
 if TYPE_CHECKING:
@@ -63,3 +64,18 @@ def test_search_respects_the_limit_and_empty_queries(workspace: Path) -> None:
     files = WorkspaceFiles(workspace)
     assert len(files.search("e", limit=2)) == 2
     assert files.search("", limit=10) == []
+
+
+def test_search_stops_checking_paths_once_it_has_enough(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    checked: list[str] = []
+    match = workspace_module._path_segment_prefix_match  # noqa: SLF001 - counted to see the scan stop
+
+    def counting(path: str, query: str) -> bool:
+        checked.append(path)
+        return match(path, query)
+
+    monkeypatch.setattr(workspace_module, "_path_segment_prefix_match", counting)
+    assert WorkspaceFiles(workspace).search("src", limit=1) == ["src/app.py"]
+    assert checked == ["README.md", "src/app.py"]  # Not the three files after it.
