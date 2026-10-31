@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
-from koda_tui.overlays.list.renderer import CURRENT_STYLE
-from koda_tui.palette.items import ListItem
+from koda_tui.ui.primitives import ListItem
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -79,7 +78,6 @@ class ModelMenu:
             label=_truncate_label(model.name, 32),
             detail=model.detail or "",
             group=provider_name,
-            marker="*" if is_active else None,
-            marker_style=CURRENT_STYLE if is_active else None,
+            current=is_active,
             data=model,
         )

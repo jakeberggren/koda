@@ -88,8 +88,6 @@ class AutoTheme:
         return self.light if background is not None and background.is_light else self.dark
 
 
-
-
 TERMINAL_DARK = Theme(
     name="terminal-dark",
     label="Terminal Dark",

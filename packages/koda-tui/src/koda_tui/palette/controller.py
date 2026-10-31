@@ -17,8 +17,8 @@ from koda_tui.palette.root import RootMenu
 if TYPE_CHECKING:
     from typing import Any
 
-    from koda_tui.palette.items import ListItem
     from koda_tui.palette.palette import Palette
+    from koda_tui.ui.primitives import ListItem
 
 
 log = get_logger(__name__)

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_tui.overlays.list.renderer import CURRENT_STYLE
-from koda_tui.palette.items import ListItem
+from koda_tui.ui.primitives import ListItem
 
 if TYPE_CHECKING:
     from koda_tui.palette.palette import Palette
@@ -33,8 +32,7 @@ class InputMenu:
                 id=f"select_input_mode:{'queue' if queue_inputs else 'steer'}",
                 label=label,
                 detail=detail,
-                marker="*" if current == queue_inputs else None,
-                marker_style=CURRENT_STYLE if current == queue_inputs else None,
+                current=current == queue_inputs,
                 data="queue" if queue_inputs else "steer",
             )
             for queue_inputs, label, detail in _INPUT_MODE_OPTIONS

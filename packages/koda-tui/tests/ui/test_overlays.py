@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 from prompt_toolkit.layout import Float, Window
 
-from koda_tui.overlays.manager import OverlayManager
+from koda_tui.ui.overlays import OverlayManager
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -30,17 +30,9 @@ class _MockContainer:
 
 @dataclass
 class _MockOverlay:
-    """Mock overlay implementing the Overlay protocol."""
+    """Mock overlay: any prompt_toolkit container."""
 
     name: str
-    buffer_name: str = "search_buffer"
-    search_buffer: _MockBuffer | None = None
-    input_buffer: _MockBuffer | None = None
-
-    def __post_init__(self) -> None:
-        buffer = _MockBuffer(self.buffer_name)
-        setattr(self, self.buffer_name, buffer)
-        self.focus_target = buffer
 
     def __pt_container__(self) -> _MockContainer:
         return _MockContainer()
@@ -130,17 +122,11 @@ class TestPush:
         manager.push(o2)
         assert first_float not in root.floats
 
-    def test_focuses_search_buffer(self, manager) -> None:
+    def test_focuses_the_overlay(self, manager) -> None:
         manager, _root, app = manager
-        overlay = _MockOverlay("test", buffer_name="search_buffer")
+        overlay = _MockOverlay("test")
         manager.push(overlay)
-        assert app.layout.focused is overlay.search_buffer
-
-    def test_focuses_input_buffer(self, manager) -> None:
-        manager, _root, app = manager
-        overlay = _MockOverlay("test", buffer_name="input_buffer")
-        manager.push(overlay)
-        assert app.layout.focused is overlay.input_buffer
+        assert app.layout.focused is overlay
 
 
 class TestPop:
@@ -163,7 +149,7 @@ class TestPop:
         manager.push(o2)
         manager.pop()
         assert len(root.floats) == 1
-        assert app.layout.focused is o1.search_buffer
+        assert app.layout.focused is o1
 
     def test_pop_closes_when_last(self, manager) -> None:
         manager, _root, _app = manager
