@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from koda_tui.components import Composer
 from koda_tui.state import AppState
+from koda_tui.views import Composer
 
 if TYPE_CHECKING:
     from pathlib import Path

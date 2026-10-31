@@ -8,8 +8,8 @@ from prompt_toolkit.layout import to_container
 from prompt_toolkit.layout.mouse_handlers import MouseHandlers
 from prompt_toolkit.layout.screen import Screen, WritePosition
 
-from koda_tui.components import PendingMessages
 from koda_tui.state import AppState
+from koda_tui.views import PendingMessages
 
 
 def _rows(pending: list[str], width: int = 40) -> list[str]:

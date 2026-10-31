@@ -2,7 +2,7 @@
 
 from prompt_toolkit.formatted_text import fragment_list_width
 
-from koda_tui.components.chat import _fit
+from koda_tui.views.chat import _fit
 
 
 def _text(lines: list) -> list[str]:

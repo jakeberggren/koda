@@ -13,8 +13,8 @@ from koda.llm import ModelDefinition, ThinkingOption
 from koda.messages import TokenUsage
 from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui.appearance import Tokens
-from koda_tui.components import status
 from koda_tui.state import AppState, ResponsePhase
+from koda_tui.views import status
 
 
 def _texts(segments) -> list[str]:

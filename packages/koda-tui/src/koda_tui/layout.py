@@ -10,16 +10,16 @@ from prompt_toolkit.layout import (
 )
 
 from koda_tui.appearance import Tokens
-from koda_tui.components import (
+from koda_tui.rendering import MessageRenderer
+from koda_tui.state import AppState
+from koda_tui.ui.primitives import Spacer
+from koda_tui.views import (
     ActivityIndicator,
     Chat,
     Composer,
     PendingMessages,
     StatusBar,
 )
-from koda_tui.rendering import MessageRenderer
-from koda_tui.state import AppState
-from koda_tui.ui.primitives import Spacer
 
 SEPARATOR_HEIGHT = 1
 
@@ -31,7 +31,6 @@ class TUILayout:
         self._state = state
         self.renderer = MessageRenderer()
 
-        # Initialize components
         self.chat = Chat(state, self.renderer)
         self.activity = ActivityIndicator()
         self.pending = PendingMessages(state)
