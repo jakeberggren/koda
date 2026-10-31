@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_tui.ui.primitives import ListItem
-from koda_tui.ui.widgets import Picker
 
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
@@ -17,42 +16,24 @@ _LIST_HEADING = "Select Model Reasoning Effort"
 
 
 class ThinkingMenu:
-    """Thinking submenu behavior."""
+    """Picks the active model's thinking level."""
 
     def __init__(self, context: PaletteContext) -> None:
-        self._overlays = context.overlays
-        self._settings = context.settings
-        self._state = context.state
+        self._context = context
 
-    def items(self) -> list[ListItem[ThinkingOptionId]]:
-        """Build thinking level selection items."""
-        if self._state.active_model is None:
-            return []
-        options = self._state.active_model.effective_thinking_options
-
-        return [
+    def open(self) -> None:
+        model = self._context.state.active_model
+        current = self._context.settings.core.thinking
+        items: list[ListItem[ThinkingOptionId]] = [
             ListItem(
                 label=option.label,
                 detail=option.description or "",
-                current=self._settings.core.thinking == option.id,
+                current=current == option.id,
                 data=option.id,
             )
-            for option in options
+            for option in (model.effective_thinking_options if model else [])
         ]
+        self._context.choose(_TITLE, items, heading=_LIST_HEADING, on_choose=self._select)
 
-    def open(self) -> None:
-        """Open the thinking selection submenu."""
-        self._overlays.open(
-            Picker(
-                _TITLE,
-                self.items(),
-                on_select=lambda item: self.select(item.data),
-                heading=_LIST_HEADING,
-                on_close=self._overlays.close,
-            ),
-        )
-
-    def select(self, thinking: ThinkingOptionId) -> None:
-        """Handle thinking level selection."""
-        self._settings.core.set("thinking", thinking)
-        self._overlays.close_all()
+    def _select(self, thinking: ThinkingOptionId) -> None:
+        self._context.settings.core.set("thinking", thinking)
