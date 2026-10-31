@@ -1,4 +1,4 @@
-"""Scroll primitive: a viewport over lines that follows the end as lines are added."""
+"""Scroll primitive: blocks of text fitted to the width, in a viewport that follows the end."""
 
 from __future__ import annotations
 
@@ -10,15 +10,16 @@ from prompt_toolkit.layout.margins import ConditionalMargin, Margin
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 
 from koda_tui.appearance import Spacing, Tokens
+from koda_tui.ui.primitives.text import fit
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
     from prompt_toolkit.filters import FilterOrBool
     from prompt_toolkit.formatted_text import StyleAndTextTuples
     from prompt_toolkit.layout import WindowRenderInfo
 
-    type Lines = Callable[[int], list[StyleAndTextTuples]]
+    type Blocks = Callable[[int], Sequence[StyleAndTextTuples]]
 
 THUMB = "█"
 THUMB_STYLE = Tokens.Text.DEFAULT
@@ -58,15 +59,24 @@ class ScrollState:
 
 
 class Scroll:
-    """The lines from ``lines(width)``, one row each, scrolled by ``state``.
+    """The blocks from ``blocks(width)``, ``gap`` blank rows apart, scrolled by ``state``.
 
-    Lines wider than the view are clipped, so ``lines`` should fit them to ``width``.
-    A scrollbar shows while the lines overflow, if ``scrollbar`` allows.
+    Each block is fitted to the width like a wrapping Text: split at newlines, and
+    lines too wide wrapped by word. A block is fitted again only when it is a new
+    object or the width changes, so return the same object for a block that hasn't
+    changed. A scrollbar shows while the lines overflow, if ``scrollbar`` allows.
     """
 
-    def __init__(self, state: ScrollState, lines: Lines, *, scrollbar: FilterOrBool = True) -> None:
+    def __init__(
+        self,
+        state: ScrollState,
+        blocks: Blocks,
+        *,
+        gap: int = 0,
+        scrollbar: FilterOrBool = True,
+    ) -> None:
         self._window = Window(
-            ScrollControl(state, lines),
+            ScrollControl(state, blocks, gap=gap),
             right_margins=[ConditionalMargin(ScrollbarMargin(state), filter=scrollbar)],
         )
 
@@ -77,13 +87,40 @@ class Scroll:
 class ScrollControl(UIControl):
     """Draws the visible lines and scrolls on the mouse wheel."""
 
-    def __init__(self, state: ScrollState, lines: Lines) -> None:
+    def __init__(self, state: ScrollState, blocks: Blocks, *, gap: int) -> None:
         self._state = state
-        self._lines = lines
+        self._blocks = blocks
+        self._gap = gap
+        self._width = 0
+        self._fitted: dict[int, tuple[StyleAndTextTuples, list[StyleAndTextTuples]]] = {}
+
+    def lines(self, width: int) -> list[StyleAndTextTuples]:
+        """Every block's lines at ``width``, with the gaps between them."""
+        if width != self._width:
+            self._fitted.clear()
+            self._width = width
+        blocks = self._blocks(width)
+        for stale in self._fitted.keys() - {id(block) for block in blocks}:
+            del self._fitted[stale]
+
+        lines: list[StyleAndTextTuples] = []
+        for index, block in enumerate(blocks):
+            if index:
+                lines.extend([] for _ in range(self._gap))
+            lines.extend(self._fit(block, width))
+        return lines
+
+    def _fit(self, block: StyleAndTextTuples, width: int) -> list[StyleAndTextTuples]:
+        cached = self._fitted.get(id(block))
+        if cached is not None and cached[0] is block:
+            return cached[1]
+        lines = fit(block, width)
+        self._fitted[id(block)] = (block, lines)
+        return lines
 
     @override
     def create_content(self, width: int, height: int) -> UIContent:
-        lines = self._lines(width)
+        lines = self.lines(width)
         state = self._state
         state.update(len(lines), height)
 

@@ -1,27 +1,24 @@
-"""Tests for fitting rendered chat lines to the width."""
+"""Tests for the chat: messages rendered once per width."""
 
-from prompt_toolkit.formatted_text import fragment_list_width
+# ruff: noqa: SLF001 - the render cache is private
 
-from koda_tui.views.chat import _fit
-
-
-def _text(lines: list) -> list[str]:
-    return ["".join(text for _, text, *_ in line) for line in lines]
+from koda_tui.state import AppState, UserMessage
+from koda_tui.views import Chat
 
 
-def test_splits_at_newlines_without_a_trailing_empty_line() -> None:
-    assert _text(_fit([("", "one\ntwo\n")], 10)) == ["one", "two"]
-    assert _text(_fit([("", "one\n\n")], 10)) == ["one", ""]
-    assert _text(_fit([], 10)) == [""]
+def test_messages_are_rendered_once_per_width(state: AppState) -> None:
+    state.messages = [UserMessage("hi"), UserMessage("there")]
+    chat = Chat(state)
+    first = chat._blocks(40)
+    assert all(a is b for a, b in zip(chat._blocks(40), first, strict=True))
+    assert chat._blocks(30)[0] is not first[0]
 
 
-def test_wraps_lines_that_prompt_toolkit_draws_wider() -> None:
-    # Rich measures a skin-toned emoji as 2 columns; prompt_toolkit draws 4.
-    lines = _fit([("", "ab👍🏽cd")], 4)
-    assert all(fragment_list_width(line) <= 4 for line in lines)
-    assert "".join(_text(lines)) == "ab👍🏽cd"
-
-
-def test_keeps_each_character_style() -> None:
-    lines = _fit([("bold", "ab"), ("italic", "cd")], 3)
-    assert lines == [[("bold", "a"), ("bold", "b"), ("italic", "c")], [("italic", "d")]]
+def test_a_new_message_is_rendered_alongside_the_cached_ones(state: AppState) -> None:
+    state.messages = [UserMessage("hi")]
+    chat = Chat(state)
+    first = chat._blocks(40)[0]
+    state.messages = [*state.messages, UserMessage("there")]
+    blocks = chat._blocks(40)
+    assert blocks[0] is first
+    assert len(blocks) == 2
