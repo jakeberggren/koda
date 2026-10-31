@@ -11,7 +11,7 @@ from koda_tui.appearance import Spacing, Tokens, compose
 from koda_tui.appearance.rich import render
 from koda_tui.rendering.markdown import Markdown
 from koda_tui.rendering.tools import render_tool_call
-from koda_tui.state import AssistantMessage, ToolMessage, UserMessage
+from koda_tui.state import AssistantMessage, ErrorMessage, ToolMessage, UserMessage
 
 if TYPE_CHECKING:
     from koda_tui.state import Message
@@ -19,11 +19,12 @@ if TYPE_CHECKING:
 USER_PADDING = (Spacing.GAP, 0, Spacing.GAP, Spacing.EDGE)  # Top, right, bottom, left.
 THINKING_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS)
 GAP = "\n" * (Spacing.GAP + 1)  # Ends a line, then leaves blank rows.
+ERROR_FALLBACK = "Complete the required setup and try again."
 
 
 def render_message(message: Message, width: int) -> FormattedText:
     """The user's message on a raised block, a reply after its thinking, a tool as its
-    call and result."""
+    call and result, and an error as its summary in bold above its detail."""
     match message:
         case UserMessage():
             block = Padding(Markdown(message.text), USER_PADDING, style=Tokens.Surface.RAISED)
@@ -32,6 +33,9 @@ def render_message(message: Message, width: int) -> FormattedText:
             return _assistant(message, width)
         case ToolMessage():
             return render(render_tool_call(message.call, message.result), width)
+        case ErrorMessage():
+            detail = message.detail or ERROR_FALLBACK
+            return render(Markdown(f"**{message.summary}**\n\n{detail}"), width)
 
 
 def _reply(content: str, width: int) -> FormattedText:

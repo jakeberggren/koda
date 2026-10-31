@@ -12,6 +12,7 @@ from koda_tui.messaging import Conversation, Outbox
 from koda_tui.state import (
     AppState,
     AssistantMessage,
+    ErrorMessage,
     Message,
     ToolMessage,
     UserMessage,
@@ -160,10 +161,12 @@ class TestSending:
         await _send(state, client, "do something")
 
         assert state.responding is False
-        _user_msg, assistant_msg = state.messages
-        assert "Starting..." in _text(assistant_msg)
-        assert "**Rate limit exceeded.**" in _text(assistant_msg)
-        assert "quota hit" in _text(assistant_msg)
+        _user_msg, assistant_msg, error = state.messages
+        assert _text(assistant_msg) == "Starting..."
+        assert isinstance(error, ErrorMessage)
+        assert error.summary == "Rate limit exceeded."
+        assert error.detail is not None
+        assert "quota hit" in error.detail
 
     @pytest.mark.asyncio
     async def test_stream_propagates_unexpected_exception(self, state: AppState) -> None:
@@ -200,9 +203,11 @@ class TestSending:
         await _send(state, client, "do something")
 
         assert state.responding is False
-        _user_msg, assistant_msg = state.messages
-        assert "**Connection error.**" in _text(assistant_msg)
-        assert "network down" in _text(assistant_msg)
+        _user_msg, error = state.messages
+        assert isinstance(error, ErrorMessage)
+        assert error.summary == "Connection error."
+        assert error.detail is not None
+        assert "network down" in error.detail
 
     @pytest.mark.asyncio
     async def test_cancel_stream(self, state: AppState) -> None:

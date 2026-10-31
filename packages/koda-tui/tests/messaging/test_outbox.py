@@ -9,7 +9,7 @@ import pytest
 
 from koda.agent import AgentTextDelta
 from koda_tui.messaging import Conversation, Outbox
-from koda_tui.state import UserMessage
+from koda_tui.state import PendingInput, UserMessage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
@@ -55,13 +55,18 @@ async def _until(condition: Callable[[], bool]) -> None:
             await asyncio.sleep(0.01)
 
 
+def _queue(state: AppState) -> list[str]:
+    """The queue as text, steers marked."""
+    return [f"steer: {item.text}" if item.steer else item.text for item in state.pending_inputs]
+
+
 def _said(state: AppState) -> list[str]:
     return [message.text for message in state.messages if isinstance(message, UserMessage)]
 
 
 async def test_sends_right_away_when_idle(state: AppState, agent: _Agent, outbox: Outbox) -> None:
     outbox.submit("hello", steer=False)
-    assert state.pending_inputs == []  # Never shown as queued.
+    assert _queue(state) == []  # Never shown as queued.
     await _until(lambda: agent.sent == ["hello"])
     assert _said(state) == ["hello"]
 
@@ -70,7 +75,7 @@ async def test_sends_right_away_when_idle(state: AppState, agent: _Agent, outbox
 def test_blank_messages_are_ignored(state: AppState, outbox: Outbox, text: str) -> None:
     outbox.submit(text, steer=False)
     outbox.submit(text, steer=True)
-    assert state.pending_inputs == []
+    assert _queue(state) == []
 
 
 async def test_queued_messages_follow_the_response_in_order(
@@ -82,11 +87,11 @@ async def test_queued_messages_follow_the_response_in_order(
     await _until(lambda: state.responding)
     outbox.submit("second", steer=False)
     outbox.submit("third", steer=False)
-    assert state.pending_inputs == ["second", "third"]
+    assert _queue(state) == ["second", "third"]
 
     agent.released.set()
     await _until(lambda: agent.sent == ["first", "second", "third"])
-    assert state.pending_inputs == []
+    assert _queue(state) == []
     assert agent.most_active == 1  # One response at a time.
 
 
@@ -100,12 +105,12 @@ async def test_a_steer_interrupts_and_goes_before_the_queue(
     outbox.submit("queued", steer=False)
     outbox.submit("steer one", steer=True)
     outbox.submit("steer two", steer=True)
-    assert state.pending_inputs == ["steer one", "steer two", "queued"]
+    assert _queue(state) == ["steer: steer one", "steer: steer two", "queued"]
 
     await _until(lambda: agent.sent[:2] == ["first", "steer one"])
     agent.released.set()
     await _until(lambda: agent.sent == ["first", "steer one", "steer two", "queued"])
-    assert state.pending_inputs == []
+    assert _queue(state) == []
 
 
 async def test_take_last_takes_back_queued_messages_but_not_steers(
@@ -115,12 +120,11 @@ async def test_take_last_takes_back_queued_messages_but_not_steers(
     outbox.submit("first", steer=False)
     await _until(lambda: state.responding)
     outbox.submit("queued", steer=False)
-    state.pending_inputs.insert(0, "steer")  # As if a steer were waiting to go.
-    outbox._steers = 1  # noqa: SLF001
+    state.pending_inputs.insert(0, PendingInput("steer", steer=True))  # Waiting to go.
 
     assert outbox.take_last() == "queued"
     assert outbox.take_last() is None
-    assert state.pending_inputs == ["steer"]
+    assert _queue(state) == ["steer: steer"]
 
 
 async def test_send_now_interrupts_and_sends_the_queue(
@@ -135,7 +139,7 @@ async def test_send_now_interrupts_and_sends_the_queue(
     outbox.send_now()
 
     await _until(lambda: agent.sent == ["first", "queued"])
-    assert state.pending_inputs == []
+    assert _queue(state) == []
 
 
 async def test_cancelling_the_sending_stops_it_without_sending_the_queue(
@@ -154,4 +158,4 @@ async def test_cancelling_the_sending_stops_it_without_sending_the_queue(
         await sending
 
     assert agent.sent == ["first"]
-    assert state.pending_inputs == ["queued"]
+    assert _queue(state) == ["queued"]

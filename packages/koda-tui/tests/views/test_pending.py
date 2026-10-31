@@ -9,13 +9,13 @@ from prompt_toolkit.layout.mouse_handlers import MouseHandlers
 from prompt_toolkit.layout.screen import Screen, WritePosition
 
 from koda_service import ServiceStatus, ServiceStatusCode
-from koda_tui.state import AppState
+from koda_tui.state import AppState, PendingInput
 from koda_tui.views import PendingMessages
 
 READY = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 
 
-def _rows(pending: list[str], width: int = 40) -> list[str]:
+def _rows(pending: list[PendingInput], width: int = 40) -> list[str]:
     container = to_container(
         PendingMessages(
             AppState(workspace=Path("/tmp"), service_status=READY, pending_inputs=pending)
@@ -42,7 +42,7 @@ def test_hidden_when_nothing_is_queued() -> None:
 
 
 def test_shows_the_count_then_the_latest_three_indented() -> None:
-    rows = _rows(["one", "two", "three", "four"], width=80)
+    rows = _rows([PendingInput(text) for text in ["one", "two", "three", "four"]], width=80)
     assert rows == [
         "  4 messages queued (esc to send now, alt/option-up to edit)",
         "  two",
@@ -52,5 +52,18 @@ def test_shows_the_count_then_the_latest_three_indented() -> None:
 
 
 def test_long_messages_wrap_by_word() -> None:
-    rows = _rows(["keep the tests green while refactoring"], width=24)
+    rows = _rows([PendingInput("keep the tests green while refactoring")], width=24)
     assert rows[-2:] == ["  keep the tests green", "  while refactoring"]
+
+
+def test_steers_are_labelled_above_the_queue() -> None:
+    pending = [PendingInput("fix it", steer=True), PendingInput("then this")]
+    assert _rows(pending, width=80) == [
+        "  steering: fix it",
+        "  1 message queued (esc to send now, alt/option-up to edit)",
+        "  then this",
+    ]
+
+
+def test_only_steers_shows_no_queue_count() -> None:
+    assert _rows([PendingInput("fix it", steer=True)]) == ["  steering: fix it"]

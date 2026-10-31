@@ -35,7 +35,23 @@ class ToolMessage:
     result: ToolOutput | None = None  # None while the tool runs.
 
 
-type Message = UserMessage | AssistantMessage | ToolMessage
+@dataclass(frozen=True, slots=True)
+class ErrorMessage:
+    """A response that failed: what went wrong, and what to do about it if known."""
+
+    summary: str
+    detail: str | None = None
+
+
+type Message = UserMessage | AssistantMessage | ToolMessage | ErrorMessage
+
+
+@dataclass(frozen=True, slots=True)
+class PendingInput:
+    """A message waiting to be sent: queued behind the response, or steering into it."""
+
+    text: str
+    steer: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,7 +72,7 @@ class AppState:
     warnings: list[str] = field(default_factory=list)
     messages: list[Message] = field(default_factory=list)
     responding: bool = False  # Whether a response is in flight.
-    pending_inputs: list[str] = field(default_factory=list)
+    pending_inputs: list[PendingInput] = field(default_factory=list)  # Steers first.
     active_model: ModelDefinition | None = None
     configured_providers: list[ProviderDefinition] = field(default_factory=list)
     thinking: ThinkingOption = field(default_factory=ThinkingOption.none)
