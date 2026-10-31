@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
+from pydantic_core import PydanticCustomError
 
 from koda_common.settings import (
     BaseSettingsManager,
@@ -11,13 +12,23 @@ from koda_common.settings import (
     SettingsUnknownKeysError,
     SettingsValidationError,
 )
-from koda_tui.appearance import ThemeSetting  # noqa: TC001 - pydantic resolves this at runtime
+from koda_tui.appearance import AUTO, THEMES
 
 if TYPE_CHECKING:
     from koda_common.settings.protocols import JsonObject, SettingsStore
 
 
 _TUI_SECTION = "tui"
+
+
+def _validate_theme(value: str) -> str:
+    if value not in THEMES:
+        choices = ", ".join(f"'{name}'" for name in THEMES)
+        raise PydanticCustomError("theme", "Input should be one of {choices}", {"choices": choices})
+    return value
+
+
+_Theme = Annotated[str, AfterValidator(_validate_theme)]
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +42,7 @@ class TuiSettings(BaseModel):
 
     model_config = ConfigDict(validate_assignment=True)
 
-    theme: ThemeSetting = Field(default="auto", description="UI theme")
+    theme: _Theme = Field(default=AUTO.name, description="UI theme")
     show_scrollbar: bool = Field(default=True, description="Show chat scrollbar")
     queue_inputs: bool = Field(default=True, description="Queue inputs during streaming")
 

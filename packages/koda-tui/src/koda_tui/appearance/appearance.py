@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit.styles import DynamicStyle, Style
 
-from koda_tui.appearance.themes import AUTO_THEME, TERMINAL_DARK, TERMINAL_LIGHT, THEMES
+from koda_tui.appearance.themes import THEMES
 from koda_tui.appearance.tokens import Tokens
 
 if TYPE_CHECKING:
-    from koda_tui.appearance.themes import RGBColor, Theme
+    from koda_tui.appearance.themes import RGBColor
 
 
 class Appearance:
@@ -45,14 +45,8 @@ class Appearance:
         self._terminal_background = background
         self._stylesheet = self._build()
 
-    def _current_theme(self) -> Theme:
-        if self._theme != AUTO_THEME:
-            return THEMES[self._theme]
-        background = self._terminal_background
-        return TERMINAL_LIGHT if background is not None and background.is_light else TERMINAL_DARK
-
     def _build(self) -> Style:
-        theme = self._current_theme()
+        theme = THEMES[self._theme].resolve(self._terminal_background)
         rules = {
             **theme.rules,
             Tokens.Surface.RAISED: f"bg:{theme.surface_on(self._terminal_background)}",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_tui.appearance import AUTO_THEME, THEMES
+from koda_tui.appearance import THEMES
 from koda_tui.overlays.list.renderer import CURRENT_STYLE
 from koda_tui.palette.items import ListItem
 
@@ -14,15 +14,6 @@ if TYPE_CHECKING:
 
 _TITLE = "Select Theme"
 _LIST_HEADING = "Select UI Theme"
-
-_AUTO_OPTION = (AUTO_THEME, "Auto", "Follow terminal theme when detectable")
-
-
-def _theme_options() -> list[tuple[str, str, str]]:
-    return [
-        _AUTO_OPTION,
-        *((theme.name, theme.label, theme.description) for theme in THEMES.values()),
-    ]
 
 
 class ThemeMenu:
@@ -37,14 +28,14 @@ class ThemeMenu:
         current = self._settings.tui.theme
         return [
             ListItem(
-                id=f"select_theme:{theme}",
-                label=label,
-                detail=detail,
-                marker="*" if current == theme else None,
-                marker_style=CURRENT_STYLE if current == theme else None,
-                data=theme,
+                id=f"select_theme:{theme.name}",
+                label=theme.label,
+                detail=theme.description,
+                marker="*" if current == theme.name else None,
+                marker_style=CURRENT_STYLE if current == theme.name else None,
+                data=theme.name,
             )
-            for theme, label, detail in _theme_options()
+            for theme in THEMES.values()
         ]
 
     def open(self) -> None:

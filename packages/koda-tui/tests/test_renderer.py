@@ -296,7 +296,7 @@ def test_rich_emits_no_colors_so_every_color_comes_from_a_token(
         Padding(_Markdown(markdown), 1, style=Tokens.Surface.RAISED),
         converter._render_diff(diff),  # noqa: SLF001
     ]
-    console = rich_bridge._Console(width=60, theme=rich_bridge._THEME)  # noqa: SLF001
+    console = rich_bridge._Console(width=60)  # noqa: SLF001
 
     colored = [
         segment

@@ -12,7 +12,7 @@ from rich.text import Text
 
 from koda.tools import ToolCall
 from koda_tui.appearance import Tokens, compose
-from koda_tui.appearance.rich import SYNTAX_THEME, render
+from koda_tui.appearance.rich import render, syntax
 from koda_tui.state import Message, MessageRole
 
 type DiffBlockType = Literal["add", "del", "context"]
@@ -44,18 +44,14 @@ class DiffBlockAccumulator:
         if not self.lines:
             return
 
-        syntax = Syntax(
+        block = syntax(
             "\n".join(self.lines),
             self.lexer,
-            theme=SYNTAX_THEME,
-            background_color="default",
             line_numbers=True,
             start_line=self.start_line or 1,
         )
         style = _DIFF_STYLES.get(self.block_type)
-        if style is not None:
-            syntax = Padding(syntax, 0, style=style)
-        self.renderables.append(syntax)
+        self.renderables.append(block if style is None else Padding(block, 0, style=style))
         self.lines = []
         self.block_type = None
         self.start_line = None
@@ -72,7 +68,7 @@ class DiffBlockAccumulator:
 class _CodeBlock(CodeBlock):
     def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         code = str(self.text).rstrip()
-        yield Syntax(code, self.lexer_name, theme=SYNTAX_THEME, background_color="default")
+        yield syntax(code, self.lexer_name)
 
 
 class _Heading(Heading):

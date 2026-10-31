@@ -1,20 +1,16 @@
-"""Theme data: colors, the built-in themes, and the theme setting."""
+"""Theme data: colors and the built-in themes."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Annotated, NamedTuple
-
-from pydantic import AfterValidator
-from pydantic_core import PydanticCustomError
+from typing import TYPE_CHECKING, NamedTuple
 
 from koda_tui.appearance.tokens import Tokens
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-# Relative luminance at or above which a background reads as light.
-_LIGHT_LUMINANCE = 0.5
+LIGHT_LUMINANCE = 0.5  # Luminance from which a color reads as light.
 
 
 class RGBColor(NamedTuple):
@@ -27,9 +23,9 @@ class RGBColor(NamedTuple):
     @property
     def is_light(self) -> bool:
         """Whether the color reads as a light background."""
-        # Relative luminance in sRGB space is enough for light/dark background choice.
+        # Relative luminance in sRGB space: 0 is black, 1 is white.
         luminance = (0.2126 * self.red + 0.7152 * self.green + 0.0722 * self.blue) / 255
-        return luminance >= _LIGHT_LUMINANCE
+        return luminance >= LIGHT_LUMINANCE
 
     @property
     def hex(self) -> str:
@@ -48,9 +44,6 @@ class RGBColor(NamedTuple):
 BLACK = RGBColor(0, 0, 0)
 WHITE = RGBColor(255, 255, 255)
 
-# How far a derived surface moves from the terminal background toward contrast.
-_SURFACE_CONTRAST = 0.125
-
 
 @dataclass(frozen=True, slots=True)
 class Theme:
@@ -67,12 +60,34 @@ class Theme:
     surface: str  # Fallback background for ``Tokens.Surface.RAISED``.
     rules: Mapping[str, str]  # Token (or ``pygments.*`` class) to style rule.
 
+    def resolve(self, background: RGBColor | None) -> Theme:  # noqa: ARG002 - matches AutoTheme
+        """The theme to apply: always this one."""
+        return self
+
     def surface_on(self, background: RGBColor | None) -> str:
         """This theme's surface, derived from a matching terminal background when known."""
         if background is None or background.is_light == self.dark:
             return self.surface
         contrast = BLACK if background.is_light else WHITE
-        return background.blend(contrast, _SURFACE_CONTRAST).hex
+        # A raised surface sits an eighth of the way from the background toward contrast.
+        return background.blend(contrast, 0.125).hex
+
+
+@dataclass(frozen=True, slots=True)
+class AutoTheme:
+    """Picks the dark or light theme to match the terminal background."""
+
+    name: str
+    label: str
+    description: str
+    dark: Theme
+    light: Theme
+
+    def resolve(self, background: RGBColor | None) -> Theme:
+        """The theme to apply for the detected terminal background."""
+        return self.light if background is not None and background.is_light else self.dark
+
+
 
 
 TERMINAL_DARK = Theme(
@@ -193,16 +208,14 @@ TERMINAL_LIGHT = Theme(
     },
 )
 
-THEMES: dict[str, Theme] = {theme.name: theme for theme in (TERMINAL_DARK, TERMINAL_LIGHT)}
+AUTO = AutoTheme(
+    name="auto",
+    label="Auto",
+    description="Follow terminal theme when detectable",
+    dark=TERMINAL_DARK,
+    light=TERMINAL_LIGHT,
+)
 
-AUTO_THEME = "auto"
-
-
-def _validate_theme_setting(value: str) -> str:
-    if value != AUTO_THEME and value not in THEMES:
-        choices = ", ".join(f"'{name}'" for name in (AUTO_THEME, *THEMES))
-        raise PydanticCustomError("theme", "Input should be one of {choices}", {"choices": choices})
-    return value
-
-
-ThemeSetting = Annotated[str, AfterValidator(_validate_theme_setting)]
+THEMES: dict[str, Theme | AutoTheme] = {
+    theme.name: theme for theme in (AUTO, TERMINAL_DARK, TERMINAL_LIGHT)
+}

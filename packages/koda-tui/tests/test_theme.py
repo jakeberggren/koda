@@ -137,7 +137,11 @@ def test_theme_setting_rejects_unknown_theme(value: str) -> None:
         TuiSettings(theme=value)
 
 
-@pytest.mark.parametrize("theme", THEMES.values(), ids=lambda theme: theme.name)
+@pytest.mark.parametrize(
+    "theme",
+    [theme for theme in THEMES.values() if isinstance(theme, Theme)],
+    ids=lambda theme: theme.name,
+)
 def test_stylesheet_applies_every_theme_rule(theme: Theme) -> None:
     applied = dict(Appearance(theme.name).style.style_rules)
 
