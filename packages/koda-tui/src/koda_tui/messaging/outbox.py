@@ -40,9 +40,9 @@ class Outbox:
 
     def submit(self, text: str, *, steer: bool) -> None:
         """Send ``text``, or queue it or steer with it while Koda responds."""
-        if not text.strip():
-            return
         text = text.strip()
+        if not text:
+            return
         queue = self._state.pending_inputs
         if steer:
             queue.insert(sum(item.steer for item in queue), PendingInput(text, steer=True))

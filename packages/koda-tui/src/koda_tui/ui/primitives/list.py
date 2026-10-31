@@ -7,12 +7,13 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING, override
 
 from prompt_toolkit.data_structures import Point
-from prompt_toolkit.formatted_text import FormattedText
+from prompt_toolkit.formatted_text import FormattedText, fragment_list_to_text
 from prompt_toolkit.layout import UIContent, UIControl, Window
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
+from prompt_toolkit.utils import get_cwidth
 
 from koda_tui.appearance import Tokens, compose
-from koda_tui.ui.primitives.text import ELLIPSIS
+from koda_tui.ui.primitives.text import truncate
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -164,8 +165,8 @@ class List[T]:
         return rows + self._item_rows(spacer_first=bool(rows))
 
     def _label_column(self) -> int:
-        """The width labels are padded to: the longest, up to ``label_width``."""
-        width = max(len(item.label) for item in self.state.filtered_items)
+        """The width labels are padded to, in cells: the longest, up to ``label_width``."""
+        width = max(get_cwidth(item.label) for item in self.state.filtered_items)
         return width if self._label_width is None else min(width, self._label_width)
 
     def _item_rows(self, *, spacer_first: bool) -> list[Row]:
@@ -196,19 +197,11 @@ def _item_row[T](item: ListItem[T], *, selected: bool, width: int) -> Row:
         line.append((style if selected else CURRENT_STYLE, f"{marker} "))
     else:
         line.append((style, "- " if selected else "  "))
-    line.append((label_style, _cut(item.label, width).ljust(width)))
+    label = fragment_list_to_text(truncate([("", item.label)], width))
+    line.append((label_style, label + " " * (width - get_cwidth(label))))
     if item.detail:
         line.append((SELECTED_STYLE if selected else Tokens.Text.MUTED, f"  {item.detail}"))
     return Row(RowKind.ITEM, FormattedText(line))
-
-
-def _cut(label: str, width: int) -> str:
-    """``label`` cut to ``width``, ending in an ellipsis when cut."""
-    if len(label) <= width:
-        return label
-    if width <= len(ELLIPSIS):
-        return ELLIPSIS[:width]
-    return label[: width - len(ELLIPSIS)] + ELLIPSIS
 
 
 class ListControl[T](UIControl):
