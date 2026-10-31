@@ -6,6 +6,7 @@ from prompt_toolkit.formatted_text import FormattedText
 
 from koda.tools import ToolCall, ToolOutput
 from koda_tui.appearance.rich import render
+from koda_tui.rendering.diff import diff_summary
 from koda_tui.rendering.tools import render_tool_call
 
 
@@ -178,3 +179,13 @@ class TestToolCalls:
 
         assert "✕ read_file" in content
         assert "\n  └ File not found" in content
+
+
+def test_diff_summary_counts_additions_and_deletions() -> None:
+    assert diff_summary("--- a/x\n+++ b/x\n@@ -1,2 +1,1 @@\n-one\n-two\n+three\n") == (
+        "1 addition, 2 deletions"
+    )
+
+
+def test_diff_summary_with_nothing_added() -> None:
+    assert diff_summary("--- a/x\n+++ b/x\n@@ -1,1 +1,0 @@\n-gone\n") == "0 additions, 1 deletion"

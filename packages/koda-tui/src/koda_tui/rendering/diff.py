@@ -63,8 +63,7 @@ def diff_summary(diff: str) -> str:
     deletions = len(DELETION.findall(diff))
     added = f"{additions} addition" if additions == 1 else f"{additions} additions"
     deleted = f"{deletions} deletion" if deletions == 1 else f"{deletions} deletions"
-    comma = ", " if additions > 0 else ""
-    return f"{added}{comma}{deleted}"
+    return f"{added}, {deleted}"
 
 
 def _lexer(diff: str) -> str:

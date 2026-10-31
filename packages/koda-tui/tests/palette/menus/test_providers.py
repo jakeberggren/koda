@@ -144,10 +144,10 @@ def _provider_menu(
     )
 
 
-def _openai_provider() -> ProviderDefinition:
+def _openai_provider(name: str = "OpenAI") -> ProviderDefinition:
     return ProviderDefinition(
         id="openai",
-        name="OpenAI",
+        name=name,
         connections=[
             ProviderConnectionDefinition(
                 id="api-key",
@@ -178,6 +178,15 @@ def test_provider_menu_provider_opens_connection_choice() -> None:
         "ChatGPT Plus/Pro",
         "OpenAI API key",
     ]
+
+
+def test_provider_menu_connection_choice_names_the_provider() -> None:
+    palette = _FakeOverlays()
+    menu = _provider_menu(palette)
+
+    menu.select(_openai_provider(name="Acme"))
+
+    assert palette.choices[0]["message"] == "Connect Acme using:"
 
 
 def test_provider_menu_api_key_connection_opens_key_dialog() -> None:
