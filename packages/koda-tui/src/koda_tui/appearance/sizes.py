@@ -4,8 +4,9 @@ from __future__ import annotations
 
 
 class Spacing:
-    GAP = 1  # Blank rows between sections.
+    GAP = 1  # Blank rows or columns between sections.
     INSET = 2  # Columns of padding inside a panel.
+    EDGE = 1  # Columns kept clear at the screen edges.
 
 
 class Width:

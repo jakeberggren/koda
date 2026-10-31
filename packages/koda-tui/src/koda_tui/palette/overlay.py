@@ -11,7 +11,7 @@ from prompt_toolkit.layout import Dimension, VSplit
 
 from koda_tui.appearance import Tokens, Width, compose
 from koda_tui.ui.components import Panel
-from koda_tui.ui.primitives import Input, List, ListState, Spacer, Text
+from koda_tui.ui.primitives import Input, List, ListState, Overflow, Spacer, Text
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -119,7 +119,7 @@ class PaletteOverlay:
         )
         body: list[AnyContainer] = [search_row, Spacer(), self._list]
         if footer:
-            body += [Spacer(), Text(footer, wrap=True)]
+            body += [Spacer(), Text(footer, overflow=Overflow.WRAP)]
         return Panel(
             self._title,
             body,

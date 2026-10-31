@@ -1,5 +1,6 @@
 """Components: reusable pieces composed from primitives."""
 
+from koda_tui.ui.components.bar import Bar, Segment
 from koda_tui.ui.components.dialogs import (
     ChoiceDialog,
     DialogChoice,
@@ -8,4 +9,12 @@ from koda_tui.ui.components.dialogs import (
 )
 from koda_tui.ui.components.panel import Panel
 
-__all__ = ["ChoiceDialog", "DialogChoice", "InputDialog", "MessageDialog", "Panel"]
+__all__ = [
+    "Bar",
+    "ChoiceDialog",
+    "DialogChoice",
+    "InputDialog",
+    "MessageDialog",
+    "Panel",
+    "Segment",
+]

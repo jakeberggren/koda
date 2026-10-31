@@ -12,20 +12,19 @@ from prompt_toolkit.widgets import Box
 
 from koda_tui.appearance import Tokens
 from koda_tui.components import (
+    ActivityIndicator,
     ChatAreaControl,
     ChatScrollbarMargin,
     FileSuggestions,
     InputArea,
     QueuedInputs,
-    ResponseIndicatorControl,
-    StatusBarControl,
+    StatusBar,
 )
 from koda_tui.rendering import MessageRenderer
 from koda_tui.state import AppState
+from koda_tui.ui.primitives import Spacer
 
 SEPARATOR_HEIGHT = 1
-RESPONSE_INDICATOR_HEIGHT = 2
-STATUS_BAR_HEIGHT = 1
 
 
 class TUILayout:
@@ -37,11 +36,11 @@ class TUILayout:
 
         # Initialize components
         self.chat_area = ChatAreaControl(state, self.renderer)
-        self.response_indicator = ResponseIndicatorControl(state)
+        self.activity = ActivityIndicator()
         self.queued_inputs = QueuedInputs(state)
         self.input_area = InputArea(state)
         self.file_suggestions = FileSuggestions(self.input_area)
-        self.status_bar = StatusBarControl(state)
+        self.status_bar = StatusBar(state)
         self.root_container: FloatContainer | None = None
 
     def create_layout(self) -> Layout:
@@ -50,11 +49,8 @@ class TUILayout:
             content=self.chat_area,
             right_margins=[ChatScrollbarMargin(self.chat_area, self._state)],
         )
-        response_indicator = ConditionalContainer(
-            content=Window(
-                content=self.response_indicator,
-                height=RESPONSE_INDICATOR_HEIGHT,
-            ),
+        activity = ConditionalContainer(
+            content=HSplit([self.activity, Spacer()]),
             filter=Condition(lambda: self._state.is_streaming),
         )
         separator = Window(
@@ -65,10 +61,6 @@ class TUILayout:
         queued_inputs = self.queued_inputs.create_window()
         file_suggestions = self.file_suggestions.create_window()
         input = self.input_area.create_window()
-        status_bar = Window(
-            content=self.status_bar,
-            height=STATUS_BAR_HEIGHT,
-        )
 
         # Main layout body. Wrapped in FloatContainer for command palette support
         root_container = FloatContainer(
@@ -76,12 +68,12 @@ class TUILayout:
                 [
                     Box(chat_area, padding=0, padding_left=1, padding_top=1),
                     separator,
-                    response_indicator,
+                    activity,
                     queued_inputs,
                     file_suggestions,
                     input,  # Dynamic height 1-10 lines
                     separator,
-                    status_bar,  # Fixed 1 line
+                    self.status_bar,  # Fixed 1 line
                 ]
             ),
             floats=[],  # Floats added dynamically for palette
