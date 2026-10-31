@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_tui.palette.items import ListItem
+from koda_tui.ui.primitives import ListItem
 
 if TYPE_CHECKING:
     from koda_tui.state import AppState

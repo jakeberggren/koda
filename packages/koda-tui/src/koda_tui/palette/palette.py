@@ -4,16 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_tui.overlays.dialogs import (
-    ChoiceDialog,
-    ConfirmDialog,
-    DialogChoice,
-    MessageDialog,
-    TextInputDialog,
-)
-from koda_tui.overlays.manager import OverlayManager
 from koda_tui.palette.controller import PaletteController
 from koda_tui.palette.overlay import PaletteOverlay
+from koda_tui.ui.components import ChoiceDialog, DialogChoice, InputDialog, MessageDialog
+from koda_tui.ui.overlays import OverlayManager
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -23,10 +17,10 @@ if TYPE_CHECKING:
     from prompt_toolkit.layout import FloatContainer
 
     from koda_service import KodaService
-    from koda_tui.palette.items import ListItem
     from koda_tui.palette.protocols import PaletteApp
     from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
+    from koda_tui.ui.primitives import ListItem
 
 
 class Palette:
@@ -99,7 +93,7 @@ class Palette:
             list_heading=list_heading,
             shortcuts=shortcuts,
         )
-        self._overlay_manager.push(palette, width=palette.preferred_width)
+        self._overlay_manager.push(palette)
         self.state.palette_open = True
         self.invalidate()
 
@@ -115,14 +109,14 @@ class Palette:
         if self._overlay_manager is None:
             return
 
-        dialog = TextInputDialog(
+        dialog = InputDialog(
             title=title,
             on_submit=on_submit,
             on_cancel=self.close_top_overlay,
             detail=detail,
             mask_input=mask_input,
         )
-        self._overlay_manager.push(dialog, width=dialog.preferred_width)
+        self._overlay_manager.push(dialog)
         self.state.palette_open = True
         self.invalidate()
 
@@ -135,12 +129,15 @@ class Palette:
         if self._overlay_manager is None:
             return
 
-        dialog = ConfirmDialog(
+        dialog = ChoiceDialog(
             message=message,
-            on_confirm=on_confirm,
+            choices=[
+                DialogChoice("Yes", on_confirm, key="y"),
+                DialogChoice("No", self.close_top_overlay, key="n"),
+            ],
             on_cancel=self.close_top_overlay,
         )
-        self._overlay_manager.push(dialog, width=dialog.preferred_width)
+        self._overlay_manager.push(dialog)
         self.state.palette_open = True
         self.invalidate()
 
@@ -158,7 +155,7 @@ class Palette:
             choices=choices,
             on_cancel=self.close_top_overlay,
         )
-        self._overlay_manager.push(dialog, width=dialog.preferred_width)
+        self._overlay_manager.push(dialog)
         self.state.palette_open = True
         self.invalidate()
 
@@ -172,7 +169,7 @@ class Palette:
             detail=detail,
             on_close=self.close_top_overlay,
         )
-        self._overlay_manager.push(dialog, width=dialog.preferred_width)
+        self._overlay_manager.push(dialog)
         self.state.palette_open = True
         self.invalidate()
 

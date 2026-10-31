@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_tui.appearance import THEMES
-from koda_tui.overlays.list.renderer import CURRENT_STYLE
-from koda_tui.palette.items import ListItem
+from koda_tui.ui.primitives import ListItem
 
 if TYPE_CHECKING:
     from koda_tui.palette.palette import Palette
@@ -31,8 +30,7 @@ class ThemeMenu:
                 id=f"select_theme:{theme.name}",
                 label=theme.label,
                 detail=theme.description,
-                marker="*" if current == theme.name else None,
-                marker_style=CURRENT_STYLE if current == theme.name else None,
+                current=current == theme.name,
                 data=theme.name,
             )
             for theme in THEMES.values()

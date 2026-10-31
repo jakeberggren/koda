@@ -1,4 +1,4 @@
-"""Modal overlay stack manager."""
+"""Modal overlays: a stack of containers shown one at a time as floats."""
 
 from __future__ import annotations
 
@@ -11,8 +11,6 @@ if TYPE_CHECKING:
     from prompt_toolkit.buffer import Buffer
     from prompt_toolkit.layout import FloatContainer
     from prompt_toolkit.layout.containers import AnyContainer
-
-    from koda_tui.overlays.base import Overlay
 
     FocusTarget = Buffer | AnyContainer
 
@@ -42,23 +40,23 @@ class OverlayManager:
         self._root = root_container
         self._app = app
         self._fallback_focus_target = fallback_focus_target
-        self._stack: list[tuple[Overlay, Float]] = []
+        self._stack: list[tuple[AnyContainer, Float]] = []
 
     @property
     def is_open(self) -> bool:
         """Return whether the overlay stack currently contains any overlays."""
         return len(self._stack) > 0
 
-    def _focus(self, overlay: Overlay) -> None:
-        """Focus the active overlay's declared focus target."""
-        self._app.layout.focus(overlay.focus_target)
+    def _focus(self, overlay: AnyContainer) -> None:
+        """Focus the overlay; prompt_toolkit focuses its first focusable window."""
+        self._app.layout.focus(overlay)
 
     def _focus_fallback(self) -> None:
         """Restore focus after the last overlay has been removed."""
         if self._fallback_focus_target is not None:
             self._app.layout.focus(self._fallback_focus_target)
 
-    def push(self, overlay: Overlay, *, width: int | None = None) -> None:
+    def push(self, overlay: AnyContainer) -> None:
         """Show ``overlay`` as the new top modal overlay.
 
         Existing overlay floats are temporarily removed from the root
@@ -67,12 +65,12 @@ class OverlayManager:
         """
         self._root.floats.clear()
 
-        float_item = Float(content=overlay, width=width)
+        float_item = Float(content=overlay)
         self._root.floats.append(float_item)
         self._stack.append((overlay, float_item))
         self._focus(overlay)
 
-    def pop(self) -> Overlay | None:
+    def pop(self) -> AnyContainer | None:
         """Close and return the top overlay.
 
         If another overlay remains on the stack, it is restored and focused.
