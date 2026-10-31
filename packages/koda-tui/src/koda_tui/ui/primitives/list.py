@@ -12,6 +12,7 @@ from prompt_toolkit.layout import UIContent, UIControl, Window
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 
 from koda_tui.appearance import Tokens, compose
+from koda_tui.ui.primitives.text import ELLIPSIS
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -25,16 +26,15 @@ EMPTY_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
-class ListItem:
-    """A selectable item in a list."""
+class ListItem[T]:
+    """A selectable item in a list, carrying ``data`` for whoever acts on it."""
 
-    id: str
     label: str
+    data: T
     detail: str = ""
     group: str | None = None
     marker: str | None = None  # Shown before the label, e.g. "✓".
     current: bool = False  # Marks the active choice, e.g. the selected model.
-    data: Any = None
 
 
 class RowKind(Enum):
@@ -53,16 +53,16 @@ class Row:
 
     kind: RowKind
     text: FormattedText
-    item: ListItem | None = None
+    item: ListItem[Any] | None = None
 
 
-class ListState:
+class ListState[T]:
     """The items of a list, filtered by search text, with one item selected.
 
     Items with a ``group`` are grouped under it; ungrouped items come first.
     """
 
-    def __init__(self, items: list[ListItem]) -> None:
+    def __init__(self, items: list[ListItem[T]]) -> None:
         self.items = items
         self.search_text = ""
         self.selected_index = 0
@@ -76,7 +76,7 @@ class ListState:
         ]
         self.selected_index = 0
 
-    def set_items(self, items: list[ListItem]) -> None:
+    def set_items(self, items: list[ListItem[T]]) -> None:
         """Replace the items, keeping the selected item selected if it is still there."""
         selected = self.selected_item
         self.items = items
@@ -85,11 +85,11 @@ class ListState:
             self.selected_index = self.display_items.index(selected)
 
     @property
-    def filtered_items(self) -> list[ListItem]:
+    def filtered_items(self) -> list[ListItem[T]]:
         return self._filtered_items
 
     @property
-    def selected_item(self) -> ListItem | None:
+    def selected_item(self) -> ListItem[T] | None:
         """Return the selected item in visual display order."""
         display_items = self.display_items
         if not display_items:
@@ -97,7 +97,7 @@ class ListState:
         return display_items[max(0, min(self.selected_index, len(display_items) - 1))]
 
     @property
-    def display_items(self) -> list[ListItem]:
+    def display_items(self) -> list[ListItem[T]]:
         """Return filtered items in the same order rendered on screen."""
         return [item for _group, items in self.grouped_items() for item in items]
 
@@ -112,11 +112,11 @@ class ListState:
         else:
             self.selected_index = max(0, min(self.selected_index + delta, count - 1))
 
-    def grouped_items(self) -> list[tuple[str | None, list[ListItem]]]:
+    def grouped_items(self) -> list[tuple[str | None, list[ListItem[T]]]]:
         """Return items grouped by their group label."""
-        grouped: list[tuple[str | None, list[ListItem]]] = []
-        group_map: dict[str, list[ListItem]] = {}
-        ungrouped: list[ListItem] = []
+        grouped: list[tuple[str | None, list[ListItem[T]]]] = []
+        group_map: dict[str, list[ListItem[T]]] = {}
+        ungrouped: list[ListItem[T]] = []
 
         for item in self._filtered_items:
             if not item.group:
@@ -137,15 +137,17 @@ class List:
 
     def __init__(
         self,
-        state: ListState,
+        state: ListState[Any],
         *,
         heading: str | None = None,
         empty_message: str = "No results found",
         height: AnyDimension = None,
+        label_width: int | None = None,
     ) -> None:
         self.state = state
         self._heading = heading
         self._empty_message = empty_message
+        self._label_width = label_width  # Longer labels are cut to it.
         self._window = Window(ListControl(self), height=height, dont_extend_height=True)
 
     def __pt_container__(self) -> Window:
@@ -162,10 +164,15 @@ class List:
             return [*rows, Row(RowKind.EMPTY, empty)]
         return rows + self._item_rows(spacer_first=bool(rows))
 
+    def _label_column(self) -> int:
+        """The width labels are padded to: the longest, up to ``label_width``."""
+        width = max(len(item.label) for item in self.state.filtered_items)
+        return width if self._label_width is None else min(width, self._label_width)
+
     def _item_rows(self, *, spacer_first: bool) -> list[Row]:
         """Rows for the filtered items, each group under its header."""
         rows: list[Row] = []
-        width = max(len(item.label) for item in self.state.filtered_items)
+        width = self._label_column()
         index = 0
         for group, items in self.state.grouped_items():
             if group:
@@ -179,7 +186,7 @@ class List:
         return rows
 
 
-def _item_row(item: ListItem, *, selected: bool, width: int) -> Row:
+def _item_row(item: ListItem[Any], *, selected: bool, width: int) -> Row:
     """A row for one item: marker or selection indicator, padded label, then detail."""
     style = SELECTED_STYLE if selected else Tokens.Text.DEFAULT
     label_style = CURRENT_STYLE if item.current and not selected else style
@@ -190,10 +197,19 @@ def _item_row(item: ListItem, *, selected: bool, width: int) -> Row:
         line.append((style if selected else CURRENT_STYLE, f"{marker} "))
     else:
         line.append((style, "- " if selected else "  "))
-    line.append((label_style, item.label.ljust(width)))
+    line.append((label_style, _cut(item.label, width).ljust(width)))
     if item.detail:
         line.append((SELECTED_STYLE if selected else Tokens.Text.MUTED, f"  {item.detail}"))
     return Row(RowKind.ITEM, FormattedText(line), item)
+
+
+def _cut(label: str, width: int) -> str:
+    """``label`` cut to ``width``, ending in an ellipsis when cut."""
+    if len(label) <= width:
+        return label
+    if width <= len(ELLIPSIS):
+        return ELLIPSIS[:width]
+    return label[: width - len(ELLIPSIS)] + ELLIPSIS
 
 
 class ListControl(UIControl):

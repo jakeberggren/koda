@@ -10,15 +10,16 @@ from typing import TYPE_CHECKING
 from koda.llm.auth.protocols import OAuthLoginCallbacks
 from koda_common.logging import get_logger
 from koda_common.settings.credentials import ApiKeyCredential
+from koda_tui.appearance import Tokens
 from koda_tui.ui.primitives import ListItem
-from koda_tui.ui.widgets import DialogChoice
+from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, InputDialog, MessageDialog, Picker
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
     from koda.llm import ProviderConnectionDefinition, ProviderDefinition
     from koda.llm.auth.registry import ProviderAuthRegistry
-    from koda_tui.palette.palette import Palette
+    from koda_tui.palette.context import PaletteContext
 
 
 log = get_logger(__name__)
@@ -29,7 +30,7 @@ _PROXY_MANAGED_LIST_HEADING = "Available Providers"
 
 _PROXY_MANAGED_PROVIDER_FOOTER: StyleAndTextTuples = [
     (
-        "fg:ansiyellow",
+        Tokens.Text.WARNING,
         "Proxy-managed credentials: use sbx secret set outside Koda; "
         "connectivity is verified on request.",
     )
@@ -53,10 +54,10 @@ class ProviderConnectionSelection:
 class ProviderMenu:
     """Provider submenu behavior."""
 
-    def __init__(self, palette: Palette, auth_registry: ProviderAuthRegistry) -> None:
-        self._palette = palette
-        self._service = palette.service
-        self._settings = palette.app_settings
+    def __init__(self, context: PaletteContext, auth_registry: ProviderAuthRegistry) -> None:
+        self._overlays = context.overlays
+        self._service = context.service
+        self._settings = context.settings
         self._auth_registry = auth_registry
         self._oauth_tasks: set[asyncio.Task[None]] = set()
 
@@ -75,12 +76,11 @@ class ProviderMenu:
             if self._settings.core.get_credential(self._connection_key(provider, connection.id))
         }
 
-    def _items(self, *, proxy_managed: bool) -> list[ListItem]:
+    def _items(self, *, proxy_managed: bool) -> list[ListItem[ProviderDefinition]]:
         """Build provider selection items."""
         connected = self._connected_connection_keys()
         return [
             ListItem(
-                id=f"select_provider:{provider.id}",
                 label=provider.name,
                 detail=provider.description or "",
                 marker=(
@@ -102,11 +102,15 @@ class ProviderMenu:
         proxy_managed = self._is_proxy_managed()
         list_heading = _PROXY_MANAGED_LIST_HEADING if proxy_managed else _LIST_HEADING
         footer = _PROXY_MANAGED_PROVIDER_FOOTER if proxy_managed else None
-        self._palette.open_palette(
-            self._items(proxy_managed=proxy_managed),
-            title=_TITLE,
-            list_heading=list_heading,
-            footer=footer,
+        self._overlays.open(
+            Picker(
+                _TITLE,
+                self._items(proxy_managed=proxy_managed),
+                on_select=lambda item: self.select(item.data),
+                heading=list_heading,
+                footer=footer,
+                on_close=self._overlays.close,
+            ),
         )
 
     def _auto_select_first_model(self, provider: ProviderDefinition) -> None:
@@ -122,7 +126,7 @@ class ProviderMenu:
             ApiKeyCredential(type="api_key", value=key),
         )
         self._auto_select_first_model(selection.provider)
-        self._palette.close_all_overlays()
+        self._overlays.close_all()
 
     async def _connect_oauth_provider(self, selection: ProviderConnectionSelection) -> None:
         auth_provider = self._auth_registry.get(selection.credential_key)
@@ -135,7 +139,7 @@ class ProviderMenu:
         )
         self._settings.core.set_credential(selection.credential_key, credential)
         self._auto_select_first_model(selection.provider)
-        self._palette.close_all_overlays()
+        self._overlays.close_all()
 
     @staticmethod
     def _open_auth_url(url: str) -> None:
@@ -149,17 +153,23 @@ class ProviderMenu:
             if not result.done():
                 result.set_result(value)
 
-        self._palette.open_text_dialog(
-            title="Complete browser login",
-            detail=message,
-            on_submit=submit,
+        self._overlays.open(
+            InputDialog(
+                title="Complete browser login",
+                detail=message,
+                on_submit=submit,
+                on_cancel=self._overlays.close,
+            ),
         )
         return await result
 
     def _show_oauth_progress(self, message: str) -> None:
-        self._palette.open_text_dialog(
-            title=message,
-            on_submit=lambda _: None,
+        self._overlays.open(
+            InputDialog(
+                title=message,
+                on_submit=lambda _: None,
+                on_cancel=self._overlays.close,
+            ),
         )
 
     def _on_oauth_task_done(self, task: asyncio.Task[None]) -> None:
@@ -168,9 +178,12 @@ class ProviderMenu:
             task.result()
         except Exception as error:
             log.warning("provider_oauth_login_failed", error=repr(error))
-            self._palette.open_message(
-                title="Provider login failed",
-                detail=str(error),
+            self._overlays.open(
+                MessageDialog(
+                    title="Provider login failed",
+                    detail=str(error),
+                    on_close=self._overlays.close,
+                ),
             )
 
     def _select_oauth_provider(self, selection: ProviderConnectionSelection) -> None:
@@ -183,11 +196,10 @@ class ProviderMenu:
         provider: ProviderDefinition,
         *,
         proxy_managed: bool,
-    ) -> list[ListItem]:
+    ) -> list[ListItem[ProviderConnectionSelection]]:
         connected = self._connected_connection_keys()
         return [
             ListItem(
-                id=f"select_provider_connection:{provider.id}:{connection.id}",
                 label=connection.label or connection.id,
                 detail=connection.description or "",
                 marker=(
@@ -227,44 +239,51 @@ class ProviderMenu:
                     )
                 )
             else:
-                self._palette.open_palette(
-                    self._connection_items(provider, proxy_managed=self._is_proxy_managed()),
-                    title=provider.name,
-                    list_heading="Connect Provider Connection",
-                    footer=_PROXY_MANAGED_PROVIDER_FOOTER if self._is_proxy_managed() else None,
+                self._overlays.open(
+                    Picker(
+                        provider.name,
+                        self._connection_items(provider, proxy_managed=self._is_proxy_managed()),
+                        on_select=lambda item: self._select_connection(item.data),
+                        heading="Connect Provider Connection",
+                        footer=_PROXY_MANAGED_PROVIDER_FOOTER if self._is_proxy_managed() else None,
+                        on_close=self._overlays.close,
+                    ),
                 )
             return
 
-        self._palette.open_choice(
-            "Connect OpenAI using:",
-            [
-                DialogChoice(
-                    label=oauth_selection.label,
-                    on_select=lambda: self._select_connection(oauth_selection),
-                ),
-                DialogChoice(
-                    label=api_key_selection.label,
-                    on_select=lambda: self._select_connection(api_key_selection),
-                ),
-            ],
+        self._overlays.open(
+            ChoiceDialog(
+                "Connect OpenAI using:",
+                [
+                    DialogChoice(
+                        label=oauth_selection.label,
+                        on_select=lambda: self._select_connection(oauth_selection),
+                    ),
+                    DialogChoice(
+                        label=api_key_selection.label,
+                        on_select=lambda: self._select_connection(api_key_selection),
+                    ),
+                ],
+                on_cancel=self._overlays.close,
+            ),
         )
 
     def _select_connection(self, selection: ProviderConnectionSelection) -> None:
         if self._settings.core.credential_mode == "proxy-managed":
-            self._palette.close_all_overlays()
+            self._overlays.close_all()
             return
         if selection.connection.auth == "oauth":
             self._select_oauth_provider(selection)
             return
-        self._palette.open_text_dialog(
-            title=f"Enter {selection.label}",
-            mask_input=True,
-            on_submit=lambda key: self._submit_api_key(selection, key),
+        self._overlays.open(
+            InputDialog(
+                title=f"Enter {selection.label}",
+                mask_input=True,
+                on_submit=lambda key: self._submit_api_key(selection, key),
+                on_cancel=self._overlays.close,
+            ),
         )
 
-    def select(self, item: ProviderDefinition | ProviderConnectionSelection) -> None:
-        """Handle provider or provider connection selection."""
-        if isinstance(item, ProviderConnectionSelection):
-            self._select_connection(item)
-            return
-        self._open_provider_connections(item)
+    def select(self, provider: ProviderDefinition) -> None:
+        """Connect ``provider``: pick how, if it has several ways."""
+        self._open_provider_connections(provider)

@@ -15,8 +15,10 @@ from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
 from koda_tui.appearance import Appearance
-from koda_tui.palette.palette import Palette
+from koda_tui.palette.context import PaletteContext
+from koda_tui.palette.root import RootMenu
 from koda_tui.state import AppState
+from koda_tui.ui.overlays import Overlays
 from koda_tui.views import Screen
 
 if TYPE_CHECKING:
@@ -100,7 +102,17 @@ class KodaTuiApp:
             state=self.state,
             invalidate=self.invalidate,
         )
-        self.palette = Palette(self)
+        self.overlays = Overlays(self.screen.root, fallback=self.screen.composer.buffer)
+        self._palette = RootMenu(
+            PaletteContext(
+                overlays=self.overlays,
+                service=self._service,
+                settings=self._app_settings,
+                state=self.state,
+                cancel_streaming=self.cancel_streaming,
+                refresh_theme=self.refresh_theme,
+            ),
+        )
         self._refresh_service_state()
 
     def _write_control_sequence(self, data: str) -> None:
@@ -321,8 +333,11 @@ class KodaTuiApp:
         self._stream_processor.cancel_stream()
 
     def toggle_palette(self) -> None:
-        """Toggle command palette visibility."""
-        self.palette.toggle()
+        """Open the command palette, or close it and any dialogs it opened."""
+        if self.overlays.is_open:
+            self.overlays.close_all()
+        else:
+            self._palette.open()
 
     def exit(self) -> None:
         """Exit the application."""
@@ -347,7 +362,6 @@ class KodaTuiApp:
     async def run(self) -> None:
         """Start the TUI application."""
         self._app = self._create_application()
-        self.palette.attach(self._app, self.screen.root)
         try:
             await self._app.run_async()
         finally:

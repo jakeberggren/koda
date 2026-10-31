@@ -3,18 +3,23 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING, cast
 
+import pytest
+
 from koda.llm import ModelDefinition, ProviderConnectionDefinition, ProviderDefinition
 from koda.llm.auth.registry import ProviderAuthRegistry
 from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
+from koda_tui.palette.context import PaletteContext
+from koda_tui.palette.menus import providers
 from koda_tui.palette.menus.providers import ProviderMenu
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    import pytest
-
     from koda.llm.auth.protocols import OAuthLoginCallbacks
-    from koda_tui.palette.palette import Palette
+    from koda_service import KodaService
+    from koda_tui.settings import AppSettings
+    from koda_tui.state import AppState
+    from koda_tui.ui.overlays import Overlays
     from koda_tui.ui.widgets import DialogChoice
 
 
@@ -51,44 +56,54 @@ class _FakeService:
         return [ModelDefinition(id="gpt-5.5", name="gpt-5.5", provider="openai")]
 
 
-class _FakePalette:
+class _FakeOverlays:
+    """Records what the menu opens: the dialogs are replaced by records of their arguments."""
+
     def __init__(self) -> None:
         self.service = _FakeService()
-        self.app_settings = _FakeAppSettings()
+        self.settings = _FakeAppSettings()
         self.text_dialogs: list[dict[str, object]] = []
         self.palettes: list[dict[str, object]] = []
         self.choices: list[dict[str, object]] = []
         self.closed = False
 
-    def open_palette(
-        self,
-        items: list[object],
-        *,
-        title: str,
-        list_heading: str | None = None,
-        footer: object | None = None,
-    ) -> None:
-        self.palettes.append(
-            {"items": items, "title": title, "list_heading": list_heading, "footer": footer}
+    def open(self, overlay: tuple[str, dict[str, object]]) -> None:
+        kind, fields = overlay
+        {"text": self.text_dialogs, "picker": self.palettes, "choice": self.choices}[kind].append(
+            fields,
         )
 
-    def open_text_dialog(
-        self,
-        title: str,
-        on_submit: Callable[[str], None],
+    def close(self) -> None:
+        pass
+
+    def close_all(self) -> None:
+        self.closed = True
+
+
+@pytest.fixture(autouse=True)
+def _record_dialogs(monkeypatch: pytest.MonkeyPatch) -> None:
+    def text(
         *,
+        title: str,
+        on_submit: object,
         detail: str | None = None,
         mask_input: bool = False,
-    ) -> None:
-        self.text_dialogs.append(
-            {"title": title, "detail": detail, "on_submit": on_submit, "mask_input": mask_input}
+        **_: object,
+    ) -> tuple:
+        return (
+            "text",
+            {"title": title, "detail": detail, "on_submit": on_submit, "mask_input": mask_input},
         )
 
-    def open_choice(self, message: str, choices: list[DialogChoice]) -> None:
-        self.choices.append({"message": message, "choices": choices})
+    def choice(message: str, choices: list[DialogChoice], **_: object) -> tuple:
+        return ("choice", {"message": message, "choices": choices})
 
-    def close_all_overlays(self) -> None:
-        self.closed = True
+    def picker(title: str, items: list[object], **fields: object) -> tuple:
+        return ("picker", {"title": title, "items": items, **fields})
+
+    monkeypatch.setattr(providers, "InputDialog", text)
+    monkeypatch.setattr(providers, "ChoiceDialog", choice)
+    monkeypatch.setattr(providers, "Picker", picker)
 
 
 class _FakeAuthProvider:
@@ -109,11 +124,19 @@ class _FakeAuthProvider:
 
 
 def _provider_menu(
-    palette: _FakePalette,
+    palette: _FakeOverlays,
     auth_registry: ProviderAuthRegistry | None = None,
 ) -> ProviderMenu:
+    context = PaletteContext(
+        overlays=cast("Overlays", palette),
+        service=cast("KodaService", palette.service),
+        settings=cast("AppSettings", palette.settings),
+        state=cast("AppState", None),
+        cancel_streaming=lambda: None,
+        refresh_theme=lambda: None,
+    )
     return ProviderMenu(
-        cast("Palette", palette),
+        context,
         auth_registry or ProviderAuthRegistry({"openai:oauth": _FakeAuthProvider()}),
     )
 
@@ -137,12 +160,12 @@ def _openai_provider() -> ProviderDefinition:
     )
 
 
-def _last_choices(palette: _FakePalette) -> list[DialogChoice]:
+def _last_choices(palette: _FakeOverlays) -> list[DialogChoice]:
     return cast("list[DialogChoice]", palette.choices[-1]["choices"])
 
 
 def test_provider_menu_provider_opens_connection_choice() -> None:
-    palette = _FakePalette()
+    palette = _FakeOverlays()
     menu = _provider_menu(palette)
 
     menu.select(_openai_provider())
@@ -155,7 +178,7 @@ def test_provider_menu_provider_opens_connection_choice() -> None:
 
 
 def test_provider_menu_api_key_connection_opens_key_dialog() -> None:
-    palette = _FakePalette()
+    palette = _FakeOverlays()
     menu = _provider_menu(palette)
     provider = _openai_provider()
 
@@ -174,7 +197,7 @@ def test_provider_menu_api_key_connection_opens_key_dialog() -> None:
     on_submit = cast("Callable[[str], None]", palette.text_dialogs[0]["on_submit"])
     on_submit("api-key")
 
-    credential = palette.app_settings.core.credentials["openai:api-key"]
+    credential = palette.settings.core.credentials["openai:api-key"]
     assert isinstance(credential, ApiKeyCredential)
     assert credential.value == "api-key"
 
@@ -183,7 +206,7 @@ async def test_provider_menu_oauth_connection_stores_credential(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     opened_urls: list[str] = []
-    palette = _FakePalette()
+    palette = _FakeOverlays()
     menu = _provider_menu(palette)
     monkeypatch.setattr("webbrowser.open", opened_urls.append)
     provider = _openai_provider()
@@ -193,16 +216,16 @@ async def test_provider_menu_oauth_connection_stores_credential(
 
     await next(iter(menu._oauth_tasks))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
-    credential = palette.app_settings.core.credentials["openai:oauth"]
+    credential = palette.settings.core.credentials["openai:oauth"]
     assert isinstance(credential, OAuthCredential)
     assert opened_urls == ["https://auth.example"]
     assert credential.metadata["chatgpt_account_id"] == "account-id"
-    assert palette.app_settings.core.model == "gpt-5.5"
+    assert palette.settings.core.model == "gpt-5.5"
     assert palette.closed is True
 
 
 async def test_provider_menu_oauth_prompt_uses_text_dialog() -> None:
-    palette = _FakePalette()
+    palette = _FakeOverlays()
     menu = _provider_menu(palette)
 
     task = asyncio.create_task(
@@ -226,7 +249,7 @@ async def test_provider_menu_oauth_prompt_uses_text_dialog() -> None:
 
 
 def test_provider_menu_oauth_progress_uses_text_dialog() -> None:
-    palette = _FakePalette()
+    palette = _FakeOverlays()
     menu = _provider_menu(palette)
 
     menu._show_oauth_progress("Enter code ABCD-EFGH")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]

@@ -1,4 +1,4 @@
-"""Sizes shared by every theme, in terminal cells: spacing and preferred widths."""
+"""Sizes shared by every theme, in terminal cells: spacing, and preferred widths and heights."""
 
 from __future__ import annotations
 
@@ -15,3 +15,10 @@ class Width:
     SMALL = 60
     MEDIUM = 72
     LARGE = 80
+
+
+class Height:
+    """Heights in rows, for content that grows; prompt_toolkit shrinks them to fit."""
+
+    SMALL = 5
+    LARGE = 20

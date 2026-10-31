@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from koda_tui.ui.primitives import ListItem
+from koda_tui.ui.widgets import Picker
 
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
-    from koda_tui.palette.palette import Palette
+    from koda_tui.palette.context import PaletteContext
 
 
 _TITLE = "Set Thinking Level"
@@ -18,12 +19,12 @@ _LIST_HEADING = "Select Model Reasoning Effort"
 class ThinkingMenu:
     """Thinking submenu behavior."""
 
-    def __init__(self, palette: Palette) -> None:
-        self._palette = palette
-        self._settings = palette.app_settings
-        self._state = palette.state
+    def __init__(self, context: PaletteContext) -> None:
+        self._overlays = context.overlays
+        self._settings = context.settings
+        self._state = context.state
 
-    def items(self) -> list[ListItem]:
+    def items(self) -> list[ListItem[ThinkingOptionId]]:
         """Build thinking level selection items."""
         if self._state.active_model is None:
             return []
@@ -31,7 +32,6 @@ class ThinkingMenu:
 
         return [
             ListItem(
-                id=f"select_thinking:{option.id}",
                 label=option.label,
                 detail=option.description or "",
                 current=self._settings.core.thinking == option.id,
@@ -42,9 +42,17 @@ class ThinkingMenu:
 
     def open(self) -> None:
         """Open the thinking selection submenu."""
-        self._palette.open_palette(self.items(), title=_TITLE, list_heading=_LIST_HEADING)
+        self._overlays.open(
+            Picker(
+                _TITLE,
+                self.items(),
+                on_select=lambda item: self.select(item.data),
+                heading=_LIST_HEADING,
+                on_close=self._overlays.close,
+            ),
+        )
 
     def select(self, thinking: ThinkingOptionId) -> None:
         """Handle thinking level selection."""
         self._settings.core.set("thinking", thinking)
-        self._palette.close_all_overlays()
+        self._overlays.close_all()

@@ -9,15 +9,14 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit, Window
 
-from koda_tui.appearance import Spacing, Tokens, compose
-from koda_tui.ui.primitives import Editor, List, ListItem, ListState, Spacer, Text
+from koda_tui.appearance import Spacing, Tokens
+from koda_tui.ui.primitives import Editor, List, ListItem, ListState, Spacer
+from koda_tui.ui.widgets import Prompt
 from koda_tui.workspace import WorkspaceFiles
 
 if TYPE_CHECKING:
     from koda_tui.state import AppState
 
-PROMPT = "❯"  # noqa: RUF001 - the prompt glyph
-PROMPT_STYLE = compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)
 MAX_ROWS = 10  # The composer grows with its text up to this many rows.
 SUGGESTIONS = 10  # Most files suggested for an @ mention.
 
@@ -31,7 +30,7 @@ class Composer:
 
     def __init__(self, state: AppState) -> None:
         self._files = WorkspaceFiles(state.workspace_root)
-        self._suggestions = ListState([])
+        self._suggestions: ListState[str] = ListState([])
         self._mention: tuple[int, int] | None = None  # Text range of the @ mention.
         self.buffer = Buffer(
             multiline=True,
@@ -50,7 +49,7 @@ class Composer:
                 VSplit(
                     [
                         Window(width=Spacing.EDGE),
-                        Text(PROMPT, style=PROMPT_STYLE, fit=True),
+                        Prompt(),
                         Window(width=Spacing.GAP),
                         self._editor,
                     ],
@@ -128,7 +127,7 @@ class Composer:
         start, end, query = mention
         self._mention = (start, end)
         paths = self._files.search(query, SUGGESTIONS)
-        self._suggestions.set_items([ListItem(id=path, label=path) for path in paths])
+        self._suggestions.set_items([ListItem(label=path, data=path) for path in paths])
 
     def _close_suggestions(self) -> None:
         self._mention = None

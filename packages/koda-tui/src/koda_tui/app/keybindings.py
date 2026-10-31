@@ -148,12 +148,12 @@ def _handle_cycle_thinking(app: KodaTuiApp) -> None:
 
 def _mentioning(app: KodaTuiApp) -> Condition:
     """Return whether file suggestion bindings should be active."""
-    return Condition(lambda: app.screen.composer.is_mentioning and not app.state.palette_open)
+    return Condition(lambda: app.screen.composer.is_mentioning and not app.overlays.is_open)
 
 
 def _has_suggestion(app: KodaTuiApp) -> Condition:
     """Return whether a suggested file is selected."""
-    return Condition(lambda: app.screen.composer.has_suggestion and not app.state.palette_open)
+    return Condition(lambda: app.screen.composer.has_suggestion and not app.overlays.is_open)
 
 
 def _cancelable(app: KodaTuiApp) -> Condition:

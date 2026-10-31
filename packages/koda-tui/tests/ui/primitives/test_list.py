@@ -10,7 +10,7 @@ from koda_tui.ui.primitives.list import Row, RowKind
 
 
 def _items(labels: list[str], **kwargs) -> list[ListItem]:
-    return [ListItem(id=label.lower(), label=label, **kwargs) for label in labels]
+    return [ListItem(data=label.lower(), label=label, **kwargs) for label in labels]
 
 
 @pytest.fixture
@@ -80,9 +80,9 @@ class TestGrouping:
 
     def test_grouped(self) -> None:
         items = [
-            ListItem(id="a1", label="A1", group="Group A"),
-            ListItem(id="a2", label="A2", group="Group A"),
-            ListItem(id="b1", label="B1", group="Group B"),
+            ListItem(data="a1", label="A1", group="Group A"),
+            ListItem(data="a2", label="A2", group="Group A"),
+            ListItem(data="b1", label="B1", group="Group B"),
         ]
         state = ListState(items)
         grouped = state.grouped_items()
@@ -90,22 +90,22 @@ class TestGrouping:
 
     def test_selected_item_uses_display_order(self) -> None:
         items = [
-            ListItem(id="connect_provider", label="Connect Provider", group="Agent"),
-            ListItem(id="set_thinking", label="Set Thinking Level", group="Agent"),
-            ListItem(id="new_session", label="New Session", group="Sessions"),
-            ListItem(id="list_sessions", label="List Sessions", group="Sessions"),
-            ListItem(id="switch_model", label="Switch Model", group="Agent"),
-            ListItem(id="select_theme", label="Select Theme", group="Appearance"),
+            ListItem(data="connect_provider", label="Connect Provider", group="Agent"),
+            ListItem(data="set_thinking", label="Set Thinking Level", group="Agent"),
+            ListItem(data="new_session", label="New Session", group="Sessions"),
+            ListItem(data="list_sessions", label="List Sessions", group="Sessions"),
+            ListItem(data="switch_model", label="Switch Model", group="Agent"),
+            ListItem(data="select_theme", label="Select Theme", group="Appearance"),
         ]
         state = ListState(items)
         state.move_selection(4)
-        assert state.display_items[4].id == "list_sessions"
+        assert state.display_items[4].data == "list_sessions"
         assert state.selected_item is state.display_items[4]
 
     def test_mixed(self) -> None:
         items = [
-            ListItem(id="u1", label="Ungrouped"),
-            ListItem(id="a1", label="A1", group="Group A"),
+            ListItem(data="u1", label="Ungrouped"),
+            ListItem(data="a1", label="A1", group="Group A"),
         ]
         state = ListState(items)
         grouped = state.grouped_items()
@@ -121,7 +121,7 @@ class TestGrouping:
 
 
 def _item(label: str, **kwargs) -> ListItem:
-    return ListItem(id=label.lower(), label=label, **kwargs)
+    return ListItem(data=label.lower(), label=label, **kwargs)
 
 
 def _item_label(row: Row) -> str:
@@ -208,3 +208,11 @@ class TestSearchedRows:
         item_rows = [r for r in rows if r.kind == RowKind.ITEM]
         assert len(item_rows) == 1
         assert _item_label(item_rows[0]) == "Apple"
+
+
+def test_label_width_cuts_longer_labels_with_an_ellipsis() -> None:
+    state = ListState(_items(["claude-opus-5-5-with-a-long-name", "short"]))
+    rows = List(state, label_width=10).rows()
+    labels = ["".join(text for _, text, *_ in row.text) for row in rows]
+    assert labels[0].startswith("- claude-...")
+    assert labels[1].startswith("  short     ")

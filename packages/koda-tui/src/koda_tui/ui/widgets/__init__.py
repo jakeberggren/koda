@@ -8,6 +8,8 @@ from koda_tui.ui.widgets.dialogs import (
     MessageDialog,
 )
 from koda_tui.ui.widgets.panel import Panel
+from koda_tui.ui.widgets.picker import Picker
+from koda_tui.ui.widgets.prompt import Prompt
 
 __all__ = [
     "Bar",
@@ -16,5 +18,7 @@ __all__ = [
     "InputDialog",
     "MessageDialog",
     "Panel",
+    "Picker",
+    "Prompt",
     "Segment",
 ]

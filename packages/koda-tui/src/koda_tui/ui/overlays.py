@@ -1,98 +1,56 @@
-"""Modal overlays: a stack of containers shown one at a time as floats."""
+"""Overlays: containers shown one at a time above the screen, such as pickers and dialogs."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from prompt_toolkit.application.current import get_app
 from prompt_toolkit.layout import Float
 
 if TYPE_CHECKING:
-    from prompt_toolkit import Application
     from prompt_toolkit.buffer import Buffer
     from prompt_toolkit.layout import FloatContainer
     from prompt_toolkit.layout.containers import AnyContainer
 
-    FocusTarget = Buffer | AnyContainer
+    type FocusTarget = Buffer | AnyContainer
 
 
-class OverlayManager:
-    """Manage modal overlay content in an app-level ``FloatContainer``.
-
-    The root layout owns the ``FloatContainer`` passed to this manager.
-    Individual overlays are wrapped in prompt_toolkit ``Float`` objects and
-    mounted into that root container. Only the top overlay is visible; older
-    stack entries are kept so they can be restored when the top overlay closes.
+class Overlays:
+    """A stack of overlays floating in ``root``. Only the top one shows and has focus;
+    closing it reveals the one below, and closing the last focuses ``fallback``.
     """
 
-    def __init__(
-        self,
-        root_container: FloatContainer,
-        app: Application[None],
-        *,
-        fallback_focus_target: FocusTarget | None = None,
-    ) -> None:
-        """Create a manager for modal overlays.
-
-        ``root_container`` is the app-level float host. ``fallback_focus_target``
-        is focused whenever the overlay stack becomes empty, normally the main
-        input buffer.
-        """
-        self._root = root_container
-        self._app = app
-        self._fallback_focus_target = fallback_focus_target
-        self._stack: list[tuple[AnyContainer, Float]] = []
+    def __init__(self, root: FloatContainer, *, fallback: FocusTarget | None = None) -> None:
+        self._root = root
+        self._fallback = fallback
+        self._stack: list[Float] = []
 
     @property
     def is_open(self) -> bool:
-        """Return whether the overlay stack currently contains any overlays."""
-        return len(self._stack) > 0
+        return bool(self._stack)
 
-    def _focus(self, overlay: AnyContainer) -> None:
-        """Focus the overlay; prompt_toolkit focuses its first focusable window."""
-        self._app.layout.focus(overlay)
+    def open(self, overlay: AnyContainer) -> None:
+        """Show ``overlay`` above the others, and focus it."""
+        self._stack.append(Float(content=overlay))
+        self._show_top()
 
-    def _focus_fallback(self) -> None:
-        """Restore focus after the last overlay has been removed."""
-        if self._fallback_focus_target is not None:
-            self._app.layout.focus(self._fallback_focus_target)
-
-    def push(self, overlay: AnyContainer) -> None:
-        """Show ``overlay`` as the new top modal overlay.
-
-        Existing overlay floats are temporarily removed from the root
-        container, but their stack entries are retained so ``pop`` can reveal
-        the previous overlay.
-        """
-        self._root.floats.clear()
-
-        float_item = Float(content=overlay)
-        self._root.floats.append(float_item)
-        self._stack.append((overlay, float_item))
-        self._focus(overlay)
-
-    def pop(self) -> AnyContainer | None:
-        """Close and return the top overlay.
-
-        If another overlay remains on the stack, it is restored and focused.
-        Otherwise, focus returns to the fallback target.
-        """
-        if not self._stack:
-            return None
-
-        overlay, _ = self._stack.pop()
-        self._root.floats.clear()
-
+    def close(self) -> None:
+        """Close the top overlay."""
         if self._stack:
-            prev_overlay, prev_float = self._stack[-1]
-            self._root.floats.append(prev_float)
-            self._focus(prev_overlay)
-        else:
-            self._focus_fallback()
+            self._stack.pop()
+            self._show_top()
 
-        return overlay
-
-    def clear(self) -> None:
-        """Close every overlay and restore fallback focus."""
+    def close_all(self) -> None:
         self._stack.clear()
+        self._show_top()
+
+    def _show_top(self) -> None:
+        """Float only the top overlay and focus it, or the fallback when none are left."""
         self._root.floats.clear()
-        self._focus_fallback()
+        app = get_app()
+        if self._stack:
+            self._root.floats.append(self._stack[-1])
+            app.layout.focus(self._stack[-1].content)
+        elif self._fallback is not None:
+            app.layout.focus(self._fallback)
+        app.invalidate()

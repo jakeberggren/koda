@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING
 
 from koda_tui.appearance import THEMES
 from koda_tui.ui.primitives import ListItem
+from koda_tui.ui.widgets import Picker
 
 if TYPE_CHECKING:
-    from koda_tui.palette.palette import Palette
+    from koda_tui.palette.context import PaletteContext
 
 
 _TITLE = "Select Theme"
@@ -18,16 +19,16 @@ _LIST_HEADING = "Select UI Theme"
 class ThemeMenu:
     """Theme selection submenu behavior."""
 
-    def __init__(self, palette: Palette) -> None:
-        self._palette = palette
-        self._settings = palette.app_settings
+    def __init__(self, context: PaletteContext) -> None:
+        self._overlays = context.overlays
+        self._refresh_theme = context.refresh_theme
+        self._settings = context.settings
 
-    def items(self) -> list[ListItem]:
+    def items(self) -> list[ListItem[str]]:
         """Build theme selection items."""
         current = self._settings.tui.theme
         return [
             ListItem(
-                id=f"select_theme:{theme.name}",
                 label=theme.label,
                 detail=theme.description,
                 current=current == theme.name,
@@ -38,12 +39,20 @@ class ThemeMenu:
 
     def open(self) -> None:
         """Open the theme selection submenu."""
-        self._palette.open_palette(self.items(), title=_TITLE, list_heading=_LIST_HEADING)
+        self._overlays.open(
+            Picker(
+                _TITLE,
+                self.items(),
+                on_select=lambda item: self.select(item.data),
+                heading=_LIST_HEADING,
+                on_close=self._overlays.close,
+            ),
+        )
 
     def select(self, theme: str) -> None:
         """Handle theme selection."""
         if self._settings.tui.theme == theme:
-            self._palette.refresh_theme()
+            self._refresh_theme()
         else:
             self._settings.tui.set("theme", theme)
-        self._palette.close_all_overlays()
+        self._overlays.close_all()
