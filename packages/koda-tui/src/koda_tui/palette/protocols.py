@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from koda_service import KodaService
-    from koda_tui.layout import TUILayout
     from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
+    from koda_tui.views import Screen
 
 
 class PaletteApp(Protocol):
@@ -24,7 +24,7 @@ class PaletteApp(Protocol):
     def state(self) -> AppState: ...
 
     @property
-    def layout(self) -> TUILayout: ...
+    def screen(self) -> Screen: ...
 
     def cancel_streaming(self) -> None: ...
 

@@ -108,11 +108,11 @@ async def _submit_buffer(
     cancel_current_if_streaming: bool,
 ) -> None:
     """Submit the current buffer, optionally steering the current stream."""
-    text = app.layout.composer.text.strip()
+    text = app.screen.composer.text.strip()
     if not text:
         return
 
-    app.layout.composer.clear()
+    app.screen.composer.clear()
 
     if app.state.is_streaming:
         if cancel_current_if_streaming:
@@ -148,12 +148,12 @@ def _handle_cycle_thinking(app: KodaTuiApp) -> None:
 
 def _mentioning(app: KodaTuiApp) -> Condition:
     """Return whether file suggestion bindings should be active."""
-    return Condition(lambda: app.layout.composer.is_mentioning and not app.state.palette_open)
+    return Condition(lambda: app.screen.composer.is_mentioning and not app.state.palette_open)
 
 
 def _has_suggestion(app: KodaTuiApp) -> Condition:
     """Return whether a suggested file is selected."""
-    return Condition(lambda: app.layout.composer.has_suggestion and not app.state.palette_open)
+    return Condition(lambda: app.screen.composer.has_suggestion and not app.state.palette_open)
 
 
 def _cancelable(app: KodaTuiApp) -> Condition:
@@ -186,7 +186,7 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
     def _edit_last_queued(_event: KeyPressEvent) -> None:
         text = app.pop_last_queued_message()
         if text is not None:
-            app.layout.composer.text = text
+            app.screen.composer.text = text
             app.invalidate()
 
     @kb.add(*ALT_DOWN_KEY)
@@ -237,13 +237,13 @@ def _create_main_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901
     def _terminal_background_response(event: KeyPressEvent) -> None:
         app.handle_terminal_background_response(event.key_sequence[0].data)
 
-    @kb.add(Keys.Up, eager=True, filter=has_focus(app.layout.composer.buffer))
+    @kb.add(Keys.Up, eager=True, filter=has_focus(app.screen.composer.buffer))
     def _move_up(event: KeyPressEvent) -> None:
-        app.layout.composer.move_cursor_up(event.arg)
+        app.screen.composer.move_cursor_up(event.arg)
 
-    @kb.add(Keys.Down, eager=True, filter=has_focus(app.layout.composer.buffer))
+    @kb.add(Keys.Down, eager=True, filter=has_focus(app.screen.composer.buffer))
     def _move_down(event: KeyPressEvent) -> None:
-        app.layout.composer.move_cursor_down(event.arg)
+        app.screen.composer.move_cursor_down(event.arg)
 
     return kb
 
@@ -265,22 +265,22 @@ def _create_suggestion_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C90
 
     @kb.add(Keys.Up, eager=True, filter=_has_suggestion(app))
     def _move_up(_event: KeyPressEvent) -> None:
-        app.layout.composer.move_suggestion(-1)
+        app.screen.composer.move_suggestion(-1)
         app.invalidate()
 
     @kb.add(Keys.Down, eager=True, filter=_has_suggestion(app))
     def _move_down(_event: KeyPressEvent) -> None:
-        app.layout.composer.move_suggestion(1)
+        app.screen.composer.move_suggestion(1)
         app.invalidate()
 
     @kb.add(Keys.Enter, eager=True, filter=_has_suggestion(app))
     def _accept_enter(_event: KeyPressEvent) -> None:
-        if app.layout.composer.accept_suggestion():
+        if app.screen.composer.accept_suggestion():
             app.invalidate()
 
     @kb.add(Keys.Tab, eager=True, filter=_has_suggestion(app))
     def _accept_tab(_event: KeyPressEvent) -> None:
-        if app.layout.composer.accept_suggestion():
+        if app.screen.composer.accept_suggestion():
             app.invalidate()
 
     return kb

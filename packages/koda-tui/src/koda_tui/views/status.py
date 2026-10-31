@@ -5,12 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from prompt_toolkit.layout import VSplit
+from prompt_toolkit.filters import Condition
+from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit
 
 from koda_tui.appearance import Tokens
 from koda_tui.state import ResponsePhase
 from koda_tui.ui.components import Bar
-from koda_tui.ui.primitives import Spinner, Text
+from koda_tui.ui.primitives import Spacer, Spinner, Text
 
 if TYPE_CHECKING:
     from koda_tui.state import AppState
@@ -32,18 +33,22 @@ class StatusBar:
 
 
 class ActivityIndicator:
-    """A spinner and a hint, shown while a response is running."""
+    """A spinner and a hint, with a gap below, shown while a response is running."""
 
-    def __init__(self) -> None:
-        self._row = VSplit(
+    def __init__(self, state: AppState) -> None:
+        row = VSplit(
             [
                 Spinner(style=Tokens.Text.INFO),
                 Text(f" {ACTIVITY_TEXT}", style=Tokens.Text.MUTED),
             ],
         )
+        self._container = ConditionalContainer(
+            HSplit([row, Spacer()]),
+            filter=Condition(lambda: state.is_streaming),
+        )
 
-    def __pt_container__(self) -> VSplit:
-        return self._row
+    def __pt_container__(self) -> ConditionalContainer:
+        return self._container
 
 
 def _left(state: AppState) -> list[Segment]:

@@ -55,7 +55,7 @@ class Palette:
         self._overlay_manager = OverlayManager(
             root_container,
             pt_app,
-            fallback_focus_target=self._app.layout.composer.buffer,
+            fallback_focus_target=self._app.screen.composer.buffer,
         )
 
     def toggle(self) -> None:

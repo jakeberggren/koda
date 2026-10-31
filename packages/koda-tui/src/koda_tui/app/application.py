@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from prompt_toolkit import Application
 from prompt_toolkit.application.current import get_app_session
 from prompt_toolkit.input.vt100 import Vt100Input
+from prompt_toolkit.layout import Layout
 from prompt_toolkit.output import ColorDepth, Output
 
 from koda.llm import ThinkingOption
@@ -14,9 +15,9 @@ from koda_tui.app.keybindings import create_keybindings
 from koda_tui.app.queue import MessageQueue
 from koda_tui.app.streaming import StreamProcessor
 from koda_tui.appearance import Appearance
-from koda_tui.layout import TUILayout
 from koda_tui.palette.palette import Palette
 from koda_tui.state import AppState
+from koda_tui.views import Screen
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -80,8 +81,7 @@ class KodaTuiApp:
             queue_inputs=self._app_settings.tui.queue_inputs,
         )
 
-        # Initialize layout
-        self.layout = TUILayout(self.state)
+        self.screen = Screen(self.state)
 
         # Application instance (created on run)
         self._app: Application[None] | None = None
@@ -121,7 +121,7 @@ class KodaTuiApp:
         self._terminal_output = app_session.output
 
         app = _KodaApplication(
-            layout=self.layout.create_layout(),
+            layout=Layout(self.screen, focused_element=self.screen.composer.buffer),
             key_bindings=create_keybindings(self),
             style=self.appearance.style,
             full_screen=True,
@@ -202,7 +202,7 @@ class KodaTuiApp:
         should_invalidate = False
         if "show_scrollbar" in change_names:
             self.state.show_scrollbar = self._app_settings.tui.show_scrollbar
-            self.layout.chat.clear_caches()
+            self.screen.chat.clear_caches()
             should_invalidate = True
         if "queue_inputs" in change_names:
             self.state.queue_inputs = self._app_settings.tui.queue_inputs
@@ -347,13 +347,7 @@ class KodaTuiApp:
     async def run(self) -> None:
         """Start the TUI application."""
         self._app = self._create_application()
-        root_container = self.layout.root_container
-        if root_container is None:
-            self.layout.create_layout()
-            root_container = self.layout.root_container
-        if root_container is None:
-            raise RuntimeError
-        self.palette.attach(self._app, root_container)
+        self.palette.attach(self._app, self.screen.root)
         try:
             await self._app.run_async()
         finally:
