@@ -69,7 +69,7 @@ class ChoiceDialog:
         kb.add(Keys.Right)(self._on_next)
         kb.add(Keys.Up)(self._on_previous)
         kb.add(Keys.Down)(self._on_next)
-        kb.add("tab")(self._on_next)
+        kb.add(Keys.Tab)(self._on_next)
         for choice in self._choices:
             if choice.key is not None:
                 kb.add(choice.key)(lambda _event, choice=choice: choice.on_select())

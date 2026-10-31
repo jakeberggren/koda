@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from prompt_toolkit.utils import get_cwidth
 
 from koda_tui.appearance import Tokens, compose
 from koda_tui.ui.primitives import List, ListItem, ListState
@@ -216,3 +217,12 @@ def test_label_width_cuts_longer_labels_with_an_ellipsis() -> None:
     labels = ["".join(text for _, text, *_ in row.text) for row in rows]
     assert labels[0].startswith("- claude-...")
     assert labels[1].startswith("  short     ")
+
+
+def test_labels_are_padded_and_cut_by_cells_not_characters() -> None:
+    # Each of these characters takes two cells.
+    state = ListState(_items(["日本語のモデル", "ab"]))
+    rows = List(state, label_width=6).rows()
+    labels = [row.text[1][1] for row in rows]
+    assert labels == ["日... ", "ab    "]  # 日本... would take 7 cells.
+    assert all(get_cwidth(label) == 6 for label in labels)
