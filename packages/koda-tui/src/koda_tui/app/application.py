@@ -82,7 +82,7 @@ class KodaTuiApp:
 
         # Application instance (created on run)
         self._app: Application[None] | None = None
-        self._terminal = Terminal()
+        self._terminal = Terminal(on_background=self._on_terminal_background)
         self._exit_reset_handle: asyncio.TimerHandle | None = None
 
         self.conversation = Conversation(self.state)
@@ -110,11 +110,7 @@ class KodaTuiApp:
         """The session's input, reading the terminal's replies when it is a real terminal."""
         if not isinstance(terminal_input, Vt100Input):
             return terminal_input
-        return TerminalInput(
-            terminal_input.stdin,
-            on_focus_in=self._terminal.ask_background,
-            on_background=self._on_terminal_background,
-        )
+        return TerminalInput(terminal_input.stdin, self._terminal)
 
     def _create_application(self) -> Application[None]:
         """Create the prompt_toolkit Application."""
