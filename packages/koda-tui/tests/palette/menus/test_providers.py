@@ -1,3 +1,7 @@
+"""Tests for the provider menu: picking how to connect, API keys, and browser logins."""
+
+# ruff: noqa: SLF001 - the login task is private
+
 from __future__ import annotations
 
 import asyncio
@@ -22,19 +26,20 @@ if TYPE_CHECKING:
     from koda_tui.state import AppState
     from koda_tui.terminal import Terminal
     from koda_tui.ui.overlays import Overlays
-    from koda_tui.ui.widgets import DialogChoice
+    from koda_tui.ui.primitives import ListItem
 
 
 class _FakeCoreSettings:
-    credential_mode = "local"
     model: str | None = None
-    thinking = "medium"
 
     def __init__(self) -> None:
         self.credentials: dict[str, ProviderCredential] = {}
 
-    def set_credential(self, provider: str, credential: ProviderCredential) -> None:
-        self.credentials[provider] = credential
+    def get_credential(self, key: str) -> ProviderCredential | None:
+        return self.credentials.get(key)
+
+    def set_credential(self, key: str, credential: ProviderCredential) -> None:
+        self.credentials[key] = credential
 
     def update(self, **changes: object) -> None:
         for key, value in changes.items():
@@ -44,14 +49,12 @@ class _FakeCoreSettings:
 class _FakeAppSettings:
     def __init__(self) -> None:
         self.core = _FakeCoreSettings()
+        self.proxy_managed = False
 
 
 class _FakeService:
-    def list_configured_providers(self) -> list[ProviderDefinition]:
-        return []
-
     def list_providers(self) -> list[ProviderDefinition]:
-        return []
+        return [_openai_provider()]
 
     def list_models(self, provider: str) -> list[ModelDefinition]:
         _ = provider
@@ -59,218 +62,279 @@ class _FakeService:
 
 
 class _FakeOverlays:
-    """Records what the menu opens: the dialogs are replaced by records of their arguments."""
+    """A stack of records of what the menu opens: each dialog is replaced by its kind
+    and arguments."""
 
     def __init__(self) -> None:
-        self.service = _FakeService()
-        self.settings = _FakeAppSettings()
-        self.text_dialogs: list[dict[str, object]] = []
-        self.palettes: list[dict[str, object]] = []
-        self.choices: list[dict[str, object]] = []
-        self.closed = False
+        self.stack: list[tuple[str, dict]] = []
 
-    def open(self, overlay: tuple[str, dict[str, object]]) -> None:
-        kind, fields = overlay
-        {"text": self.text_dialogs, "picker": self.palettes, "choice": self.choices}[kind].append(
-            fields,
-        )
+    def open(self, overlay: tuple[str, dict]) -> None:
+        self.stack.append(overlay)
 
     def close(self) -> None:
-        pass
+        self.stack.pop()
 
     def close_all(self) -> None:
-        self.closed = True
+        self.stack.clear()
+
+    @property
+    def top(self) -> tuple[str, dict]:
+        return self.stack[-1]
+
+    @property
+    def kinds(self) -> list[str]:
+        return [kind for kind, _ in self.stack]
 
 
 @pytest.fixture(autouse=True)
 def _record_dialogs(monkeypatch: pytest.MonkeyPatch) -> None:
-    def text(
-        *,
-        title: str,
-        on_submit: object,
-        detail: str | None = None,
-        mask_input: bool = False,
-        **_: object,
-    ) -> tuple:
-        return (
-            "text",
-            {"title": title, "detail": detail, "on_submit": on_submit, "mask_input": mask_input},
-        )
+    def record(kind: str) -> Callable[..., tuple[str, dict]]:
+        return lambda *args, **fields: (kind, {"args": args, **fields})
 
-    def choice(message: str, choices: list[DialogChoice], **_: object) -> tuple:
-        return ("choice", {"message": message, "choices": choices})
-
-    def picker(title: str, items: list[object], **fields: object) -> tuple:
-        return ("picker", {"title": title, "items": items, **fields})
-
-    monkeypatch.setattr(providers, "InputDialog", text)
-    monkeypatch.setattr(providers, "ChoiceDialog", choice)
-    monkeypatch.setattr(providers, "Picker", picker)
+    monkeypatch.setattr(providers, "InputDialog", record("input"))
+    monkeypatch.setattr(providers, "MessageDialog", record("message"))
+    monkeypatch.setattr(providers, "Picker", record("picker"))
 
 
-class _FakeAuthProvider:
+@pytest.fixture
+def opened_urls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    urls: list[str] = []
+    monkeypatch.setattr("webbrowser.open", urls.append)
+    return urls
+
+
+def _credential() -> OAuthCredential:
+    return OAuthCredential(
+        type="oauth",
+        access_token="access-token",  # noqa: S106
+        refresh_token="refresh-token",  # noqa: S106
+        expires_at="123",
+        metadata={"chatgpt_account_id": "account-id"},
+    )
+
+
+class _BrowserLogin:
+    """Logs in once the browser comes back."""
+
     id = "openai:oauth"
 
     async def login(self, callbacks: OAuthLoginCallbacks) -> OAuthCredential:
         callbacks.on_auth_url("https://auth.example")
-        return OAuthCredential(
-            type="oauth",
-            access_token="access-token",  # noqa: S106
-            refresh_token="refresh-token",  # noqa: S106
-            expires_at="123",
-            metadata={"chatgpt_account_id": "account-id"},
-        )
+        return _credential()
 
     async def refresh(self, credential: OAuthCredential) -> OAuthCredential:
         return credential
 
 
-def _provider_menu(
-    palette: _FakeOverlays,
-    auth_registry: ProviderAuthRegistry | None = None,
+class _PromptedLogin(_BrowserLogin):
+    """Logs in with what is pasted into the prompt."""
+
+    def __init__(self) -> None:
+        self.answer: str | None = None
+
+    async def login(self, callbacks: OAuthLoginCallbacks) -> OAuthCredential:
+        callbacks.on_auth_url("https://auth.example")
+        self.answer = await callbacks.on_prompt("Paste the callback URL")
+        return _credential()
+
+
+class _FailingLogin(_BrowserLogin):
+    async def login(self, callbacks: OAuthLoginCallbacks) -> OAuthCredential:
+        _ = callbacks
+        raise RuntimeError("token exchange failed")
+
+
+def _menu(
+    overlays: _FakeOverlays, settings: _FakeAppSettings, login: _BrowserLogin
 ) -> ProviderMenu:
     context = PaletteContext(
-        overlays=cast("Overlays", palette),
-        service=cast("KodaService", palette.service),
-        settings=cast("AppSettings", palette.settings),
+        overlays=cast("Overlays", overlays),
+        service=cast("KodaService", _FakeService()),
+        settings=cast("AppSettings", settings),
         state=cast("AppState", None),
         conversation=cast("Conversation", None),
         outbox=cast("Outbox", None),
         terminal=cast("Terminal", None),
     )
-    return ProviderMenu(
-        context,
-        auth_registry or ProviderAuthRegistry({"openai:oauth": _FakeAuthProvider()}),
-    )
+    return ProviderMenu(context, ProviderAuthRegistry({"openai:oauth": login}))
 
 
-def _openai_provider(name: str = "OpenAI") -> ProviderDefinition:
-    return ProviderDefinition(
-        id="openai",
-        name=name,
-        connections=[
-            ProviderConnectionDefinition(
-                id="api-key",
-                label="OpenAI API key",
-                auth="api-key",
-            ),
-            ProviderConnectionDefinition(
-                id="oauth",
-                label="ChatGPT Plus/Pro",
-                auth="oauth",
-            ),
-        ],
-    )
+def _openai_provider(*, oauth: bool = True) -> ProviderDefinition:
+    connections = [ProviderConnectionDefinition(id="api-key", label="OpenAI API key")]
+    if oauth:
+        connections.append(
+            ProviderConnectionDefinition(id="oauth", label="ChatGPT Plus/Pro", auth="oauth")
+        )
+    return ProviderDefinition(id="openai", name="OpenAI", connections=connections)
 
 
-def _last_choices(palette: _FakeOverlays) -> list[DialogChoice]:
-    return cast("list[DialogChoice]", palette.choices[-1]["choices"])
+def _items(overlay: tuple[str, dict]) -> list[ListItem]:
+    return overlay[1]["args"][1]
 
 
-def test_provider_menu_provider_opens_connection_choice() -> None:
-    palette = _FakeOverlays()
-    menu = _provider_menu(palette)
-
-    menu.select(_openai_provider())
-
-    assert palette.choices[0]["message"] == "Connect OpenAI using:"
-    assert [choice.label for choice in _last_choices(palette)] == [
-        "ChatGPT Plus/Pro",
-        "OpenAI API key",
-    ]
+def _pick(overlay: tuple[str, dict], label: str) -> None:
+    item = next(item for item in _items(overlay) if item.label == label)
+    overlay[1]["on_select"](item)
 
 
-def test_provider_menu_connection_choice_names_the_provider() -> None:
-    palette = _FakeOverlays()
-    menu = _provider_menu(palette)
-
-    menu.select(_openai_provider(name="Acme"))
-
-    assert palette.choices[0]["message"] == "Connect Acme using:"
+async def _finish(menu: ProviderMenu) -> None:
+    """Let the login run until it ends."""
+    if (login := menu._login) is not None:
+        await asyncio.wait([login])
 
 
-def test_provider_menu_api_key_connection_opens_key_dialog() -> None:
-    palette = _FakeOverlays()
-    menu = _provider_menu(palette)
-    provider = _openai_provider()
-
-    menu.select(provider)
-    _last_choices(palette)[1].on_select()
-
-    assert palette.text_dialogs == [
-        {
-            "title": "Enter OpenAI API key",
-            "detail": None,
-            "on_submit": palette.text_dialogs[0]["on_submit"],
-            "mask_input": True,
-        }
-    ]
-
-    on_submit = cast("Callable[[str], None]", palette.text_dialogs[0]["on_submit"])
-    on_submit("api-key")
-
-    credential = palette.settings.core.credentials["openai:api-key"]
-    assert isinstance(credential, ApiKeyCredential)
-    assert credential.value == "api-key"
+@pytest.fixture
+def overlays() -> _FakeOverlays:
+    return _FakeOverlays()
 
 
-async def test_provider_menu_oauth_connection_stores_credential(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.fixture
+def settings() -> _FakeAppSettings:
+    return _FakeAppSettings()
+
+
+def test_providers_with_a_connection_are_marked(
+    overlays: _FakeOverlays, settings: _FakeAppSettings
 ) -> None:
-    opened_urls: list[str] = []
-    palette = _FakeOverlays()
-    menu = _provider_menu(palette)
-    monkeypatch.setattr("webbrowser.open", opened_urls.append)
-    provider = _openai_provider()
-
-    menu.select(provider)
-    _last_choices(palette)[0].on_select()
-
-    await next(iter(menu._oauth_tasks))  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
-    credential = palette.settings.core.credentials["openai:oauth"]
-    assert isinstance(credential, OAuthCredential)
-    assert opened_urls == ["https://auth.example"]
-    assert credential.metadata["chatgpt_account_id"] == "account-id"
-    assert palette.settings.core.model == "gpt-5.5"
-    assert palette.closed is True
+    settings.core.credentials["openai:api-key"] = ApiKeyCredential(type="api_key", value="k")
+    _menu(overlays, settings, _BrowserLogin()).open()
+    assert [item.marker for item in _items(overlays.top)] == ["✓"]
 
 
-async def test_provider_menu_oauth_prompt_uses_text_dialog() -> None:
-    palette = _FakeOverlays()
-    menu = _provider_menu(palette)
+def test_several_connections_are_offered_in_a_picker(
+    overlays: _FakeOverlays, settings: _FakeAppSettings
+) -> None:
+    settings.core.credentials["openai:oauth"] = _credential()
+    _menu(overlays, settings, _BrowserLogin()).select(_openai_provider())
 
-    task = asyncio.create_task(
-        menu._prompt_oauth_code("Paste callback URL")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    kind, fields = overlays.top
+    assert (kind, fields["args"][0]) == ("picker", "OpenAI")
+    assert [(item.label, item.marker) for item in _items(overlays.top)] == [
+        ("OpenAI API key", None),
+        ("ChatGPT Plus/Pro", "✓"),
+    ]
+
+
+def test_an_api_key_is_stored_and_picks_a_model(
+    overlays: _FakeOverlays, settings: _FakeAppSettings
+) -> None:
+    _menu(overlays, settings, _BrowserLogin()).select(_openai_provider())
+    _pick(overlays.top, "OpenAI API key")
+
+    kind, fields = overlays.top
+    assert (kind, fields["title"], fields["mask_input"]) == ("input", "Enter OpenAI API key", True)
+    fields["on_submit"]("secret")
+
+    assert settings.core.credentials["openai:api-key"] == ApiKeyCredential(
+        type="api_key", value="secret"
     )
+    assert settings.core.model == "gpt-5.5"
+    assert overlays.stack == []
+
+
+def test_a_single_connection_skips_the_picker(
+    overlays: _FakeOverlays, settings: _FakeAppSettings
+) -> None:
+    _menu(overlays, settings, _BrowserLogin()).select(_openai_provider(oauth=False))
+    assert overlays.kinds == ["input"]
+
+
+def test_proxy_managed_providers_only_close_the_palette(
+    overlays: _FakeOverlays, settings: _FakeAppSettings
+) -> None:
+    settings.proxy_managed = True
+    overlays.open(("picker", {}))
+    _menu(overlays, settings, _BrowserLogin()).select(_openai_provider())
+    assert overlays.stack == []
+
+
+async def test_a_browser_login_stores_the_credential(
+    overlays: _FakeOverlays, settings: _FakeAppSettings, opened_urls: list[str]
+) -> None:
+    menu = _menu(overlays, settings, _BrowserLogin())
+    menu.select(_openai_provider())
+    _pick(overlays.top, "ChatGPT Plus/Pro")
+    await _finish(menu)
+
+    assert opened_urls == ["https://auth.example"]
+    assert settings.core.credentials["openai:oauth"] == _credential()
+    assert settings.core.model == "gpt-5.5"
+    assert overlays.stack == []
+
+
+@pytest.mark.usefixtures("opened_urls")
+async def test_a_login_can_be_finished_by_pasting_into_the_prompt(
+    overlays: _FakeOverlays, settings: _FakeAppSettings
+) -> None:
+    login = _PromptedLogin()
+    menu = _menu(overlays, settings, login)
+    menu.select(_openai_provider())
+    _pick(overlays.top, "ChatGPT Plus/Pro")
     await asyncio.sleep(0)
 
-    assert palette.text_dialogs == [
-        {
-            "title": "Complete browser login",
-            "detail": "Paste callback URL",
-            "on_submit": palette.text_dialogs[0]["on_submit"],
-            "mask_input": False,
-        }
-    ]
+    kind, fields = overlays.top
+    assert (kind, fields["title"], fields["detail"]) == (
+        "input",
+        "Connecting OpenAI ChatGPT Plus/Pro",
+        "Paste the callback URL",
+    )
+    fields["on_submit"]("https://callback.example")
+    await _finish(menu)
 
-    on_submit = cast("Callable[[str], None]", palette.text_dialogs[0]["on_submit"])
-    on_submit("callback-url")
-
-    assert await task == "callback-url"
+    assert login.answer == "https://callback.example"
+    assert settings.core.credentials["openai:oauth"] == _credential()
 
 
-def test_provider_menu_oauth_progress_uses_text_dialog() -> None:
-    palette = _FakeOverlays()
-    menu = _provider_menu(palette)
+@pytest.mark.usefixtures("opened_urls")
+async def test_closing_the_prompt_cancels_the_login(
+    overlays: _FakeOverlays, settings: _FakeAppSettings
+) -> None:
+    menu = _menu(overlays, settings, _PromptedLogin())
+    menu.select(_openai_provider())
+    _pick(overlays.top, "ChatGPT Plus/Pro")
+    await asyncio.sleep(0)
+    login = menu._login
+    assert login is not None
 
-    menu._show_oauth_progress("Enter code ABCD-EFGH")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    overlays.top[1]["on_cancel"]()
+    await asyncio.wait([login])
 
-    assert palette.text_dialogs == [
-        {
-            "title": "Enter code ABCD-EFGH",
-            "detail": None,
-            "on_submit": palette.text_dialogs[0]["on_submit"],
-            "mask_input": False,
-        }
-    ]
+    assert login.cancelled()
+    assert overlays.kinds == ["picker"]  # Back to choosing how to connect.
+    assert settings.core.credentials == {}
+    assert menu._login is None
+
+
+@pytest.mark.usefixtures("opened_urls")
+async def test_a_new_login_replaces_one_under_way(
+    overlays: _FakeOverlays, settings: _FakeAppSettings
+) -> None:
+    menu = _menu(overlays, settings, _PromptedLogin())
+    menu.select(_openai_provider())
+    _pick(overlays.top, "ChatGPT Plus/Pro")
+    await asyncio.sleep(0)
+    first = menu._login
+    assert first is not None
+
+    _pick(overlays.stack[0], "ChatGPT Plus/Pro")
+    await asyncio.wait([first])
+    await asyncio.sleep(0)
+
+    assert first.cancelled()
+    assert menu._login is not None
+    assert overlays.top[1]["title"] == "Connecting OpenAI ChatGPT Plus/Pro"
+
+
+async def test_a_failed_login_says_why(overlays: _FakeOverlays, settings: _FakeAppSettings) -> None:
+    menu = _menu(overlays, settings, _FailingLogin())
+    menu.select(_openai_provider())
+    _pick(overlays.top, "ChatGPT Plus/Pro")
+    await _finish(menu)
+
+    kind, fields = overlays.top
+    assert (kind, fields["title"], fields["detail"]) == (
+        "message",
+        "Provider login failed",
+        "token exchange failed",
+    )
+    assert overlays.kinds == ["message"]
