@@ -65,8 +65,8 @@ class WorkspaceFiles:
         matches = chain(self._prefix_matches(query), self._fuzzy_matches(query))
         return list(islice(_unique(matches), limit))
 
-    def _prefix_matches(self, query: str) -> list[str]:
-        return [path for path in self.files if _path_segment_prefix_match(path, query)]
+    def _prefix_matches(self, query: str) -> Iterator[str]:
+        return (path for path in self.files if _path_segment_prefix_match(path, query))
 
     def _fuzzy_matches(self, query: str) -> Iterator[str]:
         completions = self._fuzzy.get_completions(
