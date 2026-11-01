@@ -8,8 +8,8 @@ from prompt_toolkit.formatted_text import FormattedText
 from rich.padding import Padding
 
 from koda_tui.appearance import Spacing, Tokens, compose
-from koda_tui.appearance.rich import render
 from koda_tui.rendering.markdown import Markdown
+from koda_tui.rendering.rich import render
 from koda_tui.rendering.tools import render_tool_call
 from koda_tui.state import AssistantMessage, ErrorMessage, ToolMessage, UserMessage
 

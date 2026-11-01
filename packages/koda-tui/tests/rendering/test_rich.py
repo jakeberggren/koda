@@ -3,7 +3,8 @@
 from rich.markdown import Markdown
 from rich.text import Text
 
-from koda_tui.appearance import Tokens, compose, rich
+from koda_tui.appearance import Tokens, compose
+from koda_tui.rendering import rich
 
 
 def test_rich_and_prompt_toolkit_share_style_names() -> None:
