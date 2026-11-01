@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING
 from koda_common.logging import get_logger
 from koda_service.exceptions import ServiceSessionNotFoundError
 from koda_tui.appearance import Tokens
-from koda_tui.ui.primitives import ListItem
-from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, Picker
+from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, ListItem, Picker
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
