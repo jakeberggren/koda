@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 from typing import TYPE_CHECKING
 
@@ -54,43 +55,81 @@ def _type(composer: Composer, text: str) -> None:
     composer.buffer.cursor_position = len(text)
 
 
-def test_typing_a_mention_suggests_files(composer: Composer) -> None:
+async def _settle(composer: Composer) -> list[str]:
+    """The suggestions once they stop changing, as the completer finds them off-thread."""
+    shown: list[str] | None = None
+    steady = 0
+    for _ in range(200):
+        await asyncio.sleep(0.005)
+        now = [item.label for item in composer._suggestions.items]  # noqa: SLF001
+        steady = steady + 1 if now == shown else 0
+        shown = now
+        if steady >= 5:
+            break
+    return shown or []
+
+
+async def test_typing_a_mention_suggests_files(composer: Composer) -> None:
     _type(composer, "look at @src/ap")
-    assert composer.is_mentioning
-    assert composer.has_suggestion
+    assert composer.is_mentioning()
+    assert await _settle(composer) == ["src/app.py", "src/apply.py", "src/appearance/theme.py"]
+    assert composer.has_suggestion()
 
 
-def test_accepting_replaces_the_mention_with_the_path(composer: Composer) -> None:
-    _type(composer, "look at @src/ap please")
-    composer.buffer.cursor_position = len("look at @src/ap")
+async def test_accepting_puts_the_path_after_the_at_and_leaves_the_mention(
+    composer: Composer,
+) -> None:
+    _type(composer, "look at @src/ap")
+    await _settle(composer)
     composer.move_suggestion(1)
     assert composer.accept_suggestion()
-    assert composer.text == "look at src/apply.py please"
-    assert not composer.is_mentioning
+    assert composer.text == "look at @src/apply.py "
+    assert not composer.is_mentioning()
+    assert await _settle(composer) == []
 
 
-def test_selection_follows_the_same_file_while_typing(composer: Composer) -> None:
+async def test_selection_follows_the_same_file_while_typing(composer: Composer) -> None:
     _type(composer, "@src/ap")
+    await _settle(composer)
     composer.move_suggestion(1)
-    selected = composer.text
     _type(composer, "@src/app")
+    await _settle(composer)
     composer.accept_suggestion()
-    assert composer.text != selected
-    assert composer.text.startswith("src/apply.py")
+    assert composer.text == "@src/apply.py "
 
 
-def test_leaving_the_mention_closes_the_suggestions(composer: Composer) -> None:
+async def test_a_backspace_in_a_mention_keeps_suggesting(composer: Composer) -> None:
+    _type(composer, "@src/appl")
+    await _settle(composer)
+    composer.buffer.delete_before_cursor()
+    assert await _settle(composer) == ["src/app.py", "src/apply.py", "src/appearance/theme.py"]
+
+
+async def test_moving_into_a_mention_suggests_again(composer: Composer) -> None:
+    _type(composer, "@src/apply and more")
+    await _settle(composer)
+    assert not composer.has_suggestion()
+    composer.buffer.cursor_position = len("@src/apply")
+    assert await _settle(composer) == ["src/apply.py"]
+
+
+async def test_leaving_the_mention_closes_the_suggestions(composer: Composer) -> None:
     _type(composer, "@src/ap")
+    await _settle(composer)
     _type(composer, "@src/ap and more")
-    assert not composer.is_mentioning
+    assert not composer.is_mentioning()
     assert not composer.accept_suggestion()
 
 
-def test_text_can_be_set_and_cleared(composer: Composer) -> None:
+async def test_a_mention_without_matches_suggests_nothing(composer: Composer) -> None:
+    _type(composer, "@nothing-like-this")
+    assert await _settle(composer) == []
+    assert composer.is_mentioning()
+
+
+def test_setting_the_text_puts_the_cursor_at_its_end(composer: Composer) -> None:
     composer.text = "draft"
     assert composer.buffer.cursor_position == len("draft")
-    composer.clear()
-    assert composer.text == ""
 
 
 async def test_enter_submits_the_trimmed_text_and_clears(composer: Composer) -> None:
@@ -120,6 +159,7 @@ async def test_ctrl_j_starts_a_new_line(composer: Composer) -> None:
 
 async def test_enter_while_suggesting_accepts_the_file_instead(composer: Composer) -> None:
     _type(composer, "look at @src/app")
+    await _settle(composer)
     await _press(composer, Keys.Enter)
     assert SUBMITTED == []
-    assert composer.text.startswith("look at src/app")
+    assert composer.text == "look at @src/app.py "
