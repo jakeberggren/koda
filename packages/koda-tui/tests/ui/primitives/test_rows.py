@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from prompt_toolkit.data_structures import Point
-from prompt_toolkit.formatted_text import fragment_list_to_text
 from prompt_toolkit.layout import Window, to_container
+from prompt_toolkit.layout.mouse_handlers import MouseHandlers
+from prompt_toolkit.layout.screen import Screen, WritePosition
 from prompt_toolkit.mouse_events import MouseButton, MouseEvent, MouseEventType
 
 from koda_tui.ui.primitives import Lines, Rows
@@ -32,9 +33,23 @@ class _Shown:
         return Lines(lines, selected=self.selected, anchor=self.anchor)
 
     def draw(self) -> tuple[list[str], Point]:
-        content = self.window.content.create_content(10, HEIGHT)
-        lines = [fragment_list_to_text(content.get_line(i)) for i in range(content.line_count)]
-        return lines, content.cursor_position
+        """The rows the window shows, and the cursor among them."""
+        screen = Screen()
+        self.window.write_to_screen(
+            screen,
+            MouseHandlers(),
+            WritePosition(xpos=0, ypos=0, width=10, height=HEIGHT),
+            parent_style="",
+            erase_bg=False,
+            z_index=None,
+        )
+        rows = [
+            "".join(screen.data_buffer[y][x].char for x in range(10)).rstrip()
+            for y in range(HEIGHT)
+        ]
+        info = self.window.render_info
+        assert info is not None
+        return rows, info.cursor_position
 
     def select(self, selected: int | None, anchor: int | None = None) -> tuple[list[str], Point]:
         self.selected, self.anchor = selected, anchor

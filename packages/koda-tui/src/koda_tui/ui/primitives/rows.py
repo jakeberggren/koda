@@ -42,19 +42,27 @@ class Rows:
         on_scroll: Callable[[int], None] | None = None,
         height: AnyDimension = None,
     ) -> None:
-        self._window = Window(RowsControl(lines, on_scroll), height=height, dont_extend_height=True)
+        control = RowsControl(lines, on_scroll)
+        self._window = Window(
+            control,
+            height=height,
+            dont_extend_height=True,
+            get_vertical_scroll=control.vertical_scroll,
+        )
 
     def __pt_container__(self) -> Window:
         return self._window
 
 
 class RowsControl(UIControl):
-    """Draws the visible lines, with the cursor on the selected one."""
+    """Hands the window every line, with the cursor on the selected one, so the window
+    scrolls as little as it takes to show it."""
 
     def __init__(self, lines: Callable[[], Lines], on_scroll: Callable[[int], None] | None) -> None:
         self._lines = lines
         self._on_scroll = on_scroll
-        self._offset = 0  # The first line shown.
+        self._shown = Lines([])  # As last drawn.
+        self._height = 0  # As last drawn.
 
     @override
     def preferred_height(
@@ -68,22 +76,27 @@ class RowsControl(UIControl):
 
     @override
     def create_content(self, width: int, height: int) -> UIContent:
-        shown = self._lines()
-        height = max(1, height)
-        self._offset = _scrolled(self._offset, shown, height)
-        visible = shown.lines[self._offset : self._offset + height]
-        cursor = 0
-        if shown.selected is not None:
-            cursor = max(0, min(height - 1, shown.selected - self._offset))
+        shown = self._shown = self._lines()
+        self._height = height
+        lines = shown.lines
 
         def get_line(i: int) -> StyleAndTextTuples:
-            return visible[i] if 0 <= i < len(visible) else []
+            return lines[i] if 0 <= i < len(lines) else []
 
+        selected = 0 if shown.selected is None else shown.selected
         return UIContent(
             get_line=get_line,
-            line_count=len(visible),
-            cursor_position=Point(x=0, y=cursor),
+            line_count=len(lines),
+            cursor_position=Point(x=0, y=selected),
         )
+
+    def vertical_scroll(self, window: Window) -> int:
+        """Where the window scrolls from: where it is, or up at the anchor when the
+        anchor and the selected line fit together."""
+        selected, anchor = self._shown.selected, self._shown.anchor
+        start = window.vertical_scroll
+        fits = selected is not None and anchor is not None and selected - anchor < self._height
+        return anchor if fits and anchor < start else start
 
     @override
     def mouse_handler(self, mouse_event: MouseEvent) -> None:
@@ -93,18 +106,3 @@ class RowsControl(UIControl):
             self._on_scroll(-1)
         elif mouse_event.event_type == MouseEventType.SCROLL_DOWN:
             self._on_scroll(1)
-
-
-def _scrolled(offset: int, shown: Lines, height: int) -> int:
-    """The first line to show, ``height`` rows high: ``offset`` moved as little as it
-    takes to show the selected line, then up to the anchor if both fit."""
-    selected, anchor = shown.selected, shown.anchor
-    if selected is None:
-        return 0
-    if selected < offset:
-        offset = selected
-    elif selected >= offset + height:
-        offset = selected - height + 1
-    if anchor is not None and anchor < offset and selected - anchor < height:
-        offset = anchor
-    return max(0, min(offset, len(shown.lines) - height))
