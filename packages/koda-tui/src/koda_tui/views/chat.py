@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from prompt_toolkit.layout import HSplit, VSplit, Window
+from prompt_toolkit.layout import HSplit
 
 from koda_tui.appearance import Spacing
 from koda_tui.ui.primitives import Scroll, ScrollState, Spacer
@@ -24,17 +24,7 @@ class Chat:
         self._container = HSplit(
             [
                 Spacer(),
-                VSplit(
-                    [
-                        Window(width=Spacing.EDGE),
-                        Scroll(
-                            ScrollState(),
-                            renderer.render,
-                            gap=Spacing.GAP,
-                            scrollbar=scrollbar,
-                        ),
-                    ],
-                ),
+                Scroll(ScrollState(), renderer.render, gap=Spacing.GAP, scrollbar=scrollbar),
             ],
         )
 

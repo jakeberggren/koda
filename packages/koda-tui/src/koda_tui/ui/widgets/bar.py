@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from prompt_toolkit.layout import VSplit, Window
+from prompt_toolkit.layout import VSplit
 
 from koda_tui.appearance import Spacing, Tokens
 from koda_tui.ui.primitives import Overflow, Text
@@ -33,7 +33,7 @@ class Bar:
         left: Callable[[], list[Segment]],
         right: Callable[[], list[Segment]],
     ) -> None:
-        sides = VSplit(
+        self._container = VSplit(
             [
                 Text(
                     lambda: _join(left()),
@@ -44,13 +44,6 @@ class Bar:
                 Text(lambda: _join(right()), fit=True, weight=RIGHT_PRIORITY),
             ],
             padding=Spacing.GAP,
-        )
-        self._container = VSplit(
-            [
-                Window(width=Spacing.EDGE),
-                sides,
-                Window(width=Spacing.EDGE),
-            ],
             height=1,
         )
 

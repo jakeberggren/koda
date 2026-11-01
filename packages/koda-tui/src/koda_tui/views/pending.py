@@ -27,7 +27,7 @@ class PendingMessages:
         self._container = ConditionalContainer(
             VSplit(
                 [
-                    Window(width=Spacing.INSET),
+                    Window(width=Spacing.GAP),  # Indented from the chat: waiting, not sent.
                     DynamicContainer(lambda: _rows(state.pending_inputs)),
                 ],
             ),
