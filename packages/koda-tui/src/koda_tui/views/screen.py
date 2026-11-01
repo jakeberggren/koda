@@ -17,7 +17,7 @@ from koda_tui.views.status import ActivityIndicator, StatusBar
 if TYPE_CHECKING:
     from prompt_toolkit.filters import FilterOrBool
 
-    from koda_tui.rendering import MessageRenderer
+    from koda_tui.rendering import Renderer
     from koda_tui.state import AppState
     from koda_tui.views.composer import Submit
 
@@ -33,11 +33,11 @@ class Screen:
         self,
         state: AppState,
         *,
-        renderer: MessageRenderer,
+        renderer: Renderer,
         on_submit: Submit,
         show_scrollbar: FilterOrBool = True,
     ) -> None:
-        self.chat = Chat(renderer, scrollbar=show_scrollbar)
+        self.chat = Chat(state, renderer, scrollbar=show_scrollbar)
         self.composer = Composer(state, on_submit=on_submit)
         conversation = HSplit(
             [

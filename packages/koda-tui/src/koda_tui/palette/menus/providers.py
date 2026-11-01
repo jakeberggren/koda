@@ -11,7 +11,7 @@ from koda.llm.auth.protocols import OAuthLoginCallbacks
 from koda_common.logging import get_logger
 from koda_common.settings.credentials import ApiKeyCredential
 from koda_tui import strings
-from koda_tui.appearance import Tokens
+from koda_tui.appearance import Icons, Tokens
 from koda_tui.ui.widgets import InputDialog, ListItem, MessageDialog, Picker
 
 if TYPE_CHECKING:
@@ -25,7 +25,6 @@ if TYPE_CHECKING:
 
 log = get_logger(__name__)
 
-_CONNECTED = "✓"
 
 _PROXY_MANAGED_PROVIDER_FOOTER: StyleAndTextTuples = [
     (Tokens.Text.WARNING, strings.Palette.Providers.PROXY_MANAGED)
@@ -97,7 +96,7 @@ class ProviderMenu:
                     ListItem(
                         label=selection.label,
                         detail=selection.connection.description or "",
-                        marker=_CONNECTED if self._connected(selection) else None,
+                        marker=Icons.DONE if self._connected(selection) else None,
                         data=selection,
                     )
                     for selection in connections
@@ -115,7 +114,7 @@ class ProviderMenu:
             ListItem(
                 label=provider.name,
                 detail=provider.description or "",
-                marker=_CONNECTED if not proxy_managed and self._any_connected(provider) else None,
+                marker=Icons.DONE if not proxy_managed and self._any_connected(provider) else None,
                 data=provider,
             )
             for provider in self._service.list_providers()

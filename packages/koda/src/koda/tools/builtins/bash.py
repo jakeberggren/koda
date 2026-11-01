@@ -86,6 +86,7 @@ def _build_output(
             "cwd": cwd,
         },
         display=f"Command exited with code {exit_code}",
+        is_error=exit_code != 0,
     )
 
 

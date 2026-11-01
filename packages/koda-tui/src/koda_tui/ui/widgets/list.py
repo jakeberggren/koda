@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from prompt_toolkit.utils import get_cwidth
 
 from koda_tui import strings
-from koda_tui.appearance import Tokens, compose
+from koda_tui.appearance import Icons, Tokens, compose
 from koda_tui.ui.fragments import truncate_text
 from koda_tui.ui.primitives import Lines, Rows
 
@@ -178,13 +178,13 @@ def _item_line[T](item: ListItem[T], *, selected: bool, width: int) -> StyleAndT
     """One item: its marker or the selection indicator, its padded label, then detail."""
     style = SELECTED_STYLE if selected else Tokens.Text.DEFAULT
     label_style = CURRENT_STYLE if item.current and not selected else style
-    marker = "*" if item.current else item.marker
+    marker = Icons.CURRENT if item.current else item.marker
 
     line: StyleAndTextTuples = []
     if marker is not None:
         line.append((style if selected else CURRENT_STYLE, f"{marker} "))
     else:
-        line.append((style, "- " if selected else "  "))
+        line.append((style, f"{Icons.SELECTED} " if selected else "  "))
     label = truncate_text(item.label, width)
     line.append((label_style, label + " " * (width - get_cwidth(label))))
     if item.detail:

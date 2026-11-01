@@ -9,7 +9,7 @@ from prompt_toolkit.filters import Condition
 from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit
 
 from koda_tui import strings
-from koda_tui.appearance import Tokens
+from koda_tui.appearance import Icons, Tokens
 from koda_tui.state import ResponsePhase
 from koda_tui.ui.primitives import Spacer, Spinner, Text
 from koda_tui.ui.widgets import Bar
@@ -78,7 +78,7 @@ def _model(state: AppState) -> list[Segment]:
     segments: list[Segment] = []
     if state.active_model is not None:
         model = state.active_model
-        segments.append([(Tokens.Text.MUTED, f"{model.provider} · {model.name}")])
+        segments.append([(Tokens.Text.MUTED, f"{model.provider} {Icons.DIVIDER} {model.name}")])
     if state.thinking.id != "none":
         segments.append([(Tokens.Text.WARNING, state.thinking.label.lower())])
     return segments
