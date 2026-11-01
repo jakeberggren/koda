@@ -9,11 +9,12 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.key_binding import ConditionalKeyBindings, KeyBindings, merge_key_bindings
 from prompt_toolkit.keys import Keys
-from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit, Window
+from prompt_toolkit.layout import ConditionalContainer, VSplit
+from prompt_toolkit.widgets import Box
 
 from koda_tui.appearance import Spacing, Tokens
 from koda_tui.terminal.keys import ALT_ENTER
-from koda_tui.ui.primitives import Editor, Spacer
+from koda_tui.ui.primitives import Editor
 from koda_tui.ui.widgets import List, ListItem, ListState, Prompt
 from koda_tui.workspace import WorkspaceFiles
 
@@ -54,24 +55,18 @@ class Composer:
             List(self._suggestions, empty_message="no matches"),
             filter=Condition(lambda: self.is_mentioning),
         )
-        self._container = HSplit(
-            [
-                Spacer(),
-                VSplit(
-                    [
-                        Window(width=Spacing.EDGE),
-                        Prompt(),
-                        Window(width=Spacing.GAP),
-                        self._editor,
-                    ],
-                ),
-                Spacer(),
-            ],
+        self.key_bindings = self._key_bindings(on_submit)
+        self._container = Box(
+            # On the row, not the Box: Box doesn't apply key bindings it is given.
+            VSplit([Prompt(), self._editor], padding=Spacing.GAP, key_bindings=self.key_bindings),
+            padding=0,
+            padding_top=Spacing.GAP,
+            padding_bottom=Spacing.GAP,
+            padding_left=Spacing.EDGE,
             style=Tokens.Surface.RAISED,
-            key_bindings=self._key_bindings(on_submit),
         )
 
-    def __pt_container__(self) -> HSplit:
+    def __pt_container__(self) -> Box:
         return self._container
 
     @property

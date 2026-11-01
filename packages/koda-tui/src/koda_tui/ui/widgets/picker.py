@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from prompt_toolkit.buffer import Buffer
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
-from prompt_toolkit.layout import Dimension, VSplit, Window
+from prompt_toolkit.layout import Dimension, VSplit
 
 from koda_tui.appearance import Height, Spacing, Width
 from koda_tui.ui.primitives import Input, Overflow, Spacer, Text
@@ -52,7 +52,7 @@ class Picker[T]:
         self.state = ListState(items)
         self.search = Buffer(on_text_changed=lambda buffer: self.state.set_search(buffer.text))
         body: list[AnyContainer] = [
-            VSplit([Prompt(), Window(width=Spacing.GAP), Input(self.search)]),
+            VSplit([Prompt(), Input(self.search)], padding=Spacing.GAP),
             Spacer(),
             List(self.state, heading=heading, height=LIST_HEIGHT, label_width=label_width),
         ]

@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.filters import Condition
-from prompt_toolkit.layout import ConditionalContainer, DynamicContainer, HSplit, VSplit, Window
+from prompt_toolkit.layout import ConditionalContainer, DynamicContainer, HSplit
+from prompt_toolkit.widgets import Box
 
 from koda_tui.appearance import Spacing, Tokens, compose
 from koda_tui.ui.primitives import Overflow, Text
@@ -25,11 +26,11 @@ class PendingMessages:
 
     def __init__(self, state: AppState) -> None:
         self._container = ConditionalContainer(
-            VSplit(
-                [
-                    Window(width=Spacing.GAP),  # Indented from the chat: waiting, not sent.
-                    DynamicContainer(lambda: _rows(state.pending_inputs)),
-                ],
+            # Indented from the chat: waiting, not sent.
+            Box(
+                DynamicContainer(lambda: _rows(state.pending_inputs)),
+                padding=0,
+                padding_left=Spacing.GAP,
             ),
             filter=Condition(lambda: bool(state.pending_inputs)),
         )
