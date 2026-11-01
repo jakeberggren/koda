@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from koda_tui.state import AppState
     from koda_tui.terminal import Terminal
     from koda_tui.ui.overlays import Overlays
-    from koda_tui.ui.primitives import ListItem
+    from koda_tui.ui.widgets import ListItem
 
 
 class _FakeCoreSettings:

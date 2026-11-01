@@ -13,8 +13,7 @@ from koda_tui.palette.menus.providers import ProviderMenu
 from koda_tui.palette.menus.sessions import SessionMenu
 from koda_tui.palette.menus.theme import ThemeMenu
 from koda_tui.palette.menus.thinking import ThinkingMenu
-from koda_tui.ui.primitives import ListItem
-from koda_tui.ui.widgets import Picker
+from koda_tui.ui.widgets import ListItem, Picker
 
 if TYPE_CHECKING:
     from collections.abc import Callable

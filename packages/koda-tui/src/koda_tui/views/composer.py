@@ -13,8 +13,8 @@ from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit, Window
 
 from koda_tui.appearance import Spacing, Tokens
 from koda_tui.terminal.keys import ALT_ENTER
-from koda_tui.ui.primitives import Editor, List, ListItem, ListState, Spacer
-from koda_tui.ui.widgets import Prompt
+from koda_tui.ui.primitives import Editor, Spacer
+from koda_tui.ui.widgets import List, ListItem, ListState, Prompt
 from koda_tui.workspace import WorkspaceFiles
 
 if TYPE_CHECKING:

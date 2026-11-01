@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit.keys import Keys
 
-from koda_tui.ui.primitives import ListItem
-from koda_tui.ui.widgets import Picker
+from koda_tui.ui.widgets import ListItem, Picker
 
 if TYPE_CHECKING:
     from collections.abc import Callable

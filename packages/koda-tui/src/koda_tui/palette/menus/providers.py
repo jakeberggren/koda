@@ -11,8 +11,7 @@ from koda.llm.auth.protocols import OAuthLoginCallbacks
 from koda_common.logging import get_logger
 from koda_common.settings.credentials import ApiKeyCredential
 from koda_tui.appearance import Tokens
-from koda_tui.ui.primitives import ListItem
-from koda_tui.ui.widgets import InputDialog, MessageDialog, Picker
+from koda_tui.ui.widgets import InputDialog, ListItem, MessageDialog, Picker
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples

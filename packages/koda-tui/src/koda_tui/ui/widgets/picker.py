@@ -10,7 +10,8 @@ from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import Dimension, VSplit, Window
 
 from koda_tui.appearance import Height, Spacing, Width
-from koda_tui.ui.primitives import Input, List, ListState, Overflow, Spacer, Text
+from koda_tui.ui.primitives import Input, Overflow, Spacer, Text
+from koda_tui.ui.widgets.list import List, ListState
 from koda_tui.ui.widgets.panel import Panel
 from koda_tui.ui.widgets.prompt import Prompt
 
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     from prompt_toolkit.key_binding import KeyPressEvent
     from prompt_toolkit.layout import AnyContainer
 
-    from koda_tui.ui.primitives import ListItem
+    from koda_tui.ui.widgets.list import ListItem
 
     type Shortcut[T] = Callable[[ListItem[T] | None], None]
 

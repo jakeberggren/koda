@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
 from koda_tui.appearance import Tokens
-from koda_tui.ui.primitives import ListItem
-from koda_tui.ui.widgets import Picker
+from koda_tui.ui.widgets import ListItem, Picker
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples

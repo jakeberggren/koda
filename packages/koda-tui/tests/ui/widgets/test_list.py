@@ -1,13 +1,14 @@
-"""Tests for the List primitive: ListState (search, selection, grouping) and rendered rows."""
+"""Tests for the List widget: ListState (search, selection, grouping) and its lines."""
 
 from __future__ import annotations
 
 import pytest
+from prompt_toolkit.formatted_text import fragment_list_to_text
 from prompt_toolkit.utils import get_cwidth
 
 from koda_tui.appearance import Tokens, compose
-from koda_tui.ui.primitives import List, ListItem, ListState
-from koda_tui.ui.primitives.list import Row, RowKind
+from koda_tui.ui.widgets import List, ListItem, ListState
+from koda_tui.ui.widgets.list import EMPTY_STYLE, GROUP_STYLE
 
 
 def _items(labels: list[str], **kwargs) -> list[ListItem]:
@@ -125,96 +126,91 @@ def _item(label: str, **kwargs) -> ListItem:
     return ListItem(data=label.lower(), label=label, **kwargs)
 
 
-def _item_label(row: Row) -> str:
-    """The label of an item row: its second fragment, after the marker."""
-    return row.text[1][1].strip()
+def _label(line: list) -> str:
+    """The label of an item line: its second fragment, after the marker."""
+    return line[1][1].strip()
 
 
-class TestRows:
+SELECTED = compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG)
+CURRENT = compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)
+
+
+class TestLines:
     def test_renders_items(self) -> None:
-        state = ListState([_item("Apple"), _item("Banana")])
-        rows = List(state).rows()
-        item_rows = [r for r in rows if r.kind == RowKind.ITEM]
-        assert [_item_label(r) for r in item_rows] == ["Apple", "Banana"]
+        lines = List(ListState([_item("Apple"), _item("Banana")])).lines()
+        assert [_label(line) for line in lines.lines] == ["Apple", "Banana"]
 
     def test_selected_style(self) -> None:
         state = ListState([_item("A"), _item("B")])
         state.move_selection(1)
-        rows = List(state).rows()
-        item_rows = [r for r in rows if r.kind == RowKind.ITEM]
-        assert item_rows[0].text[0] == (Tokens.Text.DEFAULT, "  ")
-        assert item_rows[1].text[0] == (compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG), "- ")
+        lines = List(state).lines()
+        assert lines.lines[0][0] == (Tokens.Text.DEFAULT, "  ")
+        assert lines.lines[1][0] == (SELECTED, "- ")
+        assert lines.selected == 1
 
     @pytest.mark.parametrize("selected", [True, False])
     def test_current_item_style(self, selected) -> None:
-        items = [_item("A"), _item("B", current=True)]
-        state = ListState(items)
+        state = ListState([_item("A"), _item("B", current=True)])
         if selected:
             state.move_selection(1)
-        rows = List(state).rows()
-        item_rows = [r for r in rows if r.kind == RowKind.ITEM]
-        expected_marker_style = (
-            compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG)
-            if selected
-            else compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)
-        )
-        expected_label_style = (
-            compose(Tokens.Surface.SELECTED, Tokens.Text.STRONG)
-            if selected
-            else compose(Tokens.Text.ACCENT, Tokens.Text.STRONG)
-        )
-        assert item_rows[1].text[0] == (expected_marker_style, "* ")
-        assert item_rows[1].text[1][0] == expected_label_style
+        line = List(state).lines().lines[1]
+        style = SELECTED if selected else CURRENT
+        assert line[0] == (style, "* ")
+        assert line[1][0] == style
 
     def test_marker_without_current_keeps_label_style(self) -> None:
-        rows = List(ListState([_item("A"), _item("B", marker="✓")])).rows()
-        assert rows[1].text[0] == (compose(Tokens.Text.ACCENT, Tokens.Text.STRONG), "✓ ")
-        assert rows[1].text[1][0] == Tokens.Text.DEFAULT
+        lines = List(ListState([_item("A"), _item("B", marker="✓")])).lines().lines
+        assert lines[1][0] == (CURRENT, "✓ ")
+        assert lines[1][1][0] == Tokens.Text.DEFAULT
 
     def test_empty(self) -> None:
-        rows = List(ListState([])).rows()
-        empty = [r for r in rows if r.kind == RowKind.EMPTY]
-        assert len(empty) == 1
-        assert "No results found" in str(empty[0].text)
+        lines = List(ListState([])).lines()
+        assert lines.lines == [[(EMPTY_STYLE, "  No results found")]]
+        assert lines.selected is None
 
     def test_custom_empty_message(self) -> None:
-        rows = List(ListState([]), empty_message="Nothing").rows()
-        assert "Nothing" in str(rows[0].text)
+        lines = List(ListState([]), empty_message="Nothing").lines()
+        assert fragment_list_to_text(lines.lines[0]) == "  Nothing"
 
 
-class TestGroupedRows:
-    def test_group_header(self) -> None:
-        state = ListState(
-            [
-                _item("A1", group="Group A"),
-                _item("A2", group="Group A"),
-            ]
-        )
-        rows = List(state).rows()
-        kinds = [r.kind for r in rows]
-        assert kinds == [RowKind.GROUP, RowKind.ITEM, RowKind.ITEM]
+class TestGroupedLines:
+    def test_group_header_is_the_selected_items_anchor(self) -> None:
+        state = ListState([_item("A1", group="Group A"), _item("A2", group="Group A")])
+        state.move_selection(1)
+        lines = List(state).lines()
+        assert lines.lines[0] == [(GROUP_STYLE, "Group A")]
+        assert [_label(line) for line in lines.lines[1:]] == ["A1", "A2"]
+        assert (lines.selected, lines.anchor) == (2, 0)
 
-    def test_heading(self) -> None:
-        state = ListState([_item("Apple")])
-        rows = List(state, heading="Fruits").rows()
-        assert rows[0].kind == RowKind.HEADING
-        assert "Fruits" in str(rows[0].text)
+    def test_groups_are_a_blank_line_apart(self) -> None:
+        state = ListState([_item("U"), _item("A1", group="Group A")])
+        state.move_selection(1)
+        lines = List(state).lines()
+        assert lines.lines[1:3] == [[], [(GROUP_STYLE, "Group A")]]
+        assert (lines.selected, lines.anchor) == (3, 2)
+
+    def test_ungrouped_items_have_no_anchor(self) -> None:
+        lines = List(ListState([_item("Apple")]), heading="Fruits").lines()
+        assert lines.lines[0] == [(GROUP_STYLE, "Fruits")]
+        assert (lines.selected, lines.anchor) == (1, None)
+
+    def test_heading_is_spaced_from_the_first_group(self) -> None:
+        lines = List(ListState([_item("A1", group="Group A")]), heading="Fruits").lines()
+        assert lines.lines[:3] == [[(GROUP_STYLE, "Fruits")], [], [(GROUP_STYLE, "Group A")]]
 
 
-class TestSearchedRows:
+class TestSearchedLines:
     def test_filtered_only(self) -> None:
         state = ListState([_item("Apple"), _item("Banana")])
         state.set_search("app")
-        rows = List(state).rows()
-        item_rows = [r for r in rows if r.kind == RowKind.ITEM]
-        assert len(item_rows) == 1
-        assert _item_label(item_rows[0]) == "Apple"
+        lines = List(state).lines().lines
+        assert [_label(line) for line in lines] == ["Apple"]
 
 
 def test_label_width_cuts_longer_labels_with_an_ellipsis() -> None:
     state = ListState(_items(["claude-opus-5-5-with-a-long-name", "short"]))
-    rows = List(state, label_width=10).rows()
-    labels = ["".join(text for _, text, *_ in row.text) for row in rows]
+    lines = List(state, label_width=10).lines().lines
+    labels = [fragment_list_to_text(line) for line in lines]
     assert labels[0].startswith("- claude-...")
     assert labels[1].startswith("  short     ")
 
@@ -222,7 +218,7 @@ def test_label_width_cuts_longer_labels_with_an_ellipsis() -> None:
 def test_labels_are_padded_and_cut_by_cells_not_characters() -> None:
     # Each of these characters takes two cells.
     state = ListState(_items(["日本語のモデル", "ab"]))
-    rows = List(state, label_width=6).rows()
-    labels = [row.text[1][1] for row in rows]
+    lines = List(state, label_width=6).lines().lines
+    labels = [line[1][1] for line in lines]
     assert labels == ["日... ", "ab    "]  # 日本... would take 7 cells.
     assert all(get_cwidth(label) == 6 for label in labels)
