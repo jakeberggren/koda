@@ -10,7 +10,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import Dimension, VSplit
 
-from koda_tui.appearance import Height, Spacing, Tokens, Width
+from koda_tui.appearance import Height, Icons, Spacing, Tokens, Width
 from koda_tui.ui.primitives import Input, Overflow, Spacer, Text
 from koda_tui.ui.widgets.list import List, ListState
 from koda_tui.ui.widgets.panel import Panel
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from koda_tui.ui.widgets.list import ListItem
 
 LIST_HEIGHT = Dimension(min=Height.SMALL, max=Height.LARGE, preferred=Height.LARGE)
-HINT_DIVIDER = " · "
+HINT_DIVIDER = f" {Icons.DIVIDER} "
 
 
 @dataclass(frozen=True, slots=True)

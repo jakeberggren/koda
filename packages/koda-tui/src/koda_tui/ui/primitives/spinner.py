@@ -8,7 +8,8 @@ import time
 from prompt_toolkit.application.current import get_app
 from prompt_toolkit.layout import FormattedTextControl, Window
 
-FRAMES = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+from koda_tui.appearance import Icons
+
 FRAMES_PER_SECOND = 10
 
 
@@ -48,4 +49,4 @@ class Spinner:
 
 def frame() -> str:
     """The spinner frame for the current moment."""
-    return FRAMES[int(time.time() * FRAMES_PER_SECOND) % len(FRAMES)]
+    return Icons.SPINNER[int(time.time() * FRAMES_PER_SECOND) % len(Icons.SPINNER)]

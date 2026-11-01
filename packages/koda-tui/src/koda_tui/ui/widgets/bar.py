@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit.layout import VSplit
 
-from koda_tui.appearance import Spacing, Tokens
+from koda_tui.appearance import Icons, Spacing, Tokens
 from koda_tui.ui.primitives import Overflow, Text
 
 if TYPE_CHECKING:
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 type Segment = StyleAndTextTuples
 
-DIVIDER = " · "
+DIVIDER = f" {Icons.DIVIDER} "
 RIGHT_PRIORITY = 100
 
 

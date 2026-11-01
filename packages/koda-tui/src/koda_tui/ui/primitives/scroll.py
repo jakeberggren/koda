@@ -10,7 +10,7 @@ from prompt_toolkit.layout import UIContent, UIControl, Window
 from prompt_toolkit.layout.margins import ConditionalMargin, Margin
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 
-from koda_tui.appearance import Spacing, Tokens
+from koda_tui.appearance import Icons, Spacing, Tokens
 from koda_tui.ui.fragments import fit
 
 if TYPE_CHECKING:
@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
     type Blocks = Callable[[int], Sequence[StyleAndTextTuples]]
 
-THUMB = "█"
 THUMB_STYLE = Tokens.Text.DEFAULT
 TRACK_STYLE = Tokens.Surface.RAISED
 
@@ -153,7 +152,7 @@ class ScrollbarMargin(Margin):
 
     @override
     def get_width(self, get_ui_content: Callable[[], UIContent]) -> int:
-        return Spacing.GAP + len(THUMB)
+        return Spacing.GAP + len(Icons.SCROLL_THUMB)
 
     @override
     def create_margin(
@@ -172,6 +171,6 @@ class ScrollbarMargin(Margin):
         for row in range(height):
             thumb = start <= row < start + size
             rows.append(("", gap))
-            rows.append((THUMB_STYLE, THUMB) if thumb else (TRACK_STYLE, " "))
+            rows.append((THUMB_STYLE, Icons.SCROLL_THUMB) if thumb else (TRACK_STYLE, " "))
             rows.append(("", "\n"))
         return rows
