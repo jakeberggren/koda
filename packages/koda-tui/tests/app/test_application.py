@@ -92,14 +92,6 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
     return (app, settings, tui_settings, service, unsubscribe_settings, unsubscribe_tui_settings)
 
 
-def test_close_is_idempotent() -> None:
-    app, _settings, _tui_settings, _service, unsubscribe, unsubscribe_tui = _make_app()
-    app.close()
-    app.close()
-    unsubscribe.assert_called_once_with()
-    unsubscribe_tui.assert_called_once_with()
-
-
 def test_batched_provider_and_model_changes_update_app_state() -> None:
     app, settings, _tui_settings, service, _unsubscribe, _unsubscribe_tui = _make_app()
     settings.provider = "bergetai"
@@ -111,9 +103,7 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
         context_window=128_000,
         thinking_options=[],
     )
-    on_settings_changed = settings.subscribe.call_args.args[0]
-
-    on_settings_changed(
+    app._on_settings_changed(  # noqa: SLF001
         (
             SettingChange(name="provider", old_value="openai", new_value="bergetai"),
             SettingChange(name="model", old_value="gpt-5.2", new_value="zai-org/GLM-4.7"),
@@ -133,10 +123,9 @@ def test_theme_change_redraws_without_requerying_terminal_background(
     invalidate = Mock()
     monkeypatch.setattr(app._terminal, "ask_background", request_refresh)  # noqa: SLF001
     monkeypatch.setattr(app, "invalidate", invalidate)
-    on_tui_settings_changed = tui_settings.subscribe.call_args.args[0]
 
     tui_settings.theme = "auto"
-    on_tui_settings_changed(
+    app._on_tui_settings_changed(  # noqa: SLF001
         (SettingChange(name="theme", old_value="terminal-dark", new_value="auto"),)
     )
 
@@ -159,19 +148,20 @@ def test_terminal_background_response_is_stored_for_any_theme(
 
 
 @pytest.mark.asyncio
-async def test_run_always_closes(monkeypatch: pytest.MonkeyPatch) -> None:
-    app, _settings, _tui_settings, _service, unsubscribe, unsubscribe_tui = _make_app()
+async def test_run_follows_settings_only_while_it_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    app, settings, tui_settings, _service, unsubscribe, unsubscribe_tui = _make_app()
+    settings.subscribe.assert_not_called()
+    tui_settings.subscribe.assert_not_called()
 
     class _FakeApp:
         async def run_async(self) -> None:
+            settings.subscribe.assert_called_once_with(app._on_settings_changed)  # noqa: SLF001
+            tui_settings.subscribe.assert_called_once_with(app._on_tui_settings_changed)  # noqa: SLF001
             raise RuntimeError("boom")
 
-    def _fake_create_application() -> _FakeApp:
-        return _FakeApp()
+    monkeypatch.setattr(application, "_create_application", lambda *_args, **_kwargs: _FakeApp())
 
-    monkeypatch.setattr(app, "_create_application", _fake_create_application)
-
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match="boom"):
         await app.run()
 
     unsubscribe.assert_called_once_with()
@@ -248,21 +238,21 @@ def test_escape_is_free_for_others_while_idle() -> None:
 def test_every_core_setting_change_reaches_the_service() -> None:
     app, settings, _tui_settings, service, *_ = _make_app()
     app.invalidate = Mock()
-    on_settings_changed = settings.subscribe.call_args.args[0]
 
     change = SettingChange(name="bash_execution_sandbox", old_value="host", new_value="docker")
-    on_settings_changed((change,))
+    app._on_settings_changed((change,))  # noqa: SLF001
 
     service.update_settings.assert_called_once_with(settings)
     app.invalidate.assert_called_once_with()
 
 
 def test_any_tui_setting_change_redraws() -> None:
-    app, _settings, tui_settings, *_ = _make_app()
+    app, *_ = _make_app()
     app.invalidate = Mock()
-    on_tui_settings_changed = tui_settings.subscribe.call_args.args[0]
 
-    on_tui_settings_changed((SettingChange(name="queue_inputs", old_value=True, new_value=False),))
+    app._on_tui_settings_changed(  # noqa: SLF001
+        (SettingChange(name="queue_inputs", old_value=True, new_value=False),)
+    )
 
     app.invalidate.assert_called_once_with()
 
@@ -270,7 +260,7 @@ def test_any_tui_setting_change_redraws() -> None:
 def test_writing_a_message_takes_back_a_press_of_ctrl_c() -> None:
     app, *_ = _make_app()
     app.outbox = Mock()
-    app.confirm_exit()
+    app.exit_prompt.confirm()
 
     app._submit("hello", alternate=False)  # noqa: SLF001 - the composer's submit callback
 
@@ -280,9 +270,9 @@ def test_writing_a_message_takes_back_a_press_of_ctrl_c() -> None:
 
 def test_first_ctrl_c_asks_and_second_confirms() -> None:
     app, *_ = _make_app()
-    assert app.confirm_exit() is False
+    assert app.exit_prompt.confirm() is False
     assert app.state.exit_requested
-    assert app.confirm_exit() is True
+    assert app.exit_prompt.confirm() is True
     assert not app.state.exit_requested
 
 
@@ -291,19 +281,19 @@ async def test_the_exit_prompt_goes_away_after_the_timeout(
 ) -> None:
     monkeypatch.setattr(application, "EXIT_TIMEOUT", 0.01)
     app, *_ = _make_app()
-    app.confirm_exit()
+    app.exit_prompt.confirm()
 
     await asyncio.sleep(0.02)
 
     assert not app.state.exit_requested
-    assert app.confirm_exit() is False
+    assert app.exit_prompt.confirm() is False
 
 
 async def test_a_confirmed_exit_cancels_the_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(application, "EXIT_TIMEOUT", 0.01)
     app, *_ = _make_app()
-    app.confirm_exit()
-    assert app.confirm_exit() is True
+    app.exit_prompt.confirm()
+    assert app.exit_prompt.confirm() is True
     app.state.exit_requested = True  # As if asked again after confirming.
     await asyncio.sleep(0.02)
     assert app.state.exit_requested  # The old timer didn't fire.

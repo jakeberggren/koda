@@ -32,7 +32,7 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901 - one hand
 
     @kb.add(Keys.ControlC)
     def _exit(_event: KeyPressEvent) -> None:
-        if app.confirm_exit():
+        if app.exit_prompt.confirm():
             app.exit()
 
     @kb.add(Keys.Escape, filter=Condition(lambda: state.responding or bool(state.pending_inputs)))
