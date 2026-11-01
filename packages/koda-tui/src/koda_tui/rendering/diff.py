@@ -11,7 +11,7 @@ from rich.padding import Padding
 from rich.syntax import Syntax
 
 from koda_tui.appearance import Tokens
-from koda_tui.appearance.rich import syntax
+from koda_tui.rendering.rich import syntax
 
 if TYPE_CHECKING:
     from rich.console import RenderableType

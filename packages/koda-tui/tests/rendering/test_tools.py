@@ -5,8 +5,8 @@ from typing import Any
 from prompt_toolkit.formatted_text import FormattedText
 
 from koda.tools import ToolCall, ToolOutput
-from koda_tui.appearance.rich import render
 from koda_tui.rendering.diff import diff_summary
+from koda_tui.rendering.rich import render
 from koda_tui.rendering.tools import render_tool_call
 
 

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, ClassVar, override
 
 from rich import markdown
 
-from koda_tui.appearance.rich import syntax
+from koda_tui.rendering.rich import syntax
 
 if TYPE_CHECKING:
     from rich.console import Console, ConsoleOptions, RenderResult

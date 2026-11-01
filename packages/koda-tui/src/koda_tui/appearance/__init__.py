@@ -1,8 +1,7 @@
 """How the TUI looks: themes, design tokens, and the live stylesheet.
 
 - ``Appearance``: the entry point; owns theme state and exposes the app's style.
-- ``Tokens``: design tokens for prompt_toolkit fragments and Rich renderables.
-- ``appearance.rich``: renders Rich output as fragments styled by those tokens.
+- ``Tokens``: design tokens, the class names everything else styles itself with.
 """
 
 from koda_tui.appearance.appearance import Appearance

@@ -4,11 +4,11 @@ from rich.padding import Padding
 
 from koda.tools import ToolCall
 from koda_tui.appearance import Tokens
-from koda_tui.appearance import rich as rich_bridge
-from koda_tui.appearance.rich import render
 from koda_tui.rendering import render_message
+from koda_tui.rendering import rich as rich_bridge
 from koda_tui.rendering.diff import diff_blocks
 from koda_tui.rendering.markdown import Markdown
+from koda_tui.rendering.rich import render
 from koda_tui.state import AssistantMessage, ErrorMessage, ToolMessage, UserMessage
 
 WIDTH = 80
