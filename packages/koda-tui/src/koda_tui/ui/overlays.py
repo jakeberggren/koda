@@ -50,6 +50,8 @@ class Overlays:
         app = get_app()
         if self._stack:
             self._root.floats.append(self._stack[-1])
+            # prompt_toolkit maps parents only on render. keys before it miss the overlay bindings.
+            app.layout.update_parents_relations()
             app.layout.focus(self._stack[-1].content)
         elif self._fallback is not None:
             app.layout.focus(self._fallback)
