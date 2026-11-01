@@ -9,7 +9,7 @@ from koda_tui.ui.widgets.dialogs import (
 )
 from koda_tui.ui.widgets.list import List, ListItem, ListState
 from koda_tui.ui.widgets.panel import Panel
-from koda_tui.ui.widgets.picker import Picker
+from koda_tui.ui.widgets.picker import Picker, Shortcut
 from koda_tui.ui.widgets.prompt import Prompt
 
 __all__ = [
@@ -25,4 +25,5 @@ __all__ = [
     "Picker",
     "Prompt",
     "Segment",
+    "Shortcut",
 ]
