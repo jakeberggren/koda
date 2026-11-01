@@ -1,11 +1,19 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from koda.llm import ModelDefinition, ProviderDefinition, ThinkingOption
-from koda.messages import TokenUsage
-from koda.tools import ToolCall, ToolOutput
-from koda_service import ServiceStatus
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from koda.llm import ThinkingOptionId
+    from koda.messages import TokenUsage
+    from koda.tools import ToolCall, ToolOutput
+    from koda_common.settings import SettingsManager
+    from koda_service import KodaService, ServiceStatus
 
 
 class ResponsePhase(Enum):
@@ -106,3 +114,37 @@ class AppState:
     @property
     def thinking_supported(self) -> bool:
         return self.active_model is not None and self.active_model.supports_thinking
+
+    @classmethod
+    def load(cls, workspace: Path, service: KodaService, settings: SettingsManager) -> AppState:
+        """The state for ``workspace``, refreshed from what the service reports."""
+        state = cls(workspace=workspace, service_status=service.status())
+        state.refresh(service, settings)
+        return state
+
+    def refresh(self, service: KodaService, settings: SettingsManager) -> None:
+        """Take what the service reports now, and the model and thinking level the
+        settings pick."""
+        self.service_status = service.status()
+        self.warnings = service.diagnostics().startup_warnings
+        self.configured_providers = service.list_configured_providers()
+        self.active_model = None
+        provider, model = settings.provider, settings.model
+        if self.service_status.is_ready and provider is not None and model is not None:
+            self.active_model = service.get_model(provider, model)
+        self.thinking = (
+            self.active_model.resolve_thinking_option(settings.thinking)
+            if self.active_model is not None
+            else ThinkingOption.none()
+        )
+
+    def next_thinking(self) -> ThinkingOptionId | None:
+        """The active model's thinking level after the current one, wrapping around;
+        None without a ready model that has any."""
+        if not self.service_status.is_ready or self.active_model is None:
+            return None
+        options = [option.id for option in self.active_model.effective_thinking_options]
+        if not options:
+            return None
+        index = options.index(self.thinking.id) if self.thinking.id in options else -1
+        return options[(index + 1) % len(options)]
