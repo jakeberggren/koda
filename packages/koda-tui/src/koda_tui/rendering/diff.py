@@ -10,6 +10,7 @@ from rich.console import Group
 from rich.padding import Padding
 from rich.syntax import Syntax
 
+from koda_tui import strings
 from koda_tui.appearance import Tokens
 from koda_tui.rendering.rich import syntax
 
@@ -61,9 +62,7 @@ def diff_summary(diff: str) -> str:
     """How many lines ``diff`` adds and removes, e.g. "2 additions, 1 deletion"."""
     additions = len(ADDITION.findall(diff))
     deletions = len(DELETION.findall(diff))
-    added = f"{additions} addition" if additions == 1 else f"{additions} additions"
-    deleted = f"{deletions} deletion" if deletions == 1 else f"{deletions} deletions"
-    return f"{added}, {deleted}"
+    return strings.Screen.Chat.Tools.diff_summary(additions, deletions)
 
 
 def _lexer(diff: str) -> str:

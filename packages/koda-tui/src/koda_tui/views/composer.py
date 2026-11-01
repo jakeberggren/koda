@@ -61,7 +61,7 @@ class Composer:
         )
         self._editor = Editor(self.buffer, max_height=MAX_ROWS)
         self.suggestions = ConditionalContainer(
-            List(self._suggestions, empty_message="no matches"),
+            List(self._suggestions),
             filter=Condition(self.is_mentioning),
         )
         self.key_bindings = self._key_bindings(on_submit)

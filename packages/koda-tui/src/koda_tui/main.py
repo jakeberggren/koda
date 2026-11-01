@@ -19,6 +19,7 @@ from koda_common.settings import (
 from koda_service import LocalRuntimeConfig
 from koda_service.exceptions import StartupError
 from koda_service.services.local import LocalKodaService
+from koda_tui import strings
 from koda_tui.app import KodaTuiApp
 from koda_tui.settings import AppSettings, TuiSettingsManager
 
@@ -59,5 +60,5 @@ def _fail(error: StartupError) -> NoReturn:
     """Log ``error``, tell the user what to fix, and exit. Expected start-up failures
     are reported briefly, not as tracebacks."""
     get_logger(__name__).error("startup_failed", summary=error.summary, details=error.details)
-    print(f"Koda failed to start: {error}", file=sys.stderr)
+    print(strings.App.failed_to_start(error), file=sys.stderr)
     sys.exit(1)

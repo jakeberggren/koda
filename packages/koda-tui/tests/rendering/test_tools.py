@@ -91,7 +91,7 @@ class TestToolCalls:
         )
         content = "".join(t[1] for t in result)
         assert "✕ bash command=exit 1 cwd=. timeout=30s" in content
-        assert "\n  └ exit 1, stdout 0 lines, stderr 1 lines" in content
+        assert "\n  └ exit 1, stdout 0 lines, stderr 1 line" in content
         assert "boom" in content
 
     def test_render_bash_success_prefers_stdout_over_stderr(self) -> None:
@@ -114,7 +114,7 @@ class TestToolCalls:
         content = "".join(t[1] for t in result)
         assert "all good" in content
         assert "warning" not in content
-        assert "\n  └ succeeded, stdout 1 lines, stderr 1 lines" in content
+        assert "\n  └ succeeded, stdout 1 line, stderr 1 line" in content
 
     def test_render_bash_success_prefers_tail_preview(self) -> None:
         """Successful bash output should preview the tail where completion info usually lives."""
@@ -140,7 +140,7 @@ class TestToolCalls:
         assert "succeeded, stdout 7 lines, stderr empty" in content
         assert "7 passed in 0.50s" in content
         assert "header" not in content
-        assert "[truncated, 7 total lines]" in content
+        assert "[truncated, 7 lines in total]" in content
 
     def test_render_bash_multiline_command_is_collapsed_for_header(self) -> None:
         """Multiline bash commands should render as a compact single-line preview."""

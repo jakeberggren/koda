@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit
 
+from koda_tui import strings
 from koda_tui.appearance import Tokens
 from koda_tui.state import ResponsePhase
 from koda_tui.ui.primitives import Spacer, Spinner, Text
@@ -17,12 +18,11 @@ if TYPE_CHECKING:
     from koda_tui.state import AppState
     from koda_tui.ui.widgets import Segment
 
-ACTIVITY_TEXT = "Working... (esc to interrupt)"
 PHASES = {
-    ResponsePhase.THINKING: "thinking",
-    ResponsePhase.RESPONDING: "responding",
-    ResponsePhase.WORKING: "working",
-    ResponsePhase.TOOLS: "running tools",
+    ResponsePhase.THINKING: strings.Screen.Status.THINKING,
+    ResponsePhase.RESPONDING: strings.Screen.Status.RESPONDING,
+    ResponsePhase.WORKING: strings.Screen.Status.WORKING,
+    ResponsePhase.TOOLS: strings.Screen.Status.RUNNING_TOOLS,
 }
 
 
@@ -44,7 +44,7 @@ class ActivityIndicator:
         row = VSplit(
             [
                 Spinner(style=Tokens.Text.INFO),
-                Text(f" {ACTIVITY_TEXT}", style=Tokens.Text.MUTED),
+                Text(f" {strings.Screen.Status.ACTIVITY}", style=Tokens.Text.MUTED),
             ],
         )
         self._container = ConditionalContainer(
@@ -89,7 +89,11 @@ def _context(state: AppState) -> list[Segment]:
     if state.usage is None:
         return []
     percentage = state.usage.latest.context_window_percentage(state.context_window)
-    return [] if percentage is None else [[(Tokens.Text.MUTED, f"ctx {percentage}%")]]
+    return (
+        []
+        if percentage is None
+        else [[(Tokens.Text.MUTED, strings.Screen.Status.context(percentage))]]
+    )
 
 
 def _tokens(state: AppState) -> list[Segment]:
@@ -97,7 +101,10 @@ def _tokens(state: AppState) -> list[Segment]:
     if state.usage is None:
         return []
     total = state.usage.total
-    counts = (total.input_tokens, "in"), (total.output_tokens, "out")
+    counts = (
+        (total.input_tokens, strings.Screen.Status.INPUT_TOKENS),
+        (total.output_tokens, strings.Screen.Status.OUTPUT_TOKENS),
+    )
     return [
         [(Tokens.Text.MUTED, f"{_compact(count)} {label}")]
         for count, label in counts
@@ -107,9 +114,9 @@ def _tokens(state: AppState) -> list[Segment]:
 
 def _hints(state: AppState) -> list[Segment]:
     """Key bindings worth knowing, each as the key followed by what it does."""
-    hints = [("ctrl+p/k", "palette")]
+    hints = [(strings.Key.CTRL_P_K, strings.Screen.Status.PALETTE)]
     if state.thinking_supported:
-        hints.insert(0, ("ctrl+t", "thinking"))
+        hints.insert(0, (strings.Key.CTRL_T, strings.Screen.Status.CYCLE_THINKING))
     return [
         [(Tokens.Text.DEFAULT, key), (Tokens.Text.MUTED, f" {action}")] for key, action in hints
     ]
@@ -123,15 +130,15 @@ def _warning(state: AppState) -> list[Segment]:
 def _activity(state: AppState) -> Segment:
     """What Koda is doing now, or why it can't."""
     if state.exit_requested:
-        return [(Tokens.Text.ACCENT, "press ctrl+c again to exit")]
+        return [(Tokens.Text.ACCENT, strings.Screen.Status.EXIT_AGAIN)]
     if not state.service_status.is_ready:
         return [(Tokens.Text.WARNING, state.service_status.summary)]
     return [(Tokens.Text.ACCENT, _phase(state))]
 
 
 def _phase(state: AppState) -> str:
-    """The stage of the current response, or "ready" between responses."""
-    return PHASES.get(state.response_phase, "ready")
+    """The stage of the current response, or ready between responses."""
+    return PHASES.get(state.response_phase, strings.Screen.Status.READY)
 
 
 def _compact(count: int) -> str:

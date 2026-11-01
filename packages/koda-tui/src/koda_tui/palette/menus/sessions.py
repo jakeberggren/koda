@@ -8,6 +8,7 @@ from prompt_toolkit.keys import Keys
 
 from koda_common.logging import get_logger
 from koda_service.exceptions import ServiceSessionNotFoundError
+from koda_tui import strings
 from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, ListItem, Picker, Shortcut
 
 if TYPE_CHECKING:
@@ -16,9 +17,6 @@ if TYPE_CHECKING:
 
 
 log = get_logger(__name__)
-
-_TITLE = "List Sessions"
-_LIST_HEADING = "Select New Session"
 
 
 class SessionMenu:
@@ -47,11 +45,24 @@ class SessionMenu:
         """Open the session selection submenu."""
         self._overlays.open(
             Picker(
-                _TITLE,
+                strings.Palette.Sessions.TITLE,
                 self.items(),
                 on_select=lambda item: self.switch(item.data),
-                heading=_LIST_HEADING,
-                shortcuts=[Shortcut(Keys.ControlD, "ctrl+d", "delete", self.confirm_delete)],
+                heading=strings.Palette.Sessions.HEADING,
+                shortcuts=[
+                    Shortcut(
+                        Keys.ControlN,
+                        strings.Key.CTRL_N,
+                        strings.Palette.Sessions.NEW_HINT,
+                        lambda _item: self.new(),
+                    ),
+                    Shortcut(
+                        Keys.ControlD,
+                        strings.Key.CTRL_D,
+                        strings.Palette.Sessions.DELETE_HINT,
+                        self.confirm_delete,
+                    ),
+                ],
                 on_close=self._overlays.close,
             ),
         )
@@ -81,10 +92,10 @@ class SessionMenu:
         session = item.data
         self._overlays.open(
             ChoiceDialog(
-                "Delete session?",
+                strings.Palette.Sessions.CONFIRM_DELETE,
                 [
-                    DialogChoice("Yes", lambda: self.delete(session), key="y"),
-                    DialogChoice("No", self._overlays.close, key="n"),
+                    DialogChoice(strings.Common.YES, lambda: self.delete(session), key="y"),
+                    DialogChoice(strings.Common.NO, self._overlays.close, key="n"),
                 ],
                 on_cancel=self._overlays.close,
             ),
@@ -109,5 +120,5 @@ class SessionMenu:
 
 
 def _format_session_label(session: Session) -> str:
-    timestamp = session.created_at.strftime("%Y-%m-%d")
-    return f"{session.display_name}  [{timestamp}] ({session.message_count} messages)"
+    date = session.created_at.strftime("%Y-%m-%d")
+    return strings.Palette.Sessions.label(session.display_name, date, session.message_count)

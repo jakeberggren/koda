@@ -4,15 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda_tui import strings
 from koda_tui.appearance import THEMES
 from koda_tui.ui.widgets import ListItem
 
 if TYPE_CHECKING:
     from koda_tui.palette.context import PaletteContext
-
-
-_TITLE = "Select Theme"
-_LIST_HEADING = "Select UI Theme"
 
 
 class ThemeMenu:
@@ -33,7 +30,12 @@ class ThemeMenu:
             )
             for theme in THEMES.values()
         ]
-        self._context.choose(_TITLE, items, heading=_LIST_HEADING, on_choose=self._select)
+        self._context.choose(
+            strings.Palette.Themes.TITLE,
+            items,
+            heading=strings.Palette.Themes.HEADING,
+            on_choose=self._select,
+        )
 
     def _select(self, theme: str) -> None:
         if self._context.settings.tui.theme == theme:
