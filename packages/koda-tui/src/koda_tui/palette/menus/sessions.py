@@ -4,29 +4,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from prompt_toolkit.keys import Keys
+
 from koda_common.logging import get_logger
 from koda_service.exceptions import ServiceSessionNotFoundError
-from koda_tui.appearance import Tokens
-from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, ListItem, Picker
+from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, ListItem, Picker, Shortcut
 
 if TYPE_CHECKING:
-    from prompt_toolkit.formatted_text import StyleAndTextTuples
-
     from koda.sessions import Session
     from koda_tui.palette.context import PaletteContext
-    from koda_tui.ui.widgets.picker import Shortcut
 
 
 log = get_logger(__name__)
 
 _TITLE = "List Sessions"
 _LIST_HEADING = "Select New Session"
-_FOOTER: StyleAndTextTuples = [
-    (Tokens.Text.DEFAULT, "ctrl-n"),
-    (Tokens.Text.MUTED, " new · "),
-    (Tokens.Text.DEFAULT, "ctrl-d"),
-    (Tokens.Text.MUTED, " delete"),
-]
 
 
 class SessionMenu:
@@ -53,18 +45,13 @@ class SessionMenu:
 
     def open(self) -> None:
         """Open the session selection submenu."""
-        shortcuts: dict[str, Shortcut[Session]] = {
-            "c-n": lambda _item: self.new(),
-            "c-d": self.confirm_delete,
-        }
         self._overlays.open(
             Picker(
                 _TITLE,
                 self.items(),
                 on_select=lambda item: self.switch(item.data),
                 heading=_LIST_HEADING,
-                footer=_FOOTER,
-                shortcuts=shortcuts,
+                shortcuts=[Shortcut(Keys.ControlD, "ctrl+d", "delete", self.confirm_delete)],
                 on_close=self._overlays.close,
             ),
         )

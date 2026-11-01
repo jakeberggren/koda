@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.buffer import Buffer
@@ -9,14 +10,14 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import Dimension, VSplit
 
-from koda_tui.appearance import Height, Spacing, Width
+from koda_tui.appearance import Height, Spacing, Tokens, Width
 from koda_tui.ui.primitives import Input, Overflow, Spacer, Text
 from koda_tui.ui.widgets.list import List, ListState
 from koda_tui.ui.widgets.panel import Panel
 from koda_tui.ui.widgets.prompt import Prompt
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
     from prompt_toolkit.formatted_text import StyleAndTextTuples
     from prompt_toolkit.key_binding import KeyPressEvent
@@ -24,17 +25,23 @@ if TYPE_CHECKING:
 
     from koda_tui.ui.widgets.list import ListItem
 
-    type Shortcut[T] = Callable[[ListItem[T] | None], None]
-
 LIST_HEIGHT = Dimension(min=Height.SMALL, max=Height.LARGE, preferred=Height.LARGE)
+HINT_DIVIDER = " · "
+
+
+@dataclass(frozen=True, slots=True)
+class Shortcut[T]:
+    """A key that acts on the selected item."""
+
+    key: Keys
+    label: str
+    action: str
+    run: Callable[[ListItem[T] | None], None]
 
 
 class Picker[T]:
     """A search field over a list, in a panel. Typing filters the items, up and down
     move the selection, enter picks it and escape closes.
-
-    ``shortcuts`` bind more keys to actions on the selected item. ``label_width``
-    cuts longer labels, so the details stay in one column.
     """
 
     def __init__(  # noqa: PLR0913 - each option is a distinct part of the picker
@@ -46,7 +53,7 @@ class Picker[T]:
         on_close: Callable[[], None],
         heading: str | None = None,
         footer: StyleAndTextTuples | None = None,
-        shortcuts: dict[str, Shortcut[T]] | None = None,
+        shortcuts: Sequence[Shortcut[T]] = (),
         label_width: int | None = None,
     ) -> None:
         self.state = ListState(items)
@@ -58,11 +65,13 @@ class Picker[T]:
         ]
         if footer:
             body += [Spacer(), Text(footer, overflow=Overflow.WRAP)]
+        if shortcuts:
+            body += [Spacer(), Text(_hints(shortcuts), overflow=Overflow.WRAP)]
         self._panel = Panel(
             title,
             body,
             on_close=on_close,
-            key_bindings=_key_bindings(self.state, on_select, shortcuts or {}),
+            key_bindings=_key_bindings(self.state, on_select, shortcuts),
             width=Width.LARGE,
         )
 
@@ -73,7 +82,7 @@ class Picker[T]:
 def _key_bindings[T](
     state: ListState[T],
     on_select: Callable[[ListItem[T]], None],
-    shortcuts: dict[str, Shortcut[T]],
+    shortcuts: Sequence[Shortcut[T]],
 ) -> KeyBindings:
     kb = KeyBindings()
 
@@ -97,7 +106,19 @@ def _key_bindings[T](
 def _add_shortcuts[T](
     kb: KeyBindings,
     state: ListState[T],
-    shortcuts: dict[str, Shortcut[T]],
+    shortcuts: Sequence[Shortcut[T]],
 ) -> None:
-    for key, shortcut in shortcuts.items():
-        kb.add(key)(lambda _event, shortcut=shortcut: shortcut(state.selected_item))
+    for shortcut in shortcuts:
+        kb.add(shortcut.key)(lambda _event, shortcut=shortcut: shortcut.run(state.selected_item))
+
+
+def _hints[T](shortcuts: Sequence[Shortcut[T]]) -> StyleAndTextTuples:
+    fragments: StyleAndTextTuples = []
+    for index, shortcut in enumerate(shortcuts):
+        if index:
+            fragments.append((Tokens.Text.MUTED, HINT_DIVIDER))
+        fragments += [
+            (Tokens.Text.DEFAULT, shortcut.label),
+            (Tokens.Text.MUTED, f" {shortcut.action}"),
+        ]
+    return fragments

@@ -5,11 +5,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.keys import Keys
+from prompt_toolkit.layout import to_container
+from prompt_toolkit.layout.mouse_handlers import MouseHandlers
+from prompt_toolkit.layout.screen import Screen, WritePosition
 
-from koda_tui.ui.widgets import ListItem, Picker
+from koda_tui.ui.widgets import ListItem, Picker, Shortcut
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
 
 
 def _items(*labels: str) -> list[ListItem]:
@@ -18,7 +21,7 @@ def _items(*labels: str) -> list[ListItem]:
 
 def _picker(
     items: list[ListItem],
-    shortcuts: dict[str, Callable[[ListItem | None], None]] | None = None,
+    shortcuts: Sequence[Shortcut] = (),
 ) -> tuple[Picker, list[ListItem], list[None]]:
     picked: list[ListItem] = []
     closed: list[None] = []
@@ -74,7 +77,29 @@ def test_escape_closes() -> None:
 
 def test_shortcuts_act_on_the_selected_item() -> None:
     acted: list[ListItem | None] = []
-    picker, _, _ = _picker(_items("Apple", "Banana"), {"c-d": acted.append})
+    picker, _, _ = _picker(
+        _items("Apple", "Banana"), [Shortcut(Keys.ControlD, "ctrl+d", "delete", acted.append)]
+    )
     _press(picker, Keys.Down)
-    _press(picker, "c-d")
+    _press(picker, Keys.ControlD)
     assert [item.label for item in acted if item] == ["Banana"]
+
+
+async def test_shortcuts_are_hinted_under_the_list() -> None:
+    noop: list[ListItem | None] = []
+    shortcuts = [
+        Shortcut(Keys.ControlN, "ctrl+n", "new", noop.append),
+        Shortcut(Keys.ControlD, "ctrl+d", "delete", noop.append),
+    ]
+    picker, _, _ = _picker(_items("Apple"), shortcuts)
+    screen = Screen()
+    to_container(picker).write_to_screen(
+        screen,
+        MouseHandlers(),
+        WritePosition(xpos=0, ypos=0, width=80, height=40),
+        parent_style="",
+        erase_bg=False,
+        z_index=None,
+    )
+    rows = ["".join(screen.data_buffer[y][x].char for x in range(80)) for y in range(40)]
+    assert any("ctrl+n new · ctrl+d delete" in row for row in rows)
