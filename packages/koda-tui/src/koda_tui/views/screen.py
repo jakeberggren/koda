@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from prompt_toolkit.layout import FloatContainer, HSplit
+from prompt_toolkit.layout import FloatContainer, HSplit, Layout
 from prompt_toolkit.widgets import Box
 
 from koda_tui.appearance import Spacing
@@ -27,8 +27,9 @@ class Screen:
     """The chat, then activity, queued messages, the composer and the status bar.
 
     Everything but the composer is kept ``Spacing.EDGE`` clear of the screen's sides;
-    the composer's raised surface runs edge to edge. ``overlays`` open above it all,
-    and give focus back to the composer when they close.
+    the composer's raised surface runs edge to edge. ``layout`` starts with the
+    composer focused; ``overlays`` open above it all, and give focus back to the
+    composer when they close.
     """
 
     def __init__(
@@ -70,6 +71,7 @@ class Screen:
             ),
             floats=[],
         )
+        self.layout = Layout(self, focused_element=self.composer.buffer)
         self.overlays = Overlays(self._root, fallback=self.composer.buffer)
 
     def __pt_container__(self) -> FloatContainer:

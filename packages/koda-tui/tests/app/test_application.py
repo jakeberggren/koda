@@ -103,7 +103,7 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
         context_window=128_000,
         thinking_options=[],
     )
-    app._on_settings_changed(  # noqa: SLF001
+    app.on_settings_changed(
         (
             SettingChange(name="provider", old_value="openai", new_value="bergetai"),
             SettingChange(name="model", old_value="gpt-5.2", new_value="zai-org/GLM-4.7"),
@@ -125,7 +125,7 @@ def test_theme_change_redraws_without_requerying_terminal_background(
     monkeypatch.setattr(app, "invalidate", invalidate)
 
     tui_settings.theme = "auto"
-    app._on_tui_settings_changed(  # noqa: SLF001
+    app.on_tui_settings_changed(
         (SettingChange(name="theme", old_value="terminal-dark", new_value="auto"),)
     )
 
@@ -141,7 +141,7 @@ def test_terminal_background_response_is_stored_for_any_theme(
     monkeypatch.setattr(app, "invalidate", invalidate)
 
     tui_settings.theme = "terminal-dark"
-    app._on_terminal_background(RGBColor(0, 0, 128))  # noqa: SLF001
+    app.on_terminal_background(RGBColor(0, 0, 128))
 
     assert app.appearance.terminal_background == (0, 0, 128)
     invalidate.assert_called_once_with()
@@ -155,11 +155,11 @@ async def test_run_follows_settings_only_while_it_runs(monkeypatch: pytest.Monke
 
     class _FakeApp:
         async def run_async(self) -> None:
-            settings.subscribe.assert_called_once_with(app._on_settings_changed)  # noqa: SLF001
-            tui_settings.subscribe.assert_called_once_with(app._on_tui_settings_changed)  # noqa: SLF001
+            settings.subscribe.assert_called_once_with(app.on_settings_changed)
+            tui_settings.subscribe.assert_called_once_with(app.on_tui_settings_changed)
             raise RuntimeError("boom")
 
-    monkeypatch.setattr(application, "_create_application", lambda *_args, **_kwargs: _FakeApp())
+    monkeypatch.setattr(application, "FullScreenApplication", lambda *_args, **_kwargs: _FakeApp())
 
     with pytest.raises(RuntimeError, match="boom"):
         await app.run()
@@ -240,7 +240,7 @@ def test_every_core_setting_change_reaches_the_service() -> None:
     app.invalidate = Mock()
 
     change = SettingChange(name="bash_execution_sandbox", old_value="host", new_value="docker")
-    app._on_settings_changed((change,))  # noqa: SLF001
+    app.on_settings_changed((change,))
 
     service.update_settings.assert_called_once_with(settings)
     app.invalidate.assert_called_once_with()
@@ -250,7 +250,7 @@ def test_any_tui_setting_change_redraws() -> None:
     app, *_ = _make_app()
     app.invalidate = Mock()
 
-    app._on_tui_settings_changed(  # noqa: SLF001
+    app.on_tui_settings_changed(
         (SettingChange(name="queue_inputs", old_value=True, new_value=False),)
     )
 
@@ -262,7 +262,7 @@ def test_writing_a_message_takes_back_a_press_of_ctrl_c() -> None:
     app.outbox = Mock()
     app.exit_prompt.confirm()
 
-    app._submit("hello", alternate=False)  # noqa: SLF001 - the composer's submit callback
+    app.submit("hello", alternate=False)
 
     assert not app.state.exit_requested
     app.outbox.submit.assert_called_once_with("hello", steer=False)

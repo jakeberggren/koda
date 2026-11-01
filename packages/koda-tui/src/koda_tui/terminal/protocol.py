@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from prompt_toolkit import Application
+    from prompt_toolkit.input import Input
     from prompt_toolkit.key_binding.key_processor import KeyPress
 
 OSC11_QUERY = "\x1b]11;?\x1b\\"
@@ -57,6 +58,14 @@ class Terminal:
         self._reporting_focus = False
         self._asked_background = False
         self._held = ""
+
+    def input(self) -> Input:
+        """The session's input, with this terminal's replies taken out when it is a real
+        terminal."""
+        session_input = get_app_session().input
+        if not isinstance(session_input, Vt100Input):
+            return session_input
+        return TerminalInput(session_input.stdin, self)
 
     def after_render(self, app: Application[None]) -> None:
         """Turn focus reporting on while running, and off on the final render.
