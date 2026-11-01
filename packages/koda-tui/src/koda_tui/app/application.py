@@ -17,6 +17,7 @@ from koda_tui.appearance import Appearance
 from koda_tui.messaging import Conversation, Outbox
 from koda_tui.palette.context import PaletteContext
 from koda_tui.palette.root import RootMenu
+from koda_tui.rendering import MessageRenderer
 from koda_tui.state import AppState
 from koda_tui.terminal import Terminal, TerminalInput, keys
 from koda_tui.ui.overlays import Overlays
@@ -80,6 +81,7 @@ class KodaTuiApp:
 
         self.screen = Screen(
             self.state,
+            renderer=MessageRenderer(self.state),
             on_submit=self._submit,
             show_scrollbar=Condition(lambda: self._app_settings.tui.show_scrollbar),
         )
