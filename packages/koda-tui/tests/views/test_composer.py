@@ -43,9 +43,7 @@ def _clear_submitted() -> None:
 
 async def _press(composer: Composer, *keys: str) -> None:
     """Run the composer's binding for ``keys``, as prompt_toolkit would."""
-    bindings = composer.__pt_container__().key_bindings
-    assert bindings is not None
-    active = [b for b in bindings.get_bindings_for_keys(keys) if b.filter()]
+    active = [b for b in composer.key_bindings.get_bindings_for_keys(keys) if b.filter()]
     result = active[-1].handler(None)  # type: ignore
     if inspect.isawaitable(result):
         await result
