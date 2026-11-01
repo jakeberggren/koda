@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from rich.console import Group
 from rich.text import Text
 
+from koda_tui import strings
 from koda_tui.appearance import Tokens
 from koda_tui.rendering.diff import diff_blocks, diff_summary, is_diff
 
@@ -22,8 +23,8 @@ if TYPE_CHECKING:
 type Arguments = dict[str, object]
 type Content = dict[str, Any] | None
 
+TEXT = strings.Screen.Chat.Tools
 RESULT = "  └ "  # Leads each line of a result.
-ELLIPSIS = "…"
 INLINE_CHARS = 120  # Longest value shown inline before it is summarised.
 PREVIEW_LINES = 6  # Most output lines previewed from a command.
 PREVIEW_CHARS = 600  # Most output characters previewed from a command.
@@ -113,16 +114,16 @@ def _bash_details(content: Content) -> str | None:
     failed = _bash_failed(content)
 
     stderr_lines = _line_count(stderr)
-    stderr_summary = "stderr empty" if stderr_lines == 0 else f"stderr {stderr_lines} lines"
-    outcome = f"exit {content.get('exit_code')}" if failed else "succeeded"
-    blocks = [f"{outcome}, stdout {_line_count(stdout)} lines, {stderr_summary}"]
+    stderr_summary = TEXT.STDERR_EMPTY if stderr_lines == 0 else TEXT.stderr_lines(stderr_lines)
+    outcome = TEXT.exited(content.get("exit_code")) if failed else TEXT.SUCCEEDED
+    blocks = [f"{outcome}, {TEXT.stdout_lines(_line_count(stdout))}, {stderr_summary}"]
 
     if failed and stderr:
-        blocks.append(f"stderr:\n{_preview(stderr)}")
+        blocks.append(f"{TEXT.STDERR}\n{_preview(stderr)}")
     elif stdout:
-        blocks.append(f"stdout:\n{_preview(stdout, tail=not failed)}")
+        blocks.append(f"{TEXT.STDOUT}\n{_preview(stdout, tail=not failed)}")
     elif stderr:
-        blocks.append(f"stderr:\n{_preview(stderr)}")
+        blocks.append(f"{TEXT.STDERR}\n{_preview(stderr)}")
     return f"\n{RESULT}".join(blocks)
 
 
@@ -154,7 +155,7 @@ def _value(value: object) -> str:
     if not isinstance(value, str):
         return json.dumps(value, ensure_ascii=False)
     if "\n" in value or len(value) > INLINE_CHARS:
-        return f"[{len(value)} chars, {_line_count(value)} lines]"
+        return TEXT.long_value(len(value), _line_count(value))
     return value
 
 
@@ -173,7 +174,8 @@ def _inline(value: str) -> str:
     normalized = " ".join(value.split())
     if len(normalized) <= INLINE_CHARS:
         return normalized
-    return f"{normalized[: INLINE_CHARS - len(ELLIPSIS)].rstrip()}{ELLIPSIS}"
+    ellipsis = strings.Common.ELLIPSIS
+    return f"{normalized[: INLINE_CHARS - len(ellipsis)].rstrip()}{ellipsis}"
 
 
 def _preview(value: str, *, tail: bool = False) -> str:
@@ -188,5 +190,6 @@ def _preview(value: str, *, tail: bool = False) -> str:
         preview = preview[-PREVIEW_CHARS:].lstrip() if tail else preview[:PREVIEW_CHARS].rstrip()
     if not (cut_lines or cut_chars):
         return preview
-    marker = f"[truncated, {_line_count(value)} total lines]"
-    return f"...\n{marker}\n{preview}" if tail else f"{preview}\n...\n{marker}"
+    marker = TEXT.truncated(_line_count(value))
+    ellipsis = strings.Common.ELLIPSIS
+    return f"{ellipsis}\n{marker}\n{preview}" if tail else f"{preview}\n{ellipsis}\n{marker}"

@@ -4,15 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda_tui import strings
 from koda_tui.ui.widgets import ListItem
 
 if TYPE_CHECKING:
     from koda.llm import ThinkingOptionId
     from koda_tui.palette.context import PaletteContext
-
-
-_TITLE = "Set Thinking Level"
-_LIST_HEADING = "Select Model Reasoning Effort"
 
 
 class ThinkingMenu:
@@ -33,7 +30,12 @@ class ThinkingMenu:
             )
             for option in (model.effective_thinking_options if model else [])
         ]
-        self._context.choose(_TITLE, items, heading=_LIST_HEADING, on_choose=self._select)
+        self._context.choose(
+            strings.Palette.Thinking.TITLE,
+            items,
+            heading=strings.Palette.Thinking.HEADING,
+            on_choose=self._select,
+        )
 
     def _select(self, thinking: ThinkingOptionId) -> None:
         self._context.settings.core.set("thinking", thinking)

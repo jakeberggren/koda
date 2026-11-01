@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit.utils import get_cwidth
 
+from koda_tui import strings
 from koda_tui.appearance import Tokens, compose
 from koda_tui.ui.fragments import truncate_text
 from koda_tui.ui.primitives import Lines, Rows
@@ -122,7 +123,7 @@ class List[T]:
         state: ListState[T],
         *,
         heading: str | None = None,
-        empty_message: str = "No results found",
+        empty_message: str = strings.Common.NO_MATCHES,
         height: AnyDimension = None,
         label_width: int | None = None,
     ) -> None:

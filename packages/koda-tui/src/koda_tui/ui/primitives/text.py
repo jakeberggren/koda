@@ -15,7 +15,8 @@ from prompt_toolkit.layout import (
     WindowAlign,
 )
 
-from koda_tui.ui.fragments import ELLIPSIS, fit, truncate
+from koda_tui import strings
+from koda_tui.ui.fragments import fit, truncate
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -53,7 +54,7 @@ class Text:
         align: WindowAlign = WindowAlign.LEFT,
         fit: bool = False,
         overflow: Overflow = Overflow.CLIP,
-        ellipsis: Ending = ELLIPSIS,
+        ellipsis: Ending = strings.Common.ELLIPSIS,
         tail: StyleAndTextTuples | None = None,
         focusable: bool = False,
         weight: int = 1,
@@ -135,7 +136,7 @@ class TruncateControl(UIControl):
         self,
         content: str | StyleAndTextTuples | Callable[[], StyleAndTextTuples],
         *,
-        ellipsis: Ending = ELLIPSIS,
+        ellipsis: Ending = strings.Common.ELLIPSIS,
         tail: StyleAndTextTuples | None = None,
     ) -> None:
         self._content = content

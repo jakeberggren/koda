@@ -12,12 +12,13 @@ from prompt_toolkit.formatted_text import fragment_list_to_text, fragment_list_w
 from prompt_toolkit.formatted_text.utils import split_lines
 from prompt_toolkit.utils import get_cwidth
 
+from koda_tui import strings
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-ELLIPSIS = "..."
 WORDS = re.compile(r"\s+|\S+")
 
 # What cut text ends with: a string takes the cut text's style; fragments keep their own.
@@ -91,7 +92,7 @@ def _pieces(word: str, width: int) -> Iterator[str]:
 def truncate(
     fragments: StyleAndTextTuples,
     width: int,
-    ellipsis: Ending = ELLIPSIS,
+    ellipsis: Ending = strings.Common.ELLIPSIS,
     tail: StyleAndTextTuples | None = None,
 ) -> StyleAndTextTuples:
     """Fit ``fragments`` in ``width``, keeping their styles.

@@ -8,6 +8,7 @@ from prompt_toolkit.filters import Condition
 from prompt_toolkit.layout import ConditionalContainer
 from prompt_toolkit.widgets import Box
 
+from koda_tui import strings
 from koda_tui.appearance import Spacing, Tokens, compose
 from koda_tui.ui.primitives import Overflow, Text
 
@@ -17,7 +18,6 @@ if TYPE_CHECKING:
     from koda_tui.state import AppState
 
 SHOWN = 3  # Most recent queued messages shown under the count.
-STEERING = "steering: "
 TITLE_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.STRONG)
 MESSAGE_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS)
 
@@ -45,17 +45,13 @@ class PendingMessages:
         steering = [item.text for item in pending if item.steer]
         queued = [item.text for item in pending if not item.steer]
         lines: list[StyleAndTextTuples] = [
-            [(TITLE_STYLE, STEERING), (MESSAGE_STYLE, text)] for text in steering
+            [(TITLE_STYLE, strings.Screen.Pending.STEERING), (MESSAGE_STYLE, text)]
+            for text in steering
         ]
         if queued:
-            lines.append([(TITLE_STYLE, _title(len(queued)))])
+            lines.append([(TITLE_STYLE, strings.Screen.Pending.queued(len(queued)))])
             lines += [[(MESSAGE_STYLE, text)] for text in queued[-SHOWN:]]
         return _joined(lines)
-
-
-def _title(count: int) -> str:
-    messages = "message" if count == 1 else "messages"
-    return f"{count} {messages} queued (esc to send now, alt/option-up to edit)"
 
 
 def _joined(lines: list[StyleAndTextTuples]) -> StyleAndTextTuples:

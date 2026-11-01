@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, NamedTuple
 
+from koda_tui import strings
 from koda_tui.appearance.tokens import Tokens
 
 if TYPE_CHECKING:
@@ -90,8 +91,8 @@ class AutoTheme:
 
 TERMINAL_DARK = Theme(
     name="terminal-dark",
-    label="Terminal Dark",
-    description="Terminal colors for dark backgrounds",
+    label=strings.Palette.Themes.DARK,
+    description=strings.Palette.Themes.DARK_DETAIL,
     dark=True,
     surface="#434343",
     rules={
@@ -149,8 +150,8 @@ TERMINAL_DARK = Theme(
 
 TERMINAL_LIGHT = Theme(
     name="terminal-light",
-    label="Terminal Light",
-    description="Terminal colors for light backgrounds",
+    label=strings.Palette.Themes.LIGHT,
+    description=strings.Palette.Themes.LIGHT_DETAIL,
     dark=False,
     surface="#dcdcdc",
     rules={
@@ -208,8 +209,8 @@ TERMINAL_LIGHT = Theme(
 
 AUTO = AutoTheme(
     name="auto",
-    label="Auto",
-    description="Follow terminal theme when detectable",
+    label=strings.Palette.Themes.AUTO,
+    description=strings.Palette.Themes.AUTO_DETAIL,
     dark=TERMINAL_DARK,
     light=TERMINAL_LIGHT,
 )

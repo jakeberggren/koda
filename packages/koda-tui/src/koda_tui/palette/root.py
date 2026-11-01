@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 from koda.llm.auth.registry import ProviderAuthRegistry
+from koda_tui import strings
 from koda_tui.palette.menus.input import InputMenu
 from koda_tui.palette.menus.models import ModelMenu
 from koda_tui.palette.menus.providers import ProviderMenu
@@ -21,24 +22,29 @@ if TYPE_CHECKING:
     from koda_tui.palette.context import PaletteContext
     from koda_tui.state import AppState
 
-TITLE = "Commands"
+
+class Group(Enum):
+    """The groups commands are listed under, in the order they first appear."""
+
+    AGENT = auto()
+    SESSIONS = auto()
+    APPEARANCE = auto()
+    SYSTEM = auto()
 
 
-class Group(StrEnum):
-    """The headings commands are listed under, in the order they first appear."""
-
-    AGENT = "Agent"
-    SESSIONS = "Sessions"
-    APPEARANCE = "Appearance"
-    SYSTEM = "System"
+HEADINGS = {
+    Group.AGENT: strings.Palette.Groups.AGENT,
+    Group.SESSIONS: strings.Palette.Groups.SESSIONS,
+    Group.APPEARANCE: strings.Palette.Groups.APPEARANCE,
+    Group.SYSTEM: strings.Palette.Groups.SYSTEM,
+}
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Command:
     """A command: how it is listed, what running it does, and when it is offered."""
 
-    label: str
-    detail: str
+    text: type[strings.Palette.Command]
     group: Group
     run: Callable[[], None]
     available: Callable[[AppState], bool] = lambda _state: True
@@ -54,54 +60,46 @@ class RootMenu:
         sessions = SessionMenu(context)
         self._commands = [
             Command(
-                label="Connect Provider",
-                detail="Configure LLM provider API keys",
+                text=strings.Palette.Providers,
                 group=Group.AGENT,
                 run=ProviderMenu(context, ProviderAuthRegistry.default()).open,
             ),
             Command(
-                label="Set Thinking Level",
-                detail="Select model reasoning effort",
+                text=strings.Palette.Thinking,
                 group=Group.AGENT,
                 run=ThinkingMenu(context).open,
                 available=lambda state: _ready(state) and state.thinking_supported,
             ),
             Command(
-                label="Switch Model",
-                detail="Select a different model",
+                text=strings.Palette.Models,
                 group=Group.AGENT,
                 run=ModelMenu(context).open,
                 available=lambda state: bool(state.configured_providers),
             ),
             Command(
-                label="New Session",
-                detail="Start a new conversation",
+                text=strings.Palette.NewSession,
                 group=Group.SESSIONS,
                 run=sessions.new,
                 available=_ready,
             ),
             Command(
-                label="List Sessions",
-                detail="Switch between sessions",
+                text=strings.Palette.Sessions,
                 group=Group.SESSIONS,
                 run=sessions.open,
                 available=_ready,
             ),
             Command(
-                label="Select Theme",
-                detail="Choose auto, light, or dark mode",
+                text=strings.Palette.Themes,
                 group=Group.APPEARANCE,
                 run=ThemeMenu(context).open,
             ),
             Command(
-                label="Toggle Scrollbar",
-                detail="Show or hide the chat scrollbar",
+                text=strings.Palette.Scrollbar,
                 group=Group.APPEARANCE,
                 run=self._toggle_scrollbar,
             ),
             Command(
-                label="Input Mode",
-                detail="Prefer queue or steer as default input mode",
+                text=strings.Palette.InputMode,
                 group=Group.SYSTEM,
                 run=InputMenu(context).open,
             ),
@@ -110,7 +108,7 @@ class RootMenu:
     def open(self) -> None:
         self._overlays.open(
             Picker(
-                TITLE,
+                strings.Palette.TITLE,
                 self.items(),
                 on_select=lambda item: item.data.run(),
                 on_close=self._overlays.close,
@@ -120,7 +118,12 @@ class RootMenu:
     def items(self) -> list[ListItem[Command]]:
         """The commands offered right now."""
         return [
-            ListItem(label=command.label, detail=command.detail, group=command.group, data=command)
+            ListItem(
+                label=command.text.TITLE,
+                detail=command.text.DETAIL,
+                group=HEADINGS[command.group],
+                data=command,
+            )
             for command in self._commands
             if command.available(self._state)
         ]

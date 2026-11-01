@@ -36,7 +36,7 @@ def test_hidden_when_nothing_is_queued(state: AppState) -> None:
 def test_shows_the_count_then_the_latest_three_indented(state: AppState) -> None:
     rows = _rows(state, [PendingInput(text) for text in ["one", "two", "three", "four"]], width=80)
     assert rows == [
-        " 4 messages queued (esc to send now, alt/option-up to edit)",
+        " 4 messages queued (esc to send now, alt+up to edit)",
         " two",
         " three",
         " four",
@@ -52,7 +52,7 @@ def test_steers_are_labelled_above_the_queue(state: AppState) -> None:
     pending = [PendingInput("fix it", steer=True), PendingInput("then this")]
     assert _rows(state, pending, width=80) == [
         " steering: fix it",
-        " 1 message queued (esc to send now, alt/option-up to edit)",
+        " 1 message queued (esc to send now, alt+up to edit)",
         " then this",
     ]
 

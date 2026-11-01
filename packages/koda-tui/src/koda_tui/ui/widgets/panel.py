@@ -9,6 +9,7 @@ from prompt_toolkit.keys import Keys
 from prompt_toolkit.layout import Dimension, HSplit, VSplit
 from prompt_toolkit.widgets import Box, Frame
 
+from koda_tui import strings
 from koda_tui.appearance import Spacing, Tokens
 from koda_tui.ui.primitives import Spacer, Text
 
@@ -17,8 +18,6 @@ if TYPE_CHECKING:
 
     from prompt_toolkit.key_binding import KeyBindingsBase
     from prompt_toolkit.layout import AnyContainer
-
-CLOSE_HINT = "esc"  # Shown next to the title; Escape is bound in _with_escape.
 
 
 class Panel:
@@ -57,7 +56,7 @@ def _title_row(title: str) -> VSplit:
     return VSplit(
         [
             Text(title, style=Tokens.Text.STRONG),
-            Text(CLOSE_HINT, style=Tokens.Text.MUTED, fit=True),
+            Text(strings.Key.ESC, style=Tokens.Text.MUTED, fit=True),  # Bound in _with_escape.
         ],
     )
 

@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from koda.llm.auth.protocols import OAuthLoginCallbacks
 from koda_common.logging import get_logger
 from koda_common.settings.credentials import ApiKeyCredential
+from koda_tui import strings
 from koda_tui.appearance import Tokens
 from koda_tui.ui.widgets import InputDialog, ListItem, MessageDialog, Picker
 
@@ -24,18 +25,10 @@ if TYPE_CHECKING:
 
 log = get_logger(__name__)
 
-_TITLE = "Connect Provider"
-_LIST_HEADING = "Configure LLM Provider API Key"
-_PROXY_MANAGED_LIST_HEADING = "Available Providers"
-_CONNECTIONS_HEADING = "Connect using"
 _CONNECTED = "✓"
 
 _PROXY_MANAGED_PROVIDER_FOOTER: StyleAndTextTuples = [
-    (
-        Tokens.Text.WARNING,
-        "Proxy-managed credentials: use sbx secret set outside Koda; "
-        "connectivity is verified on request.",
-    )
+    (Tokens.Text.WARNING, strings.Palette.Providers.PROXY_MANAGED)
 ]
 
 
@@ -75,10 +68,14 @@ class ProviderMenu:
         proxy_managed = self._settings.proxy_managed
         self._overlays.open(
             Picker(
-                _TITLE,
+                strings.Palette.Providers.TITLE,
                 self._provider_items(proxy_managed=proxy_managed),
                 on_select=lambda item: self.select(item.data),
-                heading=_PROXY_MANAGED_LIST_HEADING if proxy_managed else _LIST_HEADING,
+                heading=(
+                    strings.Palette.Providers.PROXY_MANAGED_HEADING
+                    if proxy_managed
+                    else strings.Palette.Providers.HEADING
+                ),
                 footer=_PROXY_MANAGED_PROVIDER_FOOTER if proxy_managed else None,
                 on_close=self._overlays.close,
             ),
@@ -106,7 +103,7 @@ class ProviderMenu:
                     for selection in connections
                 ],
                 on_select=lambda item: self._connect(item.data),
-                heading=_CONNECTIONS_HEADING,
+                heading=strings.Palette.Providers.CONNECTIONS_HEADING,
                 on_close=self._overlays.close,
             ),
         )
@@ -140,7 +137,7 @@ class ProviderMenu:
             return
         self._overlays.open(
             InputDialog(
-                title=f"Enter {selection.label}",
+                title=strings.Palette.Providers.enter(selection.label),
                 mask_input=True,
                 on_submit=lambda key: self._save(
                     selection, ApiKeyCredential(type="api_key", value=key)
@@ -167,7 +164,7 @@ class ProviderMenu:
         self._login.add_done_callback(self._on_login_done)
 
     async def _log_in(self, selection: ProviderConnectionSelection) -> None:
-        title = f"Connecting {selection.provider.name} {selection.label}"
+        title = strings.Palette.Providers.connecting(selection.provider.name, selection.label)
         credential = await self._auth_registry.get(selection.credential_key).login(
             OAuthLoginCallbacks(
                 on_auth_url=_open_in_browser,
@@ -207,7 +204,7 @@ class ProviderMenu:
         self._overlays.close_all()
         self._overlays.open(
             MessageDialog(
-                title="Provider login failed",
+                title=strings.Palette.Providers.LOGIN_FAILED,
                 detail=str(error),
                 on_close=self._overlays.close,
             ),

@@ -275,7 +275,7 @@ async def test_a_login_can_be_finished_by_pasting_into_the_prompt(
     kind, fields = overlays.top
     assert (kind, fields["title"], fields["detail"]) == (
         "input",
-        "Connecting OpenAI ChatGPT Plus/Pro",
+        "Connecting OpenAI (ChatGPT Plus/Pro)",
         "Paste the callback URL",
     )
     fields["on_submit"]("https://callback.example")
@@ -322,7 +322,7 @@ async def test_a_new_login_replaces_one_under_way(
 
     assert first.cancelled()
     assert menu._login is not None
-    assert overlays.top[1]["title"] == "Connecting OpenAI ChatGPT Plus/Pro"
+    assert overlays.top[1]["title"] == "Connecting OpenAI (ChatGPT Plus/Pro)"
 
 
 async def test_a_failed_login_says_why(overlays: _FakeOverlays, settings: _FakeAppSettings) -> None:

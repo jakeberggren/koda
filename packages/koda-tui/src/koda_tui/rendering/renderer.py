@@ -8,6 +8,7 @@ from rich.console import Group
 from rich.padding import Padding
 from rich.text import Text
 
+from koda_tui import strings
 from koda_tui.appearance import Spacing, Tokens, compose
 from koda_tui.rendering.markdown import Markdown
 from koda_tui.rendering.rich import render
@@ -22,7 +23,6 @@ if TYPE_CHECKING:
 
 USER_PADDING = (Spacing.GAP, 0, Spacing.GAP, Spacing.EDGE)  # Top, right, bottom, left.
 THINKING_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS)
-ERROR_FALLBACK = "Complete the required setup and try again."
 
 
 class MessageRenderer:
@@ -68,7 +68,7 @@ def message_renderable(message: Message) -> RenderableType:
         case ToolMessage():
             return render_tool_call(message.call, message.result)
         case ErrorMessage():
-            detail = message.detail or ERROR_FALLBACK
+            detail = message.detail or strings.Screen.Chat.ERROR_FALLBACK
             return Markdown(f"**{message.summary}**\n\n{detail}")
 
 

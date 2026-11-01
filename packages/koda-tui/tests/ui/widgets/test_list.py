@@ -165,7 +165,7 @@ class TestLines:
 
     def test_empty(self) -> None:
         lines = List(ListState([])).lines()
-        assert lines.lines == [[(EMPTY_STYLE, "  No results found")]]
+        assert lines.lines == [[(EMPTY_STYLE, "  No matches")]]
         assert lines.selected is None
 
     def test_custom_empty_message(self) -> None:
