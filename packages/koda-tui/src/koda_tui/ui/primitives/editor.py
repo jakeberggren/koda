@@ -9,7 +9,8 @@ from prompt_toolkit.data_structures import Point
 from prompt_toolkit.layout import BufferControl, Dimension, UIContent, Window
 from prompt_toolkit.layout.processors import explode_text_fragments
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
-from wcwidth import wcswidth, wrap
+from prompt_toolkit.utils import get_cwidth
+from wcwidth import wrap
 
 if TYPE_CHECKING:
     from prompt_toolkit.buffer import Buffer
@@ -144,7 +145,7 @@ class EditorControl(BufferControl):
         text = document.lines[line]
         for index, row in enumerate(self._rows):
             if row.line == line and _holds(row, column, len(text)):
-                return Point(x=_cells(text[row.shown : column]), y=index)
+                return Point(x=get_cwidth(text[row.shown : column]), y=index)
         return None
 
 
@@ -192,12 +193,7 @@ def _holds(row: _Row, column: int, length: int) -> bool:
 def _column_at(text: str, row: _Row, x: int) -> int:
     """The column of ``text`` drawn at cell ``x`` of ``row``."""
     column, used = row.shown, 0
-    while column < row.end and used + _cells(text[column]) <= x:
-        used += _cells(text[column])
+    while column < row.end and used + get_cwidth(text[column]) <= x:
+        used += get_cwidth(text[column])
         column += 1
     return column
-
-
-def _cells(text: str) -> int:
-    """How many cells ``text`` takes; unprintable characters take none."""
-    return max(wcswidth(text), 0)
