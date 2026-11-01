@@ -14,7 +14,7 @@ dev = [
 members = ["packages/*"]
 
 [tool.bumpversion]
-current_version = "0.8.2"
+current_version = "0.8.3"
 commit = true
 tag = true
 message = "release: bump version to {new_version}"
