@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-from koda.telemetry import LangfuseTelemetry, Telemetry
+from koda.telemetry import LangfuseTelemetry
 from koda_common.logging import LoggingConfig, configure_logging, get_logger
 from koda_common.settings import (
     JsonFileSecretsStore,
@@ -23,26 +23,11 @@ from koda_tui.app import KodaTuiApp
 from koda_tui.settings import AppSettings, TuiSettingsManager
 
 
-def build_app(
-    workspace: Path,
-    *,
-    settings_store: SettingsStore,
-    secrets_store: SecretsStore,
-    telemetry: Telemetry,
-) -> KodaTuiApp:
-    """The app for ``workspace``, with its settings, secrets and telemetry. Raises if the
-    settings or secrets can't be loaded."""
-    core_settings = SettingsManager(settings_store=settings_store, secrets_store=secrets_store)
-    tui_settings = TuiSettingsManager(settings_store=settings_store)
-    service = LocalKodaService(
-        settings=core_settings,
-        runtime=LocalRuntimeConfig(cwd=workspace, sandbox_dir=workspace),
-        telemetry=telemetry,
-    )
-    return KodaTuiApp(
-        app_settings=AppSettings(core=core_settings, tui=tui_settings),
-        service=service,
-        workspace=workspace,
+def load_settings(settings_store: SettingsStore, secrets_store: SecretsStore) -> AppSettings:
+    """The core and TUI settings, from ``settings_store`` and ``secrets_store``."""
+    return AppSettings(
+        core=SettingsManager(settings_store=settings_store, secrets_store=secrets_store),
+        tui=TuiSettingsManager(settings_store=settings_store),
     )
 
 
@@ -51,14 +36,15 @@ def main() -> None:
     configure_logging(LoggingConfig(app_name="koda-tui", console=False))
     workspace = Path.cwd().resolve()
     try:
-        app = build_app(
-            workspace,
-            settings_store=JsonFileSettingsStore(),
-            secrets_store=JsonFileSecretsStore(),
-            telemetry=LangfuseTelemetry(),
-        )
+        settings = load_settings(JsonFileSettingsStore(), JsonFileSecretsStore())
     except (SettingsLoadError, SecretsLoadError) as error:
         _fail(_startup_error(error))
+    service = LocalKodaService(
+        settings=settings.core,
+        runtime=LocalRuntimeConfig(cwd=workspace, sandbox_dir=workspace),
+        telemetry=LangfuseTelemetry(),
+    )
+    app = KodaTuiApp(app_settings=settings, service=service, workspace=workspace)
     asyncio.run(app.run())
 
 
