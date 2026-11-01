@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda_tui import strings
 from koda_tui.palette.menus.theme import ThemeMenu
 
 if TYPE_CHECKING:
@@ -29,7 +30,7 @@ def test_choosing_a_theme_sets_it(
 ) -> None:
     settings.tui.theme = "auto"
     ThemeMenu(context).open()
-    overlays.pick("Terminal Dark")
+    overlays.pick(strings.Palette.Themes.DARK)
     settings.tui.set.assert_called_once_with("theme", "terminal-dark")
 
 

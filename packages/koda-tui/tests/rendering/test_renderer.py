@@ -7,6 +7,7 @@ from prompt_toolkit.formatted_text import FormattedText
 from rich.padding import Padding
 
 from koda.tools import ToolCall, ToolOutput
+from koda_tui import strings
 from koda_tui.appearance import Tokens
 from koda_tui.rendering import Renderer
 from koda_tui.rendering import rich as rich_bridge
@@ -22,6 +23,7 @@ from koda_tui.state import (
 )
 
 WIDTH = 80
+TOOLS = strings.Screen.Chat.Tools
 
 
 def render_message(message: Message, width: int) -> FormattedText:
@@ -87,7 +89,7 @@ class TestMessages:
 
     def test_render_error_without_detail_says_what_to_do(self) -> None:
         result = render_message(ErrorMessage("Not set up."), WIDTH)
-        assert "Complete the required setup and try again." in "".join(t[1] for t in result)
+        assert strings.Screen.Chat.ERROR_FALLBACK in "".join(t[1] for t in result)
 
 
 class TestStyleClasses:
@@ -192,7 +194,7 @@ class TestToolCalls:
         content = "".join(t[1] for t in result)
         assert "✓ bash command=python -m pytest packages/koda/tests/tools -k bash cwd=." in content
         assert "timeout_seconds=30" in content
-        assert "\n  └ succeeded, stdout 3 lines, stderr empty" in content
+        assert f"\n  └ {TOOLS.bash_summary(None, 3, 0)}" in content
         assert "7 passed in 0.50s" in content
 
     def test_render_bash_nonzero_exit_is_visually_marked_failed(self) -> None:
@@ -214,7 +216,7 @@ class TestToolCalls:
         )
         content = "".join(t[1] for t in result)
         assert "✕ bash command=exit 1 cwd=. timeout_seconds=30" in content
-        assert "\n  └ exit 1, stdout 0 lines, stderr 1 line" in content
+        assert f"\n  └ {TOOLS.bash_summary(1, 0, 1)}" in content
         assert "boom" in content
 
     def test_render_bash_success_prefers_stdout_over_stderr(self) -> None:
@@ -237,7 +239,7 @@ class TestToolCalls:
         content = "".join(t[1] for t in result)
         assert "all good" in content
         assert "warning" not in content
-        assert "\n  └ succeeded, stdout 1 line, stderr 1 line" in content
+        assert f"\n  └ {TOOLS.bash_summary(None, 1, 1)}" in content
 
     def test_render_bash_success_prefers_tail_preview(self) -> None:
         """Successful bash output should preview the tail where completion info usually lives."""
@@ -260,10 +262,10 @@ class TestToolCalls:
         )
         content = "".join(t[1] for t in result)
 
-        assert "succeeded, stdout 7 lines, stderr empty" in content
+        assert TOOLS.bash_summary(None, 7, 0) in content
         assert "7 passed in 0.50s" in content
         assert "header" not in content
-        assert "[truncated, 7 lines in total]" in content
+        assert TOOLS.truncated(7) in content
 
     def test_render_bash_multiline_command_is_collapsed_for_header(self) -> None:
         """Multiline bash commands should render as a compact single-line preview."""
@@ -306,9 +308,9 @@ class TestToolCalls:
 
 def test_diff_summary_counts_additions_and_deletions() -> None:
     assert diff_summary("--- a/x\n+++ b/x\n@@ -1,2 +1,1 @@\n-one\n-two\n+three\n") == (
-        "1 addition, 2 deletions"
+        TOOLS.diff_summary(1, 2)
     )
 
 
 def test_diff_summary_with_nothing_added() -> None:
-    assert diff_summary("--- a/x\n+++ b/x\n@@ -1,1 +1,0 @@\n-gone\n") == "0 additions, 1 deletion"
+    assert diff_summary("--- a/x\n+++ b/x\n@@ -1,1 +1,0 @@\n-gone\n") == TOOLS.diff_summary(0, 1)

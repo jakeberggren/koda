@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from koda_tui import strings
 from koda_tui.palette.menus.input import InputMenu
 
 if TYPE_CHECKING:
@@ -22,8 +23,8 @@ def test_lists_both_modes_and_sets_the_chosen_one(
 
     items = overlays.stack[-1]["items"]
     assert [(item.label, item.current) for item in items] == [
-        ("Prefer steer", False),
-        ("Prefer queue", True),
+        (strings.Palette.InputMode.STEER, False),
+        (strings.Palette.InputMode.QUEUE, True),
     ]
-    overlays.pick("Prefer steer")
+    overlays.pick(strings.Palette.InputMode.STEER)
     settings.tui.set.assert_called_once_with("queue_inputs", False)  # noqa: FBT003

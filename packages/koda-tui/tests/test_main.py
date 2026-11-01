@@ -13,6 +13,7 @@ from koda_common.settings.errors import (
 )
 from koda_common.settings.store import JsonObject, SecretsStore
 from koda_service.exceptions import StartupConfigurationError
+from koda_tui import strings
 from koda_tui.app import KodaTuiApp
 from koda_tui.main import _fail, load_settings, main
 
@@ -151,7 +152,7 @@ def test_fail_prints_what_to_fix_and_exits(capsys: pytest.CaptureFixture[str]) -
 
     assert exc_info.value.code == 1
     assert capsys.readouterr().err == (
-        "Koda failed to start: Invalid configuration\n"
+        f"{strings.App.failed_to_start('Invalid configuration')}\n"
         "- theme: Input should be 'auto', 'dark' or 'light'\n"
     )
 
@@ -193,4 +194,4 @@ def test_main_reports_a_secrets_file_that_isnt_json(
     )
     err = _run_main_with_error(monkeypatch, capsys, error)
 
-    assert err.startswith("Koda failed to start: ")
+    assert err.startswith(strings.App.failed_to_start(""))
