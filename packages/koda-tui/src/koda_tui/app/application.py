@@ -15,7 +15,7 @@ from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import Appearance
 from koda_tui.messaging import Conversation, Outbox
 from koda_tui.palette.context import PaletteContext
-from koda_tui.palette.root import RootMenu
+from koda_tui.palette.palette import CommandPalette
 from koda_tui.state import AppState
 from koda_tui.terminal import Terminal, TerminalInput, keys
 from koda_tui.views import Screen
@@ -62,7 +62,7 @@ class KodaTuiApp:
             service=service,
             invalidate=self.invalidate,
         )
-        self._palette = RootMenu(
+        self._palette = CommandPalette(
             PaletteContext(
                 overlays=self.screen.overlays,
                 service=service,

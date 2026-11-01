@@ -1,4 +1,4 @@
-"""Root menu: the commands the palette opens with."""
+"""Command palette: the commands it opens with, grouped."""
 
 from __future__ import annotations
 
@@ -50,8 +50,8 @@ class Command:
     available: Callable[[AppState], bool] = lambda _state: True
 
 
-class RootMenu:
-    """The commands, grouped. Each opens a menu or acts directly."""
+class CommandPalette:
+    """The command palette. Each command opens a menu or acts directly."""
 
     def __init__(self, context: PaletteContext) -> None:
         self._overlays = context.overlays
