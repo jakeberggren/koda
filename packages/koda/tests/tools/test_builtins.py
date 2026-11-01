@@ -923,8 +923,8 @@ class TestBashTool:
 
     @bash_required
     @pytest.mark.asyncio
-    async def test_bash_returns_nonzero_exit_without_tool_error(self, sandbox_dir: Path) -> None:
-        """bash tool returns non-zero exit codes without marking tool execution as failed."""
+    async def test_bash_marks_nonzero_exit_as_tool_error(self, sandbox_dir: Path) -> None:
+        """bash tool marks a non-zero exit as a tool error, keeping its output."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
         context = _tool_context(sandbox_dir)
@@ -938,7 +938,7 @@ class TestBashTool:
 
         result = await executor.execute_call(call, context)
 
-        assert result.output.is_error is False
+        assert result.output.is_error is True
         assert result.output.content["exit_code"] == 7
         assert result.output.display == "Command exited with code 7"
 
