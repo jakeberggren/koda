@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, override
 
 from prompt_toolkit.data_structures import Point
+from prompt_toolkit.filters import Condition, to_filter
 from prompt_toolkit.layout import UIContent, UIControl, Window
 from prompt_toolkit.layout.margins import ConditionalMargin, Margin
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
@@ -39,7 +40,6 @@ class ScrollState:
         self._following = True
         self._pending = 0  # Scrolled since the last frame, applied on the next one.
 
-    @property
     def overflowing(self) -> bool:
         """Whether there are more lines than rows."""
         return self.total > self.height
@@ -56,6 +56,10 @@ class ScrollState:
         self.offset = max(0, min(self.offset + self._pending, end))
         self._pending = 0
         self._following = self.offset >= end
+
+    def vertical_scroll(self, _window: Window) -> int:
+        """The first visible line, as a Window's ``get_vertical_scroll`` asks for it."""
+        return self.offset
 
 
 class Scroll:
@@ -75,9 +79,11 @@ class Scroll:
         gap: int = 0,
         scrollbar: FilterOrBool = True,
     ) -> None:
+        showing = Condition(state.overflowing) & to_filter(scrollbar)
         self._window = Window(
             ScrollControl(state, blocks, gap=gap),
-            right_margins=[ConditionalMargin(ScrollbarMargin(state), filter=scrollbar)],
+            get_vertical_scroll=state.vertical_scroll,
+            right_margins=[ConditionalMargin(ScrollbarMargin(), filter=showing)],
         )
 
     def __pt_container__(self) -> Window:
@@ -85,7 +91,7 @@ class Scroll:
 
 
 class ScrollControl(UIControl):
-    """Draws the visible lines and scrolls on the mouse wheel."""
+    """Hands the window every line, and scrolls the state on the mouse wheel."""
 
     def __init__(self, state: ScrollState, blocks: Blocks, *, gap: int) -> None:
         self._state = state
@@ -121,19 +127,17 @@ class ScrollControl(UIControl):
     @override
     def create_content(self, width: int, height: int) -> UIContent:
         lines = self.lines(width)
-        state = self._state
-        state.update(len(lines), height)
+        self._state.update(len(lines), height)
 
         def get_line(i: int) -> StyleAndTextTuples:
-            index = state.offset + i
-            return lines[index] if index < len(lines) else []
+            return lines[i] if 0 <= i < len(lines) else []
 
-        # The cursor sits on the last visible line, so the window never scrolls by itself.
-        cursor = max(0, min(height, len(lines) - state.offset) - 1)
+        # On the first visible line, the cursor keeps the window at the state's offset:
+        # the window scrolls from there only as far as it takes to show the cursor.
         return UIContent(
             get_line=get_line,
-            line_count=min(height, max(len(lines), 1)),
-            cursor_position=Point(x=0, y=cursor),
+            line_count=max(len(lines), 1),
+            cursor_position=Point(x=0, y=self._state.offset),
         )
 
     @override
@@ -145,14 +149,11 @@ class ScrollControl(UIControl):
 
 
 class ScrollbarMargin(Margin):
-    """A thumb on a track, after a gap, while the lines overflow."""
-
-    def __init__(self, state: ScrollState) -> None:
-        self._state = state
+    """A thumb on a track, after a gap, sized and placed from what the window shows."""
 
     @override
     def get_width(self, get_ui_content: Callable[[], UIContent]) -> int:
-        return Spacing.GAP + len(THUMB) if self._state.overflowing else 0
+        return Spacing.GAP + len(THUMB)
 
     @override
     def create_margin(
@@ -161,12 +162,11 @@ class ScrollbarMargin(Margin):
         width: int,
         height: int,
     ) -> StyleAndTextTuples:
-        state = self._state
-        if not state.overflowing or height == 0:
+        total, shown = window_render_info.content_height, window_render_info.window_height
+        if total <= shown or height == 0:
             return []
-        size = max(1, height * state.height // state.total)
-        end = state.total - state.height
-        start = (height - size) * state.offset // end
+        size = max(1, height * shown // total)
+        start = (height - size) * window_render_info.vertical_scroll // (total - shown)
         gap = " " * Spacing.GAP
         rows: StyleAndTextTuples = []
         for row in range(height):
