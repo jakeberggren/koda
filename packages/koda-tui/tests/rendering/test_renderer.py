@@ -1,17 +1,30 @@
-"""Tests for rendering messages, streaming content and their styles."""
+"""Tests for the renderer: what messages look like, their styles, and the cache."""
 
+from prompt_toolkit.formatted_text import FormattedText
 from rich.padding import Padding
 
 from koda.tools import ToolCall
 from koda_tui.appearance import Tokens
-from koda_tui.rendering import render_message
+from koda_tui.rendering import MessageRenderer
 from koda_tui.rendering import rich as rich_bridge
 from koda_tui.rendering.diff import diff_blocks
 from koda_tui.rendering.markdown import Markdown
+from koda_tui.rendering.renderer import message_renderable
 from koda_tui.rendering.rich import render
-from koda_tui.state import AssistantMessage, ErrorMessage, ToolMessage, UserMessage
+from koda_tui.state import (
+    AppState,
+    AssistantMessage,
+    ErrorMessage,
+    Message,
+    ToolMessage,
+    UserMessage,
+)
 
 WIDTH = 80
+
+
+def render_message(message: Message, width: int) -> FormattedText:
+    return render(message_renderable(message), width)
 
 
 class TestMessages:
@@ -116,3 +129,32 @@ def test_rich_emits_no_colors_so_every_color_comes_from_a_token() -> None:
     ]
 
     assert colored == []
+
+
+def test_messages_are_rendered_once_per_width(state: AppState) -> None:
+    state.messages = [UserMessage("hi"), UserMessage("there")]
+    renderer = MessageRenderer(state)
+    first = renderer.render(40)
+    assert all(a is b for a, b in zip(renderer.render(40), first, strict=True))
+    assert renderer.render(30)[0] is not first[0]
+
+
+def test_a_new_message_is_rendered_alongside_the_cached_ones(state: AppState) -> None:
+    state.messages = [UserMessage("hi")]
+    renderer = MessageRenderer(state)
+    first = renderer.render(40)[0]
+    state.messages = [*state.messages, UserMessage("there")]
+    blocks = renderer.render(40)
+    assert blocks[0] is first
+    assert len(blocks) == 2
+
+
+def test_a_message_that_is_gone_is_rendered_again_if_it_comes_back(state: AppState) -> None:
+    message = UserMessage("hi")
+    state.messages = [message]
+    renderer = MessageRenderer(state)
+    first = renderer.render(40)[0]
+    state.messages = []
+    renderer.render(40)
+    state.messages = [message]
+    assert renderer.render(40)[0] is not first
