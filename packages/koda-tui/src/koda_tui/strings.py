@@ -55,22 +55,20 @@ class Screen:
         class Tools:
             """Tool calls and their results."""
 
-            SUCCEEDED = "succeeded"
-            STDERR_EMPTY = "stderr empty"
             STDOUT = "stdout:"
             STDERR = "stderr:"
 
             @staticmethod
-            def exited(code: object) -> str:
-                return f"exit {code}"
-
-            @staticmethod
-            def stdout_lines(count: int) -> str:
-                return f"stdout {_count(count, 'line')}"
-
-            @staticmethod
-            def stderr_lines(count: int) -> str:
-                return f"stderr {_count(count, 'line')}"
+            def bash_summary(exit_code: int | None, stdout_lines: int, stderr_lines: int) -> str:
+                """How a command went: its exit code if it failed, then how much it printed."""
+                outcome = "succeeded" if exit_code is None else f"exit {exit_code}"
+                stdout = f"stdout {_count(stdout_lines, 'line')}"
+                stderr = (
+                    "stderr empty"
+                    if stderr_lines == 0
+                    else f"stderr {_count(stderr_lines, 'line')}"
+                )
+                return f"{outcome}, {stdout}, {stderr}"
 
             @staticmethod
             def long_value(chars: int, lines: int) -> str:

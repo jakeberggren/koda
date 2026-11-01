@@ -4,6 +4,6 @@ Rendering only produces fragments; views lay them out. Content is built as Rich
 renderables, and ``rendering.rich`` renders them as fragments styled by tokens.
 """
 
-from koda_tui.rendering.renderer import MessageRenderer
+from koda_tui.rendering.renderer import Renderer
 
-__all__ = ["MessageRenderer"]
+__all__ = ["Renderer"]

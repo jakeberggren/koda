@@ -7,6 +7,7 @@ class Spacing:
     GAP = 1  # Blank rows or columns between sections.
     INSET = 2  # Columns of padding inside a panel.
     EDGE = 1  # Columns kept clear at the screen edges.
+    INDENT = 2  # Columns a nested block is indented, such as a tool's result.
 
 
 class Width:
