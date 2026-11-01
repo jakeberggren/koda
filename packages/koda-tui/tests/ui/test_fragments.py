@@ -1,4 +1,4 @@
-"""Tests for the Text primitive's truncation and wrapping."""
+"""Tests for fitting, wrapping and truncating fragments."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 import pytest
 from prompt_toolkit.formatted_text import fragment_list_width
 
-from koda_tui.ui.primitives.text import fit, truncate, wrap
+from koda_tui.ui.fragments import fit, truncate, truncate_text, wrap
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
@@ -27,6 +27,14 @@ if TYPE_CHECKING:
 )
 def test_truncate_keeps_styles_and_adds_an_ellipsis(width: int, expected: list) -> None:
     assert truncate([("a", "hello "), ("b", "world")], width) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "width", "expected"),
+    [("hello", 5, "hello"), ("hello world", 8, "hello..."), ("日本語テキスト", 7, "日本...")],
+)
+def test_truncate_text_cuts_plain_text_by_cells(text: str, width: int, expected: str) -> None:
+    assert truncate_text(text, width) == expected
 
 
 def test_truncate_ends_with_a_custom_ellipsis() -> None:

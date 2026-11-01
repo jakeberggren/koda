@@ -10,7 +10,7 @@ from prompt_toolkit.layout.margins import ConditionalMargin, Margin
 from prompt_toolkit.mouse_events import MouseEvent, MouseEventType
 
 from koda_tui.appearance import Spacing, Tokens
-from koda_tui.ui.primitives.text import fit
+from koda_tui.ui.fragments import fit
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
