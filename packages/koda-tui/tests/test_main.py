@@ -13,7 +13,8 @@ from koda_common.settings.errors import (
 )
 from koda_common.settings.store import JsonObject, SecretsStore
 from koda_service.exceptions import StartupConfigurationError
-from koda_tui.main import _fail, build_app, main
+from koda_tui.app import KodaTuiApp
+from koda_tui.main import _fail, load_settings, main
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -69,10 +70,10 @@ def _run_main_with_error(
     capsys: pytest.CaptureFixture[str],
     error: Exception,
 ) -> str:
-    """Run main with build_app raising ``error``; it must exit with 1. Returns stderr."""
+    """Run main with load_settings raising ``error``; it must exit with 1. Returns stderr."""
     monkeypatch.setattr(
-        "koda_tui.main.build_app",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(error),
+        "koda_tui.main.load_settings",
+        lambda *_args: (_ for _ in ()).throw(error),
     )
     monkeypatch.setattr("koda_tui.main.configure_logging", lambda _config: None)
 
@@ -83,56 +84,60 @@ def _run_main_with_error(
     return capsys.readouterr().err
 
 
-def test_build_app_raises_settings_error_from_store(tmp_path: Path) -> None:
-    path = tmp_path / "config.json"
+def test_load_settings_raises_settings_error_from_store(tmp_path: Path) -> None:
     error = SettingsDecodeError(
-        path=path,
+        path=tmp_path / "config.json",
         error=json.JSONDecodeError("Expecting value", "{", 1),
     )
     with pytest.raises(SettingsDecodeError) as exc_info:
-        build_app(
-            tmp_path,
-            settings_store=_FakeSettingsStore(error=error),
-            secrets_store=_FakeSecretsStore(),
-            telemetry=_TelemetryStub(),
-        )
+        load_settings(_FakeSettingsStore(error=error), _FakeSecretsStore())
 
     assert exc_info.value is error
 
 
-def test_build_app_raises_secrets_error_from_store(tmp_path: Path) -> None:
-    path = tmp_path / "secrets.json"
+def test_load_settings_raises_secrets_error_from_store(tmp_path: Path) -> None:
     error = SecretsDecodeError(
-        path=path,
+        path=tmp_path / "secrets.json",
         error=json.JSONDecodeError("Expecting value", "{", 1),
     )
     with pytest.raises(SecretsDecodeError) as exc_info:
-        build_app(
-            tmp_path,
-            settings_store=_FakeSettingsStore(),
-            secrets_store=_FakeSecretsStore(error=error),
-            telemetry=_TelemetryStub(),
-        )
+        load_settings(_FakeSettingsStore(), _FakeSecretsStore(error=error))
 
     assert exc_info.value is error
 
 
-def test_build_app_creates_application_with_injected_dependencies(tmp_path: Path) -> None:
-    telemetry = _TelemetryStub()
+def test_load_settings_validates_the_secrets() -> None:
     secrets_store = _FakeSecretsStore()
 
-    app = build_app(
-        tmp_path,
-        settings_store=_FakeSettingsStore(),
-        secrets_store=secrets_store,
-        telemetry=telemetry,
-    )
+    settings = load_settings(_FakeSettingsStore(), secrets_store)
 
-    assert app.app_settings is not None
-    assert app.service is not None
-    assert app.state.workspace == tmp_path
+    assert settings.core is not None
+    assert settings.tui is not None
     assert secrets_store.validate_calls == 1
-    assert telemetry.settings is app.app_settings.core
+
+
+def test_main_runs_the_app_for_the_current_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    settings = load_settings(_FakeSettingsStore(), _FakeSecretsStore())
+    telemetry = _TelemetryStub()
+    monkeypatch.setattr("koda_tui.main.configure_logging", lambda _config: None)
+    monkeypatch.setattr("koda_tui.main.load_settings", lambda *_args: settings)
+    monkeypatch.setattr("koda_tui.main.LangfuseTelemetry", lambda: telemetry)
+    ran: list[KodaTuiApp] = []
+
+    async def _run(app: KodaTuiApp) -> None:
+        ran.append(app)
+
+    monkeypatch.setattr(KodaTuiApp, "run", _run)
+
+    main()
+
+    [app] = ran
+    assert app.app_settings is settings
+    assert app.state.workspace == tmp_path.resolve()
+    assert telemetry.settings is settings.core
 
 
 def test_fail_prints_what_to_fix_and_exits(capsys: pytest.CaptureFixture[str]) -> None:
