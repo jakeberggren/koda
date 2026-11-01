@@ -14,6 +14,7 @@ from koda.llm import ModelDefinition, ThinkingOption
 from koda.messages import TokenUsage
 from koda.tools import ToolCall
 from koda_service import ServiceStatus, ServiceStatusCode
+from koda_tui import strings
 from koda_tui.appearance import Tokens
 from koda_tui.state import AppState, AssistantMessage, ToolMessage, Usage, UserMessage
 from koda_tui.views import status
@@ -72,25 +73,31 @@ def test_right_shows_hints_warning_and_activity(state: AppState) -> None:
     )
     state = _state(state, active_model=model, warnings=["Config has unknown keys"])
     assert _texts(status._right(state)) == [
-        "ctrl+t thinking",
-        "ctrl+p/k palette",
+        f"{strings.Key.CTRL_T} {strings.Screen.Status.CYCLE_THINKING}",
+        f"{strings.Key.CTRL_P_K} {strings.Screen.Status.PALETTE}",
         "Config has unknown keys",
-        "ready",
+        strings.Screen.Status.READY,
     ]
 
 
 @pytest.mark.parametrize(
     ("fields", "text"),
     [
-        ({"exit_requested": True}, "press ctrl+c again to exit"),
-        ({"responding": True, "messages": [AssistantMessage("", "hmm")]}, "thinking"),
-        ({"responding": True, "messages": [AssistantMessage("Hi")]}, "responding"),
-        ({"responding": True, "messages": [UserMessage("hi")]}, "working"),
+        ({"exit_requested": True}, strings.Screen.Status.EXIT_AGAIN),
+        (
+            {"responding": True, "messages": [AssistantMessage("", "hmm")]},
+            strings.Screen.Status.THINKING,
+        ),
+        (
+            {"responding": True, "messages": [AssistantMessage("Hi")]},
+            strings.Screen.Status.RESPONDING,
+        ),
+        ({"responding": True, "messages": [UserMessage("hi")]}, strings.Screen.Status.WORKING),
         (
             {"responding": True, "messages": [UserMessage("hi"), ToolMessage(_CALL)]},
-            "running tools",
+            strings.Screen.Status.RUNNING_TOOLS,
         ),
-        ({}, "ready"),
+        ({}, strings.Screen.Status.READY),
     ],
 )
 def test_activity_follows_the_response(state: AppState, fields: dict, text: str) -> None:

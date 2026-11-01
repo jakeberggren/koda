@@ -6,6 +6,7 @@ import pytest
 from prompt_toolkit.formatted_text import fragment_list_to_text
 from prompt_toolkit.utils import get_cwidth
 
+from koda_tui import strings
 from koda_tui.appearance import Tokens, compose
 from koda_tui.ui.widgets import List, ListItem, ListState
 from koda_tui.ui.widgets.list import EMPTY_STYLE, GROUP_STYLE
@@ -165,7 +166,7 @@ class TestLines:
 
     def test_empty(self) -> None:
         lines = List(ListState([])).lines()
-        assert lines.lines == [[(EMPTY_STYLE, "  No matches")]]
+        assert lines.lines == [[(EMPTY_STYLE, f"  {strings.Common.NO_MATCHES}")]]
         assert lines.selected is None
 
     def test_custom_empty_message(self) -> None:
