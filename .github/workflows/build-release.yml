@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -30,6 +31,8 @@ jobs:
         shell: bash
         env:
           TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
 
@@ -49,32 +52,16 @@ jobs:
           fi
 
           commit="$(git rev-parse "${tag}^{commit}")"
-          # The tag is the release PR's bump commit, built on top of main.
-          if ! git merge-base --is-ancestor "${commit}^" origin/main; then
-            echo "Release tag ${tag} is not a commit on top of origin/main" >&2
+
+          merged_head="$(gh pr list --state merged --base main --head "release/${tag}" \
+            --json headRefOid --jq '.[].headRefOid')"
+          if [[ "${merged_head}" != "${commit}" ]]; then
+            echo "Release tag ${tag} is not the head of a merged release/${tag} PR" >&2
             exit 1
           fi
 
-          python - "${version}" <<'PY2'
-          import pathlib
-          import re
-          import sys
-
-          expected = sys.argv[1]
-          files = [pathlib.Path("pyproject.toml"), *pathlib.Path("packages").glob("*/pyproject.toml")]
-          for path in files:
-              text = path.read_text()
-              if path.name == "pyproject.toml" and path.parent == pathlib.Path("."):
-                  match = re.search(r'^current_version = "([^"\n]+)"$', text, re.M)
-                  field = "current_version"
-              else:
-                  match = re.search(r'^version = "([^"\n]+)"$', text, re.M)
-                  field = "version"
-              if not match:
-                  raise SystemExit(f"{path}: missing {field}")
-              if match.group(1) != expected:
-                  raise SystemExit(f"{path}: {field} is {match.group(1)}, expected {expected}")
-          PY2
+          git checkout --quiet "${commit}"
+          git show origin/main:.github/scripts/release.sh | bash -s -- commit "${version}"
 
           {
             echo "version=${version}"

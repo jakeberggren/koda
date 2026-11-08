@@ -5,6 +5,10 @@ on:
     branches:
       - main
     types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
       - closed
 
 permissions:
@@ -12,17 +16,16 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: tag-release
+  group: tag-release-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
   validate:
-    name: Validate Merged Release PR
+    name: Validate Release PR
     if: >-
       ${{
-        github.event.pull_request.merged == true &&
         startsWith(github.event.pull_request.head.ref, 'release/v') &&
-        startsWith(github.event.pull_request.title, 'release: v')
+        (github.event.action != 'closed' || github.event.pull_request.merged == true)
       }}
     runs-on: ubuntu-latest
     outputs:
@@ -37,12 +40,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
-      - name: Validate merged release
+      - name: Validate release
         id: release
         shell: bash
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-          RELEASE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
 
@@ -55,33 +57,11 @@ jobs:
 
           tag="v${version}"
 
-          # Tag the release PR's own commit, not the merge commit, so PRs merged
-          # after Prepare Release stay out. It must be one bump commit on main.
-          if ! git merge-base --is-ancestor "${RELEASE_SHA}^" origin/main; then
-            echo "Release commit's parent is not on main: ${RELEASE_SHA}" >&2
-            exit 1
-          fi
-
-          unexpected_files="$(git diff --name-only "${RELEASE_SHA}^" "${RELEASE_SHA}" -- . \
-            ':!pyproject.toml' ':!uv.lock' ':!packages/*/pyproject.toml')"
-          if [[ -n "${unexpected_files}" ]]; then
-            echo "Release PR changed unexpected files:" >&2
-            echo "${unexpected_files}" >&2
-            exit 1
-          fi
-
-          check_version() {
-            local path="$1" field="$2"
-            if ! grep -qxF "${field} = \"${version}\"" "${path}"; then
-              echo "${path}: expected ${field} = \"${version}\", found: $(grep -m1 "^${field} = " "${path}" || echo none)" >&2
-              exit 1
-            fi
-          }
-
-          check_version pyproject.toml current_version
-          for path in packages/*/pyproject.toml; do
-            check_version "${path}" version
-          done
+          # Tag the release PR's own head, not main's squash commit, so PRs
+          # merged while the release PR was open stay out of the release.
+          # Run main's checker, not the copy in the PR, which the PR could edit.
+          git fetch origin main
+          git show origin/main:.github/scripts/release.sh | bash -s -- commit "${version}"
 
           if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
             echo "Tag already exists: ${tag}" >&2
@@ -96,6 +76,7 @@ jobs:
   tag:
     name: Tag Release
     needs: validate
+    if: ${{ github.event.action == 'closed' && github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     steps:
       - name: Generate token
