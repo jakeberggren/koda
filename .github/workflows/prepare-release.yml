@@ -219,29 +219,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-
-          python - "${VERSION}" <<'PY'
-          import pathlib
-          import re
-          import sys
-
-          expected = sys.argv[1]
-          files = [pathlib.Path("pyproject.toml"), *pathlib.Path("packages").glob("*/pyproject.toml")]
-          for path in files:
-              text = path.read_text()
-              if path.name == "pyproject.toml" and path.parent == pathlib.Path("."):
-                  match = re.search(r'^current_version = "([^"]+)"$', text, re.M)
-                  field = "current_version"
-              else:
-                  match = re.search(r'^version = "([^"]+)"$', text, re.M)
-                  field = "version"
-              if not match:
-                  raise SystemExit(f"{path}: missing {field}")
-              if match.group(1) != expected:
-                  raise SystemExit(f"{path}: {field} is {match.group(1)}, expected {expected}")
-          PY
+        run: .github/scripts/release.sh versions "${VERSION}"
 
       - name: Commit release bump
         shell: bash
@@ -253,7 +231,8 @@ jobs:
             echo "No release changes were produced" >&2
             exit 1
           }
-          git commit -m "release: bump version to ${VERSION}"
+          # Release-Base is the main commit this release is frozen at.
+          git commit -m "release: bump version to ${VERSION}" --trailer "Release-Base: $(git rev-parse HEAD)"
 
       - name: Push release branch
         shell: bash
@@ -281,7 +260,7 @@ jobs:
             echo "- Target version: ${VERSION}"
             echo "- Tag after merge: ${TAG}"
             echo
-            echo "After this PR is merged, the tag-release workflow will validate the merge commit and create ${TAG}."
+            echo "After this PR is merged, the tag-release workflow will tag its head commit as ${TAG}."
           } > "${body}"
 
           gh pr create \
