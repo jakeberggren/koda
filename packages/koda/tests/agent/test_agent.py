@@ -7,6 +7,7 @@ import pytest
 
 from koda.agent import Agent, AgentConfig
 from koda.context.manager import ContextManager
+from koda.sessions import Session
 
 
 class TestAgent:
@@ -24,7 +25,12 @@ class TestAgent:
         (tmp_path / "AGENTS.md").write_text("Always run tests before committing.", encoding="utf-8")
         context_manager = ContextManager.from_workspace(tmp_path)
 
-        agent = Agent(llm=mock_llm, config=AgentConfig(), context_manager=context_manager)
+        agent = Agent(
+            llm=mock_llm,
+            config=AgentConfig(),
+            session=Session(),
+            context_manager=context_manager,
+        )
         instructions = agent.runner.resolve_instructions()
 
         assert instructions is not None
@@ -45,6 +51,7 @@ class TestAgent:
         agent = Agent(
             llm=mock_llm,
             config=AgentConfig(),
+            session=Session(),
             context_manager=ContextManager.from_workspace(tmp_path),
         )
         path.write_text("Changed instructions.", encoding="utf-8")

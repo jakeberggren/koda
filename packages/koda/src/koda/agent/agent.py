@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from koda.agent.runner import AgentRunner
 from koda.llm import LLMRequestOptions
 from koda.prompts import SystemPrompt
-from koda.sessions import InMemorySessionStore, SessionManager
 from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -15,6 +14,7 @@ if TYPE_CHECKING:
     from koda.agent.events import AgentEvent
     from koda.context.manager import ContextManager
     from koda.llm import LLM
+    from koda.sessions import Session, SessionStore
     from koda.tools import ToolConfig
 
 logger = get_logger(__name__)
@@ -31,12 +31,14 @@ class AgentConfig:
 class Agent:
     """Public facade for running a Koda agent."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - each dependency is injected as its own keyword argument
         self,
         llm: LLM,
         config: AgentConfig,
+        *,
+        session: Session,
+        store: SessionStore | None = None,
         tools: ToolConfig | None = None,
-        session_manager: SessionManager | None = None,
         context_manager: ContextManager | None = None,
     ) -> None:
         self.llm = llm
@@ -45,13 +47,15 @@ class Agent:
             if context_manager is not None
             else config
         )
-        self.session_manager = session_manager or SessionManager(InMemorySessionStore())
+        self.session = session
+        self.store = store
         self.tools = tools
         self.runner = AgentRunner(
             llm=self.llm,
             config=self.config,
-            session_manager=self.session_manager,
-            tools=self.tools,
+            session=session,
+            store=store,
+            tools=tools,
         )
 
         logger.info("agent_initialized", llm=type(llm).__name__)

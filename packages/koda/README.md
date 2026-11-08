@@ -44,7 +44,6 @@ packages/koda/
 │   │   └── messages.py             # Internal message types
 │   ├── sessions/
 │   │   ├── exceptions.py           # Session-related exceptions
-│   │   ├── manager.py              # Session orchestration
 │   │   ├── session.py              # Session model
 │   │   └── store.py                # In-memory and JSON session stores
 │   ├── tools/

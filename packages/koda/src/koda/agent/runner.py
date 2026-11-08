@@ -32,27 +32,30 @@ from koda.tools.executor import ToolExecutor
 from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-    from uuid import UUID
+    from collections.abc import AsyncIterator, Callable
 
     from koda.agent.agent import AgentConfig
-    from koda.sessions import SessionManager
+    from koda.sessions import Session, SessionStore
+    from koda.sessions.session import SessionMessage
     from koda.tools import ToolConfig, ToolDefinition
 
 logger = get_logger(__name__)
 
 
 class ToolRunner:
-    """Run requested tool calls and persist their results."""
+    """Run requested tool calls and append their results to the conversation."""
 
-    def __init__(self, session_manager: SessionManager, tools: ToolConfig | None) -> None:
-        """Create a runner for the agent-level tool execution boundary."""
-        self.session_manager = session_manager
+    def __init__(
+        self,
+        append: Callable[[SessionMessage], None],
+        tools: ToolConfig | None,
+    ) -> None:
+        """Create a runner that hands each tool message to ``append``."""
+        self.append = append
         self.tools = tools
 
     async def run(  # noqa: C901 - keep tool execution flow in one place
         self,
-        session_id: UUID,
         tool_calls: list[ToolCall],
     ) -> AsyncIterator[AgentToolStarted | AgentToolResultReady | AgentToolCompleted]:
         """Execute tool calls, append tool messages, and stream tool result events."""
@@ -64,7 +67,7 @@ class ToolRunner:
                 tool_output = ToolOutput(is_error=True, error_message="No tools configured")
                 tool_result = ToolResult(call_id=tool_call.call_id, output=tool_output)
                 tool_message = ToolMessage(tool_name=tool_call.tool_name, tool_result=tool_result)
-                self.session_manager.append_message(session_id, tool_message)
+                self.append(tool_message)
 
                 yield AgentToolCompleted(
                     tool_name=tool_call.tool_name,
@@ -87,7 +90,7 @@ class ToolRunner:
         for tool_call in tool_calls:
             tool_result = tool_results_by_call_id[tool_call.call_id]
             tool_message = ToolMessage(tool_name=tool_call.tool_name, tool_result=tool_result)
-            self.session_manager.append_message(session_id, tool_message)
+            self.append(tool_message)
 
             yield AgentToolCompleted(
                 tool_name=tool_call.tool_name,
@@ -103,22 +106,23 @@ class AgentRunner:
         *,
         llm: LLM,
         config: AgentConfig,
-        session_manager: SessionManager,
+        session: Session,
+        store: SessionStore | None = None,
         tools: ToolConfig | None = None,
     ) -> None:
-        """Create a runner for one stateful agent conversation."""
+        """Create a runner for one conversation, saved to ``store`` if given."""
         self.llm = llm
         self.config = config
-        self.session_manager = session_manager
+        self.session = session
+        self.store = store
         self.tools = tools
-        self.tool_runner = ToolRunner(session_manager=session_manager, tools=tools)
+        self.tool_runner = ToolRunner(append=self._append, tools=tools)
 
-    def _ensure_active_session_id(self) -> UUID:
-        """Return the active session id, creating a session when needed."""
-        session = self.session_manager.active_session
-        if session is not None:
-            return session.session_id
-        return self.session_manager.create_session().session_id
+    def _append(self, message: SessionMessage) -> None:
+        """Append ``message`` to the session and save the session."""
+        self.session.messages.append(message)
+        if self.store is not None:
+            self.store.save_session(self.session)
 
     def _get_tool_definitions(self) -> list[ToolDefinition] | None:
         """Return provider-facing tool definitions for the configured tools."""
@@ -126,8 +130,6 @@ class AgentRunner:
 
     def _append_assistant_message(
         self,
-        session_id: UUID,
-        *,
         accumulator: AgentStreamAccumulator,
     ) -> AssistantMessage | None:
         """Persist the assistant output collected during one model iteration."""
@@ -141,23 +143,18 @@ class AgentRunner:
             tool_calls=accumulator.tool_calls,
             usage=usage,
         )
-        self.session_manager.append_message(session_id, assistant_message)
+        self._append(assistant_message)
         return assistant_message
 
     def resolve_instructions(self) -> str | None:
         """Render the configured system prompt."""
         return self.config.system_prompt.render()
 
-    def _build_request(
-        self,
-        session_id: UUID,
-        tool_definitions: list[ToolDefinition] | None,
-    ) -> LLMRequest:
+    def _build_request(self, tool_definitions: list[ToolDefinition] | None) -> LLMRequest:
         """Build the model request for the current session state."""
-        session = self.session_manager.get_session(session_id)
         instructions = self.resolve_instructions()
         return LLMRequest(
-            messages=session.messages,
+            messages=self.session.messages,
             instructions=instructions,
             tools=tool_definitions,
             options=self.config.request_options,
@@ -192,9 +189,9 @@ class AgentRunner:
             logger.warning("run_called_with_empty_message")
             raise llm_exceptions.EmptyMessageError
 
-        session_id = self._ensure_active_session_id()
+        session_id = self.session.session_id
         yield AgentTurnStarted(session_id=session_id)
-        self.session_manager.append_message(session_id, UserMessage(content=user_text))
+        self._append(UserMessage(content=user_text))
         tool_definitions = self._get_tool_definitions()
 
         iteration = 0
@@ -203,7 +200,7 @@ class AgentRunner:
             logger.info("agent_loop_iteration", iteration=iteration)
             yield AgentIterationStarted(session_id=session_id, iteration=iteration)
 
-            request = self._build_request(session_id=session_id, tool_definitions=tool_definitions)
+            request = self._build_request(tool_definitions)
             accumulator = AgentStreamAccumulator()
 
             async for event in accumulator.process_stream(self.llm.generate_stream(request)):
@@ -211,10 +208,7 @@ class AgentRunner:
                 if agent_event is not None:
                     yield agent_event
 
-            assistant_message = self._append_assistant_message(
-                session_id,
-                accumulator=accumulator,
-            )
+            assistant_message = self._append_assistant_message(accumulator)
             if assistant_message is not None:
                 yield AgentResponseCompleted(message=assistant_message)
 
@@ -224,8 +218,5 @@ class AgentRunner:
                 return
 
             logger.info("tool_calls_pending", count=len(accumulator.tool_calls))
-            async for event in self.tool_runner.run(
-                session_id=session_id,
-                tool_calls=accumulator.tool_calls,
-            ):
+            async for event in self.tool_runner.run(accumulator.tool_calls):
                 yield event
