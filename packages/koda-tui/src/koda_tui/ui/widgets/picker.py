@@ -52,7 +52,6 @@ class Picker[T]:
         on_select: Callable[[ListItem[T]], None],
         on_close: Callable[[], None],
         heading: str | None = None,
-        footer: StyleAndTextTuples | None = None,
         shortcuts: Sequence[Shortcut[T]] = (),
         label_width: int | None = None,
     ) -> None:
@@ -63,8 +62,6 @@ class Picker[T]:
             Spacer(),
             List(self.state, heading=heading, height=LIST_HEIGHT, label_width=label_width),
         ]
-        if footer:
-            body += [Spacer(), Text(footer, overflow=Overflow.WRAP)]
         if shortcuts:
             body += [Spacer(), Text(_hints(shortcuts), overflow=Overflow.WRAP)]
         self._panel = Panel(

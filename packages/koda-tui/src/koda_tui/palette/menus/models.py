@@ -27,7 +27,7 @@ class ModelMenu:
         self._settings = context.settings
 
     def items(self) -> list[ListItem[ModelDefinition]]:
-        """Build model selection items and footer."""
+        """Build model selection items."""
         provider_names = {p.id: p.name for p in self._service.list_providers()}
 
         return [
