@@ -79,26 +79,18 @@ jobs:
     if: ${{ github.event.action == 'closed' && github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     steps:
-      - name: Generate token
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
-          private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
-          permission-contents: write
-
       - name: Checkout release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
           ref: ${{ needs.validate.outputs.release_sha }}
           persist-credentials: false
 
-      - name: Configure git author
-        shell: bash
-        run: |
-          git config user.name "koda-release-bot"
-          git config user.email "koda-release-bot@users.noreply.github.com"
+      - name: Set up release bot
+        id: bot
+        uses: $/.github/actions/release-bot
+        with:
+          app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
 
       - name: Create annotated tag
         shell: bash
@@ -111,7 +103,7 @@ jobs:
         shell: bash
         env:
           TAG: ${{ needs.validate.outputs.tag }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
         run: git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "refs/tags/${TAG}"
 
       - name: Summary
@@ -128,3 +120,20 @@ jobs:
             echo "- Tag: ${TAG}"
             echo "- Commit: ${RELEASE_SHA}"
           } >> "${GITHUB_STEP_SUMMARY}"
+
+  build:
+    name: Build Release
+    needs:
+      - validate
+      - tag
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: $/.github/workflows/build-release.yml
+    with:
+      tag: ${{ needs.validate.outputs.tag }}
+      version: ${{ needs.validate.outputs.version }}
+      commit: ${{ needs.validate.outputs.release_sha }}
+    secrets:
+      KODA_RELEASE_BOT_PRIVATE_KEY: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
