@@ -12,9 +12,6 @@ wheels/
 # Environment files
 .env
 
-# Docker Sandboxes local state
-.sbx/
-
 # uv local cache
 .uvcache/
 

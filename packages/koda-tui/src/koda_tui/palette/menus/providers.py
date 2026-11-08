@@ -11,12 +11,10 @@ from koda.llm.auth.protocols import OAuthLoginCallbacks
 from koda_common.logging import get_logger
 from koda_common.settings.credentials import ApiKeyCredential
 from koda_tui import strings
-from koda_tui.appearance import Icons, Tokens
+from koda_tui.appearance import Icons
 from koda_tui.ui.widgets import InputDialog, ListItem, MessageDialog, Picker
 
 if TYPE_CHECKING:
-    from prompt_toolkit.formatted_text import StyleAndTextTuples
-
     from koda.llm import ProviderConnectionDefinition, ProviderDefinition
     from koda.llm.auth.registry import ProviderAuthRegistry
     from koda_common.settings.credentials import ProviderCredential
@@ -24,11 +22,6 @@ if TYPE_CHECKING:
 
 
 log = get_logger(__name__)
-
-
-_PROXY_MANAGED_PROVIDER_FOOTER: StyleAndTextTuples = [
-    (Tokens.Text.WARNING, strings.Palette.Providers.PROXY_MANAGED)
-]
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,8 +42,7 @@ class ProviderConnectionSelection:
 
 class ProviderMenu:
     """Connects providers: pick one, pick how if it has several ways, then enter an API
-    key or log in through the browser. With proxy-managed credentials, providers are
-    only listed; they are connected outside Koda.
+    key or log in through the browser.
 
     A browser login runs in the background, one at a time; closing its dialog cancels it.
     """
@@ -64,27 +56,18 @@ class ProviderMenu:
 
     def open(self) -> None:
         """Open the provider list."""
-        proxy_managed = self._settings.proxy_managed
         self._overlays.open(
             Picker(
                 strings.Palette.Providers.TITLE,
-                self._provider_items(proxy_managed=proxy_managed),
+                self._provider_items(),
                 on_select=lambda item: self.select(item.data),
-                heading=(
-                    strings.Palette.Providers.PROXY_MANAGED_HEADING
-                    if proxy_managed
-                    else strings.Palette.Providers.HEADING
-                ),
-                footer=_PROXY_MANAGED_PROVIDER_FOOTER if proxy_managed else None,
+                heading=strings.Palette.Providers.HEADING,
                 on_close=self._overlays.close,
             ),
         )
 
     def select(self, provider: ProviderDefinition) -> None:
         """Connect ``provider``: pick how, if it has several ways."""
-        if self._settings.proxy_managed:
-            self._overlays.close_all()
-            return
         connections = [ProviderConnectionSelection(provider, c) for c in provider.connections]
         if len(connections) == 1:
             self._connect(connections[0])
@@ -107,14 +90,13 @@ class ProviderMenu:
             ),
         )
 
-    def _provider_items(self, *, proxy_managed: bool) -> list[ListItem[ProviderDefinition]]:
-        """The providers, those with a connection marked, unless credentials are managed
-        outside Koda."""
+    def _provider_items(self) -> list[ListItem[ProviderDefinition]]:
+        """The providers, those with a connection marked."""
         return [
             ListItem(
                 label=provider.name,
                 detail=provider.description or "",
-                marker=Icons.DONE if not proxy_managed and self._any_connected(provider) else None,
+                marker=Icons.DONE if self._any_connected(provider) else None,
                 data=provider,
             )
             for provider in self._service.list_providers()

@@ -31,20 +31,6 @@ koda
 
 Koda prompts for provider credentials on first launch.
 
-Koda can also run as a Docker Sandboxes agent kit. The kit installs Koda inside
-an isolated microVM-based sandbox and launches it with Docker Sandboxes-managed
-credentials and network policy. The current kit supports proxy-managed
-credentials for OpenAI, Anthropic, BergetAI, OpenRouter, and GitHub.
-
-```bash
-sbx secret set -g openai
-sbx run --kit "git+https://github.com/jakeberggren/koda.git#ref=main&dir=kit/koda" koda
-```
-
-This requires Docker Sandboxes, an early-access feature from Docker.
-For setup details, see the [Docker Sandboxes documentation](https://docs.docker.com/ai/sandboxes/).
-For more information, see [kit/README.md](kit/README.md).
-
 ## Models and Providers
 
 Koda ships with a bundled `models.json` model catalog. You can connect with your own
@@ -99,11 +85,6 @@ precedence when they use the same IDs as built-in entries.
 Credentials can be configured through the TUI provider setup flow or with the provider-specific
 environment variable, such as `OPENROUTER_API_KEY` for the example above.
 
-When running through the Docker Sandboxes kit, provider credentials are
-proxy-managed by the sandbox runtime. Set supported provider secrets on the host
-with `sbx secret set -g <service>` before starting Koda. Note that only built-in
-providers are supported when running Koda through Docker Sandboxes.
-
 ## Agent
 
 Koda runs with a small set of built-in tools for reading, searching, editing, and
@@ -124,8 +105,7 @@ workspace and respect `.gitignore` patterns.
 The built-in `bash` tool supports configurable command execution modes:
 
 - `host` - Default, non-sandboxed execution on the local machine. This is
-  intended for trusted environments, such as when Koda itself is already running
-  inside a Docker Sandboxes microVM.
+  intended for trusted environments.
 - `seatbelt` - Runs each command with macOS `sandbox-exec`, allowing network
   access and limiting writes to the workspace plus temporary storage.
 - `bubblewrap` - Planned Linux sandbox mode. Not yet available.

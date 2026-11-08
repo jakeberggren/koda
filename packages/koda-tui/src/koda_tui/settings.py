@@ -36,11 +36,6 @@ class AppSettings:
     core: SettingsManager
     tui: TuiSettingsManager
 
-    @property
-    def proxy_managed(self) -> bool:
-        """Whether provider credentials are managed outside Koda, by a proxy."""
-        return self.core.credential_mode == "proxy-managed"
-
 
 class TuiSettings(BaseModel):
     """TUI-only preferences persisted to the ``tui`` config section."""

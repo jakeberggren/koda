@@ -6,12 +6,9 @@ from typing import TYPE_CHECKING
 
 from koda_common.logging import get_logger
 from koda_tui import strings
-from koda_tui.appearance import Tokens
 from koda_tui.ui.widgets import ListItem, Picker
 
 if TYPE_CHECKING:
-    from prompt_toolkit.formatted_text import StyleAndTextTuples
-
     from koda.llm import ModelDefinition
     from koda_tui.palette.context import PaletteContext
 
@@ -19,9 +16,6 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 _LABEL_WIDTH = 32  # Longer model names are cut, so details line up.
-_PROXY_MANAGED_MODEL_FOOTER: StyleAndTextTuples = [
-    (Tokens.Text.WARNING, strings.Palette.Models.PROXY_MANAGED)
-]
 
 
 class ModelMenu:
@@ -43,13 +37,11 @@ class ModelMenu:
 
     def open(self) -> None:
         """Open the model selection submenu."""
-        footer = _PROXY_MANAGED_MODEL_FOOTER if self._settings.proxy_managed else None
         self._overlays.open(
             Picker(
                 strings.Palette.Models.TITLE,
                 self.items(),
                 on_select=lambda item: self.select(item.data),
-                footer=footer,
                 label_width=_LABEL_WIDTH,
                 on_close=self._overlays.close,
             ),

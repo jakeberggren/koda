@@ -137,12 +137,7 @@ class Palette:
         TITLE = "Connect Provider"
         DETAIL = "Add an API key or log in to a provider"
         HEADING = "Choose a provider"
-        PROXY_MANAGED_HEADING = "Available providers"
         CONNECTIONS_HEADING = "Connect using"
-        PROXY_MANAGED = (
-            "Credentials are managed by a proxy: set them with sbx secret set outside Koda. "
-            "Connections are checked when you send a message."
-        )
         LOGIN_FAILED = "Provider login failed"
 
         @staticmethod
@@ -162,9 +157,6 @@ class Palette:
     class Models(Command):
         TITLE = "Switch Model"
         DETAIL = "Choose a different model"
-        PROXY_MANAGED = (
-            "Credentials are managed by a proxy: model access is checked when you send a message."
-        )
 
     class NewSession(Command):
         TITLE = "New Session"

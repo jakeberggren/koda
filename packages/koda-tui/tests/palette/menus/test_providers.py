@@ -50,7 +50,6 @@ class _FakeCoreSettings:
 class _FakeAppSettings:
     def __init__(self) -> None:
         self.core = _FakeCoreSettings()
-        self.proxy_managed = False
 
 
 class _FakeService:
@@ -238,15 +237,6 @@ def test_a_single_connection_skips_the_picker(
 ) -> None:
     _menu(overlays, settings, _BrowserLogin()).select(_openai_provider(oauth=False))
     assert overlays.kinds == ["input"]
-
-
-def test_proxy_managed_providers_only_close_the_palette(
-    overlays: _FakeOverlays, settings: _FakeAppSettings
-) -> None:
-    settings.proxy_managed = True
-    overlays.open(("picker", {}))
-    _menu(overlays, settings, _BrowserLogin()).select(_openai_provider())
-    assert overlays.stack == []
 
 
 async def test_a_browser_login_stores_the_credential(
