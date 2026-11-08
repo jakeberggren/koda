@@ -22,7 +22,7 @@ terminal.
 - **Streaming coordination** for incremental text, thinking, tool, and completion updates.
 - **Palette-driven controls** for provider setup, model selection, thinking level, sessions,
   theme, scrollbar visibility, and input behavior.
-- **In-process bootstrap** that wires settings, telemetry, the bundled service, and the TUI agent.
+- **In-process bootstrap** that wires settings, the bundled service, and the TUI agent.
 
 ## Package Structure
 

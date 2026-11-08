@@ -12,7 +12,7 @@
 </div>
 
 `koda` is the core library for the Koda coding assistant. It contains the agent loop,
-LLM abstractions, session model, telemetry hooks, and tool framework used by higher-level
+LLM abstractions, session model, and tool framework used by higher-level
 packages such as `koda-service` and `koda-tui`.
 
 ## Responsibilities
@@ -21,7 +21,7 @@ packages such as `koda-service` and `koda-tui`.
 - Define provider-agnostic LLM protocols, models, events, and registries.
 - Provide built-in provider integrations for OpenAI and BergetAI.
 - Model internal conversation messages and session persistence.
-- Provide telemetry integration points.
+- Optionally trace OpenAI-compatible calls to Langfuse (configured via `LANGFUSE_*` env vars).
 - Expose the tool framework and built-in filesystem-oriented tools.
 
 ## Package Structure
@@ -47,8 +47,6 @@ packages/koda/
 │   │   ├── manager.py              # Session orchestration
 │   │   ├── session.py              # Session model
 │   │   └── store.py                # In-memory and JSON session stores
-│   ├── telemetry/
-│   │   └── langfuse.py             # Langfuse integration
 │   ├── tools/
 │   │   ├── builtins/               # read/list/glob/grep/edit/write tools
 │   │   ├── base.py                 # Core tool protocols and base models
@@ -71,5 +69,4 @@ The package re-exports its main building blocks from the following modules:
 - `koda.sessions` for session management and persistence
 - `koda.messages` for internal message models
 - `koda.tools` for the tool framework and built-in tool registration helpers
-- `koda.telemetry` for telemetry interfaces and Langfuse integration
 - `koda.agent` for the core `Agent` implementation

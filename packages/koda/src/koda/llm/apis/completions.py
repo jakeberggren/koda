@@ -392,7 +392,7 @@ class OpenAICompletionsAPI(LLM):
             base_url=context.connection.base_url,
             model=context.model.id,
         )
-        client_factory = resolve_openai_client(context.settings)
+        client_factory = resolve_openai_client(tracing=context.tracing)
         return cls(
             config,
             client=client_factory(api_key=config.api_key, base_url=config.base_url),

@@ -18,12 +18,10 @@ if TYPE_CHECKING:
 
     from openai import AsyncOpenAI
 
-    from koda_common.settings import SettingsManager
+    from koda.llm import Credentials
 
 
-class _FakeSettings:
-    langfuse_tracing_enabled = False
-
+class _FakeCredentials:
     def __init__(self, credential: ProviderCredential | None) -> None:
         self._credential = credential
 
@@ -100,7 +98,7 @@ def _context(credential: ProviderCredential | None) -> LLMApiContext:
             name="gpt-5.5",
             capabilities={"extended_prompt_retention": True},
         ),
-        settings=cast("SettingsManager", _FakeSettings(credential)),
+        credentials=cast("Credentials", _FakeCredentials(credential)),
         auth_registry=ProviderAuthRegistry({"openai:oauth": _FakeAuthProvider()}),
     )
 
@@ -115,7 +113,7 @@ async def test_codex_responses_factory_builds_oauth_client(
     factory = _FakeClientFactory()
     monkeypatch.setattr(
         "koda.llm.apis.codex.resolve_openai_client",
-        cast("Callable[[object], Callable[..., AsyncOpenAI]]", lambda _settings: factory),
+        cast("Callable[..., Callable[..., AsyncOpenAI]]", lambda **_: factory),
     )
 
     api = await OpenAICodexResponsesAPI.from_context(
@@ -171,7 +169,7 @@ async def test_codex_responses_factory_refreshes_expired_oauth_credential(
     factory = _FakeClientFactory()
     monkeypatch.setattr(
         "koda.llm.apis.codex.resolve_openai_client",
-        cast("Callable[[object], Callable[..., AsyncOpenAI]]", lambda _settings: factory),
+        cast("Callable[..., Callable[..., AsyncOpenAI]]", lambda **_: factory),
     )
     expired = OAuthCredential(
         type="oauth",
@@ -187,7 +185,7 @@ async def test_codex_responses_factory_refreshes_expired_oauth_credential(
         expires_at=str(int(time()) + 3600),
         metadata={"chatgpt_account_id": "fresh-account-id"},
     )
-    settings = _FakeSettings(expired)
+    credentials = _FakeCredentials(expired)
     auth_provider = _FakeAuthProvider(refreshed)
     context = _context(expired)
     context = LLMApiContext(
@@ -196,14 +194,14 @@ async def test_codex_responses_factory_refreshes_expired_oauth_credential(
         connection_id=context.connection_id,
         connection=context.connection,
         model=context.model,
-        settings=cast("SettingsManager", settings),
+        credentials=cast("Credentials", credentials),
         auth_registry=ProviderAuthRegistry({"openai:oauth": auth_provider}),
     )
 
     api = await OpenAICodexResponsesAPI.from_context(context)
 
     assert auth_provider.refresh_calls == [expired]
-    assert settings.get_credential("openai:oauth") == refreshed
+    assert credentials.get_credential("openai:oauth") == refreshed
     assert api.config.api_key == "fresh-access-token"
     assert factory.clients[0].kwargs["default_headers"] == {
         "chatgpt-account-id": "fresh-account-id",
@@ -225,7 +223,7 @@ async def test_codex_responses_factory_translates_oauth_refresh_failure() -> Non
         connection_id=context.connection_id,
         connection=context.connection,
         model=context.model,
-        settings=context.settings,
+        credentials=context.credentials,
         auth_registry=ProviderAuthRegistry(
             {"openai:oauth": _FakeAuthProvider(refresh_error=RuntimeError("refresh failed"))}
         ),

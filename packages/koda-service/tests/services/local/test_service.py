@@ -56,7 +56,6 @@ def _make_settings() -> Mock:
             "thinking",
             "allow_web_search",
             "allow_extended_prompt_retention",
-            "langfuse_tracing_enabled",
             "bash_execution_sandbox",
             "credentials",
             "get_credential",
@@ -67,7 +66,6 @@ def _make_settings() -> Mock:
     settings.thinking = "none"
     settings.allow_web_search = False
     settings.allow_extended_prompt_retention = False
-    settings.langfuse_tracing_enabled = False
     settings.bash_execution_sandbox = "none"
     credential = ApiKeyCredential(type="api_key", value="test-key")
     settings.credentials = {"openai:api-key": credential}

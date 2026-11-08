@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 from typing import NoReturn
 
-from koda.telemetry import LangfuseTelemetry
 from koda_common.logging import LoggingConfig, configure_logging, get_logger
 from koda_common.settings import (
     JsonFileSecretsStore,
@@ -42,8 +41,7 @@ def main() -> None:
         _fail(_startup_error(error))
     service = LocalKodaService(
         settings=settings.core,
-        runtime=LocalRuntimeConfig(cwd=workspace, sandbox_dir=workspace),
-        telemetry=LangfuseTelemetry(),
+        runtime=LocalRuntimeConfig(cwd=workspace, sandbox_dir=workspace, tracing=True),
     )
     app = KodaTuiApp(app_settings=settings, service=service, workspace=workspace)
     asyncio.run(app.run())

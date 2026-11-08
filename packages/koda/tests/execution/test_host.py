@@ -1,25 +1,18 @@
 import asyncio
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any
 
 import pytest
 
 from koda.execution.host import HostCommandExecutor
-
-if TYPE_CHECKING:
-    from koda_common.settings import SettingsManager
-
-
-class _FakeSettings:
-    bash_execution_sandbox = "host"
 
 
 @pytest.mark.skipif(shutil.which("bash") is None, reason="bash is not installed")
 class TestHostCommandExecutor:
     @pytest.mark.asyncio
     async def test_run_returns_stdout_stderr_and_exit_code(self, tmp_path: Path) -> None:
-        executor = HostCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = HostCommandExecutor()
 
         result = await executor.run(
             command="printf 'hello'; printf 'oops' >&2; exit 3",
@@ -54,7 +47,7 @@ class TestHostCommandExecutor:
         monkeypatch.setattr("koda.execution.host._get_bash_path", lambda: "/bin/bash")
         monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_create_subprocess_exec)
 
-        executor = HostCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = HostCommandExecutor()
         await executor.run(
             command="printf test",
             cwd=str(tmp_path),

@@ -17,7 +17,7 @@ from koda.llm.models import (
     ThinkingOptionId,
     resolve_thinking_mode,
 )
-from koda.llm.protocols import LLM
+from koda.llm.protocols import LLM, Credentials
 from koda.llm.types import (
     LLMEvent,
     LLMRequest,
@@ -30,6 +30,7 @@ from koda.llm.types import (
 __all__ = [
     "LLM",
     "AuthMethod",
+    "Credentials",
     "LLMEvent",
     "LLMFactory",
     "LLMRequest",

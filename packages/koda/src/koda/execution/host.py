@@ -3,15 +3,11 @@ from __future__ import annotations
 import asyncio
 import functools
 import shutil
-from typing import TYPE_CHECKING
 
 from koda.execution.exceptions import CommandExecutionError, CommandTimeoutError
 from koda.execution.models import ExecutionResult
 from koda.execution.protocols import CommandExecutor
 from koda.execution.utils import terminate_process_tree
-
-if TYPE_CHECKING:
-    from koda_common.settings import SettingsManager
 
 
 class BashNotFoundError(Exception):
@@ -31,9 +27,6 @@ def _get_bash_path() -> str:
 
 class HostCommandExecutor(CommandExecutor):
     """Execute commands directly on the host using bash."""
-
-    def __init__(self, settings: SettingsManager) -> None:
-        self._settings = settings
 
     async def run(
         self,

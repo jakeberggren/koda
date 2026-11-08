@@ -203,36 +203,36 @@ class SettingsManager(BaseSettingsManager):
         """Return cached credentials keyed by provider or provider connection id."""
         return dict(self._credential_cache)
 
-    def get_credential(self, provider: str) -> ProviderCredential | None:
-        """Return the configured credential for one provider or provider connection."""
+    def get_credential(self, key: str) -> ProviderCredential | None:
+        """Return the configured credential for one provider connection."""
 
-        if provider in self._credential_cache:
-            return self._credential_cache[provider]
+        if key in self._credential_cache:
+            return self._credential_cache[key]
 
-        env_var = _api_key_env_var_for_credential_key(provider)
-        if env_var is not None and (key := os.getenv(env_var)):
-            credential = ApiKeyCredential(type="api_key", value=key)
-            self._credential_cache[provider] = credential
+        env_var = _api_key_env_var_for_credential_key(key)
+        if env_var is not None and (api_key := os.getenv(env_var)):
+            credential = ApiKeyCredential(type="api_key", value=api_key)
+            self._credential_cache[key] = credential
             return credential
 
-        if credential := self._secrets_store.get_credential(provider):
-            self._credential_cache[provider] = credential
+        if credential := self._secrets_store.get_credential(key):
+            self._credential_cache[key] = credential
             return credential
 
         return None
 
-    def set_credential(self, provider: str, credential: ProviderCredential) -> None:
+    def set_credential(self, key: str, credential: ProviderCredential) -> None:
         """Persist one provider credential and notify subscribers if it changed."""
 
-        old = self.get_credential(provider)
-        self._secrets_store.set_credential(provider, credential)
-        self._credential_cache[provider] = credential
+        old = self.get_credential(key)
+        self._secrets_store.set_credential(key, credential)
+        self._credential_cache[key] = credential
         if old == credential:
             return
         self._notify(
             (
                 SettingChange(
-                    name=f"credentials.{provider}",
+                    name=f"credentials.{key}",
                     old_value=old,
                     new_value=credential,
                 ),

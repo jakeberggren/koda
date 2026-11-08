@@ -26,11 +26,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from koda.execution import CommandExecutor
-    from koda_common.settings import SettingsManager
-
-
-class _FakeSettings:
-    bash_execution_sandbox = "host"
 
 
 class _TimeoutExecutor:
@@ -50,7 +45,7 @@ def _tool_context(sandbox_dir: Path) -> ToolContext:
         cwd=sandbox_dir,
         policy=ToolPolicy.create(sandbox_dir),
         coordinator=ToolExecutionCoordinator(),
-        executor=HostCommandExecutor(cast("SettingsManager", _FakeSettings())),
+        executor=HostCommandExecutor(),
     )
 
 

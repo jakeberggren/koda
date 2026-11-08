@@ -20,13 +20,11 @@ if TYPE_CHECKING:
 
     from openai import AsyncOpenAI
 
-    from koda_common.settings import SettingsManager
-
 logger = get_logger(__name__)
 
 
-def resolve_openai_client(settings: SettingsManager) -> Callable[..., AsyncOpenAI]:
-    if not settings.langfuse_tracing_enabled:
+def resolve_openai_client(*, tracing: bool) -> Callable[..., AsyncOpenAI]:
+    if not tracing:
         return importlib.import_module("openai").AsyncOpenAI
     try:
         return importlib.import_module("langfuse.openai").AsyncOpenAI

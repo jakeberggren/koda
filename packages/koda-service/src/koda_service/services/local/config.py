@@ -21,3 +21,4 @@ class LocalRuntimeConfig:
     system_prompt: SystemPrompt = field(default_factory=SystemPrompt)
     tools: ToolConfig | None = None
     llm: LLM | None = None
+    tracing: bool = False

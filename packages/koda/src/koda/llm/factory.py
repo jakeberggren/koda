@@ -12,13 +12,11 @@ from koda.llm.models import (
     ThinkingOption,
     resolve_thinking_mode,
 )
-from koda.llm.types import LLMRequestOptions
 
 if TYPE_CHECKING:
     from koda.llm.catalog import ModelCatalog
-    from koda.llm.models import ProviderConfig, ProviderModelConfig
-    from koda.llm.protocols import LLM
-    from koda_common.settings import SettingsManager
+    from koda.llm.models import ProviderConfig, ProviderModelConfig, ThinkingOptionId
+    from koda.llm.protocols import LLM, Credentials
 
 
 class LLMFactory:
@@ -29,8 +27,11 @@ class LLMFactory:
         catalog: ModelCatalog,
         api_registry: LLMApiRegistry | None = None,
         auth_registry: ProviderAuthRegistry | None = None,
+        *,
+        tracing: bool = False,
     ) -> None:
         self._catalog = catalog
+        self._tracing = tracing
         self._api_registry = api_registry or LLMApiRegistry.default()
         self._auth_registry = auth_registry or ProviderAuthRegistry.default()
 
@@ -78,7 +79,7 @@ class LLMFactory:
 
     def _configured_credential_ids(
         self,
-        settings: SettingsManager,
+        credentials: Credentials,
         provider_id: str,
         model_id: str,
     ) -> set[str]:
@@ -87,7 +88,7 @@ class LLMFactory:
         credential_ids: set[str] = set()
         for connection_id in self._catalog.model_connection_ids(normalized_provider_id, model_id):
             credential_key = f"{normalized_provider_id}:{connection_id}"
-            credential = settings.get_credential(credential_key)
+            credential = credentials.get_credential(credential_key)
             connection = provider.connections[connection_id]
             if credential is not None and credential.auth_type == connection.auth:
                 credential_ids.add(credential_key)
@@ -107,34 +108,28 @@ class LLMFactory:
             credential_ids=credential_ids,
         )
 
-    def resolve_route_for_settings(self, settings: SettingsManager):
-        """Resolve the selected provider/model using currently configured credentials."""
-        if settings.provider is None:
-            raise exceptions.ProviderSelectionMissingError
-        if settings.model is None:
-            raise exceptions.ModelSelectionMissingError
+    def resolve_configured_route(self, provider_id: str, model_id: str, credentials: Credentials):
+        """Resolve a provider/model selection to a connection that has credentials."""
         return self._catalog.resolve_route(
-            settings.provider,
-            settings.model,
-            credential_ids=self._configured_credential_ids(
-                settings,
-                settings.provider,
-                settings.model,
-            ),
+            provider_id,
+            model_id,
+            credential_ids=self._configured_credential_ids(credentials, provider_id, model_id),
         )
 
-    def request_options_for_settings(self, settings: SettingsManager) -> LLMRequestOptions:
-        """Build model-valid request defaults from user settings."""
-        route = self.resolve_route_for_settings(settings)
-        return LLMRequestOptions(
-            thinking=resolve_thinking_mode(settings.thinking, route.model.thinking.modes),
-            web_search=settings.allow_web_search,
-            extended_prompt_retention=settings.allow_extended_prompt_retention,
-        )
+    def resolve_thinking(
+        self,
+        provider_id: str,
+        model_id: str,
+        credentials: Credentials,
+        thinking: ThinkingOptionId,
+    ) -> ThinkingOptionId:
+        """Resolve ``thinking`` to a mode the selected model supports."""
+        route = self.resolve_configured_route(provider_id, model_id, credentials)
+        return resolve_thinking_mode(thinking, route.model.thinking.modes)
 
-    async def create(self, settings: SettingsManager) -> LLM:
-        """Create an LLM instance from settings."""
-        route = self.resolve_route_for_settings(settings)
+    async def create(self, provider_id: str, model_id: str, credentials: Credentials) -> LLM:
+        """Create an LLM instance for a provider/model selection."""
+        route = self.resolve_configured_route(provider_id, model_id, credentials)
         api = self._api_registry.get(route.connection.api)
         return await api(
             LLMApiContext(
@@ -143,8 +138,9 @@ class LLMFactory:
                 connection_id=route.connection_id,
                 connection=route.connection,
                 model=route.model,
-                settings=settings,
+                credentials=credentials,
                 auth_registry=self._auth_registry,
+                tracing=self._tracing,
             )
         )
 

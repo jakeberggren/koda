@@ -57,7 +57,7 @@ class OpenAICodexResponsesAPI(OpenAIResponsesAPI):
             account_id=account_id,
             backend=config.backend,
         )
-        client_factory = resolve_openai_client(context.settings)
+        client_factory = resolve_openai_client(tracing=context.tracing)
         return cls(
             config,
             client=client_factory(
