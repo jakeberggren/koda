@@ -26,8 +26,5 @@ wheels/
 .pytest_cache/
 .ruff_cache/
 
-# Claude local settings
-settings.local.json
-
 # Logging
 logs/
