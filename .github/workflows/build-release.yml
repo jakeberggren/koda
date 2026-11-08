@@ -49,8 +49,9 @@ jobs:
           fi
 
           commit="$(git rev-parse "${tag}^{commit}")"
-          if ! git merge-base --is-ancestor "${commit}" origin/main; then
-            echo "Release tag ${tag} does not point to a commit on origin/main" >&2
+          # The tag is the release PR's bump commit, built on top of main.
+          if ! git merge-base --is-ancestor "${commit}^" origin/main; then
+            echo "Release tag ${tag} is not a commit on top of origin/main" >&2
             exit 1
           fi
 
