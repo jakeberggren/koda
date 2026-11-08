@@ -166,7 +166,7 @@ jobs:
             echo "- Target version: ${VERSION}"
             echo "- Tag after merge: ${TAG}"
             echo
-            echo "After this PR is merged, the tag-release workflow will tag its head commit as ${TAG}."
+            echo "After this PR is merged, the release workflow will tag its head commit as ${TAG}."
           } > "${body}"
 
           gh pr create \
