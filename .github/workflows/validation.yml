@@ -12,56 +12,70 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read # List the PR's changed files.
+    outputs:
+      python: ${{ github.event_name == 'push' || steps.filter.outputs.python == 'true' }}
+      shell: ${{ github.event_name == 'push' || steps.filter.outputs.shell == 'true' }}
+      workflows: ${{ github.event_name == 'push' || steps.filter.outputs.workflows == 'true' }}
+    steps:
+      - name: Filter changed files
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        with:
+          filters: |
+            python:
+              - packages/**
+              - pyproject.toml
+              - uv.lock
+              - .python-version
+              - .github/workflows/validation.yml
+              - .github/actions/setup-python/**
+            shell:
+              - '**/*.sh'
+              - scripts/**
+              - .github/workflows/validation.yml
+            workflows:
+              - .github/**
+
   lint:
     name: Lint
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version-file: "pyproject.toml"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --locked
+      - uses: $/.github/actions/setup-python
 
       - name: Run ruff
         run: uv run ruff check
 
   typecheck:
     name: Typecheck
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version-file: "pyproject.toml"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --locked
+      - uses: $/.github/actions/setup-python
 
       - name: Run ty
         run: uv run ty check
 
   test:
     name: Test (${{ matrix.name }})
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ${{ matrix.runs_on }}
     strategy:
       fail-fast: false
@@ -80,18 +94,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
-        with:
-          python-version-file: "pyproject.toml"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
-        with:
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --locked
+      - uses: $/.github/actions/setup-python
 
       - name: Install ripgrep on Linux
         if: runner.os == 'Linux'
@@ -106,6 +109,8 @@ jobs:
 
   shellcheck:
     name: ShellCheck
+    needs: changes
+    if: needs.changes.outputs.shell == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -120,6 +125,8 @@ jobs:
 
   zizmor:
     name: zizmor
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read # Check out the repository.
@@ -131,3 +138,21 @@ jobs:
 
       - name: Run zizmor
         uses: zizmorcore/zizmor-action@53290badfa369cb0bf7ad16342cb62c2fa47ac7b # v0.8.0
+
+  # The only required check, so jobs can be skipped, added or renamed without
+  # touching the ruleset.
+  ci:
+    name: CI
+    needs:
+      - changes
+      - lint
+      - typecheck
+      - test
+      - shellcheck
+      - zizmor
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if a job failed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
