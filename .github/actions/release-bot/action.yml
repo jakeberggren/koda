@@ -1,0 +1,32 @@
+name: Release bot
+description: Generate a koda-release-bot token and make it the git author.
+
+inputs:
+  app-id:
+    required: true
+  private-key:
+    required: true
+  permission-pull-requests:
+    required: false
+
+outputs:
+  token:
+    value: ${{ steps.app-token.outputs.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Generate token
+      id: app-token
+      uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.private-key }}
+        permission-contents: write
+        permission-pull-requests: ${{ inputs.permission-pull-requests }}
+
+    - name: Configure git author
+      shell: bash
+      run: |
+        git config --global user.name "koda-release-bot"
+        git config --global user.email "koda-release-bot@users.noreply.github.com"

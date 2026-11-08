@@ -30,20 +30,19 @@ jobs:
     name: Prepare Release PR
     runs-on: ubuntu-latest
     steps:
-      - name: Generate token
-        id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
-          private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Set up release bot
+        id: bot
+        uses: $/.github/actions/release-bot
+        with:
+          app-id: ${{ vars.KODA_RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
+          permission-pull-requests: write
 
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -58,98 +57,32 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Read current version
-        id: current
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          current_version="$(uv run bump-my-version show current_version)"
-          echo "version=${current_version}" >> "${GITHUB_OUTPUT}"
-
       - name: Compute version
         id: version
         shell: bash
         env:
           BUMP: ${{ inputs.bump }}
           EXPLICIT_VERSION: ${{ inputs.version }}
-          CURRENT_VERSION: ${{ steps.current.outputs.version }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
         run: |
           set -euo pipefail
 
-          current_version="${CURRENT_VERSION}"
-          [[ -n "${current_version}" ]] || {
-            echo "Could not read current version" >&2
-            exit 1
-          }
-
-          semver_re='^[0-9]+\.[0-9]+\.[0-9]+$'
-          if [[ ! "${current_version}" =~ ${semver_re} ]]; then
-            echo "Current version is not valid semver: ${current_version}" >&2
-            exit 1
-          fi
+          current_version="$(uv run bump-my-version show current_version)"
 
           if [[ "${BUMP}" == "explicit" ]]; then
-            if [[ -z "${EXPLICIT_VERSION}" ]]; then
-              echo "Explicit version is required when bump=explicit" >&2
-              exit 1
-            fi
-            if [[ ! "${EXPLICIT_VERSION}" =~ ${semver_re} ]]; then
-              echo "Explicit version must look like X.Y.Z: ${EXPLICIT_VERSION}" >&2
-              exit 1
-            fi
             new_version="${EXPLICIT_VERSION}"
-            bump_part="$(python - "${current_version}" "${new_version}" <<'PY'
-          import sys
-
-          current = tuple(int(part) for part in sys.argv[1].split("."))
-          new = tuple(int(part) for part in sys.argv[2].split("."))
-          if new[0] > current[0]:
-              print("major")
-          elif new[1] > current[1]:
-              print("minor")
-          else:
-              print("patch")
-          PY
-          )"
-          else
-            if [[ -n "${EXPLICIT_VERSION}" ]]; then
-              echo "version input is only valid when bump=explicit" >&2
+            if [[ ! "${new_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Explicit version must look like X.Y.Z: ${new_version}" >&2
               exit 1
             fi
-
-            IFS=. read -r major minor patch <<< "${current_version}"
-            case "${BUMP}" in
-              patch)
-                patch=$((patch + 1))
-                ;;
-              minor)
-                minor=$((minor + 1))
-                patch=0
-                ;;
-              major)
-                major=$((major + 1))
-                minor=0
-                patch=0
-                ;;
-              *)
-                echo "Unsupported bump: ${BUMP}" >&2
-                exit 1
-                ;;
-            esac
-            new_version="${major}.${minor}.${patch}"
-            bump_part="${BUMP}"
+            highest="$(printf '%s\n' "${current_version}" "${new_version}" | sort -V | tail -n1)"
+            if [[ "${new_version}" == "${current_version}" || "${highest}" != "${new_version}" ]]; then
+              echo "${new_version} must be greater than ${current_version}" >&2
+              exit 1
+            fi
+          else
+            new_version="$(uv run bump-my-version show new_version --increment "${BUMP}")"
           fi
-
-          python - "${current_version}" "${new_version}" <<'PY'
-          import sys
-
-          current = tuple(int(part) for part in sys.argv[1].split("."))
-          new = tuple(int(part) for part in sys.argv[2].split("."))
-          if new <= current:
-              raise SystemExit(f"{sys.argv[2]} must be greater than {sys.argv[1]}")
-          PY
 
           tag="v${new_version}"
           branch="release/${tag}"
@@ -159,21 +92,10 @@ jobs:
             exit 1
           fi
 
-          if git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1; then
-            echo "Release branch already exists: ${branch}" >&2
-            exit 1
-          fi
-
-          open_release_prs="$(gh pr list --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("release/v"))] | length')"
+          open_release_prs="$(gh pr list --state open --json headRefName \
+            --jq '[.[] | select(.headRefName | startswith("release/v"))] | length')"
           if [[ "${open_release_prs}" != "0" ]]; then
             echo "Another release PR is already open" >&2
-            exit 1
-          fi
-
-          if gh pr list --state open --head "${branch}" --json number --jq 'length' | grep -qx '0'; then
-            :
-          else
-            echo "An open release PR already exists for ${branch}" >&2
             exit 1
           fi
 
@@ -182,14 +104,7 @@ jobs:
             echo "version=${new_version}"
             echo "tag=${tag}"
             echo "branch=${branch}"
-            echo "bump_part=${bump_part}"
           } >> "${GITHUB_OUTPUT}"
-
-      - name: Configure git author
-        shell: bash
-        run: |
-          git config user.name "koda-release-bot"
-          git config user.email "koda-release-bot@users.noreply.github.com"
 
       - name: Create release branch
         shell: bash
@@ -200,17 +115,8 @@ jobs:
       - name: Bump version
         shell: bash
         env:
-          BUMP: ${{ inputs.bump }}
           VERSION: ${{ steps.version.outputs.version }}
-          BUMP_PART: ${{ steps.version.outputs.bump_part }}
-        run: |
-          set -euo pipefail
-
-          if [[ "${BUMP}" == "explicit" ]]; then
-            uv run bump-my-version bump "${BUMP_PART}" --new-version "${VERSION}" --no-commit --no-tag
-          else
-            uv run bump-my-version bump "${BUMP}" --no-commit --no-tag
-          fi
+        run: uv run bump-my-version bump --new-version "${VERSION}" --no-commit --no-tag
 
       - name: Refresh lockfile
         run: uv lock
@@ -238,13 +144,13 @@ jobs:
         shell: bash
         env:
           BRANCH: ${{ steps.version.outputs.branch }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
         run: git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
 
       - name: Open release PR
         shell: bash
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.bot.outputs.token }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
           CURRENT_VERSION: ${{ steps.version.outputs.current }}
