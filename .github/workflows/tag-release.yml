@@ -28,13 +28,13 @@ jobs:
     outputs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
-      merge_sha: ${{ github.event.pull_request.merge_commit_sha }}
+      release_sha: ${{ github.event.pull_request.head.sha }}
     steps:
-      - name: Checkout merge commit
+      - name: Checkout release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
 
       - name: Validate merged release
@@ -42,8 +42,7 @@ jobs:
         shell: bash
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          RELEASE_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
 
@@ -56,42 +55,33 @@ jobs:
 
           tag="v${version}"
 
-          expected_files="$(
-            {
-              echo "pyproject.toml"
-              echo "uv.lock"
-              git ls-files 'packages/*/pyproject.toml'
-            } | sort
-          )"
-
-          changed_files="$(git diff --name-only "${BASE_SHA}" "${MERGE_SHA}" | sort)"
-          unexpected_files="$(comm -13 <(printf '%s\n' "${expected_files}") <(printf '%s\n' "${changed_files}"))"
-          if [[ -n "${unexpected_files}" ]]; then
-            echo "Release PR changed unexpected files:" >&2
-            printf '%s\n' "${unexpected_files}" >&2
+          # Tag the release PR's own commit, not the merge commit, so PRs merged
+          # after Prepare Release stay out. It must be one bump commit on main.
+          if ! git merge-base --is-ancestor "${RELEASE_SHA}^" origin/main; then
+            echo "Release commit's parent is not on main: ${RELEASE_SHA}" >&2
             exit 1
           fi
 
-          python - "${version}" <<'PY'
-          import pathlib
-          import re
-          import sys
+          unexpected_files="$(git diff --name-only "${RELEASE_SHA}^" "${RELEASE_SHA}" -- . \
+            ':!pyproject.toml' ':!uv.lock' ':!packages/*/pyproject.toml')"
+          if [[ -n "${unexpected_files}" ]]; then
+            echo "Release PR changed unexpected files:" >&2
+            echo "${unexpected_files}" >&2
+            exit 1
+          fi
 
-          expected = sys.argv[1]
-          files = [pathlib.Path("pyproject.toml"), *pathlib.Path("packages").glob("*/pyproject.toml")]
-          for path in files:
-              text = path.read_text()
-              if path.name == "pyproject.toml" and path.parent == pathlib.Path("."):
-                  match = re.search(r'^current_version = "([^"]+)"$', text, re.M)
-                  field = "current_version"
-              else:
-                  match = re.search(r'^version = "([^"]+)"$', text, re.M)
-                  field = "version"
-              if not match:
-                  raise SystemExit(f"{path}: missing {field}")
-              if match.group(1) != expected:
-                  raise SystemExit(f"{path}: {field} is {match.group(1)}, expected {expected}")
-          PY
+          check_version() {
+            local path="$1" field="$2"
+            if ! grep -qxF "${field} = \"${version}\"" "${path}"; then
+              echo "${path}: expected ${field} = \"${version}\", found: $(grep -m1 "^${field} = " "${path}" || echo none)" >&2
+              exit 1
+            fi
+          }
+
+          check_version pyproject.toml current_version
+          for path in packages/*/pyproject.toml; do
+            check_version "${path}" version
+          done
 
           if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
             echo "Tag already exists: ${tag}" >&2
@@ -116,11 +106,11 @@ jobs:
           private-key: ${{ secrets.KODA_RELEASE_BOT_PRIVATE_KEY }}
           permission-contents: write
 
-      - name: Checkout merge commit
+      - name: Checkout release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ needs.validate.outputs.merge_sha }}
+          ref: ${{ needs.validate.outputs.release_sha }}
           persist-credentials: false
 
       - name: Configure git author
@@ -133,8 +123,8 @@ jobs:
         shell: bash
         env:
           TAG: ${{ needs.validate.outputs.tag }}
-          MERGE_SHA: ${{ needs.validate.outputs.merge_sha }}
-        run: git tag -a "${TAG}" -m "Release ${TAG}" "${MERGE_SHA}"
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
+        run: git tag -a "${TAG}" -m "Release ${TAG}" "${RELEASE_SHA}"
 
       - name: Push tag
         shell: bash
@@ -148,12 +138,12 @@ jobs:
         env:
           TAG: ${{ needs.validate.outputs.tag }}
           VERSION: ${{ needs.validate.outputs.version }}
-          MERGE_SHA: ${{ needs.validate.outputs.merge_sha }}
+          RELEASE_SHA: ${{ needs.validate.outputs.release_sha }}
         run: |
           {
             echo "## Release tagged"
             echo
             echo "- Version: ${VERSION}"
             echo "- Tag: ${TAG}"
-            echo "- Commit: ${MERGE_SHA}"
+            echo "- Commit: ${RELEASE_SHA}"
           } >> "${GITHUB_STEP_SUMMARY}"
