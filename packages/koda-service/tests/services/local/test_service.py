@@ -12,6 +12,7 @@ from koda.llm.types import LLMEvent, LLMRequest, LLMResponse
 from koda.messages import AssistantMessage
 from koda.prompts import SystemPrompt
 from koda.sessions import InMemorySessionStore, Session
+from koda_common.settings import SecretsPermissionError
 from koda_common.settings.credentials import ApiKeyCredential
 from koda_service import ChatRequest, ServiceStatusCode
 from koda_service.exceptions import ServiceAuthenticationError
@@ -398,3 +399,13 @@ async def test_config_prompt_used_when_system_prompt_files_absent(tmp_path: Path
 
     assert fake_llm.last_request is not None
     assert fake_llm.last_request.instructions == "Configured system prompt."
+
+
+def test_status_reports_an_unreadable_secrets_file() -> None:
+    settings = _make_settings()
+    settings.get_credential.side_effect = SecretsPermissionError(
+        path=Path("secrets.json"), error=PermissionError("denied")
+    )
+    service = _make_service(llm=_FakeLLM(), settings=settings)
+
+    assert service.status().code is ServiceStatusCode.STARTUP_ERROR

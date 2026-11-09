@@ -83,15 +83,15 @@ class EmptyMessageError(LLMValidationError):
 class EmptyApiKeyError(LLMConfigurationError):
     """API key cannot be empty."""
 
-    def __init__(self, backend_name: str = "LLM backend") -> None:
-        super().__init__(f"{backend_name} API key cannot be empty")
+    def __init__(self, credential_key: str) -> None:
+        super().__init__(f"{credential_key} API key cannot be empty")
 
 
 class ProviderCredentialNotConfiguredError(LLMConfigurationError):
     """Provider credential is not configured."""
 
-    def __init__(self, backend_name: str) -> None:
-        super().__init__(f"{backend_name} credential not configured")
+    def __init__(self, credential_key: str) -> None:
+        super().__init__(f"{credential_key} credential not configured")
 
 
 class ApiKeyCredentialRequiredError(LLMConfigurationError):
@@ -148,9 +148,12 @@ class ProviderNotSupportedError(ProviderConfigurationError):
         self.provider_name = provider_name
 
 
-class ProviderSelectionMissingError(ProviderConfigurationError):
-    def __init__(self) -> None:
-        super().__init__("Provider selection is required")
+class ProviderNotConnectedError(ProviderConfigurationError):
+    """No connection to the provider has a credential."""
+
+    def __init__(self, provider_name: str) -> None:
+        super().__init__(f"Provider '{provider_name}' is not connected")
+        self.provider_name = provider_name
 
 
 class ModelNotSupportedError(ModelConfigurationError):

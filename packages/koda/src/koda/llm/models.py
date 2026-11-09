@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Self
 
+from koda.llm import exceptions
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -60,6 +62,11 @@ class Connection:
         """The key this connection's credential is stored under."""
         return f"{self.provider}:{self.id}"
 
+    def is_connected(self, credentials: Credentials) -> bool:
+        """Whether ``credentials`` has a credential for this connection."""
+        credential = credentials.get_credential(self.credential_key)
+        return credential is not None and credential.auth_type == self.auth
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Provider:
@@ -81,6 +88,7 @@ class Model:
     thinking_budget_tokens: int | None = None
     capabilities: dict[str, object] = field(default_factory=dict)
     connections: tuple[Connection, ...] = ()
+    """The connections that offer this model, in order of preference."""
 
     @property
     def effective_thinking_options(self) -> tuple[ThinkingOption, ...]:
@@ -98,14 +106,13 @@ class Model:
         resolved_id = resolve_thinking_mode(thinking_id, [option.id for option in options])
         return next(option for option in options if option.id == resolved_id)
 
-    def connection(self, credentials: Credentials) -> Connection:
-        """The connection to use: the first with a matching credential, OAuth first.
+    def is_connected(self, credentials: Credentials) -> bool:
+        """Whether any of this model's connections has a credential."""
+        return any(connection.is_connected(credentials) for connection in self.connections)
 
-        Falls back to the preferred connection when none has a credential.
-        """
-        preferred = sorted(self.connections, key=lambda connection: connection.auth != "oauth")
-        for connection in preferred:
-            credential = credentials.get_credential(connection.credential_key)
-            if credential is not None and credential.auth_type == connection.auth:
+    def connection(self, credentials: Credentials) -> Connection:
+        """The connection to use: the first connected one."""
+        for connection in self.connections:
+            if connection.is_connected(credentials):
                 return connection
-        return preferred[0]
+        raise exceptions.ProviderNotConnectedError(self.provider)
