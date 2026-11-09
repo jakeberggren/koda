@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal, Self
-
-from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from koda.llm.apis import LLMApi
+    from koda.llm.protocols import Credentials
 
 type ThinkingOptionId = str
 type AuthMethod = Literal["api-key", "oauth"]
@@ -27,15 +29,8 @@ def resolve_thinking_mode(
     return supported[0]
 
 
-type ProviderApi = Literal[
-    "anthropic-messages",
-    "openai-responses",
-    "openai-completions",
-    "openai-codex-responses",
-]
-
-
-class ThinkingOption(BaseModel):
+@dataclass(frozen=True, slots=True)
+class ThinkingOption:
     id: ThinkingOptionId
     label: str
     description: str | None = None
@@ -46,37 +41,51 @@ class ThinkingOption(BaseModel):
         return cls(id="none", label="none")
 
 
-class ProviderConnectionDefinition(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Connection:
+    """One way to reach a provider: an API, an endpoint and an auth method."""
+
     id: str
+    provider: str
+    api: type[LLMApi]
+    base_url: str
+    auth: AuthMethod = "api-key"
     label: str | None = None
     description: str | None = None
-    auth: AuthMethod = "api-key"
+    detail: str | None = None
+    capabilities: dict[str, object] = field(default_factory=dict)
+
+    @property
+    def credential_key(self) -> str:
+        """The key this connection's credential is stored under."""
+        return f"{self.provider}:{self.id}"
 
 
-class ProviderDefinition(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Provider:
     id: str
     name: str
     description: str | None = None
-    auth: AuthMethod = "api-key"
-    connections: list[ProviderConnectionDefinition] = Field(default_factory=list)
-    provider_features: dict[str, object] = Field(default_factory=dict)
+    connections: tuple[Connection, ...] = ()
 
 
-class ModelDefinition(BaseModel):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class Model:
     id: str
     name: str
     provider: str
     detail: str | None = None
     context_window: int | None = None
     max_output_tokens: int | None = None
-    routes: list[str] = Field(default_factory=list)
-    thinking_options: list[ThinkingOption] = Field(default_factory=list)
-    model_features: dict[str, object] = Field(default_factory=dict)
+    thinking_options: tuple[ThinkingOption, ...] = ()
+    thinking_budget_tokens: int | None = None
+    capabilities: dict[str, object] = field(default_factory=dict)
+    connections: tuple[Connection, ...] = ()
 
     @property
     def effective_thinking_options(self) -> tuple[ThinkingOption, ...]:
         """Return selectable thinking options with no-thinking as the fallback."""
-        return tuple(self.thinking_options) or (ThinkingOption.none(),)
+        return self.thinking_options or (ThinkingOption.none(),)
 
     @property
     def supports_thinking(self) -> bool:
@@ -89,50 +98,14 @@ class ModelDefinition(BaseModel):
         resolved_id = resolve_thinking_mode(thinking_id, [option.id for option in options])
         return next(option for option in options if option.id == resolved_id)
 
+    def connection(self, credentials: Credentials) -> Connection:
+        """The connection to use: the first with a matching credential, OAuth first.
 
-class ProviderThinkingBudgetConfig(BaseModel):
-    min_tokens: int | None = None
-    max_tokens: int | None = None
-
-
-class ProviderThinkingModeConfig(BaseModel):
-    label: str
-    description: str | None = None
-
-
-class ProviderThinkingConfig(BaseModel):
-    modes: list[ThinkingOptionId] = Field(default_factory=list)
-    budget_tokens: ProviderThinkingBudgetConfig | None = None
-
-
-class ProviderModelConfig(BaseModel):
-    id: str
-    name: str
-    detail: str | None = None
-    context_window: int | None = None
-    max_output_tokens: int | None = None
-    capabilities: dict[str, object] = Field(default_factory=dict)
-    thinking: ProviderThinkingConfig = Field(default_factory=ProviderThinkingConfig)
-
-
-class ProviderConnectionConfig(BaseModel):
-    auth: AuthMethod = "api-key"
-    label: str | None = None
-    detail: str | None = None
-    description: str | None = None
-    api: ProviderApi
-    base_url: str
-    capabilities: dict[str, object] = Field(default_factory=dict)
-    models: list[ProviderModelConfig] = Field(default_factory=list)
-
-
-class ProviderConfig(BaseModel):
-    name: str
-    description: str | None = None
-    connections: dict[str, ProviderConnectionConfig]
-    capabilities: dict[str, object] = Field(default_factory=dict)
-    thinking_modes: dict[ThinkingOptionId, ProviderThinkingModeConfig] = Field(default_factory=dict)
-
-
-class ProvidersConfig(BaseModel):
-    providers: dict[str, ProviderConfig] = Field(default_factory=dict)
+        Falls back to the preferred connection when none has a credential.
+        """
+        preferred = sorted(self.connections, key=lambda connection: connection.auth != "oauth")
+        for connection in preferred:
+            credential = credentials.get_credential(connection.credential_key)
+            if credential is not None and credential.auth_type == connection.auth:
+                return connection
+        return preferred[0]

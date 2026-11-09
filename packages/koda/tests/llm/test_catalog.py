@@ -1,109 +1,92 @@
 import json
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import pytest
 
-from koda.llm import exceptions
-from koda.llm.apis import LLMApiFactory
-from koda.llm.apis.registry import LLMApiRegistry
-from koda.llm.catalog import ModelCatalog
-from koda.llm.factory import LLMFactory
-from koda_common.settings.credentials import ProviderCredential
+from koda.llm import Catalog, Credentials, exceptions
+from koda.llm.apis.codex import OpenAICodexResponsesAPI
+from koda.llm.apis.completions import OpenAICompletionsAPI
+from koda_common.settings.credentials import ApiKeyCredential, ProviderCredential
 
 
 def _write_json(path: Path, data: object) -> None:
     path.write_text(json.dumps(data), encoding="utf-8")
 
 
-def _api_factory() -> LLMApiFactory:
-    return cast("LLMApiFactory", lambda _context: None)
+def _credentials(credentials: dict[str, ProviderCredential]) -> Credentials:
+    class _Credentials:
+        def get_credential(self, key: str) -> ProviderCredential | None:
+            return credentials.get(key)
 
+        def set_credential(self, key: str, credential: ProviderCredential) -> None:
+            credentials[key] = credential
 
-def _context_api_factory(contexts: list[Any]) -> LLMApiFactory:
-    def factory(context: Any) -> object:
-        contexts.append(context)
-        return object()
-
-    return cast("LLMApiFactory", factory)
-
-
-class _FakeSettings:
-    provider = "openai"
-    model = "gpt-5.5"
-
-    def __init__(self, credentials: dict[str, ProviderCredential]) -> None:
-        self._credentials = credentials
-        self.requested_credentials: list[str] = []
-
-    def get_credential(self, provider: str) -> ProviderCredential | None:
-        self.requested_credentials.append(provider)
-        return self._credentials.get(provider)
-
-
-def test_llm_api_registry_validates_api_ids() -> None:
-    registry = LLMApiRegistry({"anthropic-messages": _api_factory()})
-
-    assert registry.get(" ANTHROPIC-MESSAGES ") is not None
-
-    with pytest.raises(exceptions.ApiNameEmptyError):
-        registry.register(" ", _api_factory())
-
-    with pytest.raises(exceptions.ApiAlreadyRegisteredError):
-        registry.register("anthropic-messages", _api_factory())
-
-    with pytest.raises(exceptions.ApiNotSupportedError):
-        registry.get("missing-api")
+    return cast("Credentials", _Credentials())
 
 
 def test_builtin_haiku_uses_binary_extended_thinking() -> None:
-    catalog, _warnings = ModelCatalog.load()
-    factory = LLMFactory(catalog)
-    model_definition = next(
-        m for m in factory.list_models("anthropic") if m.id == "claude-haiku-4-5"
-    )
+    catalog, _warnings = Catalog.load()
+    model = catalog.model("anthropic", "claude-haiku-4-5")
 
-    assert [option.id for option in model_definition.thinking_options] == ["none", "enabled"]
-    assert [option.label for option in model_definition.thinking_options] == ["Off", "On"]
+    assert [option.id for option in model.thinking_options] == ["none", "enabled"]
+    assert [option.label for option in model.thinking_options] == ["Off", "On"]
 
 
 def test_builtin_bergetai_uses_openai_completions_api() -> None:
-    registry, _warnings = ModelCatalog.load()
-    provider = registry.get_provider("bergetai")
-    model = registry.get_model("bergetai", "google/gemma-4-31B-it")
+    catalog, _warnings = Catalog.load()
+    model = catalog.model("bergetai", "google/gemma-4-31B-it")
 
-    connection = provider.connections["api-key"]
+    [connection] = model.connections
+    assert connection.id == "api-key"
     assert connection.auth == "api-key"
-    assert connection.api == "openai-completions"
+    assert connection.api is OpenAICompletionsAPI
     assert connection.base_url == "https://api.berget.ai/v1"
     assert model.max_output_tokens == 128000
 
 
-def test_builtin_openai_declares_api_key_and_oauth_connections() -> None:
-    catalog, _warnings = ModelCatalog.load()
-    factory = LLMFactory(catalog)
-    openai_models = factory.list_models("openai")
-    openai_provider = catalog.get_provider("openai")
-    oauth_connection = openai_provider.connections["oauth"]
+def test_builtin_openai_models_are_offered_by_their_connections() -> None:
+    catalog, _warnings = Catalog.load()
+    oauth = next(c for c in catalog.provider("openai").connections if c.id == "oauth")
+    models = {model.id: model for model in catalog.models("openai")}
 
-    assert oauth_connection.auth == "oauth"
-    assert oauth_connection.api == "openai-codex-responses"
-    assert oauth_connection.base_url == "https://chatgpt.com/backend-api/codex"
-    assert catalog.model_connection_ids("openai", "gpt-5.5") == ["api-key", "oauth"]
-    assert catalog.resolve_route("openai", "gpt-5.5").connection_id == "oauth"
-    assert [model.id for model in openai_models][:5] == [
+    assert oauth.auth == "oauth"
+    assert oauth.api is OpenAICodexResponsesAPI
+    assert oauth.base_url == "https://chatgpt.com/backend-api/codex"
+    assert list(models)[:5] == [
         "gpt-5.5",
         "gpt-5.4",
         "gpt-5.4-mini",
         "gpt-5.4-nano",
         "gpt-5.3-codex",
     ]
-    models_by_id = {model.id: model for model in openai_models}
-    assert models_by_id["gpt-5.5"].routes == ["api-key", "oauth"]
-    assert models_by_id["gpt-5.4-nano"].routes == ["api-key"]
+    assert [c.id for c in models["gpt-5.5"].connections] == ["api-key", "oauth"]
+    assert [c.id for c in models["gpt-5.4-nano"].connections] == ["api-key"]
 
 
-def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> None:
+def test_model_connection_prefers_oauth() -> None:
+    catalog, _warnings = Catalog.load()
+    model = catalog.model("openai", "gpt-5.5")
+
+    assert model.connection(_credentials({})).id == "oauth"
+
+
+def test_model_connection_uses_the_connection_with_a_credential() -> None:
+    catalog, _warnings = Catalog.load()
+    model = catalog.model("openai", "gpt-5.5")
+    api_key = ApiKeyCredential(type="api_key", value="key")
+
+    assert model.connection(_credentials({"openai:api-key": api_key})).id == "api-key"
+
+
+def test_unknown_model_is_not_supported() -> None:
+    catalog, _warnings = Catalog.load()
+
+    with pytest.raises(exceptions.ModelNotSupportedError):
+        catalog.model("openai", "missing")
+
+
+def test_user_providers_replace_builtin_providers(tmp_path: Path) -> None:
     builtin_path = tmp_path / "builtin.json"
     user_path = tmp_path / "user.json"
     _write_json(
@@ -195,36 +178,46 @@ def test_providers_registry_merges_builtin_and_user_configs(tmp_path: Path) -> N
         },
     )
 
-    registry, warnings = ModelCatalog.from_files(builtin_path, user_path)
+    catalog, warnings = Catalog.from_files(builtin_path, user_path)
     assert warnings == []
 
-    provider = registry.get_provider(" OPENAI ")
+    provider = catalog.provider(" OPENAI ")
+    [connection] = provider.connections
     assert provider.name == "OpenAI Proxy"
-    assert provider.connections["api-key"].base_url == "https://proxy.example/v1"
-    assert provider.capabilities == {"reasoning": True}
-    assert [model.id for model in provider.connections["api-key"].models] == [
-        "GPT-5.4",
-        "gpt-5.4-nano",
-    ]
-    model = registry.get_model("openai", " gpt-5.4 ")
+    assert connection.base_url == "https://proxy.example/v1"
+    assert connection.capabilities == {"reasoning": True}
+    assert [model.id for model in catalog.models("openai")] == ["GPT-5.4", "gpt-5.4-nano"]
+    model = catalog.model("openai", " gpt-5.4 ")
     assert model.name == "Custom GPT 5.4"
-    assert model.thinking.modes == [
-        "none",
-        "low",
-        "medium",
-        "high",
-    ]
-    factory = LLMFactory(registry)
-    model_definition = next(m for m in factory.list_models("openai") if m.id == "gpt-5.4")
-    provider_definition = next(p for p in factory.list_providers() if p.id == "openai")
-    assert provider_definition.auth == "api-key"
-    assert [option.label for option in model_definition.thinking_options] == [
-        "Off",
-        "Low",
-        "Medium",
-        "High",
-    ]
-    assert registry.list_models("anthropic")[0][1] == "claude-sonnet-4-6"
+    assert [option.label for option in model.thinking_options] == ["Off", "Low", "Medium", "High"]
+    assert catalog.models("anthropic")[0].id == "claude-sonnet-4-6"
+
+
+def test_user_config_with_unknown_thinking_mode_falls_back_with_warning(tmp_path: Path) -> None:
+    builtin_path = tmp_path / "builtin.json"
+    user_path = tmp_path / "user.json"
+    connection = {"api": "openai-responses", "base_url": "https://api.openai.com/v1"}
+    _write_json(
+        builtin_path,
+        {"providers": {"openai": {"name": "OpenAI", "connections": {"api-key": connection}}}},
+    )
+    model = {"id": "gpt-5", "name": "GPT-5", "thinking": {"modes": ["unknown"]}}
+    _write_json(
+        user_path,
+        {
+            "providers": {
+                "openai": {
+                    "name": "Proxy",
+                    "connections": {"api-key": connection | {"models": [model]}},
+                }
+            }
+        },
+    )
+
+    catalog, warnings = Catalog.from_files(builtin_path, user_path)
+
+    assert catalog.provider("openai").name == "OpenAI"
+    assert [warning.summary for warning in warnings] == ["invalid models.json"]
 
 
 def test_invalid_user_config_falls_back_to_builtin_with_warning(tmp_path: Path) -> None:
@@ -250,8 +243,29 @@ def test_invalid_user_config_falls_back_to_builtin_with_warning(tmp_path: Path) 
     )
     user_path.write_text('{"providers": {"openrouter": ', encoding="utf-8")
 
-    registry, warnings = ModelCatalog.from_files(builtin_path, user_path)
+    catalog, warnings = Catalog.from_files(builtin_path, user_path)
 
-    assert registry.get_provider("openai").name == "OpenAI"
-    assert not registry.has_provider("openrouter")
+    assert catalog.provider("openai").name == "OpenAI"
+    with pytest.raises(exceptions.ProviderNotSupportedError):
+        catalog.provider("openrouter")
     assert [warning.summary for warning in warnings] == ["invalid models.json"]
+
+
+def test_user_config_with_unknown_api_falls_back_with_warning(tmp_path: Path) -> None:
+    builtin_path = tmp_path / "builtin.json"
+    user_path = tmp_path / "user.json"
+    connection = {"api": "openai-responses", "base_url": "https://api.openai.com/v1"}
+    _write_json(
+        builtin_path,
+        {"providers": {"openai": {"name": "OpenAI", "connections": {"api-key": connection}}}},
+    )
+    unknown = connection | {"api": "unknown-api"}
+    _write_json(
+        user_path,
+        {"providers": {"openai": {"name": "Proxy", "connections": {"api-key": unknown}}}},
+    )
+
+    catalog, warnings = Catalog.from_files(builtin_path, user_path)
+
+    assert catalog.provider("openai").name == "OpenAI"
+    assert "unknown api 'unknown-api'" in (warnings[0].detail or "")

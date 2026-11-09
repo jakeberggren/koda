@@ -5,30 +5,30 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from koda.llm.auth.registry import ProviderAuthRegistry
-    from koda.llm.models import ProviderConfig, ProviderConnectionConfig, ProviderModelConfig
+    from koda.llm.models import Connection, Model
     from koda.llm.protocols import LLM, Credentials
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
 class LLMApiContext:
-    """Resolved catalog selection and credentials used to construct an LLM API."""
+    """What an API needs to build an LLM: the model, the connection and its credentials."""
 
-    provider_id: str
-    provider: ProviderConfig
-    connection_id: str
-    connection: ProviderConnectionConfig
-    model: ProviderModelConfig
+    model: Model
+    connection: Connection
     credentials: Credentials
     auth_registry: ProviderAuthRegistry
     tracing: bool = False
 
+    @property
+    def capabilities(self) -> dict[str, object]:
+        """The connection's capabilities, overridden by the model's."""
+        return self.connection.capabilities | self.model.capabilities
 
-class LLMApiFactory(Protocol):
-    """Callable constructor registered for a model-catalog API id."""
 
-    async def __call__(
-        self,
-        context: LLMApiContext,
-    ) -> LLM:
-        """Create an LLM instance using the given provider and model."""
+class LLMApi(Protocol):
+    """An LLM API implementation, built from a connection to a model."""
+
+    @classmethod
+    async def from_context(cls, context: LLMApiContext) -> LLM:
+        """Build the LLM for ``context``."""
         ...

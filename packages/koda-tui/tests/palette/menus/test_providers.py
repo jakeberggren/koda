@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from koda.llm import ModelDefinition, ProviderConnectionDefinition, ProviderDefinition
+from koda.llm import Connection, Model, Provider
+from koda.llm.apis.codex import OpenAICodexResponsesAPI
+from koda.llm.apis.responses import OpenAIResponsesAPI
 from koda.llm.auth.registry import ProviderAuthRegistry
 from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 from koda_tui import strings
@@ -53,12 +55,12 @@ class _FakeAppSettings:
 
 
 class _FakeService:
-    def list_providers(self) -> list[ProviderDefinition]:
+    def list_providers(self) -> list[Provider]:
         return [_openai_provider()]
 
-    def list_models(self, provider: str) -> list[ModelDefinition]:
+    def list_models(self, provider: str) -> list[Model]:
         _ = provider
-        return [ModelDefinition(id="gpt-5.5", name="gpt-5.5", provider="openai")]
+        return [Model(id="gpt-5.5", name="gpt-5.5", provider="openai")]
 
 
 class _FakeOverlays:
@@ -159,13 +161,28 @@ def _menu(
     return ProviderMenu(context, ProviderAuthRegistry({"openai:oauth": login}))
 
 
-def _openai_provider(*, oauth: bool = True) -> ProviderDefinition:
-    connections = [ProviderConnectionDefinition(id="api-key", label="OpenAI API key")]
+def _openai_provider(*, oauth: bool = True) -> Provider:
+    connections = [
+        Connection(
+            id="api-key",
+            provider="openai",
+            api=OpenAIResponsesAPI,
+            base_url="https://api.openai.com/v1",
+            label="OpenAI API key",
+        )
+    ]
     if oauth:
         connections.append(
-            ProviderConnectionDefinition(id="oauth", label="ChatGPT Plus/Pro", auth="oauth")
+            Connection(
+                id="oauth",
+                provider="openai",
+                api=OpenAICodexResponsesAPI,
+                base_url="https://chatgpt.com/backend-api/codex",
+                label="ChatGPT Plus/Pro",
+                auth="oauth",
+            )
         )
-    return ProviderDefinition(id="openai", name="OpenAI", connections=connections)
+    return Provider(id="openai", name="OpenAI", connections=tuple(connections))
 
 
 def _items(overlay: tuple[str, dict]) -> list[ListItem]:

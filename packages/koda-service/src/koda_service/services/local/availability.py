@@ -24,10 +24,6 @@ class LocalAvailability:
         self.settings = settings
         self.runtime = runtime
 
-    @staticmethod
-    def _connection_key(provider_id: str, connection_id: str) -> str:
-        return f"{provider_id}:{connection_id}"
-
     def _get_credential(
         self, credential_key: str
     ) -> tuple[ProviderCredential | None, ServiceStatus | None]:
@@ -43,9 +39,9 @@ class LocalAvailability:
         try:
             provider_ids = {
                 provider.id
-                for provider in self.runtime.llm_factory.list_providers()
+                for provider in self.runtime.catalog.providers()
                 if any(
-                    self.settings.get_credential(self._connection_key(provider.id, connection.id))
+                    self.settings.get_credential(connection.credential_key)
                     for connection in provider.connections
                 )
             }
@@ -81,7 +77,7 @@ class LocalAvailability:
             )
 
         try:
-            self.runtime.llm_factory.validate_selection(provider, model)
+            self.runtime.catalog.model(provider, model)
         except LLMConfigurationError:
             return ServiceStatus(
                 code=ServiceStatusCode.MODEL_UNAVAILABLE,
@@ -134,22 +130,17 @@ class LocalAvailability:
             return self._model_selection_required_status()
 
         try:
-            route = self.runtime.llm_factory.resolve_configured_route(
-                provider,
-                model,
-                self.settings,
-            )
+            connection = self.runtime.catalog.model(provider, model).connection(self.settings)
         except LLMConfigurationError:
             return self._model_unavailable_status()
 
-        credential_key = self._connection_key(route.provider_id, route.connection_id)
-        credential, status = self._get_credential(credential_key)
+        credential, status = self._get_credential(connection.credential_key)
         if status is not None:
             return status
         return self._credential_status(
             credential,
-            provider_id=route.provider_id,
-            connection_id=route.connection_id,
+            provider_id=connection.provider,
+            connection_id=connection.id,
         )
 
     def tools_status(self) -> ServiceStatus | None:

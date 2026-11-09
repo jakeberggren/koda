@@ -50,7 +50,6 @@ if TYPE_CHECKING:
 
     from koda.llm import LLMEvent
     from koda.llm.apis.base import LLMApiContext
-    from koda.llm.models import ProviderModelConfig
     from koda.llm.types import LLMRequest
     from koda.messages import Message as KodaMessage
     from koda.tools import ToolDefinition
@@ -231,17 +230,12 @@ def _raise_anthropic_error(error: Exception, *, backend: str) -> Never:
     raise error
 
 
-def _thinking_budget_tokens(model: ProviderModelConfig) -> int | None:
-    thinking = model.thinking
-    return thinking.budget_tokens.max_tokens if thinking.budget_tokens else None
-
-
 def _max_output_tokens(context: LLMApiContext) -> int:
     max_output_tokens = context.model.max_output_tokens
     if max_output_tokens is None:
         raise exceptions.ModelMaxOutputTokensMissingError(
             context.model.id,
-            context.provider_id,
+            context.model.provider,
         )
     return max_output_tokens
 
@@ -309,7 +303,7 @@ class AnthropicMessagesAPI(LLM):
             base_url=context.connection.base_url,
             model=context.model.id,
             max_output_tokens=_max_output_tokens(context),
-            thinking_budget_tokens=_thinking_budget_tokens(context.model),
+            thinking_budget_tokens=context.model.thinking_budget_tokens,
         )
         return cls(
             config,

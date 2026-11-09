@@ -1,220 +1,254 @@
 from __future__ import annotations
 
 import json
-import logging
 from dataclasses import dataclass
 from importlib.resources import as_file, files
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
-from pydantic import ValidationError
+from pydantic import BaseModel, Field, PlainValidator, ValidationError
 
 from koda.llm import exceptions
-from koda.llm.models import ProvidersConfig
+from koda.llm.apis import LLMApi
+from koda.llm.apis.codex import OpenAICodexResponsesAPI
+from koda.llm.apis.completions import OpenAICompletionsAPI
+from koda.llm.apis.messages import AnthropicMessagesAPI
+from koda.llm.apis.responses import OpenAIResponsesAPI
+from koda.llm.models import (
+    AuthMethod,
+    Connection,
+    Model,
+    Provider,
+    ThinkingOption,
+    ThinkingOptionId,
+)
+from koda_common.logging import get_logger
 from koda_common.paths import model_overrides_file_path
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda.llm.models import (
-        ProviderConfig,
-        ProviderConnectionConfig,
-        ProviderModelConfig,
-    )
+log = get_logger(__name__)
 
-log = logging.getLogger(__name__)
+
+# The models.json file format. It is grouped by connection; the catalog regroups it by model.
+
+_APIS: dict[str, type[LLMApi]] = {
+    "anthropic-messages": AnthropicMessagesAPI,
+    "openai-responses": OpenAIResponsesAPI,
+    "openai-completions": OpenAICompletionsAPI,
+    "openai-codex-responses": OpenAICodexResponsesAPI,
+}
+
+
+class _UnknownApiError(ValueError):
+    def __init__(self, name: str) -> None:
+        super().__init__(f"unknown api '{name}', expected one of: {', '.join(_APIS)}")
+
+
+def _api(name: str) -> type[LLMApi]:
+    """The API implementation named ``name`` in models.json."""
+    try:
+        return _APIS[name]
+    except KeyError:
+        raise _UnknownApiError(name) from None
+
+
+class _ThinkingBudgetFile(BaseModel):
+    min_tokens: int | None = None
+    max_tokens: int | None = None
+
+
+class _ThinkingModeFile(BaseModel):
+    label: str
+    description: str | None = None
+
+
+class _ThinkingFile(BaseModel):
+    modes: list[ThinkingOptionId] = Field(default_factory=list)
+    budget_tokens: _ThinkingBudgetFile | None = None
+
+
+class _ModelFile(BaseModel):
+    id: str
+    name: str
+    detail: str | None = None
+    context_window: int | None = None
+    max_output_tokens: int | None = None
+    capabilities: dict[str, object] = Field(default_factory=dict)
+    thinking: _ThinkingFile = Field(default_factory=_ThinkingFile)
+
+
+class _ConnectionFile(BaseModel):
+    auth: AuthMethod = "api-key"
+    label: str | None = None
+    detail: str | None = None
+    description: str | None = None
+    api: Annotated[type[LLMApi], PlainValidator(_api)]
+    base_url: str
+    capabilities: dict[str, object] = Field(default_factory=dict)
+    models: list[_ModelFile] = Field(default_factory=list)
+
+
+class _ProviderFile(BaseModel):
+    name: str
+    description: str | None = None
+    connections: dict[str, _ConnectionFile]
+    capabilities: dict[str, object] = Field(default_factory=dict)
+    thinking_modes: dict[ThinkingOptionId, _ThinkingModeFile] = Field(default_factory=dict)
+
+
+class _CatalogFile(BaseModel):
+    providers: dict[str, _ProviderFile] = Field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
-class ModelCatalogWarning:
+class CatalogWarning:
     summary: str
     detail: str | None = None
 
 
-@dataclass(frozen=True, slots=True)
-class ResolvedModelRoute:
-    provider_id: str
-    provider: ProviderConfig
-    connection_id: str
-    connection: ProviderConnectionConfig
-    model: ProviderModelConfig
-
-
 def _normalize(value: str) -> str:
-    """Normalize a string for case-insensitive comparison."""
+    """Normalize an id for case-insensitive lookup."""
     return value.strip().lower()
 
 
-class ModelCatalog:
-    """JSON-backed provider and model catalog."""
+def _read(path: Path) -> _CatalogFile:
+    return _CatalogFile.model_validate(json.loads(path.read_text(encoding="utf-8")))
 
-    def __init__(self, providers: dict[str, ProviderConfig]) -> None:
-        # Providers are already normalized by _merge_providers
-        self._providers = providers
-        self._models, self._model_connections = self._index_provider_models(self._providers)
 
-    @staticmethod
-    def _load_config(path: Path) -> ProvidersConfig:
-        """Load a providers config from a JSON file."""
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return ProvidersConfig.model_validate(data)
+def _merge(builtin: _CatalogFile, user: _CatalogFile | None) -> dict[str, _ProviderFile]:
+    """The builtin providers, with user providers replacing those with the same id."""
+    providers = {_normalize(id_): provider for id_, provider in builtin.providers.items()}
+    for id_, provider in (user.providers if user else {}).items():
+        providers[_normalize(id_)] = provider
+    return providers
 
-    @staticmethod
-    def _index_provider_models(
-        providers: dict[str, ProviderConfig],
-    ) -> tuple[
-        dict[tuple[str, str], ProviderModelConfig],
-        dict[tuple[str, str], list[str]],
-    ]:
-        """Index connection-scoped models by (provider_id, model_id)."""
-        models: dict[tuple[str, str], ProviderModelConfig] = {}
-        model_connections: dict[tuple[str, str], list[str]] = {}
-        for provider_id, provider in providers.items():
-            for connection_id, connection in provider.connections.items():
-                normalized_connection_id = _normalize(connection_id)
-                for model in connection.models:
-                    key = (provider_id, _normalize(model.id))
-                    models.setdefault(key, model.model_copy(deep=True))
-                    model_connections.setdefault(key, [])
-                    if normalized_connection_id not in model_connections[key]:
-                        model_connections[key].append(normalized_connection_id)
-        return models, model_connections
 
-    @staticmethod
-    def _merge_providers(
-        builtin_config: ProvidersConfig,
-        user_config: ProvidersConfig | None,
-    ) -> dict[str, ProviderConfig]:
-        """Merge builtin and user provider configs."""
-        providers = {
-            _normalize(provider_id): provider.model_copy(deep=True)
-            for provider_id, provider in builtin_config.providers.items()
-        }
+def _thinking_options(
+    provider_id: str, provider: _ProviderFile, model: _ModelFile
+) -> tuple[ThinkingOption, ...]:
+    options = []
+    for mode_id in model.thinking.modes:
+        mode = provider.thinking_modes.get(mode_id)
+        if mode is None:
+            raise exceptions.ModelThinkingModeNotConfiguredError(model.id, provider_id, mode_id)
+        options.append(ThinkingOption(id=mode_id, label=mode.label, description=mode.description))
+    return tuple(options)
 
-        for provider_id, provider in (user_config.providers if user_config else {}).items():
-            normalized_provider_id = _normalize(provider_id)
-            providers[normalized_provider_id] = provider.model_copy(deep=True)
-        return providers
 
-    @staticmethod
-    def _invalid_user_config_warning(path: Path, error: Exception) -> ModelCatalogWarning:
-        """Build a user-facing warning for an invalid user catalog override."""
-        return ModelCatalogWarning(
-            summary="invalid models.json",
-            detail=f"Ignoring {path}: {error}",
+def _build_provider(provider_id: str, provider: _ProviderFile) -> tuple[Provider, list[Model]]:
+    """The provider, and its models with the connections that offer each of them."""
+    connections: list[Connection] = []
+    model_files: dict[str, _ModelFile] = {}
+    model_connections: dict[str, list[Connection]] = {}
+    for connection_id, connection_file in provider.connections.items():
+        connection = Connection(
+            id=_normalize(connection_id),
+            provider=provider_id,
+            api=connection_file.api,
+            base_url=connection_file.base_url,
+            auth=connection_file.auth,
+            label=connection_file.label,
+            description=connection_file.description,
+            detail=connection_file.detail,
+            capabilities=provider.capabilities | connection_file.capabilities,
         )
+        connections.append(connection)
+        for model_file in connection_file.models:
+            key = _normalize(model_file.id)
+            model_files.setdefault(key, model_file)
+            model_connections.setdefault(key, []).append(connection)
+
+    models = []
+    for key, model_file in model_files.items():
+        budget = model_file.thinking.budget_tokens
+        models.append(
+            Model(
+                id=model_file.id,
+                name=model_file.name,
+                provider=provider_id,
+                detail=model_file.detail,
+                context_window=model_file.context_window,
+                max_output_tokens=model_file.max_output_tokens,
+                thinking_options=_thinking_options(provider_id, provider, model_file),
+                thinking_budget_tokens=budget.max_tokens if budget else None,
+                capabilities=model_file.capabilities,
+                connections=tuple(model_connections[key]),
+            )
+        )
+    built = Provider(
+        id=provider_id,
+        name=provider.name,
+        description=provider.description,
+        connections=tuple(connections),
+    )
+    return built, models
+
+
+class Catalog:
+    """The providers and models Koda can use, from the bundled and user models.json."""
+
+    def __init__(self, providers: dict[str, _ProviderFile]) -> None:
+        self._providers: dict[str, Provider] = {}
+        self._models: dict[tuple[str, str], Model] = {}
+        for provider_id, provider_file in providers.items():
+            provider, models = _build_provider(provider_id, provider_file)
+            self._providers[provider_id] = provider
+            for model in models:
+                self._models[(provider_id, _normalize(model.id))] = model
 
     @classmethod
     def from_files(
         cls,
         builtin_path: Path,
         user_path: Path | None = None,
-    ) -> tuple[ModelCatalog, list[ModelCatalogWarning]]:
-        """Create a catalog from JSON config files."""
-        builtin_config = cls._load_config(builtin_path)
-        warnings: list[ModelCatalogWarning] = []
-        user_config = None
-        if user_path and user_path.exists():
-            try:
-                user_config = cls._load_config(user_path)
-            except (json.JSONDecodeError, ValidationError, OSError) as error:
-                warning = cls._invalid_user_config_warning(user_path, error)
-                warnings.append(warning)
-                log.warning("llm_user_models_config_invalid path=%s error=%s", user_path, error)
-        return cls(cls._merge_providers(builtin_config, user_config)), warnings
+    ) -> tuple[Catalog, list[CatalogWarning]]:
+        """Load the catalog; an invalid user file is ignored with a warning."""
+        builtin = _read(builtin_path)
+        if user_path is None or not user_path.exists():
+            return cls(_merge(builtin, None)), []
+        try:
+            return cls(_merge(builtin, _read(user_path))), []
+        except (
+            json.JSONDecodeError,
+            ValidationError,
+            OSError,
+            exceptions.LLMConfigurationError,
+        ) as e:
+            log.warning("llm_user_models_config_invalid", path=str(user_path), error=str(e))
+            warning = CatalogWarning(
+                summary="invalid models.json", detail=f"Ignoring {user_path}: {e}"
+            )
+            return cls(_merge(builtin, None)), [warning]
 
     @classmethod
-    def load(cls) -> tuple[ModelCatalog, list[ModelCatalogWarning]]:
-        """Load the catalog from the bundled models.json, merged with user overrides if present."""
-        models_config = files("koda.llm").joinpath("models.json")
-        with as_file(models_config) as builtin_path:
-            user_path = model_overrides_file_path()
-            return cls.from_files(builtin_path, user_path)
+    def load(cls) -> tuple[Catalog, list[CatalogWarning]]:
+        """Load the bundled catalog, merged with ~/.koda/models.json if present."""
+        with as_file(files("koda.llm").joinpath("models.json")) as builtin_path:
+            return cls.from_files(builtin_path, model_overrides_file_path())
 
-    def get_provider(self, provider_id: str) -> ProviderConfig:
-        """Get a provider by ID."""
+    def providers(self) -> list[Provider]:
+        """All providers, in catalog order."""
+        return list(self._providers.values())
+
+    def provider(self, provider_id: str) -> Provider:
+        """The provider with ``provider_id``."""
         provider = self._providers.get(_normalize(provider_id))
         if provider is None:
             raise exceptions.ProviderNotSupportedError(provider_id)
         return provider
 
-    def has_provider(self, provider_id: str | None) -> bool:
-        """Check if a provider exists."""
+    def models(self, provider_id: str | None = None) -> list[Model]:
+        """All models, or those of ``provider_id``, in catalog order."""
         if provider_id is None:
-            return False
-        return _normalize(provider_id) in self._providers
+            return list(self._models.values())
+        target = _normalize(provider_id)
+        return [model for (provider, _), model in self._models.items() if provider == target]
 
-    def get_model(self, provider_id: str, model_id: str) -> ProviderModelConfig:
-        """Get a model by provider and model ID."""
-        model = self._models.get((_normalize(provider_id), _normalize(model_id)))
+    def model(self, provider_id: str, model_id: str) -> Model:
+        """The model ``model_id`` of ``provider_id``."""
+        provider = self.provider(provider_id)
+        model = self._models.get((provider.id, _normalize(model_id)))
         if model is None:
             raise exceptions.ModelNotSupportedError(model_id, provider_id)
         return model
-
-    def model_connection_ids(self, provider_id: str, model_id: str) -> list[str]:
-        """Return connection ids that expose a provider model, in catalog order."""
-        key = (_normalize(provider_id), _normalize(model_id))
-        connection_ids = self._model_connections.get(key)
-        if connection_ids is None:
-            raise exceptions.ModelNotSupportedError(model_id, provider_id)
-        return list(connection_ids)
-
-    @staticmethod
-    def _prefer_oauth(connection_ids: list[str]) -> list[str]:
-        """Prefer OAuth when the same model is available through multiple connections."""
-        if "oauth" not in connection_ids:
-            return connection_ids
-        return [
-            "oauth",
-            *(connection_id for connection_id in connection_ids if connection_id != "oauth"),
-        ]
-
-    def resolve_route(
-        self,
-        provider_id: str,
-        model_id: str,
-        *,
-        credential_ids: set[str] | None = None,
-    ) -> ResolvedModelRoute:
-        """Resolve a provider/model selection to a concrete provider connection."""
-        normalized_provider_id = _normalize(provider_id)
-        provider = self.get_provider(normalized_provider_id)
-        model = self.get_model(normalized_provider_id, model_id)
-        connection_ids = self._prefer_oauth(
-            self.model_connection_ids(normalized_provider_id, model_id)
-        )
-        connections = {_normalize(k): v for k, v in provider.connections.items()}
-
-        selected_route = connection_ids[0]
-        if credential_ids is not None:
-            selected_route = next(
-                (
-                    connection_id
-                    for connection_id in connection_ids
-                    if f"{normalized_provider_id}:{connection_id}" in credential_ids
-                ),
-                selected_route,
-            )
-
-        return ResolvedModelRoute(
-            provider_id=normalized_provider_id,
-            provider=provider,
-            connection_id=selected_route,
-            connection=connections[selected_route],
-            model=model,
-        )
-
-    def list_providers(self) -> list[tuple[str, ProviderConfig]]:
-        """List all providers."""
-        return list(self._providers.items())
-
-    def list_models(
-        self,
-        provider_id: str | None = None,
-    ) -> list[tuple[str, str, ProviderModelConfig]]:
-        """List models, optionally filtered by provider."""
-        target = _normalize(provider_id) if provider_id is not None else None
-        return [
-            (resolved_provider_id, model_id, model)
-            for (resolved_provider_id, model_id), model in self._models.items()
-            if target is None or resolved_provider_id == target
-        ]

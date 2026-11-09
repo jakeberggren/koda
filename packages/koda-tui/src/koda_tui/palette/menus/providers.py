@@ -15,7 +15,7 @@ from koda_tui.appearance import Icons
 from koda_tui.ui.widgets import InputDialog, ListItem, MessageDialog, Picker
 
 if TYPE_CHECKING:
-    from koda.llm import ProviderConnectionDefinition, ProviderDefinition
+    from koda.llm import Connection, Provider
     from koda.llm.auth.registry import ProviderAuthRegistry
     from koda_common.settings.credentials import ProviderCredential
     from koda_tui.palette.context import PaletteContext
@@ -28,8 +28,8 @@ log = get_logger(__name__)
 class ProviderConnectionSelection:
     """One way to connect a provider, such as an API key or a browser login."""
 
-    provider: ProviderDefinition
-    connection: ProviderConnectionDefinition
+    provider: Provider
+    connection: Connection
 
     @property
     def credential_key(self) -> str:
@@ -66,7 +66,7 @@ class ProviderMenu:
             ),
         )
 
-    def select(self, provider: ProviderDefinition) -> None:
+    def select(self, provider: Provider) -> None:
         """Connect ``provider``: pick how, if it has several ways."""
         connections = [ProviderConnectionSelection(provider, c) for c in provider.connections]
         if len(connections) == 1:
@@ -90,7 +90,7 @@ class ProviderMenu:
             ),
         )
 
-    def _provider_items(self) -> list[ListItem[ProviderDefinition]]:
+    def _provider_items(self) -> list[ListItem[Provider]]:
         """The providers, those with a connection marked."""
         return [
             ListItem(
@@ -102,7 +102,7 @@ class ProviderMenu:
             for provider in self._service.list_providers()
         ]
 
-    def _any_connected(self, provider: ProviderDefinition) -> bool:
+    def _any_connected(self, provider: Provider) -> bool:
         return any(
             self._connected(ProviderConnectionSelection(provider, connection))
             for connection in provider.connections

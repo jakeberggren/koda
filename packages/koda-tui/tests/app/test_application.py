@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 from prompt_toolkit.keys import Keys
 
-from koda.llm import ModelDefinition, ThinkingOption
+from koda.llm import Model, ThinkingOption
 from koda_common.settings import SettingChange
 from koda_service import ServiceDiagnostics, ServiceStatus, ServiceStatusCode
 from koda_tui.app import application
@@ -75,12 +75,12 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
             "active_session",
         ]
     )
-    service.get_model.return_value = ModelDefinition(
+    service.get_model.return_value = Model(
         id="gpt-5.2",
         name="GPT 5.2",
         provider="openai",
         context_window=400_000,
-        thinking_options=[ThinkingOption(id="none", label="None")],
+        thinking_options=(ThinkingOption(id="none", label="None"),),
     )
     service.status.return_value = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
     service.diagnostics.return_value = ServiceDiagnostics(startup_warnings=[])
@@ -96,12 +96,12 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
     app, settings, _tui_settings, service, _unsubscribe, _unsubscribe_tui = _make_app()
     settings.provider = "bergetai"
     settings.model = "zai-org/GLM-4.7"
-    service.get_model.return_value = ModelDefinition(
+    service.get_model.return_value = Model(
         id="zai-org/GLM-4.7",
         name="GLM-4.7",
         provider="bergetai",
         context_window=128_000,
-        thinking_options=[],
+        thinking_options=(),
     )
     app.on_settings_changed(
         (
@@ -168,16 +168,16 @@ async def test_run_follows_settings_only_while_it_runs(monkeypatch: pytest.Monke
     unsubscribe_tui.assert_called_once_with()
 
 
-def _thinking_model() -> ModelDefinition:
-    return ModelDefinition(
+def _thinking_model() -> Model:
+    return Model(
         id="gpt-5.2",
         name="GPT 5.2",
         provider="openai",
-        thinking_options=[
+        thinking_options=(
             ThinkingOption(id="none", label="None"),
             ThinkingOption(id="low", label="Low"),
             ThinkingOption(id="high", label="High"),
-        ],
+        ),
     )
 
 

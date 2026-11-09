@@ -9,7 +9,7 @@ from koda_tui import strings
 from koda_tui.ui.widgets import ListItem, Picker
 
 if TYPE_CHECKING:
-    from koda.llm import ModelDefinition
+    from koda.llm import Model
     from koda_tui.palette.context import PaletteContext
 
 
@@ -26,7 +26,7 @@ class ModelMenu:
         self._service = context.service
         self._settings = context.settings
 
-    def items(self) -> list[ListItem[ModelDefinition]]:
+    def items(self) -> list[ListItem[Model]]:
         """Build model selection items."""
         provider_names = {p.id: p.name for p in self._service.list_providers()}
 
@@ -47,7 +47,7 @@ class ModelMenu:
             ),
         )
 
-    def select(self, model: ModelDefinition) -> None:
+    def select(self, model: Model) -> None:
         """Handle model selection."""
         try:
             self._settings.core.update(provider=model.provider, model=model.id)
@@ -56,9 +56,7 @@ class ModelMenu:
             return
         self._overlays.close_all()
 
-    def _item_for_model(
-        self, model: ModelDefinition, provider_name: str | None
-    ) -> ListItem[ModelDefinition]:
+    def _item_for_model(self, model: Model, provider_name: str | None) -> ListItem[Model]:
         is_active = (
             self._settings.core.provider == model.provider and self._settings.core.model == model.id
         )

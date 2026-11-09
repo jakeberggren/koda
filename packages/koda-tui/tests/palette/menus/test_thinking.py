@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda.llm import ModelDefinition, ThinkingOption
+from koda.llm import Model, ThinkingOption
 from koda_tui.palette.menus.thinking import ThinkingMenu
 
 if TYPE_CHECKING:
@@ -18,14 +18,14 @@ if TYPE_CHECKING:
 def test_lists_the_models_levels_and_sets_the_chosen_one(
     context: PaletteContext, overlays: Overlays, settings: Mock
 ) -> None:
-    context.state.active_model = ModelDefinition(
+    context.state.active_model = Model(
         id="m",
         name="Model",
         provider="p",
-        thinking_options=[
+        thinking_options=(
             ThinkingOption(id="none", label="None"),
             ThinkingOption(id="high", label="High"),
-        ],
+        ),
     )
     settings.core.thinking = "none"
     ThinkingMenu(context).open()
