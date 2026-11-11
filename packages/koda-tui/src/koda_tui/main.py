@@ -20,7 +20,6 @@ from koda_common.settings import (
 )
 from koda_tui import strings
 from koda_tui.app import KodaTuiApp
-from koda_tui.runtime import Runtime
 from koda_tui.settings import AppSettings, TuiSettingsManager
 from koda_tui.startup import StartupError
 
@@ -42,15 +41,14 @@ def main() -> None:
     except (SettingsLoadError, SecretsLoadError) as error:
         _fail(_startup_error(error))
     catalog, warnings = llm.Catalog.load()
-    runtime = Runtime(
-        settings.core,
+    app = KodaTuiApp(
+        settings,
         workspace,
         catalog=catalog,
         store=JsonSessionStore(),
-        warnings=[warning.summary for warning in warnings],
         connect=partial(llm.connect, tracing=True),
+        warnings=[warning.summary for warning in warnings],
     )
-    app = KodaTuiApp(app_settings=settings, runtime=runtime, workspace=workspace)
     asyncio.run(app.run())
 
 

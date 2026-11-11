@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.output import ColorDepth
 
+from koda.agent import Agent
+from koda.llm import LLMRequestOptions
+from koda.llm.exceptions import ModelSelectionMissingError
+from koda_tui.app.exit import ExitPrompt
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import Appearance
 from koda_tui.messaging import Conversation, Outbox
@@ -18,19 +21,20 @@ from koda_tui.terminal import Terminal, keys
 from koda_tui.views import Screen
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
     from pathlib import Path
 
     from prompt_toolkit.key_binding import KeyBindings
     from prompt_toolkit.styles import BaseStyle
 
+    from koda.agent import AgentEvent
+    from koda.llm import LLM, Catalog, Credentials, Model
+    from koda.sessions import SessionStore
     from koda_common.settings import SettingChange
     from koda_tui.appearance import RGBColor
-    from koda_tui.runtime import Runtime
     from koda_tui.settings import AppSettings
 
-
-EXIT_TIMEOUT = 3.0  # Seconds a second Ctrl+C has to come within to exit.
+    type Connect = Callable[[Model, Credentials], Awaitable[LLM]]
 
 
 class FullScreenApplication(Application[None]):
@@ -69,49 +73,30 @@ class FullScreenApplication(Application[None]):
         super()._on_resize()
 
 
-class ExitPrompt:
-    """Asks for a second Ctrl+C before exiting, through ``state.exit_requested``,
-    until ``EXIT_TIMEOUT`` runs out."""
-
-    def __init__(self, state: AppState, *, invalidate: Callable[[], None]) -> None:
-        self._state = state
-        self._invalidate = invalidate
-        self._dismissals = 0  # A timeout only dismisses the ask it was started for.
-
-    def confirm(self) -> bool:
-        """Whether this Ctrl+C confirms the exit; the first press only asks."""
-        if self._state.exit_requested:
-            self.dismiss()
-            return True
-        self._state.exit_requested = True
-        dismissals = self._dismissals
-        with suppress(RuntimeError):  # Without a running loop, it asks until dismissed.
-            asyncio.get_running_loop().call_later(EXIT_TIMEOUT, self._expire, dismissals)
-        self._invalidate()
-        return False
-
-    def dismiss(self) -> None:
-        """Stop asking for a second Ctrl+C."""
-        self._dismissals += 1
-        if self._state.exit_requested:
-            self._state.exit_requested = False
-            self._invalidate()
-
-    def _expire(self, dismissals: int) -> None:
-        if dismissals == self._dismissals:
-            self.dismiss()
-
-
 class KodaTuiApp:
     """Main TUI application."""
 
-    def __init__(self, app_settings: AppSettings, runtime: Runtime, workspace: Path) -> None:
+    def __init__(  # noqa: PLR0913 - the parts main builds, each its own keyword argument
+        self,
+        app_settings: AppSettings,
+        workspace: Path,
+        *,
+        catalog: Catalog,
+        store: SessionStore,
+        connect: Connect,
+        warnings: Sequence[str] = (),
+    ) -> None:
         self.app_settings = app_settings
-        self._runtime = runtime
+        self._catalog = catalog
+        self._store = store
+        self._connect = connect
+        self._agent: Agent | None = None  # Built on first use, for the current session.
+        # OAuth refresh tokens rotate, so concurrent first messages must build it once.
+        self._agent_lock = asyncio.Lock()
         self._app: FullScreenApplication | None = None  # Created on run.
         self._terminal = Terminal(on_background=self.on_terminal_background)
 
-        self.state = AppState.load(workspace, runtime, app_settings.core)
+        self.state = AppState.load(workspace, catalog, app_settings.core, warnings)
         self.exit_prompt = ExitPrompt(self.state, invalidate=self.invalidate)
         self.appearance = Appearance(app_settings.tui.theme)
         self.screen = Screen(
@@ -124,13 +109,14 @@ class KodaTuiApp:
         self.outbox = Outbox(
             state=self.state,
             conversation=conversation,
-            runtime=runtime,
+            respond=self.respond,
             invalidate=self.invalidate,
         )
         self._palette = CommandPalette(
             PaletteContext(
                 overlays=self.screen.overlays,
-                runtime=runtime,
+                catalog=catalog,
+                store=store,
                 settings=app_settings,
                 state=self.state,
                 conversation=conversation,
@@ -189,9 +175,40 @@ class KodaTuiApp:
     def on_settings_changed(self, _changes: tuple[SettingChange, ...]) -> None:
         """Rebuild the agent with the new settings when it next runs, and show what
         they change."""
-        self._runtime.settings_changed()
-        self.state.refresh(self._runtime, self.app_settings.core)
+        self._agent = None
+        self.state.refresh(self._catalog, self.app_settings.core)
         self.invalidate()
+
+    async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
+        """Send ``text`` in the current session and stream the agent's response."""
+        agent = await self._current_agent()
+        async for event in agent.run(text):
+            yield event
+
+    async def _current_agent(self) -> Agent:
+        """The agent for the current session, built after the settings or session change."""
+        async with self._agent_lock:
+            if self._agent is None or self._agent.session is not self.state.session:
+                self._agent = await self._build_agent()
+        return self._agent
+
+    async def _build_agent(self) -> Agent:
+        settings = self.app_settings.core
+        if settings.provider is None or settings.model is None:
+            raise ModelSelectionMissingError
+        model = self._catalog.model(settings.provider, settings.model)
+        return Agent(
+            await self._connect(model, settings),
+            session=self.state.session,
+            workspace=self.state.workspace,
+            store=self._store,
+            options=LLMRequestOptions(
+                thinking=model.resolve_thinking_option(settings.thinking).id,
+                web_search=settings.allow_web_search,
+                extended_prompt_retention=settings.allow_extended_prompt_retention,
+            ),
+            sandbox=settings.bash_execution_sandbox,
+        )
 
     def on_tui_settings_changed(self, changes: tuple[SettingChange, ...]) -> None:
         """Apply a new theme, and redraw for any change."""

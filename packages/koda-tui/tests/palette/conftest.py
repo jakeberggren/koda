@@ -7,6 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from koda.sessions import InMemorySessionStore
 from koda_tui.palette import context as context_module
 from koda_tui.palette.context import PaletteContext
 
@@ -64,7 +65,8 @@ def context(overlays: Overlays, settings: Mock, terminal: Mock, state: AppState)
     """A context over the fake overlays, mock ``settings`` and ``terminal``, and ``state``."""
     return PaletteContext(
         overlays=cast("RealOverlays", overlays),
-        runtime=Mock(),
+        catalog=Mock(),
+        store=InMemorySessionStore(),
         settings=settings,
         state=state,
         conversation=Mock(),

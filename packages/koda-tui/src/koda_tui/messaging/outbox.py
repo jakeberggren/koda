@@ -5,16 +5,23 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from koda.llm import exceptions as llm_exceptions
-from koda.tools import exceptions as tool_exceptions
+from koda.llm.exceptions import (
+    LLMAPIError,
+    LLMAuthenticationError,
+    LLMConfigurationError,
+    LLMConnectionError,
+    LLMError,
+    LLMRateLimitError,
+)
+from koda.tools.exceptions import ToolError
 from koda_tui import strings
 from koda_tui.state import ErrorMessage, PendingInput
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import AsyncIterator, Callable
 
+    from koda.agent import AgentEvent
     from koda_tui.messaging.conversation import Conversation
-    from koda_tui.runtime import Runtime
     from koda_tui.state import AppState
 
 
@@ -29,12 +36,12 @@ class Outbox:
         *,
         state: AppState,
         conversation: Conversation,
-        runtime: Runtime,
+        respond: Callable[[str], AsyncIterator[AgentEvent]],
         invalidate: Callable[[], None],
     ) -> None:
         self._state = state
         self._conversation = conversation
-        self._runtime = runtime
+        self._respond_with = respond
         self._invalidate = invalidate
         self._sending: asyncio.Task[None] | None = None
         self._response: asyncio.Task[None] | None = None
@@ -113,7 +120,7 @@ class Outbox:
         except asyncio.CancelledError:
             if (task := asyncio.current_task()) and task.cancelling():
                 raise  # The sending itself is cancelled, not just this response.
-        except (llm_exceptions.LLMError, tool_exceptions.ToolError) as failure:
+        except (LLMError, ToolError) as failure:
             error = _error_message(failure)
         finally:
             self._response = None
@@ -121,7 +128,7 @@ class Outbox:
             self._invalidate()
 
     async def _respond(self, text: str) -> None:
-        async for event in self._runtime.run(text):
+        async for event in self._respond_with(text):
             self._conversation.apply(event)
             self._invalidate()
 
@@ -131,12 +138,12 @@ _ERRORS = strings.Screen.Chat.Errors
 # Why a response failed and what to do about it, by error type. The first match wins, so
 # subclasses come before their bases.
 _ERROR_MESSAGES: tuple[tuple[type[Exception], str, str | None], ...] = (
-    (llm_exceptions.LLMAuthenticationError, _ERRORS.AUTHENTICATION, _ERRORS.AUTHENTICATION_FIX),
-    (llm_exceptions.LLMRateLimitError, _ERRORS.RATE_LIMIT, _ERRORS.RATE_LIMIT_FIX),
-    (llm_exceptions.LLMConnectionError, _ERRORS.CONNECTION, _ERRORS.CONNECTION_FIX),
-    (llm_exceptions.LLMAPIError, _ERRORS.PROVIDER, None),
-    (llm_exceptions.LLMConfigurationError, _ERRORS.NOT_READY, None),
-    (tool_exceptions.ToolError, _ERRORS.TOOL, None),
+    (LLMAuthenticationError, _ERRORS.AUTHENTICATION, _ERRORS.AUTHENTICATION_FIX),
+    (LLMRateLimitError, _ERRORS.RATE_LIMIT, _ERRORS.RATE_LIMIT_FIX),
+    (LLMConnectionError, _ERRORS.CONNECTION, _ERRORS.CONNECTION_FIX),
+    (LLMAPIError, _ERRORS.PROVIDER, None),
+    (LLMConfigurationError, _ERRORS.NOT_READY, None),
+    (ToolError, _ERRORS.TOOL, None),
 )
 
 
