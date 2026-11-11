@@ -23,16 +23,15 @@ class ModelMenu:
 
     def __init__(self, context: PaletteContext) -> None:
         self._overlays = context.overlays
-        self._service = context.service
+        self._runtime = context.runtime
         self._settings = context.settings
 
     def items(self) -> list[ListItem[Model]]:
         """Build model selection items."""
-        provider_names = {p.id: p.name for p in self._service.list_providers()}
-
+        provider_names = {p.id: p.name for p in self._runtime.catalog.providers()}
         return [
             self._item_for_model(model, provider_names.get(model.provider))
-            for model in self._service.list_configured_models()
+            for model in self._runtime.connected_models()
         ]
 
     def open(self) -> None:
@@ -62,8 +61,16 @@ class ModelMenu:
         )
         return ListItem(
             label=model.name,
-            detail=model.detail or "",
+            detail=self._detail(model),
             group=provider_name,
             current=is_active,
             data=model,
         )
+
+    def _detail(self, model: Model) -> str:
+        """The connection ``model`` uses, when its provider has several connected."""
+        credentials = self._settings.core
+        provider = self._runtime.catalog.provider(model.provider)
+        if sum(c.is_connected(credentials) for c in provider.connections) <= 1:
+            return ""
+        return model.connection(credentials).detail or model.detail or ""

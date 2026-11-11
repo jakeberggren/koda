@@ -33,7 +33,7 @@ class ProviderConnectionSelection:
 
     @property
     def credential_key(self) -> str:
-        return f"{self.provider.id}:{self.connection.id}"
+        return self.connection.credential_key
 
     @property
     def label(self) -> str:
@@ -49,7 +49,7 @@ class ProviderMenu:
 
     def __init__(self, context: PaletteContext, auth_registry: ProviderAuthRegistry) -> None:
         self._overlays = context.overlays
-        self._service = context.service
+        self._runtime = context.runtime
         self._settings = context.settings
         self._auth_registry = auth_registry
         self._login: asyncio.Task[None] | None = None
@@ -99,7 +99,7 @@ class ProviderMenu:
                 marker=Icons.DONE if self._any_connected(provider) else None,
                 data=provider,
             )
-            for provider in self._service.list_providers()
+            for provider in self._runtime.catalog.providers()
         ]
 
     def _any_connected(self, provider: Provider) -> bool:
@@ -132,7 +132,7 @@ class ProviderMenu:
         and close the palette."""
         self._settings.core.set_credential(selection.credential_key, credential)
         if self._settings.core.model is None and (
-            models := self._service.list_models(selection.provider.id)
+            models := self._runtime.catalog.models(selection.provider.id)
         ):
             self._settings.core.update(provider=models[0].provider, model=models[0].id)
         self._overlays.close_all()

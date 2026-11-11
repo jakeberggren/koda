@@ -13,7 +13,6 @@ from prompt_toolkit.formatted_text import fragment_list_to_text
 from koda.llm import Model, ThinkingOption
 from koda.messages import TokenUsage
 from koda.tools import ToolCall
-from koda_service import ServiceStatus, ServiceStatusCode
 from koda_tui import strings
 from koda_tui.appearance import Tokens
 from koda_tui.state import AppState, AssistantMessage, ToolMessage, Usage, UserMessage
@@ -104,11 +103,8 @@ def test_activity_follows_the_response(state: AppState, fields: dict, text: str)
     assert status._activity(_state(state, **fields)) == [(Tokens.Text.ACCENT, text)]
 
 
-def test_activity_warns_when_the_service_is_not_ready(state: AppState) -> None:
-    not_ready = next(code for code in ServiceStatusCode if code is not ServiceStatusCode.READY)
-    state = _state(
-        state, service_status=ServiceStatus(code=not_ready, summary="No provider configured")
-    )
+def test_activity_warns_when_koda_is_not_ready(state: AppState) -> None:
+    state = _state(state, issue="No provider configured")
     assert status._activity(state) == [(Tokens.Text.WARNING, "No provider configured")]
 
 

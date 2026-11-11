@@ -64,7 +64,7 @@ def context(overlays: Overlays, settings: Mock, terminal: Mock, state: AppState)
     """A context over the fake overlays, mock ``settings`` and ``terminal``, and ``state``."""
     return PaletteContext(
         overlays=cast("RealOverlays", overlays),
-        service=Mock(),
+        runtime=Mock(),
         settings=settings,
         state=state,
         conversation=Mock(),

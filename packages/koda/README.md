@@ -13,7 +13,7 @@
 
 `koda` is the core library for the Koda coding assistant. It contains the agent loop,
 LLM abstractions, session model, and tool framework used by higher-level
-packages such as `koda-service` and `koda-tui`.
+packages such as `koda-tui`.
 
 ## Responsibilities
 

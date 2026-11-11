@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from koda.messages import TokenUsage
     from koda.tools import ToolCall, ToolOutput
     from koda_common.settings import SettingsManager
-    from koda_service import KodaService, ServiceStatus
+    from koda_tui.runtime import Runtime
 
 
 class ResponsePhase(Enum):
@@ -76,7 +76,7 @@ class AppState:
     """Shared application state as single source of truth for the UI."""
 
     workspace: Path
-    service_status: ServiceStatus
+    issue: str | None = None  # What stops Koda from responding; None when it can.
     warnings: list[str] = field(default_factory=list)
     messages: list[Message] = field(default_factory=list)
     responding: bool = False  # Whether a response is in flight.
@@ -116,22 +116,19 @@ class AppState:
         return self.active_model is not None and self.active_model.supports_thinking
 
     @classmethod
-    def load(cls, workspace: Path, service: KodaService, settings: SettingsManager) -> AppState:
-        """The state for ``workspace``, refreshed from what the service reports."""
-        state = cls(workspace=workspace, service_status=service.status())
-        state.refresh(service, settings)
+    def load(cls, workspace: Path, runtime: Runtime, settings: SettingsManager) -> AppState:
+        """The state for ``workspace``, refreshed from ``runtime``."""
+        state = cls(workspace=workspace)
+        state.refresh(runtime, settings)
         return state
 
-    def refresh(self, service: KodaService, settings: SettingsManager) -> None:
-        """Take what the service reports now, and the model and thinking level the
+    def refresh(self, runtime: Runtime, settings: SettingsManager) -> None:
+        """Take what ``runtime`` reports now, and the model and thinking level the
         settings pick."""
-        self.service_status = service.status()
-        self.warnings = service.diagnostics().startup_warnings
-        self.configured_providers = service.list_configured_providers()
-        self.active_model = None
-        provider, model = settings.provider, settings.model
-        if self.service_status.is_ready and provider is not None and model is not None:
-            self.active_model = service.get_model(provider, model)
+        self.issue = runtime.issue()
+        self.warnings = runtime.warnings
+        self.configured_providers = runtime.connected_providers()
+        self.active_model = runtime.selected_model() if self.issue is None else None
         self.thinking = (
             self.active_model.resolve_thinking_option(settings.thinking)
             if self.active_model is not None
@@ -141,7 +138,7 @@ class AppState:
     def next_thinking(self) -> ThinkingOptionId | None:
         """The active model's thinking level after the current one, wrapping around;
         None without a ready model that has any."""
-        if not self.service_status.is_ready or self.active_model is None:
+        if self.issue is not None or self.active_model is None:
             return None
         options = [option.id for option in self.active_model.effective_thinking_options]
         if not options:

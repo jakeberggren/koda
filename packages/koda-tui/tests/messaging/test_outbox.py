@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from koda.agent import AgentTextDelta, AgentToolCallRequested, AgentToolCompleted
+from koda.llm.exceptions import LLMConnectionError, LLMRateLimitError
 from koda.tools import ToolCall, ToolOutput, ToolResult
-from koda_service.exceptions import ServiceConnectionError, ServiceRateLimitError
 from koda_tui.messaging import Conversation, Outbox
 from koda_tui.state import (
     AssistantMessage,
@@ -25,7 +25,6 @@ from koda_tui.state import (
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
-    from koda_service import ChatRequest
     from koda_tui.state import AppState
 
 
@@ -38,12 +37,12 @@ class _Agent:
         self.active = 0
         self.most_active = 0
 
-    async def chat(self, request: ChatRequest) -> AsyncIterator[AgentTextDelta]:
-        self.sent.append(request.message)
+    async def run(self, text: str) -> AsyncIterator[AgentTextDelta]:
+        self.sent.append(text)
         self.active += 1
         self.most_active = max(self.most_active, self.active)
         try:
-            yield AgentTextDelta(text=f"reply to {request.message}")
+            yield AgentTextDelta(text=f"reply to {text}")
             await self.released.wait()
         finally:
             self.active -= 1
@@ -57,7 +56,7 @@ def agent() -> _Agent:
 @pytest.fixture
 def outbox(state: AppState, agent: _Agent) -> Outbox:
     conversation = Conversation(state)
-    return Outbox(state=state, conversation=conversation, service=agent, invalidate=lambda: None)  # type: ignore
+    return Outbox(state=state, conversation=conversation, runtime=agent, invalidate=lambda: None)  # type: ignore
 
 
 async def _until(condition: Callable[[], bool]) -> None:
@@ -216,7 +215,7 @@ def _text(message: Message) -> str:
 
 def _outbox(state: AppState, service: object) -> Outbox:
     conversation = Conversation(state)
-    return Outbox(state=state, conversation=conversation, service=service, invalidate=lambda: None)  # type: ignore
+    return Outbox(state=state, conversation=conversation, runtime=service, invalidate=lambda: None)  # type: ignore
 
 
 async def _send(state: AppState, service: object, text: str) -> None:
@@ -235,11 +234,11 @@ class TestSending:
         """Streaming text should append to messages."""
         client = AsyncMock()
 
-        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+        async def mock_chat(_text: str) -> AsyncIterator:
             yield AgentTextDelta(text="Hello ")
             yield AgentTextDelta(text="world")
 
-        client.chat = mock_chat
+        client.run = mock_chat
 
         await _send(state, client, "hi")
 
@@ -256,7 +255,7 @@ class TestSending:
         client = AsyncMock()
         tool = ToolCall(tool_name="read_file", arguments={"path": "/tmp"}, call_id="c1")
 
-        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+        async def mock_chat(_text: str) -> AsyncIterator:
             yield AgentTextDelta(text="Let me check...")
             yield AgentToolCallRequested(call=tool)
             yield AgentToolCompleted(
@@ -268,7 +267,7 @@ class TestSending:
             )
             yield AgentTextDelta(text="Done!")
 
-        client.chat = mock_chat
+        client.run = mock_chat
 
         await _send(state, client, "read file")
 
@@ -290,7 +289,7 @@ class TestSending:
         client = AsyncMock()
         tool = ToolCall(tool_name="read_file", arguments={"path": "/bad"}, call_id="c1")
 
-        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+        async def mock_chat(_text: str) -> AsyncIterator:
             yield AgentToolCallRequested(call=tool)
             yield AgentToolCompleted(
                 tool_name="read_file",
@@ -304,7 +303,7 @@ class TestSending:
                 ),
             )
 
-        client.chat = mock_chat
+        client.run = mock_chat
 
         await _send(state, client, "read bad file")
 
@@ -318,19 +317,12 @@ class TestSending:
         """Rate limit failures should show a user-friendly inline message."""
         client = AsyncMock()
 
-        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+        async def mock_chat(_text: str) -> AsyncIterator:
             yield AgentTextDelta(text="Starting...")
-            raise ServiceRateLimitError(
-                summary="Rate limit exceeded.",
-                detail=(
-                    "openai rate limit exceeded: quota hit\n\n"
-                    "Please check your plan and billing details."
-                ),
-                message="openai rate limit exceeded: quota hit",
-            )
+            raise LLMRateLimitError("openai", RuntimeError("quota hit"))
             yield  # Make it a generator
 
-        client.chat = mock_chat
+        client.run = mock_chat
 
         await _send(state, client, "do something")
 
@@ -347,11 +339,11 @@ class TestSending:
         """Unexpected exceptions should escape local handling."""
         client = AsyncMock()
 
-        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+        async def mock_chat(_text: str) -> AsyncIterator:
             raise ValueError("Something went wrong")
             yield  # Make it a generator
 
-        client.chat = mock_chat
+        client.run = mock_chat
 
         with pytest.raises(ValueError, match="Something went wrong"):
             await _send(state, client, "do something")
@@ -361,18 +353,11 @@ class TestSending:
         """Connection failures should show recovery guidance."""
         client = AsyncMock()
 
-        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
-            raise ServiceConnectionError(
-                summary="Connection error.",
-                detail=(
-                    "openai connection error: network down\n\n"
-                    "Please check your internet connection and try again."
-                ),
-                message="openai connection error: network down",
-            )
+        async def mock_chat(_text: str) -> AsyncIterator:
+            raise LLMConnectionError("openai", RuntimeError("network down"))
             yield  # Make it a generator
 
-        client.chat = mock_chat
+        client.run = mock_chat
 
         await _send(state, client, "do something")
 
@@ -388,14 +373,14 @@ class TestSending:
         """Cancelling stream should stop processing."""
         client = AsyncMock()
 
-        async def mock_chat(_request: ChatRequest) -> AsyncIterator:
+        async def mock_chat(_text: str) -> AsyncIterator:
             yield AgentTextDelta(text="Start")
             # Simulate long-running stream that gets cancelled
 
             await asyncio.sleep(10)
             yield AgentTextDelta(text="Never reached")
 
-        client.chat = mock_chat
+        client.run = mock_chat
 
         outbox = _outbox(state, client)
         outbox.submit("test", steer=False)

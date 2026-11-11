@@ -16,16 +16,14 @@ from koda_tui.views import Composer
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda_service import ServiceStatus
-
 
 @pytest.fixture
-def composer(tmp_path: Path, ready: ServiceStatus) -> Composer:
+def composer(tmp_path: Path) -> Composer:
     for path in ["README.md", "src/app.py", "src/apply.py", "src/appearance/theme.py"]:
         (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / path).write_text("")
     return Composer(
-        AppState(workspace=tmp_path, service_status=ready),
+        AppState(workspace=tmp_path),
         on_submit=_record,
     )
 

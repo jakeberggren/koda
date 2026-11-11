@@ -86,14 +86,6 @@ repos:
         stages: [pre-push]
         pass_filenames: false
 
-      - id: pytest-koda-service # unit tests for koda-service (pre-push)
-        name: pytest koda-service
-        entry: uv run pytest packages/koda-service
-        language: system
-        files: ^packages/koda-service/
-        stages: [pre-push]
-        pass_filenames: false
-
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v4.3.0
     hooks:

@@ -12,10 +12,10 @@ from koda_common.settings.errors import (
     SettingsUnknownKeysError,
 )
 from koda_common.settings.store import JsonObject, SecretsStore
-from koda_service.exceptions import StartupConfigurationError
 from koda_tui import strings
 from koda_tui.app import KodaTuiApp
 from koda_tui.main import _fail, load_settings, main
+from koda_tui.startup import StartupConfigurationError
 
 if TYPE_CHECKING:
     from pathlib import Path
