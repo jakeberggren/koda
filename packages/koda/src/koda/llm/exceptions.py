@@ -123,13 +123,6 @@ class OAuthAccountIdMissingError(LLMConfigurationError):
         super().__init__(f"{backend_name} OAuth credential must include an account id")
 
 
-class EmptyMessagesListError(LLMValidationError):
-    """Messages list cannot be empty."""
-
-    def __init__(self) -> None:
-        super().__init__("Messages list cannot be empty")
-
-
 class UnknownMessageTypeError(LLMError):
     """Unknown message type encountered."""
 
@@ -142,21 +135,13 @@ class StructuredOutputNotSupportedError(LLMError):
     """Structured outputs are not supported by this backend implementation."""
 
 
-class ModelConfigurationError(LLMConfigurationError):
-    """LLM model configuration or registry error."""
-
-
-class ProviderConfigurationError(LLMConfigurationError):
-    """LLM provider configuration or registry error."""
-
-
-class ProviderNotSupportedError(ProviderConfigurationError):
+class ProviderNotSupportedError(LLMConfigurationError):
     def __init__(self, provider_name: str) -> None:
         super().__init__(f"Provider '{provider_name}' is not supported")
         self.provider_name = provider_name
 
 
-class ProviderNotConnectedError(ProviderConfigurationError):
+class ProviderNotConnectedError(LLMConfigurationError):
     """No connection to the provider has a credential."""
 
     def __init__(self, provider_name: str) -> None:
@@ -164,19 +149,19 @@ class ProviderNotConnectedError(ProviderConfigurationError):
         self.provider_name = provider_name
 
 
-class ModelNotSupportedError(ModelConfigurationError):
+class ModelNotSupportedError(LLMConfigurationError):
     def __init__(self, model_id: str, provider_name: str) -> None:
         super().__init__(f"Model '{model_id}' for provider {provider_name} is not supported")
         self.model_id = model_id
         self.provider_name = provider_name
 
 
-class ModelSelectionMissingError(ModelConfigurationError):
+class ModelSelectionMissingError(LLMConfigurationError):
     def __init__(self) -> None:
         super().__init__("Model selection is required")
 
 
-class ModelMaxOutputTokensMissingError(ModelConfigurationError):
+class ModelMaxOutputTokensMissingError(LLMConfigurationError):
     def __init__(self, model_id: str, provider_name: str) -> None:
         super().__init__(
             f"Model '{model_id}' for provider {provider_name} must define max_output_tokens"
@@ -194,7 +179,7 @@ class ThinkingBudgetTokensNotConfiguredError(LLMConfigurationError):
         )
 
 
-class ModelThinkingModeNotConfiguredError(ModelConfigurationError):
+class ModelThinkingModeNotConfiguredError(LLMConfigurationError):
     def __init__(self, model_id: str, provider_name: str, thinking_mode: str) -> None:
         super().__init__(
             f"Model '{model_id}' for provider {provider_name} references unknown thinking mode "
