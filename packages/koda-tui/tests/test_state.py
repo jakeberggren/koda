@@ -73,14 +73,14 @@ def test_selection_is_required_without_a_model(catalog: Catalog) -> None:
     assert state.active_model is None
 
 
-def test_an_unknown_model_is_unavailable(catalog: Catalog) -> None:
-    assert _state(catalog, model="missing").issue == (strings.Screen.Status.MODEL_UNAVAILABLE)
+def test_an_unknown_model_is_not_found(catalog: Catalog) -> None:
+    assert _state(catalog, model="missing").issue == strings.Screen.Status.MODEL_NOT_FOUND
 
 
-def test_a_model_of_an_unconnected_provider_is_unavailable(catalog: Catalog) -> None:
+def test_a_model_of_an_unconnected_provider_is_not_connected(catalog: Catalog) -> None:
     state = _state(catalog, "bergetai", "google/gemma-4-31B-it")
 
-    assert state.issue == strings.Screen.Status.MODEL_UNAVAILABLE
+    assert state.issue == strings.Screen.Status.MODEL_NOT_CONNECTED
 
 
 def test_an_unreadable_credentials_file_is_reported(catalog: Catalog) -> None:

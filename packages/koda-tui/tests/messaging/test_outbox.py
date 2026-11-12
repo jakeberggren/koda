@@ -83,6 +83,17 @@ async def test_sends_right_away_when_idle(state: AppState, agent: _Agent, outbox
     assert _said(state) == ["hello"]
 
 
+async def test_without_a_ready_model_it_says_why_instead_of_sending(
+    state: AppState, agent: _Agent, outbox: Outbox
+) -> None:
+    state.issue = "Provider setup required"
+    outbox.submit("hello", steer=False)
+    await _until(lambda: bool(state.messages) and isinstance(state.messages[-1], ErrorMessage))
+
+    assert agent.sent == []
+    assert state.messages[-1] == ErrorMessage("Provider setup required")
+
+
 @pytest.mark.parametrize("text", ["", "   "])
 def test_blank_messages_are_ignored(state: AppState, outbox: Outbox, text: str) -> None:
     outbox.submit(text, steer=False)

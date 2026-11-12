@@ -123,7 +123,8 @@ class Screen:
         CYCLE_THINKING = "thinking"
         SETUP_REQUIRED = "Provider setup required"
         SELECTION_REQUIRED = "Model selection required"
-        MODEL_UNAVAILABLE = "Selected model unavailable"
+        MODEL_NOT_FOUND = "Selected model not found"
+        MODEL_NOT_CONNECTED = "Selected model not connected"
         CREDENTIALS_UNREADABLE = "Credentials file unreadable"
 
         @staticmethod
