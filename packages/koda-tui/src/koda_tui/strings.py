@@ -124,6 +124,7 @@ class Screen:
         SETUP_REQUIRED = "Provider setup required"
         SELECTION_REQUIRED = "Model selection required"
         MODEL_UNAVAILABLE = "Selected model unavailable"
+        CREDENTIALS_UNREADABLE = "Credentials file unreadable"
 
         @staticmethod
         def context(percentage: int) -> str:

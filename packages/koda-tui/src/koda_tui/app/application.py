@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from copy import replace
 from typing import TYPE_CHECKING
 
 from prompt_toolkit import Application
@@ -31,7 +32,7 @@ if TYPE_CHECKING:
     from koda.llm import LLM, Catalog, Credentials, Model
     from koda.sessions import SessionStore
     from koda_tui.appearance import RGBColor
-    from koda_tui.settings import AppSettings, SettingChange
+    from koda_tui.settings import Settings
 
     type Connect = Callable[[Model, Credentials], Awaitable[LLM]]
 
@@ -77,16 +78,17 @@ class KodaTuiApp:
 
     def __init__(  # noqa: PLR0913 - the parts main builds, each its own keyword argument
         self,
-        app_settings: AppSettings,
+        settings: Settings,
         workspace: Path,
         *,
         catalog: Catalog,
+        credentials: Credentials,
         store: SessionStore,
         connect: Connect,
         warnings: Sequence[str] = (),
     ) -> None:
-        self.app_settings = app_settings
         self._catalog = catalog
+        self._credentials = credentials
         self._store = store
         self._connect = connect
         self._agent: Agent | None = None  # Built on first use, for the current session.
@@ -95,13 +97,19 @@ class KodaTuiApp:
         self._app: FullScreenApplication | None = None  # Created on run.
         self._terminal = Terminal(on_background=self.on_terminal_background)
 
-        self.state = AppState.load(workspace, catalog, app_settings.core, warnings)
+        self.state = AppState.load(
+            workspace,
+            settings,
+            catalog=catalog,
+            credentials=credentials,
+            warnings=warnings,
+        )
         self.exit_prompt = ExitPrompt(self.state, invalidate=self.invalidate)
-        self.appearance = Appearance(app_settings.tui.theme)
+        self.appearance = Appearance(settings.theme)
         self.screen = Screen(
             self.state,
             on_submit=self.submit,
-            show_scrollbar=Condition(lambda: app_settings.tui.show_scrollbar),
+            show_scrollbar=Condition(lambda: self.state.settings.show_scrollbar),
         )
 
         conversation = Conversation(self.state)
@@ -115,8 +123,9 @@ class KodaTuiApp:
             PaletteContext(
                 overlays=self.screen.overlays,
                 catalog=catalog,
+                credentials=credentials,
                 store=store,
-                settings=app_settings,
+                update_settings=self.update_settings,
                 state=self.state,
                 conversation=conversation,
                 outbox=self.outbox,
@@ -125,9 +134,7 @@ class KodaTuiApp:
         )
 
     async def run(self) -> None:
-        """Start the TUI application, following settings changes while it runs."""
-        unsubscribe_core = self.app_settings.core.subscribe(self.on_settings_changed)
-        unsubscribe_tui = self.app_settings.tui.subscribe(self.on_tui_settings_changed)
+        """Start the TUI application."""
         self._app = FullScreenApplication(
             self.screen,
             key_bindings=create_keybindings(self),
@@ -138,8 +145,6 @@ class KodaTuiApp:
             await self._app.run_async()
         finally:
             self._terminal.close()  # In case the final render failed before turning it off.
-            unsubscribe_core()
-            unsubscribe_tui()
 
     def invalidate(self) -> None:
         """Trigger a UI refresh."""
@@ -155,7 +160,7 @@ class KodaTuiApp:
         """Move to the active model's next thinking level, wrapping around."""
         thinking = self.state.next_thinking()
         if thinking is not None:
-            self.app_settings.core.set("thinking", thinking)
+            self.update_settings(replace(self.state.settings, thinking=thinking))
 
     def toggle_palette(self) -> None:
         """Open the command palette, or close it and any dialogs it opened."""
@@ -169,13 +174,16 @@ class KodaTuiApp:
         round when the input mode prefers steering. Writing a message takes back a
         press of Ctrl+C."""
         self.exit_prompt.dismiss()
-        self.outbox.submit(text, steer=alternate == self.app_settings.tui.queue_inputs)
+        self.outbox.submit(text, steer=alternate == self.state.settings.queue_inputs)
 
-    def on_settings_changed(self, _changes: tuple[SettingChange, ...]) -> None:
-        """Rebuild the agent with the new settings when it next runs, and show what
-        they change."""
+    def update_settings(self, settings: Settings) -> None:
+        """Save ``settings`` and apply them: the agent is rebuilt when it next runs. Also
+        what to call after a credential changes, to show what it connects."""
+        settings.save()
+        self.state.settings = settings
         self._agent = None
-        self.state.refresh(self._catalog, self.app_settings.core)
+        self.state.refresh(self._catalog, self._credentials)
+        self.appearance.theme = settings.theme
         self.invalidate()
 
     async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
@@ -192,28 +200,22 @@ class KodaTuiApp:
         return self._agent
 
     async def _build_agent(self) -> Agent:
-        settings = self.app_settings.core
+        settings = self.state.settings
         if settings.provider is None or settings.model is None:
             raise ModelSelectionMissingError
         model = self._catalog.model(settings.provider, settings.model)
         return Agent(
-            await self._connect(model, settings),
+            await self._connect(model, self._credentials),
             session=self.state.session,
             workspace=self.state.workspace,
             store=self._store,
             options=LLMRequestOptions(
                 thinking=model.resolve_thinking_option(settings.thinking).id,
-                web_search=settings.allow_web_search,
-                extended_prompt_retention=settings.allow_extended_prompt_retention,
+                web_search=settings.web_search,
+                extended_prompt_retention=settings.extended_prompt_retention,
             ),
-            sandbox=settings.bash_execution_sandbox,
+            sandbox=settings.sandbox,
         )
-
-    def on_tui_settings_changed(self, changes: tuple[SettingChange, ...]) -> None:
-        """Apply a new theme, and redraw for any change."""
-        if any(change.name == "theme" for change in changes):
-            self.appearance.theme = self.app_settings.tui.theme
-        self.invalidate()
 
     def on_terminal_background(self, background: RGBColor) -> None:
         self.appearance.terminal_background = background

@@ -6,6 +6,7 @@ from koda.llm.catalog import Catalog, CatalogWarning
 from koda.llm.credentials import (
     ApiKeyCredential,
     Credentials,
+    JsonCredentialStore,
     OAuthCredential,
     ProviderCredential,
 )
@@ -60,6 +61,7 @@ __all__ = [
     "CatalogWarning",
     "Connection",
     "Credentials",
+    "JsonCredentialStore",
     "LLMEvent",
     "LLMRequest",
     "LLMRequestOptions",

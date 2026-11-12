@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import replace
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
@@ -55,7 +56,7 @@ class CommandPalette:
 
     def __init__(self, context: PaletteContext) -> None:
         self._overlays = context.overlays
-        self._settings = context.settings
+        self._context = context
         self._state = context.state
         sessions = SessionMenu(context)
         self._commands = [
@@ -129,7 +130,8 @@ class CommandPalette:
         ]
 
     def _toggle_scrollbar(self) -> None:
-        self._settings.tui.set("show_scrollbar", not self._settings.tui.show_scrollbar)
+        settings = self._context.settings
+        self._context.update_settings(replace(settings, show_scrollbar=not settings.show_scrollbar))
         self._overlays.close_all()
 
 

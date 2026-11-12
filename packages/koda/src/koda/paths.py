@@ -16,3 +16,8 @@ def sessions_dir_path() -> Path:
 def model_overrides_file_path() -> Path:
     """The user's models.json, which adds to and overrides the bundled catalog."""
     return koda_home_dir() / "models.json"
+
+
+def credentials_file_path() -> Path:
+    """Where provider credentials are stored."""
+    return koda_home_dir() / "credentials.json"

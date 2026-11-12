@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+
 class LLMError(Exception):
     """Base exception for all LLM-related errors."""
 
@@ -195,3 +203,11 @@ class ModelThinkingModeNotConfiguredError(ModelConfigurationError):
         self.model_id = model_id
         self.provider_name = provider_name
         self.thinking_mode = thinking_mode
+
+
+class CredentialsError(LLMError):
+    """The credentials file can't be read."""
+
+    def __init__(self, path: Path, error: Exception) -> None:
+        super().__init__(f"Can't read credentials from {path}: {error}")
+        self.path = path

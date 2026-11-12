@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
+from copy import replace
 from typing import TYPE_CHECKING
-
-from structlog import get_logger
 
 from koda_tui import strings
 from koda_tui.ui.widgets import ListItem, Picker
@@ -13,8 +12,6 @@ if TYPE_CHECKING:
     from koda.llm import Model
     from koda_tui.palette.context import PaletteContext
 
-
-log = get_logger(__name__)
 
 _LABEL_WIDTH = 32  # Longer model names are cut, so details line up.
 
@@ -25,7 +22,7 @@ class ModelMenu:
     def __init__(self, context: PaletteContext) -> None:
         self._overlays = context.overlays
         self._catalog = context.catalog
-        self._settings = context.settings
+        self._context = context
 
     def items(self) -> list[ListItem[Model]]:
         """Build model selection items."""
@@ -33,7 +30,7 @@ class ModelMenu:
         return [
             self._item_for_model(model, provider_names.get(model.provider))
             for model in self._catalog.models()
-            if model.is_connected(self._settings.core)
+            if model.is_connected(self._context.credentials)
         ]
 
     def open(self) -> None:
@@ -50,17 +47,14 @@ class ModelMenu:
 
     def select(self, model: Model) -> None:
         """Handle model selection."""
-        try:
-            self._settings.core.update(provider=model.provider, model=model.id)
-        except ValueError:
-            log.warning("select_model_failed", model_id=model.id)
-            return
+        self._context.update_settings(
+            replace(self._context.settings, provider=model.provider, model=model.id)
+        )
         self._overlays.close_all()
 
     def _item_for_model(self, model: Model, provider_name: str | None) -> ListItem[Model]:
-        is_active = (
-            self._settings.core.provider == model.provider and self._settings.core.model == model.id
-        )
+        settings = self._context.settings
+        is_active = settings.provider == model.provider and settings.model == model.id
         return ListItem(
             label=model.name,
             detail=self._detail(model),
@@ -71,7 +65,7 @@ class ModelMenu:
 
     def _detail(self, model: Model) -> str:
         """The connection ``model`` uses, when its provider has several connected."""
-        credentials = self._settings.core
+        credentials = self._context.credentials
         provider = self._catalog.provider(model.provider)
         if sum(c.is_connected(credentials) for c in provider.connections) <= 1:
             return ""

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import replace
 from typing import TYPE_CHECKING
 
 from koda_tui import strings
@@ -20,7 +21,7 @@ class ThemeMenu:
         self._context = context
 
     def open(self) -> None:
-        current = self._context.settings.tui.theme
+        current = self._context.settings.theme
         items = [
             ListItem(
                 label=theme.label,
@@ -38,7 +39,7 @@ class ThemeMenu:
         )
 
     def _select(self, theme: str) -> None:
-        if self._context.settings.tui.theme == theme:
+        if self._context.settings.theme == theme:
             self._context.terminal.ask_background()
         else:
-            self._context.settings.tui.set("theme", theme)
+            self._context.update_settings(replace(self._context.settings, theme=theme))

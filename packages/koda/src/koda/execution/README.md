@@ -10,26 +10,22 @@ The default is `host`.
 
 ## Configure Execution
 
-Persist the execution mode in `~/.koda/config.json`:
+Pick the mode when creating the agent:
+
+```python
+agent = Agent(llm, session=session, sandbox="seatbelt")
+```
+
+In the Koda TUI, set it in `~/.koda/settings.json`:
 
 ```json
 {
-  "core": {
-    "bash_execution_sandbox": "host"
-  }
+  "sandbox": "seatbelt"
 }
 ```
 
-Use `seatbelt` instead of `host` to enable the macOS sandbox. Note that
 Seatbelt mode is only supported on macOS and requires `sandbox-exec` to be
-available on the host system. `host` is the default execution mode and runs
-commands directly on the local machine.
-
-Environment variables can override the persisted setting for one shell session:
-
-```bash
-export KODA_BASH_EXECUTION_SANDBOX=seatbelt
-```
+available on the host system.
 
 ## Seatbelt Runtime Contract
 

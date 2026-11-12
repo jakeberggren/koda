@@ -5,19 +5,18 @@ from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 from koda.llm import Model, Provider, ThinkingOption
-from koda.llm.exceptions import LLMConfigurationError
+from koda.llm.exceptions import CredentialsError, LLMConfigurationError
 from koda.sessions import Session
 from koda_tui import strings
-from koda_tui.settings import SecretsLoadError
+from koda_tui.settings import Settings
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-    from koda.llm import Catalog, ThinkingOptionId
+    from koda.llm import Catalog, Credentials, ThinkingOptionId
     from koda.messages import TokenUsage
     from koda.tools import ToolCall, ToolOutput
-    from koda_tui.settings import SettingsManager
 
 
 class ResponsePhase(Enum):
@@ -80,6 +79,7 @@ class AppState:
     """Shared application state as single source of truth for the UI."""
 
     workspace: Path
+    settings: Settings = field(default_factory=Settings)
     session: Session = field(default_factory=Session)  # The conversation on screen.
     issue: str | None = None  # What stops Koda from responding; None when it can.
     warnings: list[str] = field(default_factory=list)
@@ -124,16 +124,19 @@ class AppState:
     def load(
         cls,
         workspace: Path,
+        settings: Settings,
+        *,
         catalog: Catalog,
-        settings: SettingsManager,
+        credentials: Credentials,
         warnings: Sequence[str] = (),
     ) -> AppState:
-        """The state for ``workspace``, refreshed from ``catalog`` and ``settings``."""
-        state = cls(workspace=workspace, warnings=list(warnings))
-        state.refresh(catalog, settings)
+        """The state for ``workspace`` and ``settings``, refreshed from ``catalog`` and
+        ``credentials``."""
+        state = cls(workspace=workspace, settings=settings, warnings=list(warnings))
+        state.refresh(catalog, credentials)
         return state
 
-    def refresh(self, catalog: Catalog, settings: SettingsManager) -> None:
+    def refresh(self, catalog: Catalog, credentials: Credentials) -> None:
         """Take the providers connected now, and the model and thinking level the settings
         pick, or what stops Koda from responding."""
         self.configured_providers, self.active_model = [], None
@@ -141,19 +144,20 @@ class AppState:
             self.configured_providers = [
                 provider
                 for provider in catalog.providers()
-                if any(c.is_connected(settings) for c in provider.connections)
+                if any(c.is_connected(credentials) for c in provider.connections)
             ]
-            self.issue = self._check_selection(catalog, settings)
-        except SecretsLoadError as error:
-            self.issue = error.summary
+            self.issue = self._check_selection(catalog, credentials)
+        except CredentialsError:
+            self.issue = strings.Screen.Status.CREDENTIALS_UNREADABLE
         self.thinking = (
-            self.active_model.resolve_thinking_option(settings.thinking)
+            self.active_model.resolve_thinking_option(self.settings.thinking)
             if self.active_model is not None
             else ThinkingOption.none()
         )
 
-    def _check_selection(self, catalog: Catalog, settings: SettingsManager) -> str | None:
+    def _check_selection(self, catalog: Catalog, credentials: Credentials) -> str | None:
         """Make the selected model active, or say why it can't be."""
+        settings = self.settings
         if not self.configured_providers:
             return strings.Screen.Status.SETUP_REQUIRED
         if settings.provider is None or settings.model is None:
@@ -162,7 +166,7 @@ class AppState:
             model = catalog.model(settings.provider, settings.model)
         except LLMConfigurationError:
             return strings.Screen.Status.MODEL_UNAVAILABLE
-        if not model.is_connected(settings):
+        if not model.is_connected(credentials):
             return strings.Screen.Status.MODEL_UNAVAILABLE
         self.active_model = model
         return None

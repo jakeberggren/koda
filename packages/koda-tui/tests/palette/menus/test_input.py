@@ -8,17 +8,14 @@ from koda_tui import strings
 from koda_tui.palette.menus.input import InputMenu
 
 if TYPE_CHECKING:
-    from unittest.mock import Mock
-
     from tests.palette.conftest import Overlays
 
     from koda_tui.palette.context import PaletteContext
 
 
 def test_lists_both_modes_and_sets_the_chosen_one(
-    context: PaletteContext, overlays: Overlays, settings: Mock
+    context: PaletteContext, overlays: Overlays
 ) -> None:
-    settings.tui.queue_inputs = True
     InputMenu(context).open()
 
     items = overlays.stack[-1]["items"]
@@ -27,4 +24,4 @@ def test_lists_both_modes_and_sets_the_chosen_one(
         (strings.Palette.InputMode.QUEUE, True),
     ]
     overlays.pick(strings.Palette.InputMode.STEER)
-    settings.tui.set.assert_called_once_with("queue_inputs", False)  # noqa: FBT003
+    assert not context.settings.queue_inputs

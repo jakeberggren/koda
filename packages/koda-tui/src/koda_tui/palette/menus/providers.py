@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import webbrowser
+from copy import replace
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -51,7 +52,7 @@ class ProviderMenu:
     def __init__(self, context: PaletteContext, auth_registry: ProviderAuthRegistry) -> None:
         self._overlays = context.overlays
         self._catalog = context.catalog
-        self._settings = context.settings
+        self._context = context
         self._auth_registry = auth_registry
         self._login: asyncio.Task[None] | None = None
 
@@ -110,7 +111,7 @@ class ProviderMenu:
         )
 
     def _connected(self, selection: ProviderConnectionSelection) -> bool:
-        return bool(self._settings.core.get_credential(selection.credential_key))
+        return bool(self._context.credentials.get_credential(selection.credential_key))
 
     def _connect(self, selection: ProviderConnectionSelection) -> None:
         """Log in through the browser, or ask for the API key."""
@@ -131,11 +132,11 @@ class ProviderMenu:
     def _save(self, selection: ProviderConnectionSelection, credential: ProviderCredential) -> None:
         """Store the credential, pick the provider's first model if none is picked yet,
         and close the palette."""
-        self._settings.core.set_credential(selection.credential_key, credential)
-        if self._settings.core.model is None and (
-            models := self._catalog.models(selection.provider.id)
-        ):
-            self._settings.core.update(provider=models[0].provider, model=models[0].id)
+        self._context.credentials.set_credential(selection.credential_key, credential)
+        settings = self._context.settings
+        if settings.model is None and (models := self._catalog.models(selection.provider.id)):
+            settings = replace(settings, provider=models[0].provider, model=models[0].id)
+        self._context.update_settings(settings)
         self._overlays.close_all()
 
     def _start_login(self, selection: ProviderConnectionSelection) -> None:

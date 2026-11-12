@@ -110,8 +110,7 @@ The built-in `bash` tool supports configurable command execution modes:
   access and limiting writes to the workspace plus temporary storage.
 - `bubblewrap` - Planned Linux sandbox mode. Not yet available.
 
-Command execution mode can be configured in `~/.koda/config.json` or with
-environment variables. See the [command execution README](packages/koda/src/koda/execution/README.md)
+Command execution mode is set with `"sandbox"` in `~/.koda/settings.json`. See the [command execution README](packages/koda/src/koda/execution/README.md)
 for details on execution modes and configuration.
 
 ### Project Context and System Prompt Customization
