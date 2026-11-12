@@ -8,9 +8,8 @@ import pytest
 from koda.llm import exceptions
 from koda.llm.apis.base import LLMApiContext
 from koda.llm.apis.codex import CODEX_BACKEND, CODEX_ORIGINATOR, OpenAICodexResponsesAPI
-from koda.llm.apis.registry import LLMApiRegistry
 from koda.llm.auth.registry import ProviderAuthRegistry
-from koda.llm.models import ProviderConfig, ProviderConnectionConfig, ProviderModelConfig
+from koda.llm.models import Connection, Model
 from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 
 if TYPE_CHECKING:
@@ -72,39 +71,33 @@ class _FakeClientFactory:
         return client
 
 
-def _context(credential: ProviderCredential | None) -> LLMApiContext:
+_CONNECTION = Connection(
+    id="oauth",
+    provider="openai",
+    auth="oauth",
+    api=OpenAICodexResponsesAPI,
+    base_url="https://chatgpt.com/backend-api/codex",
+    capabilities={"web_search": True},
+)
+
+
+def _context(
+    credential: ProviderCredential | None,
+    auth_provider: _FakeAuthProvider | None = None,
+    credentials: _FakeCredentials | None = None,
+) -> LLMApiContext:
     return LLMApiContext(
-        provider_id="openai",
-        provider=ProviderConfig(
-            name="OpenAI",
-            connections={
-                "oauth": ProviderConnectionConfig(
-                    auth="oauth",
-                    api="openai-codex-responses",
-                    base_url="https://chatgpt.com/backend-api/codex",
-                    capabilities={"web_search": True},
-                )
-            },
-        ),
-        connection_id="oauth",
-        connection=ProviderConnectionConfig(
-            auth="oauth",
-            api="openai-codex-responses",
-            base_url="https://chatgpt.com/backend-api/codex",
-            capabilities={"web_search": True},
-        ),
-        model=ProviderModelConfig(
+        model=Model(
             id="gpt-5.5",
             name="gpt-5.5",
+            provider="openai",
             capabilities={"extended_prompt_retention": True},
+            connections=(_CONNECTION,),
         ),
-        credentials=cast("Credentials", _FakeCredentials(credential)),
-        auth_registry=ProviderAuthRegistry({"openai:oauth": _FakeAuthProvider()}),
+        connection=_CONNECTION,
+        credentials=cast("Credentials", credentials or _FakeCredentials(credential)),
+        auth_registry=ProviderAuthRegistry({"openai:oauth": auth_provider or _FakeAuthProvider()}),
     )
-
-
-def test_registry_includes_openai_codex_responses_api() -> None:
-    assert LLMApiRegistry.default().get("openai-codex-responses") is not None
 
 
 async def test_codex_responses_factory_builds_oauth_client(
@@ -187,16 +180,7 @@ async def test_codex_responses_factory_refreshes_expired_oauth_credential(
     )
     credentials = _FakeCredentials(expired)
     auth_provider = _FakeAuthProvider(refreshed)
-    context = _context(expired)
-    context = LLMApiContext(
-        provider_id=context.provider_id,
-        provider=context.provider,
-        connection_id=context.connection_id,
-        connection=context.connection,
-        model=context.model,
-        credentials=cast("Credentials", credentials),
-        auth_registry=ProviderAuthRegistry({"openai:oauth": auth_provider}),
-    )
+    context = _context(expired, auth_provider, credentials)
 
     api = await OpenAICodexResponsesAPI.from_context(context)
 
@@ -216,18 +200,7 @@ async def test_codex_responses_factory_translates_oauth_refresh_failure() -> Non
         refresh_token="old-refresh-token",  # noqa: S106
         expires_at="1",
     )
-    context = _context(expired)
-    context = LLMApiContext(
-        provider_id=context.provider_id,
-        provider=context.provider,
-        connection_id=context.connection_id,
-        connection=context.connection,
-        model=context.model,
-        credentials=context.credentials,
-        auth_registry=ProviderAuthRegistry(
-            {"openai:oauth": _FakeAuthProvider(refresh_error=RuntimeError("refresh failed"))}
-        ),
-    )
+    context = _context(expired, _FakeAuthProvider(refresh_error=RuntimeError("refresh failed")))
 
     with pytest.raises(exceptions.LLMAuthenticationError, match="refresh failed"):
         await OpenAICodexResponsesAPI.from_context(context)

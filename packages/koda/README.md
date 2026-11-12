@@ -32,12 +32,13 @@ packages/koda/
 │   ├── agents/
 │   │   └── agent.py                # Core agent loop
 │   ├── llm/
-│   │   ├── drivers/                # Provider driver adapters
-│   │   ├── providers/              # OpenAI and BergetAI providers
+│   │   ├── apis/                   # Anthropic Messages and OpenAI Responses/Completions/Codex
+│   │   ├── auth/                   # OAuth login and refresh
+│   │   ├── catalog.py              # Providers and models from models.json
 │   │   ├── exceptions.py           # LLM-related exceptions
-│   │   ├── models.py               # Model definitions and capabilities
-│   │   ├── protocols.py            # LLM protocol
-│   │   ├── registry.py             # Provider/model registries
+│   │   ├── models.py               # Provider, Connection and Model
+│   │   ├── models.json             # Bundled catalog
+│   │   ├── protocols.py            # LLM and Credentials protocols
 │   │   ├── types.py                # Requests, responses, stream events
 │   │   └── utils.py                # Shared LLM helper utilities
 │   ├── messages/
@@ -64,7 +65,7 @@ packages/koda/
 
 The package re-exports its main building blocks from the following modules:
 
-- `koda.llm` for LLM protocols, requests, responses, events, and registries
+- `koda.llm` for the catalog, `connect()`, LLM protocols, requests, responses and events
 - `koda.sessions` for session management and persistence
 - `koda.messages` for internal message models
 - `koda.tools` for the tool framework and built-in tool registration helpers

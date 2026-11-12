@@ -5,10 +5,8 @@ from typing import TYPE_CHECKING
 
 from koda.agent import Agent, AgentConfig
 from koda.execution import HostCommandExecutor, SeatbeltCommandExecutor
-from koda.llm import LLMRequestOptions
+from koda.llm import Catalog, LLMRequestOptions, connect
 from koda.llm import exceptions as llm_exceptions
-from koda.llm.catalog import ModelCatalog
-from koda.llm.factory import LLMFactory
 from koda.prompts import SystemPrompt, SystemPromptLoader
 from koda.tools import ToolConfig
 
@@ -36,9 +34,7 @@ class LocalRuntime:
         self.config = config
         self.session_store = session_store
         self.context_manager = context_manager
-        catalog, warnings = ModelCatalog.load()
-        self.warnings = warnings
-        self.llm_factory = LLMFactory(catalog, tracing=config.tracing)
+        self.catalog, self.warnings = Catalog.load()
         self.agent: Agent | None = None
         self._agent_lock = asyncio.Lock()
 
@@ -59,9 +55,8 @@ class LocalRuntime:
             raise llm_exceptions.ProviderSelectionMissingError
         if self.settings.model is None:
             raise llm_exceptions.ModelSelectionMissingError
-        return await self.llm_factory.create(
-            self.settings.provider, self.settings.model, self.settings
-        )
+        model = self.catalog.model(self.settings.provider, self.settings.model)
+        return await connect(model, self.settings, tracing=self.config.tracing)
 
     def create_executor(self) -> CommandExecutor:
         """Create the command executor selected in settings."""
@@ -112,8 +107,10 @@ class LocalRuntime:
                 raise llm_exceptions.ProviderSelectionMissingError
             return self.settings.thinking
         try:
-            return self.llm_factory.resolve_thinking(
-                provider, model, self.settings, self.settings.thinking
+            return (
+                self.catalog.model(provider, model)
+                .resolve_thinking_option(self.settings.thinking)
+                .id
             )
         except llm_exceptions.LLMConfigurationError:
             if self.config.llm is None:

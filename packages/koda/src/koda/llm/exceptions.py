@@ -87,13 +87,6 @@ class EmptyApiKeyError(LLMConfigurationError):
         super().__init__(f"{backend_name} API key cannot be empty")
 
 
-class ApiKeyNotConfiguredError(LLMConfigurationError):
-    """API key is not configured."""
-
-    def __init__(self, backend_name: str) -> None:
-        super().__init__(f"{backend_name} API key not configured")
-
-
 class ProviderCredentialNotConfiguredError(LLMConfigurationError):
     """Provider credential is not configured."""
 
@@ -149,17 +142,6 @@ class ProviderConfigurationError(LLMConfigurationError):
     """LLM provider configuration or registry error."""
 
 
-class ProviderNameEmptyError(ProviderConfigurationError):
-    def __init__(self) -> None:
-        super().__init__("Provider name cannot be empty")
-
-
-class ProviderAlreadyRegisteredError(ProviderConfigurationError):
-    def __init__(self, provider_name: str) -> None:
-        super().__init__(f"Provider '{provider_name}' is already registered")
-        self.provider_name = provider_name
-
-
 class ProviderNotSupportedError(ProviderConfigurationError):
     def __init__(self, provider_name: str) -> None:
         super().__init__(f"Provider '{provider_name}' is not supported")
@@ -169,30 +151,6 @@ class ProviderNotSupportedError(ProviderConfigurationError):
 class ProviderSelectionMissingError(ProviderConfigurationError):
     def __init__(self) -> None:
         super().__init__("Provider selection is required")
-
-
-class ApiNameEmptyError(ProviderConfigurationError):
-    def __init__(self) -> None:
-        super().__init__("API name cannot be empty")
-
-
-class ApiAlreadyRegisteredError(ProviderConfigurationError):
-    def __init__(self, api_name: str) -> None:
-        super().__init__(f"API '{api_name}' is already registered")
-        self.api_name = api_name
-
-
-class ApiNotSupportedError(ProviderConfigurationError):
-    def __init__(self, api_name: str) -> None:
-        super().__init__(f"API '{api_name}' is not supported")
-        self.api_name = api_name
-
-
-class ModelAlreadyRegisteredError(ModelConfigurationError):
-    def __init__(self, model_name: str, provider_name: str) -> None:
-        super().__init__(f"Model '{model_name}' for provider {provider_name} is already registered")
-        self.model_name = model_name
-        self.provider_name = provider_name
 
 
 class ModelNotSupportedError(ModelConfigurationError):
@@ -234,13 +192,3 @@ class ModelThinkingModeNotConfiguredError(ModelConfigurationError):
         self.model_id = model_id
         self.provider_name = provider_name
         self.thinking_mode = thinking_mode
-
-
-class ModelRouteNotConfiguredError(ModelConfigurationError):
-    def __init__(self, model_id: str, provider_name: str) -> None:
-        super().__init__(
-            f"Model '{model_id}' for provider {provider_name} does not reference any "
-            "configured route"
-        )
-        self.model_id = model_id
-        self.provider_name = provider_name

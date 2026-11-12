@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from prompt_toolkit.formatted_text import fragment_list_to_text
 
-from koda.llm import ModelDefinition, ThinkingOption
+from koda.llm import Model, ThinkingOption
 from koda.messages import TokenUsage
 from koda.tools import ToolCall
 from koda_service import ServiceStatus, ServiceStatusCode
@@ -32,12 +32,12 @@ def _state(state: AppState, **fields) -> AppState:
 
 
 def test_left_shows_workspace_model_thinking_and_usage(state: AppState) -> None:
-    model = ModelDefinition(
+    model = Model(
         id="m",
         name="Model",
         provider="provider",
         context_window=1000,
-        thinking_options=[],
+        thinking_options=(),
     )
     usage = TokenUsage(input_tokens=120, output_tokens=0)
     state = _state(
@@ -65,11 +65,11 @@ def test_home_workspace_shows_a_tilde(state: AppState) -> None:
 
 
 def test_right_shows_hints_warning_and_activity(state: AppState) -> None:
-    model = ModelDefinition(
+    model = Model(
         id="m",
         name="Model",
         provider="provider",
-        thinking_options=[ThinkingOption(id="medium", label="Medium")],
+        thinking_options=(ThinkingOption(id="medium", label="Medium"),),
     )
     state = _state(state, active_model=model, warnings=["Config has unknown keys"])
     assert _texts(status._right(state)) == [

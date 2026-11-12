@@ -1,8 +1,6 @@
-from koda.llm.apis.base import LLMApiContext, LLMApiFactory
-from koda.llm.apis.registry import LLMApiRegistry
+from koda.llm.apis.base import LLMApi, LLMApiContext
 
 __all__ = [
+    "LLMApi",
     "LLMApiContext",
-    "LLMApiFactory",
-    "LLMApiRegistry",
 ]

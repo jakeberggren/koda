@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-from koda.llm import ModelDefinition, ProviderDefinition, ThinkingOption
+from koda.llm import Model, Provider, ThinkingOption
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -81,8 +81,8 @@ class AppState:
     messages: list[Message] = field(default_factory=list)
     responding: bool = False  # Whether a response is in flight.
     pending_inputs: list[PendingInput] = field(default_factory=list)  # Steers first.
-    active_model: ModelDefinition | None = None
-    configured_providers: list[ProviderDefinition] = field(default_factory=list)
+    active_model: Model | None = None
+    configured_providers: list[Provider] = field(default_factory=list)
     thinking: ThinkingOption = field(default_factory=ThinkingOption.none)
     usage: Usage | None = None
     exit_requested: bool = False

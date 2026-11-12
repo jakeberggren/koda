@@ -32,13 +32,9 @@ class OpenAICodexResponsesAPI(OpenAIResponsesAPI):
         credential = await resolve_oauth_credential(context)
         account_id = credential.metadata.get(CODEX_ACCOUNT_ID_METADATA_KEY)
         if not account_id:
-            raise exceptions.OAuthAccountIdMissingError(context.provider_id)
+            raise exceptions.OAuthAccountIdMissingError(context.connection.provider)
 
-        capabilities = (
-            context.provider.capabilities
-            | context.connection.capabilities
-            | context.model.capabilities
-        )
+        capabilities = context.capabilities
         config = OpenAIResponsesAPIConfig(
             api_key=credential.access_token,
             base_url=context.connection.base_url,

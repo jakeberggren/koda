@@ -297,11 +297,7 @@ class OpenAIResponsesAPI(LLM):
     @classmethod
     async def from_context(cls, context: LLMApiContext) -> OpenAIResponsesAPI:
         """Create an OpenAI Responses API from a resolved model-catalog context."""
-        capabilities = (
-            context.provider.capabilities
-            | context.connection.capabilities
-            | context.model.capabilities
-        )
+        capabilities = context.capabilities
         config = OpenAIResponsesAPIConfig(
             api_key=resolve_api_key_credential(context),
             base_url=context.connection.base_url,

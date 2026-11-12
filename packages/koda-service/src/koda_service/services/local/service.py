@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from koda.agent import AgentEvent
 from koda.context import ContextManager
-from koda.llm import ModelDefinition, ProviderDefinition
+from koda.llm import Model, Provider
 from koda.llm import exceptions as llm_exceptions
 from koda.messages import Message
 from koda.sessions import JsonSessionStore, Session, SessionNotFoundError
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
     from koda_service.services.local.config import LocalRuntimeConfig
 
 
-class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefinition, Message]):
+class LocalKodaService(KodaService[AgentEvent, Provider, Model, Message]):
     """Application service for running Koda inside the current process."""
 
     def __init__(
@@ -79,113 +80,67 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
         except tool_exceptions.ToolError as error:
             raise ServiceChatError.from_tool_error(error) from error
 
-    def list_providers(self) -> list[ProviderDefinition]:
+    def list_providers(self) -> list[Provider]:
         """List available providers."""
-        return self.runtime.llm_factory.list_providers()
+        return self.runtime.catalog.providers()
 
-    def list_configured_providers(self) -> list[ProviderDefinition]:
+    def list_configured_providers(self) -> list[Provider]:
         """List providers that currently have configured credentials."""
-        providers = self.list_providers()
         try:
-            connected_ids = {
-                provider.id
-                for provider in providers
+            return [
+                provider
+                for provider in self.list_providers()
                 if any(
-                    self.settings.get_credential(f"{provider.id}:{connection.id}")
+                    self.settings.get_credential(connection.credential_key)
                     for connection in provider.connections
                 )
-            }
+            ]
         except SecretsLoadError:
             return []
 
-        return [provider for provider in providers if provider.id in connected_ids]
-
-    def list_models(self, provider: str | None = None) -> list[ModelDefinition]:
+    def list_models(self, provider: str | None = None) -> list[Model]:
         """List available models, optionally filtered by provider."""
-        return self.runtime.llm_factory.list_models(provider)
+        return self.runtime.catalog.models(provider)
 
-    def get_model(self, provider: str | None, model_id: str | None) -> ModelDefinition | None:
+    def get_model(self, provider: str | None, model_id: str | None) -> Model | None:
         """Return a model by provider/model id, or None if unavailable."""
         if provider is None or model_id is None:
             return None
-        return next(
-            (
-                model
-                for model in self.runtime.llm_factory.list_models(provider)
-                if model.id == model_id
-            ),
-            None,
-        )
+        try:
+            return self.runtime.catalog.model(provider, model_id)
+        except llm_exceptions.LLMConfigurationError:
+            return None
 
     def diagnostics(self) -> ServiceDiagnostics:
         """Return non-blocking service diagnostics."""
         warnings = [warning.summary for warning in self.runtime.warnings]
         return ServiceDiagnostics(startup_warnings=warnings)
 
-    @staticmethod
-    def _connection_credential_key(provider_id: str, connection_id: str) -> str:
-        return f"{provider_id}:{connection_id}"
-
-    def _configured_credential_ids(self) -> set[str]:
+    def _connected_keys(self) -> set[str]:
         return {
-            self._connection_credential_key(provider.id, connection.id)
+            connection.credential_key
             for provider in self.list_providers()
             for connection in provider.connections
-            if self.settings.get_credential(
-                self._connection_credential_key(provider.id, connection.id)
-            )
+            if self.settings.get_credential(connection.credential_key)
         }
 
-    @staticmethod
-    def _has_multiple_configured_connections(
-        provider_id: str,
-        credential_ids: set[str],
-    ) -> bool:
-        prefix = f"{provider_id}:"
-        provider_credentials = [
-            credential_id for credential_id in credential_ids if credential_id.startswith(prefix)
-        ]
-        return len(provider_credentials) > 1
+    def _configured_model(self, model: Model, connected: set[str]) -> Model:
+        """``model``, its detail naming its connection if its provider has several connected."""
+        if sum(key.startswith(f"{model.provider}:") for key in connected) <= 1:
+            return replace(model, detail=None)
+        return replace(model, detail=model.connection(self.settings).detail or model.detail)
 
-    def _model_has_configured_connection(
-        self,
-        model: ModelDefinition,
-        credential_ids: set[str],
-    ) -> bool:
-        return any(
-            self._connection_credential_key(model.provider, connection_id) in credential_ids
-            for connection_id in model.routes
-        )
-
-    def _configured_model_definition(
-        self,
-        model: ModelDefinition,
-        credential_ids: set[str],
-    ) -> ModelDefinition:
-        route = self.runtime.llm_factory.resolve_route(
-            model.provider,
-            model.id,
-            credential_ids=credential_ids,
-        )
-        detail = None
-        if self._has_multiple_configured_connections(model.provider, credential_ids):
-            detail = route.connection.detail or model.detail
-        return model.model_copy(update={"detail": detail})
-
-    def list_configured_models(self) -> list[ModelDefinition]:
-        """List models with detail set to the effective configured connection."""
-        models = self.runtime.llm_factory.list_models()
+    def list_configured_models(self) -> list[Model]:
+        """List models with a connected connection."""
         try:
-            credential_ids = self._configured_credential_ids()
-            configured_models = [
-                self._configured_model_definition(model, credential_ids)
-                for model in models
-                if self._model_has_configured_connection(model, credential_ids)
+            connected = self._connected_keys()
+            return [
+                self._configured_model(model, connected)
+                for model in self.runtime.catalog.models()
+                if any(connection.credential_key in connected for connection in model.connections)
             ]
         except SecretsLoadError:
             return []
-        else:
-            return configured_models
 
     def active_session(self) -> Session | None:
         """Get the current session, if any."""
