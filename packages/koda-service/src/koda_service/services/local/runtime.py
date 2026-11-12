@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from koda.context.manager import ContextManager
     from koda.execution import CommandExecutor
     from koda.llm import LLM
-    from koda.sessions import SessionManager
+    from koda.sessions import Session, SessionStore
     from koda_common.settings import SettingsManager
     from koda_service.services.local.config import LocalRuntimeConfig
 
@@ -29,12 +29,12 @@ class LocalRuntime:
         *,
         settings: SettingsManager,
         config: LocalRuntimeConfig,
-        session_manager: SessionManager,
+        session_store: SessionStore,
         context_manager: ContextManager,
     ) -> None:
         self.settings = settings
         self.config = config
-        self.session_manager = session_manager
+        self.session_store = session_store
         self.context_manager = context_manager
         catalog, warnings = ModelCatalog.load()
         self.warnings = warnings
@@ -86,8 +86,8 @@ class LocalRuntime:
             return loaded_prompt
         return self.config.system_prompt
 
-    def create_agent(self, llm: LLM) -> Agent:
-        """Create an Agent wired to the current settings and session manager."""
+    def create_agent(self, llm: LLM, session: Session) -> Agent:
+        """Create an Agent for ``session``, wired to the current settings."""
         return Agent(
             llm=llm,
             config=AgentConfig(
@@ -98,8 +98,9 @@ class LocalRuntime:
                     extended_prompt_retention=self.settings.allow_extended_prompt_retention,
                 ),
             ),
+            session=session,
+            store=self.session_store,
             tools=self.create_tools(),
-            session_manager=self.session_manager,
             context_manager=self.context_manager,
         )
 
@@ -119,11 +120,11 @@ class LocalRuntime:
                 raise
             return self.settings.thinking
 
-    async def get_agent(self) -> Agent:
-        """Return the cached Agent, creating it on first use."""
+    async def get_agent(self, session: Session) -> Agent:
+        """Return the cached Agent, creating it for ``session`` on first use."""
         if self.agent is None:
             # OAuth refresh tokens may rotate, so concurrent initialization must refresh only once.
             async with self._agent_lock:
                 if self.agent is None:
-                    self.agent = self.create_agent(await self.create_llm())
+                    self.agent = self.create_agent(await self.create_llm(), session)
         return self.agent

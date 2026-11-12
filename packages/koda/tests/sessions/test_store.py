@@ -1,4 +1,4 @@
-"""Tests for sessions/memory.py - InMemorySessionStore."""
+"""Tests for koda.sessions.store."""
 
 import uuid
 from pathlib import Path
@@ -11,103 +11,73 @@ from koda.sessions import (
     JsonSessionStore,
     Session,
     SessionNotFoundError,
+    SessionStore,
 )
 from koda.tools.base import ToolCall, ToolOutput, ToolResult
 
 
-class TestInMemorySessionStore:
-    def test_create_session(self) -> None:
-        store = InMemorySessionStore()
+@pytest.fixture(params=["memory", "json"])
+def store(request: pytest.FixtureRequest, tmp_path: Path) -> SessionStore:
+    if request.param == "memory":
+        return InMemorySessionStore()
+    return JsonSessionStore(directory=tmp_path)
 
-        session = store.create_session()
 
-        assert isinstance(session.session_id, uuid.UUID)
-        assert session.name is None
-        assert session.messages == []
+class TestSessionStore:
+    def test_save_and_get_session(self, store: SessionStore) -> None:
+        session = Session(messages=[UserMessage(content="hello")])
 
-    def test_create_session_generates_unique_ids(self) -> None:
-        store = InMemorySessionStore()
+        store.save_session(session)
 
-        session_a = store.create_session()
-        session_b = store.create_session()
+        assert store.get_session(session.session_id) == session
 
-        assert session_a.session_id != session_b.session_id
+    def test_save_session_replaces_saved_session(self, store: SessionStore) -> None:
+        session = Session()
+        store.save_session(session)
 
-    def test_get_session(self) -> None:
-        store = InMemorySessionStore()
-        created = store.create_session()
+        session.messages.append(UserMessage(content="hello"))
+        store.save_session(session)
 
-        session = store.get_session(created.session_id)
+        assert store.get_session(session.session_id).messages == [UserMessage(content="hello")]
 
-        assert session.session_id == created.session_id
+    def test_saved_session_is_independent_of_the_original(self, store: SessionStore) -> None:
+        session = Session()
+        store.save_session(session)
 
-    def test_get_session_not_found(self) -> None:
-        store = InMemorySessionStore()
+        session.messages.append(UserMessage(content="unsaved"))
 
+        assert store.get_session(session.session_id).messages == []
+
+    def test_get_session_not_found(self, store: SessionStore) -> None:
         with pytest.raises(SessionNotFoundError):
             store.get_session(uuid.uuid4())
 
-    def test_list_sessions(self) -> None:
-        store = InMemorySessionStore()
-        store.create_session()
-        store.create_session()
+    def test_list_sessions_newest_first(self, store: SessionStore) -> None:
+        older = Session()
+        newer = Session()
+        store.save_session(older)
+        store.save_session(newer)
 
-        sessions = store.list_sessions()
+        assert [s.session_id for s in store.list_sessions()] == [
+            newer.session_id,
+            older.session_id,
+        ]
 
-        assert len(sessions) == 2
-
-    def test_list_sessions_empty(self) -> None:
-        store = InMemorySessionStore()
-
+    def test_list_sessions_empty(self, store: SessionStore) -> None:
         assert store.list_sessions() == []
 
-    def test_update_session(self) -> None:
-        store = InMemorySessionStore()
-        created = store.create_session()
-
-        updated = Session(session_id=created.session_id, name="renamed")
-        result = store.update_session(updated)
-
-        assert result.name == "renamed"
-        assert store.get_session(created.session_id).name == "renamed"
-
-    def test_update_session_not_found(self) -> None:
-        store = InMemorySessionStore()
-        session = Session(session_id=uuid.uuid4(), name="ghost")
-
-        with pytest.raises(SessionNotFoundError):
-            store.update_session(session)
-
-    def test_delete_session(self) -> None:
-        store = InMemorySessionStore()
-        session = store.create_session()
+    def test_delete_session(self, store: SessionStore) -> None:
+        session = Session()
+        store.save_session(session)
 
         store.delete_session(session.session_id)
 
         with pytest.raises(SessionNotFoundError):
             store.get_session(session.session_id)
 
-    def test_delete_session_not_found(self) -> None:
-        store = InMemorySessionStore()
-
+    def test_delete_session_not_found(self, store: SessionStore) -> None:
         with pytest.raises(SessionNotFoundError):
             store.delete_session(uuid.uuid4())
-
-    def test_append_message(self) -> None:
-        store = InMemorySessionStore()
-        created = store.create_session()
-        msg = UserMessage(content="hello")
-
-        result = store.append_message(created.session_id, msg)
-
-        assert result.messages == [msg]
-        assert store.get_session(created.session_id).messages == [msg]
-
-    def test_append_message_not_found(self) -> None:
-        store = InMemorySessionStore()
-
-        with pytest.raises(SessionNotFoundError):
-            store.append_message(uuid.uuid4(), UserMessage(content="hello"))
 
 
 class TestSessionUsage:
@@ -170,110 +140,12 @@ class TestSessionUsage:
 
 
 class TestJsonSessionStore:
-    def test_create_session(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-
-        session = store.create_session()
-
-        assert isinstance(session.session_id, uuid.UUID)
-        assert session.name is None
-        assert session.messages == []
-        assert (tmp_path / f"{session.session_id}.json").exists()
-
-    def test_create_session_generates_unique_ids(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-
-        session_a = store.create_session()
-        session_b = store.create_session()
-
-        assert session_a.session_id != session_b.session_id
-
-    def test_get_session(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-        created = store.create_session()
-
-        session = store.get_session(created.session_id)
-
-        assert session.session_id == created.session_id
-
-    def test_get_session_not_found(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-
-        with pytest.raises(SessionNotFoundError):
-            store.get_session(uuid.uuid4())
-
-    def test_list_sessions(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-        store.create_session()
-        store.create_session()
-
-        sessions = store.list_sessions()
-
-        assert len(sessions) == 2
-
-    def test_list_sessions_empty(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-
-        assert store.list_sessions() == []
-
-    def test_update_session(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-        created = store.create_session()
-
-        updated = Session(session_id=created.session_id, name="renamed")
-        result = store.update_session(updated)
-
-        assert result.name == "renamed"
-        assert store.get_session(created.session_id).name == "renamed"
-
-    def test_update_session_not_found(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-        session = Session(session_id=uuid.uuid4(), name="ghost")
-
-        with pytest.raises(SessionNotFoundError):
-            store.update_session(session)
-
-    def test_delete_session(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-        session = store.create_session()
-
-        store.delete_session(session.session_id)
-
-        with pytest.raises(SessionNotFoundError):
-            store.get_session(session.session_id)
-        assert not (tmp_path / f"{session.session_id}.json").exists()
-
-    def test_delete_session_not_found(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-
-        with pytest.raises(SessionNotFoundError):
-            store.delete_session(uuid.uuid4())
-
-    def test_append_message(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-        created = store.create_session()
-        msg = UserMessage(content="hello")
-
-        result = store.append_message(created.session_id, msg)
-
-        assert len(result.messages) == 1
-        assert result.messages[0].content == "hello"
-        # Verify persistence
-        reloaded = store.get_session(created.session_id)
-        assert len(reloaded.messages) == 1
-        assert reloaded.messages[0].content == "hello"
-
-    def test_append_message_not_found(self, tmp_path: Path) -> None:
-        store = JsonSessionStore(directory=tmp_path)
-
-        with pytest.raises(SessionNotFoundError):
-            store.append_message(uuid.uuid4(), UserMessage(content="hello"))
-
     def test_directory_auto_creation(self, tmp_path: Path) -> None:
         nested = tmp_path / "a" / "b" / "c"
         store = JsonSessionStore(directory=nested)
 
-        session = store.create_session()
+        session = Session()
+        store.save_session(session)
 
         assert nested.is_dir()
         assert store.get_session(session.session_id).session_id == session.session_id
@@ -281,7 +153,7 @@ class TestJsonSessionStore:
     def test_message_polymorphism_round_trip(self, tmp_path: Path) -> None:
         """Verify subclass-specific fields survive JSON serialization."""
         store = JsonSessionStore(directory=tmp_path)
-        session = store.create_session()
+        session = Session()
 
         tool_call = ToolCall(tool_name="read_file", arguments={"path": "/tmp/x"}, call_id="tc_1")
         assistant_msg = AssistantMessage(
@@ -295,8 +167,8 @@ class TestJsonSessionStore:
             tool_result=ToolResult(output=ToolOutput(content={"text": "hello"}), call_id="tc_1"),
         )
 
-        store.append_message(session.session_id, assistant_msg)
-        store.append_message(session.session_id, tool_msg)
+        session.messages.extend([assistant_msg, tool_msg])
+        store.save_session(session)
 
         reloaded = store.get_session(session.session_id)
 

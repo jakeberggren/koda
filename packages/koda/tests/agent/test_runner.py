@@ -14,9 +14,15 @@ from koda.agent.events import (
 )
 from koda.agent.runner import AgentRunner, ToolRunner
 from koda.llm import LLMRequest, LLMResponse
-from koda.llm.types import LLMEvent, LLMResponseCompleted, LLMToolCompleted, LLMToolStarted
+from koda.llm.types import (
+    LLMEvent,
+    LLMResponseCompleted,
+    LLMTextDelta,
+    LLMToolCompleted,
+    LLMToolStarted,
+)
 from koda.messages import AssistantMessage, ToolMessage
-from koda.sessions import InMemorySessionStore, SessionManager
+from koda.sessions import InMemorySessionStore, Session
 from koda.tools import (
     ToolCall,
     ToolConfig,
@@ -104,18 +110,16 @@ async def _next_tool_runner_event(
 
 @pytest.mark.asyncio
 async def test_tool_runner_emits_started_before_awaiting_execution(tmp_path: Path) -> None:
-    session_manager = SessionManager(InMemorySessionStore())
-    session_id = session_manager.create_session().session_id
     registry = ToolRegistry()
     tool = BlockingTool()
     registry.register(tool)
     runner = ToolRunner(
-        session_manager=session_manager,
+        append=lambda _message: None,
         tools=ToolConfig(registry=registry, context=_tool_context(tmp_path)),
     )
     call = ToolCall(tool_name=tool.name, arguments={}, call_id="call_123")
 
-    stream = runner.run(session_id=session_id, tool_calls=[call])
+    stream = runner.run([call])
 
     event = await stream.__anext__()
 
@@ -140,12 +144,11 @@ async def test_tool_runner_emits_started_before_awaiting_execution(tmp_path: Pat
 async def test_tool_runner_streams_result_ready_before_ordered_persistence(
     tmp_path: Path,
 ) -> None:
-    session_manager = SessionManager(InMemorySessionStore())
-    session_id = session_manager.create_session().session_id
+    appended: list[object] = []
     registry = ToolRegistry()
     registry.register(DelayedTool())
     runner = ToolRunner(
-        session_manager=session_manager,
+        append=appended.append,
         tools=ToolConfig(registry=registry, context=_tool_context(tmp_path)),
     )
     slow_call = ToolCall(
@@ -159,7 +162,7 @@ async def test_tool_runner_streams_result_ready_before_ordered_persistence(
         call_id="fast",
     )
 
-    events = [event async for event in runner.run(session_id, [slow_call, fast_call])]
+    events = [event async for event in runner.run([slow_call, fast_call])]
 
     assert events[0] == AgentToolStarted(call=slow_call)
     assert events[1] == AgentToolStarted(call=fast_call)
@@ -174,11 +177,7 @@ async def test_tool_runner_streams_result_ready_before_ordered_persistence(
         "slow",
         "fast",
     ]
-    persisted_tool_messages = [
-        message
-        for message in session_manager.get_session(session_id).messages
-        if isinstance(message, ToolMessage)
-    ]
+    persisted_tool_messages = [message for message in appended if isinstance(message, ToolMessage)]
     assert [message.tool_result.call_id for message in persisted_tool_messages] == [
         "slow",
         "fast",
@@ -189,14 +188,51 @@ async def test_tool_runner_streams_result_ready_before_ordered_persistence(
 async def test_runner_maps_provider_hosted_tool_events() -> None:
     call = ToolCall(tool_name="web_search", arguments={"query": "koda"}, call_id="call_web")
     result = ToolResult(call_id=call.call_id, output=ToolOutput(display="result"))
-    session_manager = SessionManager(InMemorySessionStore())
     runner = AgentRunner(
         llm=HostedToolLLM(call=call, result=result),
         config=AgentConfig(),
-        session_manager=session_manager,
+        session=Session(),
     )
 
     events = [event async for event in runner.run("search")]
 
     assert AgentToolStarted(call=call) in events
     assert AgentToolCompleted(tool_name=call.tool_name, result=result) in events
+
+
+class TextLLM:
+    async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
+        raise NotImplementedError
+
+    async def generate_structured(
+        self,
+        request: LLMRequest,
+        schema: type[BaseModel],
+    ) -> LLMResponse[BaseModel]:
+        raise NotImplementedError
+
+    async def generate_stream(self, request: LLMRequest) -> AsyncIterator[LLMEvent]:
+        yield LLMTextDelta(text="hi")
+        yield LLMResponseCompleted(response=LLMResponse(output=AssistantMessage(content="hi")))
+
+
+@pytest.mark.asyncio
+async def test_runner_saves_the_session_after_each_message() -> None:
+    session = Session()
+    store = InMemorySessionStore()
+    runner = AgentRunner(llm=TextLLM(), config=AgentConfig(), session=session, store=store)
+
+    _ = [event async for event in runner.run("hello")]
+
+    assert [message.role for message in session.messages] == ["user", "assistant"]
+    assert store.get_session(session.session_id) == session
+
+
+@pytest.mark.asyncio
+async def test_runner_without_store_keeps_the_session_in_memory() -> None:
+    session = Session()
+    runner = AgentRunner(llm=TextLLM(), config=AgentConfig(), session=session)
+
+    _ = [event async for event in runner.run("hello")]
+
+    assert [message.role for message in session.messages] == ["user", "assistant"]

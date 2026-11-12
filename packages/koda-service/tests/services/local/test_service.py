@@ -11,7 +11,7 @@ from koda.llm.exceptions import LLMAuthenticationError
 from koda.llm.types import LLMEvent, LLMRequest, LLMResponse
 from koda.messages import AssistantMessage
 from koda.prompts import SystemPrompt
-from koda.sessions import InMemorySessionStore
+from koda.sessions import InMemorySessionStore, Session
 from koda_common.settings.credentials import ApiKeyCredential
 from koda_service import ChatRequest, ServiceStatusCode
 from koda_service.exceptions import ServiceAuthenticationError
@@ -155,7 +155,7 @@ async def test_chat_translates_llm_creation_authentication_error(
 ) -> None:
     service = _make_service(llm=_FakeLLM())
 
-    async def fail_to_create_agent() -> None:
+    async def fail_to_create_agent(_session: Session) -> None:
         raise LLMAuthenticationError("openai", RuntimeError("refresh failed"))
 
     monkeypatch.setattr(service.runtime, "get_agent", fail_to_create_agent)
@@ -178,8 +178,9 @@ async def test_runtime_creates_agent_once_for_concurrent_requests(
         return fake_llm
 
     monkeypatch.setattr(service.runtime, "create_llm", create_llm)
+    session = Session()
 
-    agents = await asyncio.gather(*(service.runtime.get_agent() for _ in range(3)))
+    agents = await asyncio.gather(*(service.runtime.get_agent(session) for _ in range(3)))
 
     assert create_calls == 1
     assert agents == [agents[0]] * 3
