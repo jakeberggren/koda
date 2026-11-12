@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from koda import llm
 from koda.llm import Connection, Model, Provider
 from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.responses import OpenAIResponsesAPI
-from koda.llm.auth.registry import ProviderAuthRegistry
 from koda.llm.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 from koda_tui import strings
 from koda_tui.palette.context import PaletteContext
@@ -84,6 +84,26 @@ def _record_dialogs(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(providers, "Picker", record("picker"))
 
 
+class _Logins:
+    """The login ``llm.login`` runs in these tests, set by ``_menu``."""
+
+    current: _BrowserLogin | None = None
+
+
+_logins = _Logins()
+
+
+@pytest.fixture(autouse=True)
+def _log_in_with_the_menus_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    async def login(connection: Connection, callbacks: OAuthLoginCallbacks) -> OAuthCredential:
+        assert _logins.current is not None
+        assert connection.credential_key == _logins.current.id
+        return await _logins.current.login(callbacks)
+
+    monkeypatch.setattr(llm, "login", login)
+    _logins.current = None
+
+
 @pytest.fixture
 def opened_urls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     urls: list[str] = []
@@ -146,7 +166,8 @@ def _menu(
         outbox=cast("Outbox", None),
         terminal=cast("Terminal", None),
     )
-    return ProviderMenu(context, ProviderAuthRegistry({"openai:oauth": login}))
+    _logins.current = login
+    return ProviderMenu(context)
 
 
 def _openai_provider(*, oauth: bool = True) -> Provider:

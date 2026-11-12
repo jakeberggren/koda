@@ -75,6 +75,10 @@ class Provider:
     description: str | None = None
     connections: tuple[Connection, ...] = ()
 
+    def is_connected(self, credentials: Credentials) -> bool:
+        """Whether any connection to the provider has its credential."""
+        return any(connection.is_connected(credentials) for connection in self.connections)
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Model:
