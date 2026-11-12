@@ -9,8 +9,7 @@ from prompt_toolkit.filters import Condition
 from prompt_toolkit.output import ColorDepth
 
 from koda.agent import Agent
-from koda.llm import LLMRequestOptions
-from koda.llm.exceptions import ModelSelectionMissingError
+from koda.llm import LLMConfigurationError, LLMRequestOptions
 from koda_tui.app.exit import ExitPrompt
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import Appearance
@@ -202,7 +201,7 @@ class KodaTuiApp:
     async def _build_agent(self) -> Agent:
         settings = self.state.settings
         if settings.provider is None or settings.model is None:
-            raise ModelSelectionMissingError
+            raise LLMConfigurationError("No model selected")
         model = self._catalog.model(settings.provider, settings.model)
         return Agent(
             await self._connect(model, self._credentials),

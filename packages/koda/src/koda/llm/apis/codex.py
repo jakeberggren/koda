@@ -33,7 +33,9 @@ class OpenAICodexResponsesAPI(OpenAIResponsesAPI):
         credential = await resolve_oauth_credential(context)
         account_id = credential.metadata.get(CODEX_ACCOUNT_ID_METADATA_KEY)
         if not account_id:
-            raise exceptions.OAuthAccountIdMissingError(context.connection.provider)
+            raise exceptions.LLMConfigurationError(
+                f"{context.connection.provider} OAuth credential must include an account id"
+            )
 
         capabilities = context.capabilities
         config = OpenAIResponsesAPIConfig(

@@ -115,4 +115,4 @@ class Model:
         for connection in self.connections:
             if connection.is_connected(credentials):
                 return connection
-        raise exceptions.ProviderNotConnectedError(self.provider)
+        raise exceptions.LLMConfigurationError(f"Provider '{self.provider}' is not connected")

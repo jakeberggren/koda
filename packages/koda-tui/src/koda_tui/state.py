@@ -4,8 +4,13 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-from koda.llm import Model, Provider, ThinkingOption
-from koda.llm.exceptions import CredentialsError, LLMConfigurationError
+from koda.llm import (
+    CredentialsError,
+    LLMConfigurationError,
+    Model,
+    Provider,
+    ThinkingOption,
+)
 from koda.sessions import Session
 from koda_tui import strings
 from koda_tui.settings import Settings
