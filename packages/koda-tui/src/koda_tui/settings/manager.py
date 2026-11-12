@@ -7,21 +7,20 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel, ValidationError
 
-from koda_common.settings.credentials import ApiKeyCredential, ProviderCredential
-from koda_common.settings.errors import SettingsUnknownKeysError, SettingsValidationError
-from koda_common.settings.protocols import (
+from koda.llm.credentials import ApiKeyCredential, ProviderCredential
+from koda_tui.settings.core import PersistedSettings, Settings
+from koda_tui.settings.errors import SettingsUnknownKeysError, SettingsValidationError
+from koda_tui.settings.protocols import (
     SettingChange,
     SettingsChangeCallback,
     SettingsChangeSet,
     SettingsManagerProtocol,
 )
-from koda_common.settings.settings import PersistedSettings, Settings
-from koda_common.settings.utils import provider_api_key_env_var
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_common.settings.protocols import JsonObject, SecretsStore, SettingsStore
+    from koda_tui.settings.protocols import JsonObject, SecretsStore, SettingsStore
 
 
 class BaseSettingsManager(SettingsManagerProtocol, ABC):
@@ -88,10 +87,11 @@ _CORE_SECTION = "core"
 
 
 def _api_key_env_var_for_credential_key(provider: str) -> str | None:
+    """The environment variable an API key credential can come from, e.g. OPENAI_API_KEY."""
     provider_id, separator, connection_id = provider.partition(":")
     if separator and connection_id != "api-key":
         return None
-    return provider_api_key_env_var(provider_id)
+    return f"{provider_id.strip().upper()}_API_KEY"
 
 
 class SettingsManager(BaseSettingsManager):

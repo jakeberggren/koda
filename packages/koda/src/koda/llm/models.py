@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from koda.llm.apis import LLMApi
-    from koda.llm.protocols import Credentials
+    from koda.llm.credentials import Credentials
 
 type ThinkingOptionId = str
 type AuthMethod = Literal["api-key", "oauth"]

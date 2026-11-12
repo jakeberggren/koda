@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from koda_common.settings import SecretsDecodeError, SettingsDecodeError, SettingsStructureError
-from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential
-from koda_common.settings.store import JsonFileSecretsStore, JsonFileSettingsStore
+from koda.llm.credentials import ApiKeyCredential, OAuthCredential
+from koda_tui.settings import SecretsDecodeError, SettingsDecodeError, SettingsStructureError
+from koda_tui.settings.store import JsonFileSecretsStore, JsonFileSettingsStore
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -66,7 +66,7 @@ def test_json_store_load_raises_on_non_object_document(tmp_path: Path) -> None:
         store.load_section("core")
 
     assert exc_info.value.path == path
-    assert exc_info.value.message == "Top-level settings JSON must be an object"
+    assert exc_info.value.summary == "Top-level settings JSON must be an object"
 
 
 def test_json_store_load_raises_on_non_object_section(tmp_path: Path) -> None:
@@ -78,7 +78,7 @@ def test_json_store_load_raises_on_non_object_section(tmp_path: Path) -> None:
         store.load_section("core")
 
     assert exc_info.value.path == path
-    assert exc_info.value.message == "Settings section 'core' must be an object"
+    assert exc_info.value.summary == "Settings section 'core' must be an object"
 
 
 def test_json_file_secrets_store_get_credential_returns_none_when_missing(tmp_path: Path) -> None:

@@ -5,8 +5,9 @@ from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
     from koda.llm.auth.registry import ProviderAuthRegistry
+    from koda.llm.credentials import Credentials
     from koda.llm.models import Connection, Model
-    from koda.llm.protocols import LLM, Credentials
+    from koda.llm.protocols import LLM
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

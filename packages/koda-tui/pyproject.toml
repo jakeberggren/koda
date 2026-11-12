@@ -7,16 +7,17 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "koda",
-    "koda-common",
     "pathspec>=1.1.1,<2",
     "prompt-toolkit>=3.0.52,<4",
+    "pydantic>=2.13.3,<3",
+    "pydantic-settings>=2.14.0,<3",
     "rich>=15.0.0,<16",
+    "structlog>=26.1,<27",
     "wcwidth>=0.6.2,<1",
 ]
 
 [tool.uv.sources]
 koda = { workspace = true }
-koda-common = { workspace = true }
 
 [project.scripts]
 koda = "koda_tui.main:main"

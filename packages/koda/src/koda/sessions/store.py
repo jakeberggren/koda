@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Protocol
 
+from koda.paths import sessions_dir_path
 from koda.sessions.exceptions import SessionNotFoundError
 from koda.sessions.session import Session
-from koda_common.paths import sessions_dir_path
 
 if TYPE_CHECKING:
     from pathlib import Path

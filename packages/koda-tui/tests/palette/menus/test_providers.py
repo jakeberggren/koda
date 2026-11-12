@@ -13,7 +13,7 @@ from koda.llm import Connection, Model, Provider
 from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.responses import OpenAIResponsesAPI
 from koda.llm.auth.registry import ProviderAuthRegistry
-from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
+from koda.llm.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 from koda_tui import strings
 from koda_tui.palette.context import PaletteContext
 from koda_tui.palette.menus import providers

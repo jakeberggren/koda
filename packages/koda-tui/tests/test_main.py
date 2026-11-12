@@ -5,22 +5,21 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from koda_common.settings import SettingsStore
-from koda_common.settings.errors import (
+from koda_tui import strings
+from koda_tui.app import KodaTuiApp
+from koda_tui.main import _fail, load_settings, main
+from koda_tui.settings import SettingsError, SettingsStore
+from koda_tui.settings.errors import (
     SecretsDecodeError,
     SettingsDecodeError,
     SettingsUnknownKeysError,
 )
-from koda_common.settings.store import JsonObject, SecretsStore
-from koda_tui import strings
-from koda_tui.app import KodaTuiApp
-from koda_tui.main import _fail, load_settings, main
-from koda_tui.startup import StartupConfigurationError
+from koda_tui.settings.store import JsonObject, SecretsStore
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda_common.settings.credentials import ProviderCredential
+    from koda.llm.credentials import ProviderCredential
 
 
 class _FakeSettingsStore(SettingsStore):
@@ -131,7 +130,7 @@ def test_main_runs_the_app_for_the_current_directory(
 
 
 def test_fail_prints_what_to_fix_and_exits(capsys: pytest.CaptureFixture[str]) -> None:
-    error = StartupConfigurationError(
+    error = SettingsError(
         "Invalid configuration",
         details=("theme: Input should be 'auto', 'dark' or 'light'",),
     )

@@ -11,9 +11,9 @@ from openai import (
     OpenAIError,
     RateLimitError,
 )
+from structlog import get_logger
 
 from koda.llm import exceptions
-from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Callable

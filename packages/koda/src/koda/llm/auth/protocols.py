@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from koda_common.settings.credentials import OAuthCredential
+    from koda.llm.credentials import OAuthCredential
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

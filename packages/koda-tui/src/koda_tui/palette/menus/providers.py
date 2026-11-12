@@ -7,9 +7,10 @@ import webbrowser
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from structlog import get_logger
+
 from koda.llm.auth.protocols import OAuthLoginCallbacks
-from koda_common.logging import get_logger
-from koda_common.settings.credentials import ApiKeyCredential
+from koda.llm.credentials import ApiKeyCredential
 from koda_tui import strings
 from koda_tui.appearance import Icons
 from koda_tui.ui.widgets import InputDialog, ListItem, MessageDialog, Picker
@@ -17,7 +18,7 @@ from koda_tui.ui.widgets import InputDialog, ListItem, MessageDialog, Picker
 if TYPE_CHECKING:
     from koda.llm import Connection, Provider
     from koda.llm.auth.registry import ProviderAuthRegistry
-    from koda_common.settings.credentials import ProviderCredential
+    from koda.llm.credentials import ProviderCredential
     from koda_tui.palette.context import PaletteContext
 
 

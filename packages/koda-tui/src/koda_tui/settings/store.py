@@ -2,18 +2,18 @@ import json
 from pathlib import Path
 
 from pydantic import TypeAdapter
+from structlog import get_logger
 
-from koda_common.logging.config import get_logger
-from koda_common.paths import config_file_path, secrets_file_path
-from koda_common.settings.credentials import ProviderCredential
-from koda_common.settings.errors import (
+from koda.llm.credentials import ProviderCredential
+from koda.paths import koda_home_dir
+from koda_tui.settings.errors import (
     SecretsDecodeError,
     SecretsPermissionError,
     SettingsDecodeError,
     SettingsPermissionError,
     SettingsStructureError,
 )
-from koda_common.settings.protocols import JsonObject, SecretsStore, SettingsStore
+from koda_tui.settings.protocols import JsonObject, SecretsStore, SettingsStore
 
 log = get_logger(__name__)
 
@@ -22,7 +22,7 @@ _PROVIDER_CREDENTIAL_ADAPTER = TypeAdapter(ProviderCredential)
 
 class JsonFileSettingsStore(SettingsStore):
     def __init__(self, path: Path | None = None):
-        self.path = path or config_file_path()
+        self.path = path or koda_home_dir() / "config.json"
 
     def _load_document(self) -> JsonObject:
         if not self.path.exists():
@@ -77,7 +77,7 @@ class JsonFileSecretsStore(SecretsStore):
     """
 
     def __init__(self, file_path: Path | None = None) -> None:
-        self._file_path = file_path or secrets_file_path()
+        self._file_path = file_path or koda_home_dir() / "secrets.json"
 
     def _load_data(self) -> dict[str, str]:
         if not self._file_path.exists():

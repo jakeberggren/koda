@@ -11,7 +11,6 @@ required-markers = [
 [manifest]
 members = [
     "koda",
-    "koda-common",
     "koda-tui",
 ]
 
@@ -750,12 +749,11 @@ dependencies = [
     { name = "anyio" },
     { name = "authlib" },
     { name = "httpx2" },
-    { name = "koda-common" },
     { name = "langfuse" },
     { name = "openai" },
     { name = "pathspec" },
     { name = "pydantic" },
-    { name = "pydantic-settings" },
+    { name = "structlog" },
 ]
 
 [package.metadata]
@@ -764,28 +762,10 @@ requires-dist = [
     { name = "anyio", specifier = ">=4.12.0,<5" },
     { name = "authlib", specifier = ">=1.9.1" },
     { name = "httpx2", specifier = ">=2.12.0" },
-    { name = "koda-common", editable = "packages/koda-common" },
     { name = "langfuse", specifier = ">=5.1,<6" },
     { name = "openai", specifier = ">=3.41,<4" },
     { name = "pathspec", specifier = ">=1.1.1,<2" },
     { name = "pydantic", specifier = ">=2.13.3,<3" },
-    { name = "pydantic-settings", specifier = ">=2.14.0,<3" },
-]
-
-[[package]]
-name = "koda-common"
-version = "0.8.4"
-source = { editable = "packages/koda-common" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "structlog" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "pydantic", specifier = ">=2.13.3,<3" },
-    { name = "pydantic-settings", specifier = ">=2.14.0,<3" },
     { name = "structlog", specifier = ">=26.1,<27" },
 ]
 
@@ -795,20 +775,24 @@ version = "0.8.4"
 source = { editable = "packages/koda-tui" }
 dependencies = [
     { name = "koda" },
-    { name = "koda-common" },
     { name = "pathspec" },
     { name = "prompt-toolkit" },
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
     { name = "rich" },
+    { name = "structlog" },
     { name = "wcwidth" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "koda", editable = "packages/koda" },
-    { name = "koda-common", editable = "packages/koda-common" },
     { name = "pathspec", specifier = ">=1.1.1,<2" },
     { name = "prompt-toolkit", specifier = ">=3.0.52,<4" },
+    { name = "pydantic", specifier = ">=2.13.3,<3" },
+    { name = "pydantic-settings", specifier = ">=2.14.0,<3" },
     { name = "rich", specifier = ">=15.0.0,<16" },
+    { name = "structlog", specifier = ">=26.1,<27" },
     { name = "wcwidth", specifier = ">=0.6.2,<1" },
 ]
 

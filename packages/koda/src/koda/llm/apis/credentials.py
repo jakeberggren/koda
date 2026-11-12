@@ -4,7 +4,7 @@ from time import time
 from typing import TYPE_CHECKING
 
 from koda.llm import exceptions
-from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
+from koda.llm.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 
 if TYPE_CHECKING:
     from koda.llm.apis.base import LLMApiContext

@@ -3,12 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from structlog import get_logger
+
 from koda.agent.runner import AgentRunner
 from koda.context import ContextManager
 from koda.execution import HostCommandExecutor, SeatbeltCommandExecutor
 from koda.prompts import SystemPromptLoader
 from koda.tools import ToolConfig
-from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator

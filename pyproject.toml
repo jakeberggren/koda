@@ -66,7 +66,7 @@ select = [
 ignore = ["COM812"]
 
 [tool.ruff.lint.flake8-type-checking]
-runtime-evaluated-base-classes = ["pydantic.BaseModel"]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "pydantic_settings.BaseSettings"]
 
 [tool.ruff.lint.per-file-ignores]
 "*/tests/**/*.py" = [
@@ -85,7 +85,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.isort]
-known-first-party = ["koda", "koda_common", "koda_tui"]
+known-first-party = ["koda", "koda_tui"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 5
@@ -102,10 +102,9 @@ required-environments = [
 asyncio_mode = "auto"
 testpaths = [
     "packages/koda/tests",
-    "packages/koda-common/tests",
     "packages/koda-tui/tests",
 ]
 markers = [
     "requires_rg: tests that require ripgrep (rg) to be installed",
 ]
-addopts = "--import-mode=importlib --cov=koda --cov=koda_common --cov=koda_tui --cov-report=term"
+addopts = "--import-mode=importlib --cov=koda --cov=koda_tui --cov-report=term"

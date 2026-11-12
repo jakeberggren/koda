@@ -30,6 +30,7 @@ from anthropic.types import (
     ToolUseBlockParam,
 )
 from pydantic import BaseModel
+from structlog import get_logger
 
 from koda.llm import exceptions
 from koda.llm.apis.credentials import resolve_api_key_credential
@@ -43,7 +44,6 @@ from koda.llm.types import (
 )
 from koda.messages import AssistantMessage, TokenUsage, ToolMessage
 from koda.tools import ToolCall
-from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence

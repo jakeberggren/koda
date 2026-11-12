@@ -6,7 +6,6 @@ from pydantic import BaseModel
 from koda.llm.types import LLMEvent, LLMRequest, LLMResponse
 from koda.messages import AssistantMessage, Message
 from koda.tools import ToolDefinition
-from koda_common.settings.credentials import ProviderCredential
 
 
 class LLM(Protocol):
@@ -36,18 +35,6 @@ class LLM(Protocol):
         schema: type[T],
     ) -> LLMResponse[T]:
         """Generate a response parsed into the requested Pydantic schema."""
-        ...
-
-
-class Credentials(Protocol):
-    """Provider credentials keyed by ``provider:connection``. Written back on OAuth refresh."""
-
-    def get_credential(self, key: str) -> ProviderCredential | None:
-        """Return the credential stored under ``key``, if any."""
-        ...
-
-    def set_credential(self, key: str, credential: ProviderCredential) -> None:
-        """Store ``credential`` under ``key``."""
         ...
 
 

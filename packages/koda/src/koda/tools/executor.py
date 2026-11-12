@@ -4,10 +4,10 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
+from structlog import get_logger
 
 from koda.tools import exceptions as tool_exceptions
 from koda.tools.base import ToolCall, ToolOutput, ToolResult
-from koda_common.logging import get_logger
 
 logger = get_logger(__name__)
 

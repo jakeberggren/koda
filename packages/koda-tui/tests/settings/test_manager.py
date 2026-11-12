@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-from koda_common.settings import (
+from koda.llm.credentials import ApiKeyCredential
+from koda_tui.settings import (
     SettingChange,
     SettingsManager,
     SettingsUnknownKeysError,
     SettingsValidationError,
 )
-from koda_common.settings.credentials import ApiKeyCredential
 
 from .conftest import SpySecretsStore, SpySettingsStore
 

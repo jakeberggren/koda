@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from structlog import get_logger
+
 from koda.llm import exceptions
 from koda.llm.apis.credentials import resolve_oauth_credential
 from koda.llm.apis.responses import (
@@ -11,7 +13,6 @@ from koda.llm.apis.responses import (
     OpenAIResponsesEventAdapter,
 )
 from koda.llm.utils import resolve_openai_client
-from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
     from koda.llm.apis.base import LLMApiContext

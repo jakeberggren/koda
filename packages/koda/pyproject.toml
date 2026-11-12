@@ -11,12 +11,11 @@ dependencies = [
     "anyio>=4.12.0,<5",
     "authlib>=1.9.1",
     "httpx2>=2.12.0",
-    "koda-common",
     "langfuse>=5.1,<6",
     "openai>=3.41,<4",
     "pathspec>=1.1.1,<2",
     "pydantic>=2.13.3,<3",
-    "pydantic-settings>=2.14.0,<3",
+    "structlog>=26.1,<27",
 ]
 
 [project.entry-points.pyinstaller40]
@@ -25,6 +24,3 @@ hook-dirs = "koda.__pyinstaller:get_hook_dirs"
 [build-system]
 requires = ["uv_build>=0.13.6,<0.14.0"]
 build-backend = "uv_build"
-
-[tool.uv.sources]
-koda-common = { workspace = true }

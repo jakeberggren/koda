@@ -9,15 +9,14 @@ import pytest
 from prompt_toolkit.keys import Keys
 
 from koda.llm import Catalog, Model, ThinkingOption
+from koda.llm.credentials import ApiKeyCredential
 from koda.llm.exceptions import ModelSelectionMissingError
 from koda.sessions import InMemorySessionStore, Session
-from koda_common.settings import SettingChange
-from koda_common.settings.credentials import ApiKeyCredential
 from koda_tui.app import application
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import RGBColor
-from koda_tui.settings import AppSettings
+from koda_tui.settings import AppSettings, SettingChange
 from koda_tui.state import PendingInput
 
 if TYPE_CHECKING:

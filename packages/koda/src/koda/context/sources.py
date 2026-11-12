@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path  # noqa: TC003
 from typing import Protocol
 
-from koda_common.logging import get_logger
+from structlog import get_logger
 
 logger = get_logger(__name__)
 

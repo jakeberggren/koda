@@ -1,19 +1,44 @@
+"""Logs: structured logging to ~/.koda/log, configured from the environment."""
+
 from __future__ import annotations
 
 import logging
 import sys
 from dataclasses import dataclass
+from enum import StrEnum
 from logging.handlers import RotatingFileHandler
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import structlog
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from koda_common.logging.settings import LoggingEnvSettings
-from koda_common.logging.types import LogLevel
-from koda_common.paths import log_file_path
+from koda.paths import koda_home_dir
 
-if TYPE_CHECKING:
-    from pathlib import Path
+
+class LogLevel(StrEnum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+
+
+class LoggingEnvSettings(BaseSettings):
+    koda_log_enabled: bool = Field(default=True, description="Enable logging")
+    koda_log_level: LogLevel = Field(default=LogLevel.INFO, description="Log level")
+    koda_log_file: Path | None = Field(default=None, description="Log file path")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+
+def log_file_path(app_name: str) -> Path:
+    """Where ``app_name`` logs by default."""
+    return koda_home_dir() / "log" / f"{app_name}.log"
 
 
 class NoHandlersConfiguredError(ValueError):
@@ -131,10 +156,3 @@ def configure_logging(
     )
 
     structlog.contextvars.bind_contextvars(app=config.app_name)
-
-
-def get_logger(
-    name: str | None = None,
-) -> structlog.stdlib.BoundLogger:
-    """Return a bound logger for the given name, typically __name__."""
-    return structlog.get_logger(name)

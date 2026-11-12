@@ -1,19 +1,21 @@
-from koda_common.settings.errors import (
+"""Settings: the agent's settings and the TUI's, stored in ~/.koda/config.json, and the
+provider credentials in ~/.koda/secrets.json."""
+
+from koda_tui.settings.core import PersistedSettings, Settings
+from koda_tui.settings.errors import (
     SecretsDecodeError,
     SecretsLoadError,
     SecretsPermissionError,
     SettingsDecodeError,
+    SettingsError,
     SettingsLoadError,
     SettingsPermissionError,
     SettingsStructureError,
     SettingsUnknownKeysError,
     SettingsValidationError,
 )
-from koda_common.settings.manager import (
-    BaseSettingsManager,
-    SettingsManager,
-)
-from koda_common.settings.protocols import (
+from koda_tui.settings.manager import BaseSettingsManager, SettingsManager
+from koda_tui.settings.protocols import (
     JsonObject,
     SecretsStore,
     SettingChange,
@@ -22,16 +24,12 @@ from koda_common.settings.protocols import (
     SettingsManagerProtocol,
     SettingsStore,
 )
-from koda_common.settings.settings import ExecutionSandox, PersistedSettings, Settings
-from koda_common.settings.store import (
-    JsonFileSecretsStore,
-    JsonFileSettingsStore,
-)
-from koda_common.settings.utils import provider_api_key_env_var
+from koda_tui.settings.store import JsonFileSecretsStore, JsonFileSettingsStore
+from koda_tui.settings.tui import AppSettings, TuiSettings, TuiSettingsManager
 
 __all__ = [
+    "AppSettings",
     "BaseSettingsManager",
-    "ExecutionSandox",
     "JsonFileSecretsStore",
     "JsonFileSettingsStore",
     "JsonObject",
@@ -45,6 +43,7 @@ __all__ = [
     "SettingsChangeCallback",
     "SettingsChangeSet",
     "SettingsDecodeError",
+    "SettingsError",
     "SettingsLoadError",
     "SettingsManager",
     "SettingsManagerProtocol",
@@ -53,5 +52,6 @@ __all__ = [
     "SettingsStructureError",
     "SettingsUnknownKeysError",
     "SettingsValidationError",
-    "provider_api_key_env_var",
+    "TuiSettings",
+    "TuiSettingsManager",
 ]
