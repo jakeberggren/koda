@@ -14,14 +14,14 @@ OAUTH_REFRESH_SKEW_SECONDS = 60
 
 
 def _credential_key(context: LLMApiContext) -> str:
-    """Return the settings key for a provider connection credential."""
+    """Return the credentials key for a provider connection."""
     return f"{context.provider_id}:{context.connection_id}"
 
 
 def _resolve_credential(context: LLMApiContext) -> ProviderCredential:
     """Return the configured provider connection credential or raise a configuration error."""
     credential_key = _credential_key(context)
-    credential = context.settings.get_credential(credential_key)
+    credential = context.credentials.get_credential(credential_key)
     if credential is None:
         raise exceptions.ProviderCredentialNotConfiguredError(credential_key)
     return credential
@@ -60,5 +60,5 @@ async def resolve_oauth_credential(context: LLMApiContext) -> OAuthCredential:
         refreshed = await auth.refresh(credential)
     except Exception as error:
         raise exceptions.LLMAuthenticationError(context.provider_id, error) from error
-    context.settings.set_credential(credential_key, refreshed)
+    context.credentials.set_credential(credential_key, refreshed)
     return refreshed

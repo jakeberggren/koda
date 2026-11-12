@@ -309,7 +309,7 @@ class OpenAIResponsesAPI(LLM):
             web_search=bool(capabilities.get("web_search", False)),
             extended_prompt_retention=bool(capabilities.get("extended_prompt_retention", False)),
         )
-        client_factory = resolve_openai_client(context.settings)
+        client_factory = resolve_openai_client(tracing=context.tracing)
         return cls(
             config,
             client=client_factory(api_key=config.api_key, base_url=config.base_url),

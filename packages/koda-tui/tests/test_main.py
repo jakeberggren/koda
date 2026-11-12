@@ -58,14 +58,6 @@ class _FakeSecretsStore(SecretsStore):
         return
 
 
-class _TelemetryStub:
-    def __init__(self) -> None:
-        self.settings = None
-
-    def initialize(self, settings) -> None:
-        self.settings = settings
-
-
 def _run_main_with_error(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -122,10 +114,8 @@ def test_main_runs_the_app_for_the_current_directory(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     settings = load_settings(_FakeSettingsStore(), _FakeSecretsStore())
-    telemetry = _TelemetryStub()
     monkeypatch.setattr("koda_tui.main.configure_logging", lambda _config: None)
     monkeypatch.setattr("koda_tui.main.load_settings", lambda *_args: settings)
-    monkeypatch.setattr("koda_tui.main.LangfuseTelemetry", lambda: telemetry)
     ran: list[KodaTuiApp] = []
 
     async def _run(app: KodaTuiApp) -> None:
@@ -138,7 +128,6 @@ def test_main_runs_the_app_for_the_current_directory(
     [app] = ran
     assert app.app_settings is settings
     assert app.state.workspace == tmp_path.resolve()
-    assert telemetry.settings is settings.core
 
 
 def test_fail_prints_what_to_fix_and_exits(capsys: pytest.CaptureFixture[str]) -> None:

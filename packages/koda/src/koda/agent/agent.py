@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from koda.context.manager import ContextManager
     from koda.llm import LLM
     from koda.tools import ToolConfig
-    from koda_common.settings import SettingsManager
 
 logger = get_logger(__name__)
 
@@ -27,23 +26,6 @@ class AgentConfig:
 
     system_prompt: SystemPrompt = field(default_factory=SystemPrompt)
     request_options: LLMRequestOptions = field(default_factory=LLMRequestOptions)
-
-    @classmethod
-    def from_settings(
-        cls,
-        settings: SettingsManager,
-        *,
-        system_prompt: SystemPrompt | None = None,
-    ) -> AgentConfig:
-        request_options = LLMRequestOptions(
-            thinking=settings.thinking,
-            web_search=settings.allow_web_search,
-            extended_prompt_retention=settings.allow_extended_prompt_retention,
-        )
-        return cls(
-            system_prompt=system_prompt or SystemPrompt(),
-            request_options=request_options,
-        )
 
 
 class Agent:

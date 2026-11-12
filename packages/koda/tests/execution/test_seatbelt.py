@@ -8,15 +8,12 @@ import subprocess
 import threading
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import Any, cast
 
 import pytest
 
 from koda.execution.exceptions import CommandExecutionError
 from koda.execution.seatbelt import SeatbeltCommandExecutor
-
-if TYPE_CHECKING:
-    from koda_common.settings import SettingsManager
 
 _CONFIGD_RULE = '(allow mach-lookup (global-name "com.apple.SystemConfiguration.configd"))'
 
@@ -40,10 +37,6 @@ def _sandbox_exec_usable() -> bool:
     return result.returncode == 0
 
 
-class _FakeSettings:
-    bash_execution_sandbox = "seatbelt"
-
-
 @pytest.mark.skipif(platform.system() != "Darwin", reason="seatbelt is macOS-only")
 class TestSeatbeltCommandExecutor:
     @pytest.mark.asyncio
@@ -52,7 +45,7 @@ class TestSeatbeltCommandExecutor:
         reason="sandbox-exec is unavailable or unusable in this environment",
     )
     async def test_run_returns_stdout_stderr_and_exit_code(self, tmp_path: Path) -> None:
-        executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = SeatbeltCommandExecutor()
 
         result = await executor.run(
             command="printf 'hello'; printf 'oops' >&2; exit 3",
@@ -91,7 +84,7 @@ class TestSeatbeltCommandExecutor:
         monkeypatch.setattr("koda.execution.seatbelt.platform.system", lambda: "Darwin")
         monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_create_subprocess_exec)
 
-        executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = SeatbeltCommandExecutor()
         await executor.run(
             command="printf test",
             cwd=str(tmp_path),
@@ -145,7 +138,7 @@ class TestSeatbeltCommandExecutor:
         monkeypatch.setattr("koda.execution.seatbelt.platform.system", lambda: "Darwin")
         monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_create_subprocess_exec)
 
-        executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = SeatbeltCommandExecutor()
 
         await executor.run(
             command="printf first",
@@ -167,7 +160,7 @@ class TestSeatbeltCommandExecutor:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.setattr("koda.execution.seatbelt.platform.system", lambda: "Linux")
-        executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = SeatbeltCommandExecutor()
         with pytest.raises(CommandExecutionError, match="macOS"):
             await executor.run(
                 command="printf test",
@@ -181,7 +174,7 @@ class TestSeatbeltCommandExecutor:
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     ) -> None:
         monkeypatch.setattr("koda.execution.seatbelt.platform.system", lambda: "Darwin")
-        executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = SeatbeltCommandExecutor()
         outside = tmp_path.parent
 
         with pytest.raises(CommandExecutionError, match="within the sandbox directory"):
@@ -198,7 +191,7 @@ class TestSeatbeltCommandExecutor:
         reason="sandbox-exec is unavailable or unusable in this environment",
     )
     async def test_run_allows_workspace_and_outside_reads(self, tmp_path: Path) -> None:
-        executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = SeatbeltCommandExecutor()
         inside_file = tmp_path / "inside.txt"
         outside_file = tmp_path.parent / f"{tmp_path.name}-outside.txt"
         inside_file.write_text("inside\n")
@@ -223,7 +216,7 @@ class TestSeatbeltCommandExecutor:
     async def test_run_allows_workspace_writes_and_blocks_outside_writes(
         self, tmp_path: Path
     ) -> None:
-        executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = SeatbeltCommandExecutor()
         outside_dir = tmp_path.parent / f"{tmp_path.name}-outside"
         outside_dir.mkdir()
 
@@ -248,7 +241,7 @@ class TestSeatbeltCommandExecutor:
         reason="sandbox-exec must be usable and curl installed",
     )
     async def test_run_allows_network_access(self, tmp_path: Path) -> None:
-        executor = SeatbeltCommandExecutor(cast("SettingsManager", _FakeSettings()))
+        executor = SeatbeltCommandExecutor()
 
         class _Handler(http.server.BaseHTTPRequestHandler):
             def do_GET(self) -> None:

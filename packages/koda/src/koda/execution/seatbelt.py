@@ -8,15 +8,11 @@ import shutil
 import tempfile
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from koda.execution.exceptions import CommandExecutionError, CommandTimeoutError
 from koda.execution.models import ExecutionResult
 from koda.execution.protocols import CommandExecutor
 from koda.execution.utils import resolve_sandbox_paths, terminate_process_tree
-
-if TYPE_CHECKING:
-    from koda_common.settings import SettingsManager
 
 
 class SandboxExecNotFoundError(Exception):
@@ -61,9 +57,6 @@ def _subpath_rule_lines(*paths: Path) -> list[str]:
 
 class SeatbeltCommandExecutor(CommandExecutor):
     """Execute commands in a macOS sandbox with broad reads and scoped writes."""
-
-    def __init__(self, settings: SettingsManager) -> None:
-        self._settings = settings
 
     @staticmethod
     def _execution_env(temp_dir: Path) -> dict[str, str]:

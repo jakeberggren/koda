@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import BaseModel, Field
@@ -21,8 +21,6 @@ from koda.tools.policy import ToolPolicy
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-
-    from koda_common.settings import SettingsManager
 
 
 # ==============================================================================
@@ -87,10 +85,6 @@ class CrashTool:
 # ==============================================================================
 
 
-class _FakeSettings:
-    bash_execution_sandbox = "host"
-
-
 @pytest.fixture
 def sandbox_dir() -> Generator[Path]:
     """Create a temporary sandbox directory for testing."""
@@ -112,7 +106,7 @@ def context(sandbox_dir: Path, policy: ToolPolicy) -> ToolContext:
         cwd=sandbox_dir,
         policy=policy,
         coordinator=ToolExecutionCoordinator(),
-        executor=HostCommandExecutor(cast("SettingsManager", _FakeSettings())),
+        executor=HostCommandExecutor(),
     )
 
 

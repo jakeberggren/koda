@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from koda.sessions.store import SessionStore
-    from koda.telemetry import Telemetry
     from koda_service.services.local.config import LocalRuntimeConfig
 
 
@@ -38,10 +37,8 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
         settings: SettingsManager,
         runtime: LocalRuntimeConfig,
         session_store: SessionStore | None = None,
-        telemetry: Telemetry | None = None,
     ) -> None:
         self.settings = settings
-        self.telemetry = telemetry
         self.session_manager = SessionManager(session_store or JsonSessionStore())
         self.runtime = LocalRuntime(
             settings=settings,
@@ -50,9 +47,6 @@ class LocalKodaService(KodaService[AgentEvent, ProviderDefinition, ModelDefiniti
             context_manager=ContextManager.from_workspace(runtime.cwd),
         )
         self.availability = LocalAvailability(settings=settings, runtime=self.runtime)
-
-        if telemetry is not None:
-            telemetry.initialize(settings)
 
     def update_settings(self, settings: SettingsManager) -> None:
         """Replace settings and invalidate the cached agent."""

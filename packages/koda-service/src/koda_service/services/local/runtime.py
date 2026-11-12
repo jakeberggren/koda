@@ -4,7 +4,8 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from koda.agent import Agent, AgentConfig
-from koda.execution import create_command_executor
+from koda.execution import HostCommandExecutor, SeatbeltCommandExecutor
+from koda.llm import LLMRequestOptions
 from koda.llm import exceptions as llm_exceptions
 from koda.llm.catalog import ModelCatalog
 from koda.llm.factory import LLMFactory
@@ -13,6 +14,7 @@ from koda.tools import ToolConfig
 
 if TYPE_CHECKING:
     from koda.context.manager import ContextManager
+    from koda.execution import CommandExecutor
     from koda.llm import LLM
     from koda.sessions import SessionManager
     from koda_common.settings import SettingsManager
@@ -36,7 +38,7 @@ class LocalRuntime:
         self.context_manager = context_manager
         catalog, warnings = ModelCatalog.load()
         self.warnings = warnings
-        self.llm_factory = LLMFactory(catalog)
+        self.llm_factory = LLMFactory(catalog, tracing=config.tracing)
         self.agent: Agent | None = None
         self._agent_lock = asyncio.Lock()
 
@@ -55,7 +57,17 @@ class LocalRuntime:
             return self.config.llm
         if self.settings.provider is None:
             raise llm_exceptions.ProviderSelectionMissingError
-        return await self.llm_factory.create(self.settings)
+        if self.settings.model is None:
+            raise llm_exceptions.ModelSelectionMissingError
+        return await self.llm_factory.create(
+            self.settings.provider, self.settings.model, self.settings
+        )
+
+    def create_executor(self) -> CommandExecutor:
+        """Create the command executor selected in settings."""
+        if self.settings.bash_execution_sandbox == "seatbelt":
+            return SeatbeltCommandExecutor()
+        return HostCommandExecutor()
 
     def create_tools(self) -> ToolConfig:
         """Create the configured tool bundle for local command execution."""
@@ -64,7 +76,7 @@ class LocalRuntime:
         return ToolConfig.builtins(
             cwd=self.config.cwd,
             sandbox_dir=self.config.sandbox_dir,
-            executor=create_command_executor(self.settings),
+            executor=self.create_executor(),
         )
 
     def load_system_prompt(self) -> SystemPrompt:
@@ -76,23 +88,36 @@ class LocalRuntime:
 
     def create_agent(self, llm: LLM) -> Agent:
         """Create an Agent wired to the current settings and session manager."""
-        try:
-            request_options = self.llm_factory.request_options_for_settings(self.settings)
-        except llm_exceptions.LLMConfigurationError:
-            if self.config.llm is None:
-                raise
-            request_options = AgentConfig.from_settings(self.settings).request_options
-        agent_config = AgentConfig(
-            system_prompt=self.load_system_prompt(),
-            request_options=request_options,
-        )
         return Agent(
             llm=llm,
-            config=agent_config,
+            config=AgentConfig(
+                system_prompt=self.load_system_prompt(),
+                request_options=LLMRequestOptions(
+                    thinking=self.resolve_thinking(),
+                    web_search=self.settings.allow_web_search,
+                    extended_prompt_retention=self.settings.allow_extended_prompt_retention,
+                ),
+            ),
             tools=self.create_tools(),
             session_manager=self.session_manager,
             context_manager=self.context_manager,
         )
+
+    def resolve_thinking(self) -> str:
+        """The selected thinking mode, resolved against what the model supports."""
+        provider, model = self.settings.provider, self.settings.model
+        if provider is None or model is None:
+            if self.config.llm is None:
+                raise llm_exceptions.ProviderSelectionMissingError
+            return self.settings.thinking
+        try:
+            return self.llm_factory.resolve_thinking(
+                provider, model, self.settings, self.settings.thinking
+            )
+        except llm_exceptions.LLMConfigurationError:
+            if self.config.llm is None:
+                raise
+            return self.settings.thinking
 
     async def get_agent(self) -> Agent:
         """Return the cached Agent, creating it on first use."""

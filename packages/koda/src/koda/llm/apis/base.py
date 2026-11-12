@@ -6,21 +6,21 @@ from typing import TYPE_CHECKING, Protocol
 if TYPE_CHECKING:
     from koda.llm.auth.registry import ProviderAuthRegistry
     from koda.llm.models import ProviderConfig, ProviderConnectionConfig, ProviderModelConfig
-    from koda.llm.protocols import LLM
-    from koda_common.settings import SettingsManager
+    from koda.llm.protocols import LLM, Credentials
 
 
 @dataclass(frozen=True, slots=True)
 class LLMApiContext:
-    """Resolved catalog selection and settings used to construct an LLM API."""
+    """Resolved catalog selection and credentials used to construct an LLM API."""
 
     provider_id: str
     provider: ProviderConfig
     connection_id: str
     connection: ProviderConnectionConfig
     model: ProviderModelConfig
-    settings: SettingsManager
+    credentials: Credentials
     auth_registry: ProviderAuthRegistry
+    tracing: bool = False
 
 
 class LLMApiFactory(Protocol):

@@ -4,11 +4,9 @@ from typing import Literal
 
 from pydantic import (
     AliasChoices,
-    AnyHttpUrl,
     BaseModel,
     ConfigDict,
     Field,
-    SecretStr,
 )
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
@@ -68,10 +66,6 @@ class Settings(BaseSettings):
         description="Command execution backend.",
         validation_alias=AliasChoices("bash_execution_sandbox", "KODA_BASH_EXECUTION_SANDBOX"),
     )
-    langfuse_tracing_enabled: bool = Field(default=True, description="Enable telemetry")
-    langfuse_secret_key: SecretStr | None = Field(default=None, description="Langfuse secret key")
-    langfuse_public_key: str | None = Field(default=None, description="Langfuse public key")
-    langfuse_base_url: AnyHttpUrl | None = Field(default=None, description="Langfuse base URL")
 
     @classmethod
     def settings_customise_sources(
