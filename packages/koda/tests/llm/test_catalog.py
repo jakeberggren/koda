@@ -96,21 +96,21 @@ def test_model_without_a_connected_connection_is_not_connected() -> None:
     model = catalog.model("openai", "gpt-5.5")
 
     assert not model.is_connected(_credentials({}))
-    with pytest.raises(exceptions.ProviderNotConnectedError):
+    with pytest.raises(exceptions.LLMConfigurationError, match="is not connected"):
         model.connection(_credentials({}))
 
 
 async def test_connect_requires_a_connected_provider() -> None:
     catalog, _warnings = Catalog.load()
 
-    with pytest.raises(exceptions.ProviderNotConnectedError):
+    with pytest.raises(exceptions.LLMConfigurationError, match="is not connected"):
         await llm.connect(catalog.model("openai", "gpt-5.5"), _credentials({}))
 
 
 def test_unknown_model_is_not_supported() -> None:
     catalog, _warnings = Catalog.load()
 
-    with pytest.raises(exceptions.ModelNotSupportedError):
+    with pytest.raises(exceptions.LLMConfigurationError, match="is not supported"):
         catalog.model("openai", "missing")
 
 
@@ -274,7 +274,7 @@ def test_invalid_user_config_falls_back_to_builtin_with_warning(tmp_path: Path) 
     catalog, warnings = Catalog.from_files(builtin_path, user_path)
 
     assert catalog.provider("openai").name == "OpenAI"
-    with pytest.raises(exceptions.ProviderNotSupportedError):
+    with pytest.raises(exceptions.LLMConfigurationError, match="is not supported"):
         catalog.provider("openrouter")
     assert [warning.summary for warning in warnings] == ["invalid models.json"]
 

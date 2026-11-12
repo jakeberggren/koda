@@ -136,14 +136,14 @@ async def test_codex_responses_factory_builds_oauth_client(
 
 
 async def test_codex_responses_factory_requires_oauth_credential() -> None:
-    with pytest.raises(exceptions.OAuthCredentialRequiredError):
+    with pytest.raises(exceptions.LLMConfigurationError, match="requires an OAuth credential"):
         await OpenAICodexResponsesAPI.from_context(
             _context(ApiKeyCredential(type="api_key", value="api-key"))
         )
 
 
 async def test_codex_responses_factory_requires_account_id() -> None:
-    with pytest.raises(exceptions.OAuthAccountIdMissingError):
+    with pytest.raises(exceptions.LLMConfigurationError, match="must include an account id"):
         await OpenAICodexResponsesAPI.from_context(
             _context(
                 OAuthCredential(

@@ -42,6 +42,7 @@ from koda.llm.types import (
     LLMThinkingDelta,
     LLMToolCallRequested,
 )
+from koda.llm.utils import tool_arguments
 from koda.messages import AssistantMessage, TokenUsage, ToolMessage
 from koda.tools import ToolCall
 
@@ -198,7 +199,9 @@ def _resolve_thinking(
 ) -> tuple[ThinkingConfigParam, OutputConfigParam | Omit]:
     if thinking == "enabled":
         if budget_tokens is None:
-            raise exceptions.ThinkingBudgetTokensNotConfiguredError
+            raise exceptions.LLMConfigurationError(
+                "thinking='enabled' requires budget_tokens to be configured for this model"
+            )
         return {
             "type": "enabled",
             "budget_tokens": min(budget_tokens, max_tokens - 1),
@@ -233,26 +236,15 @@ def _raise_anthropic_error(error: Exception, *, backend: str) -> Never:
 def _max_output_tokens(context: LLMApiContext) -> int:
     max_output_tokens = context.model.max_output_tokens
     if max_output_tokens is None:
-        raise exceptions.ModelMaxOutputTokensMissingError(
-            context.model.id,
-            context.model.provider,
+        model = context.model
+        raise exceptions.LLMConfigurationError(
+            f"Model '{model.id}' for provider {model.provider} must define max_output_tokens"
         )
     return max_output_tokens
 
 
 class AnthropicMessagesEventAdapter:
     """Convert Anthropic streaming events into Koda LLM stream events."""
-
-    @staticmethod
-    def _coerce_tool_input(value: object) -> dict[str, object]:
-        if not isinstance(value, dict):
-            raise exceptions.InvalidToolCallArgumentsError
-        parsed: dict[str, object] = {}
-        for key, item in value.items():
-            if not isinstance(key, str):
-                raise exceptions.InvalidToolCallArgumentsError
-            parsed[key] = item
-        return parsed
 
     @staticmethod
     def _tool_call_from_content_block_stop(
@@ -264,7 +256,7 @@ class AnthropicMessagesEventAdapter:
         return LLMToolCallRequested(
             call=ToolCall(
                 tool_name=block.name,
-                arguments=AnthropicMessagesEventAdapter._coerce_tool_input(block.input),
+                arguments=tool_arguments(block.input),
                 call_id=block.id,
             )
         )
@@ -380,4 +372,4 @@ class AnthropicMessagesAPI(LLM):
         schema: type[T],
     ) -> LLMResponse[T]:
         _ = request, schema
-        raise exceptions.StructuredOutputNotSupportedError
+        raise NotImplementedError

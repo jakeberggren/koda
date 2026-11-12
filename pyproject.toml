@@ -63,7 +63,10 @@ select = [
     "PERF",  # perflint performance rules
     "ASYNC", # flake8-async
 ]
-ignore = ["COM812"]
+ignore = [
+    "COM812",
+    "TRY003", # A message at the raise site is fine; exception types are for callers to tell apart.
+]
 
 [tool.ruff.lint.flake8-type-checking]
 runtime-evaluated-base-classes = ["pydantic.BaseModel"]
