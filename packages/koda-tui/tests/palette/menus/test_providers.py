@@ -26,33 +26,18 @@ if TYPE_CHECKING:
     from koda.llm.auth.protocols import OAuthLoginCallbacks
     from koda.sessions import SessionStore
     from koda_tui.messaging import Conversation, Outbox
-    from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
     from koda_tui.terminal import Terminal
     from koda_tui.ui.overlays import Overlays
     from koda_tui.ui.widgets import ListItem
 
 
-class _FakeCoreSettings:
-    model: str | None = None
-
-    def __init__(self) -> None:
-        self.credentials: dict[str, ProviderCredential] = {}
-
+class _Credentials(dict[str, ProviderCredential]):
     def get_credential(self, key: str) -> ProviderCredential | None:
-        return self.credentials.get(key)
+        return self.get(key)
 
     def set_credential(self, key: str, credential: ProviderCredential) -> None:
-        self.credentials[key] = credential
-
-    def update(self, **changes: object) -> None:
-        for key, value in changes.items():
-            setattr(self, key, value)
-
-
-class _FakeAppSettings:
-    def __init__(self) -> None:
-        self.core = _FakeCoreSettings()
+        self[key] = credential
 
 
 class _FakeCatalog:
@@ -148,14 +133,15 @@ class _FailingLogin(_BrowserLogin):
 
 
 def _menu(
-    overlays: _FakeOverlays, settings: _FakeAppSettings, login: _BrowserLogin
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState, login: _BrowserLogin
 ) -> ProviderMenu:
     context = PaletteContext(
         overlays=cast("Overlays", overlays),
         catalog=cast("Catalog", _FakeCatalog()),
+        credentials=credentials,
         store=cast("SessionStore", None),
-        settings=cast("AppSettings", settings),
-        state=cast("AppState", None),
+        state=state,
+        update_settings=lambda settings: setattr(state, "settings", settings),
         conversation=cast("Conversation", None),
         outbox=cast("Outbox", None),
         terminal=cast("Terminal", None),
@@ -208,23 +194,23 @@ def overlays() -> _FakeOverlays:
 
 
 @pytest.fixture
-def settings() -> _FakeAppSettings:
-    return _FakeAppSettings()
+def credentials() -> _Credentials:
+    return _Credentials()
 
 
 def test_providers_with_a_connection_are_marked(
-    overlays: _FakeOverlays, settings: _FakeAppSettings
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    settings.core.credentials["openai:api-key"] = ApiKeyCredential(type="api_key", value="k")
-    _menu(overlays, settings, _BrowserLogin()).open()
+    credentials["openai:api-key"] = ApiKeyCredential(type="api_key", value="k")
+    _menu(overlays, credentials, state, _BrowserLogin()).open()
     assert [item.marker for item in _items(overlays.top)] == ["✓"]
 
 
 def test_several_connections_are_offered_in_a_picker(
-    overlays: _FakeOverlays, settings: _FakeAppSettings
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    settings.core.credentials["openai:oauth"] = _credential()
-    _menu(overlays, settings, _BrowserLogin()).select(_openai_provider())
+    credentials["openai:oauth"] = _credential()
+    _menu(overlays, credentials, state, _BrowserLogin()).select(_openai_provider())
 
     kind, fields = overlays.top
     assert (kind, fields["args"][0]) == ("picker", "OpenAI")
@@ -235,49 +221,47 @@ def test_several_connections_are_offered_in_a_picker(
 
 
 def test_an_api_key_is_stored_and_picks_a_model(
-    overlays: _FakeOverlays, settings: _FakeAppSettings
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    _menu(overlays, settings, _BrowserLogin()).select(_openai_provider())
+    _menu(overlays, credentials, state, _BrowserLogin()).select(_openai_provider())
     _pick(overlays.top, "OpenAI API key")
 
     kind, fields = overlays.top
     assert (kind, fields["title"], fields["mask_input"]) == ("input", "Enter OpenAI API key", True)
     fields["on_submit"]("secret")
 
-    assert settings.core.credentials["openai:api-key"] == ApiKeyCredential(
-        type="api_key", value="secret"
-    )
-    assert settings.core.model == "gpt-5.5"
+    assert credentials["openai:api-key"] == ApiKeyCredential(type="api_key", value="secret")
+    assert state.settings.model == "gpt-5.5"
     assert overlays.stack == []
 
 
 def test_a_single_connection_skips_the_picker(
-    overlays: _FakeOverlays, settings: _FakeAppSettings
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    _menu(overlays, settings, _BrowserLogin()).select(_openai_provider(oauth=False))
+    _menu(overlays, credentials, state, _BrowserLogin()).select(_openai_provider(oauth=False))
     assert overlays.kinds == ["input"]
 
 
 async def test_a_browser_login_stores_the_credential(
-    overlays: _FakeOverlays, settings: _FakeAppSettings, opened_urls: list[str]
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState, opened_urls: list[str]
 ) -> None:
-    menu = _menu(overlays, settings, _BrowserLogin())
+    menu = _menu(overlays, credentials, state, _BrowserLogin())
     menu.select(_openai_provider())
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await _finish(menu)
 
     assert opened_urls == ["https://auth.example"]
-    assert settings.core.credentials["openai:oauth"] == _credential()
-    assert settings.core.model == "gpt-5.5"
+    assert credentials["openai:oauth"] == _credential()
+    assert state.settings.model == "gpt-5.5"
     assert overlays.stack == []
 
 
 @pytest.mark.usefixtures("opened_urls")
 async def test_a_login_can_be_finished_by_pasting_into_the_prompt(
-    overlays: _FakeOverlays, settings: _FakeAppSettings
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
     login = _PromptedLogin()
-    menu = _menu(overlays, settings, login)
+    menu = _menu(overlays, credentials, state, login)
     menu.select(_openai_provider())
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await asyncio.sleep(0)
@@ -292,14 +276,14 @@ async def test_a_login_can_be_finished_by_pasting_into_the_prompt(
     await _finish(menu)
 
     assert login.answer == "https://callback.example"
-    assert settings.core.credentials["openai:oauth"] == _credential()
+    assert credentials["openai:oauth"] == _credential()
 
 
 @pytest.mark.usefixtures("opened_urls")
 async def test_closing_the_prompt_cancels_the_login(
-    overlays: _FakeOverlays, settings: _FakeAppSettings
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    menu = _menu(overlays, settings, _PromptedLogin())
+    menu = _menu(overlays, credentials, state, _PromptedLogin())
     menu.select(_openai_provider())
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await asyncio.sleep(0)
@@ -311,15 +295,15 @@ async def test_closing_the_prompt_cancels_the_login(
 
     assert login.cancelled()
     assert overlays.kinds == ["picker"]  # Back to choosing how to connect.
-    assert settings.core.credentials == {}
+    assert credentials == {}
     assert menu._login is None
 
 
 @pytest.mark.usefixtures("opened_urls")
 async def test_a_new_login_replaces_one_under_way(
-    overlays: _FakeOverlays, settings: _FakeAppSettings
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    menu = _menu(overlays, settings, _PromptedLogin())
+    menu = _menu(overlays, credentials, state, _PromptedLogin())
     menu.select(_openai_provider())
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await asyncio.sleep(0)
@@ -337,8 +321,10 @@ async def test_a_new_login_replaces_one_under_way(
     )
 
 
-async def test_a_failed_login_says_why(overlays: _FakeOverlays, settings: _FakeAppSettings) -> None:
-    menu = _menu(overlays, settings, _FailingLogin())
+async def test_a_failed_login_says_why(
+    overlays: _FakeOverlays, credentials: _Credentials, state: AppState
+) -> None:
+    menu = _menu(overlays, credentials, state, _FailingLogin())
     menu.select(_openai_provider())
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await _finish(menu)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from copy import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
@@ -12,11 +13,10 @@ from koda.llm import Catalog, Model, ThinkingOption
 from koda.llm.credentials import ApiKeyCredential
 from koda.llm.exceptions import ModelSelectionMissingError
 from koda.sessions import InMemorySessionStore, Session
-from koda_tui.app import application
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import RGBColor
-from koda_tui.settings import AppSettings, SettingChange
+from koda_tui.settings import Settings
 from koda_tui.state import PendingInput
 
 if TYPE_CHECKING:
@@ -24,50 +24,19 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from koda.llm import Credentials
+    from koda.llm import Credentials, ProviderCredential
     from koda.llm.types import LLMEvent, LLMRequest, LLMResponse
     from koda.messages import AssistantMessage
 
 
-def _make_settings_mock(unsubscribe: Mock) -> Mock:
-    settings = Mock(
-        spec=[
-            "subscribe",
-            "set",
-            "provider",
-            "model",
-            "thinking",
-            "allow_web_search",
-            "allow_extended_prompt_retention",
-            "bash_execution_sandbox",
-            "get_credential",
-        ]
-    )
-    settings.provider = "openai"
-    settings.model = "gpt-5.2"
-    settings.thinking = "none"
-    settings.allow_web_search = False
-    settings.allow_extended_prompt_retention = False
-    settings.bash_execution_sandbox = "host"
-    settings.get_credential.return_value = ApiKeyCredential(type="api_key", value="key")
-    settings.subscribe.return_value = unsubscribe
-    return settings
+class _Credentials:
+    """An API key for every connection."""
 
+    def get_credential(self, key: str) -> ProviderCredential | None:
+        return ApiKeyCredential(type="api_key", value="key")
 
-def _make_tui_settings_mock(unsubscribe: Mock) -> Mock:
-    settings = Mock(
-        spec=[
-            "subscribe",
-            "show_scrollbar",
-            "queue_inputs",
-            "theme",
-        ]
-    )
-    settings.show_scrollbar = True
-    settings.queue_inputs = True
-    settings.theme = "terminal-dark"
-    settings.subscribe.return_value = unsubscribe
-    return settings
+    def set_credential(self, key: str, credential: ProviderCredential) -> None:
+        raise NotImplementedError
 
 
 class _FakeLLM:
@@ -103,92 +72,63 @@ class _Connect:
         return self.llm
 
 
+_SETTINGS = Settings(provider="openai", model="gpt-5.2", theme="terminal-dark")
+
+
 def _make_app(
-    workspace: Path = Path("/workspace"),
-) -> tuple[KodaTuiApp, Mock, Mock, _Connect, Mock, Mock]:
-    unsubscribe_settings = Mock()
-    unsubscribe_tui_settings = Mock()
-    settings = _make_settings_mock(unsubscribe_settings)
-    tui_settings = _make_tui_settings_mock(unsubscribe_tui_settings)
+    workspace: Path = Path("/workspace"), settings: Settings = _SETTINGS
+) -> tuple[KodaTuiApp, _Connect]:
     connect = _Connect()
     catalog, _warnings = Catalog.load()
     app = KodaTuiApp(
-        AppSettings(core=settings, tui=tui_settings),
+        settings,
         workspace,
         catalog=catalog,
+        credentials=_Credentials(),
         store=InMemorySessionStore(),
         connect=connect,
     )
-    return (app, settings, tui_settings, connect, unsubscribe_settings, unsubscribe_tui_settings)
+    return app, connect
 
 
-def test_batched_provider_and_model_changes_update_app_state() -> None:
-    app, settings, *_ = _make_app()
-    settings.provider = "bergetai"
-    settings.model = "zai-org/GLM-4.7-FP8"
-    app.on_settings_changed(
-        (
-            SettingChange(name="provider", old_value="openai", new_value="bergetai"),
-            SettingChange(name="model", old_value="gpt-5.2", new_value="zai-org/GLM-4.7-FP8"),
-        )
+def test_new_settings_are_saved_and_shown() -> None:
+    app, _ = _make_app()
+    app.update_settings(
+        replace(app.state.settings, provider="bergetai", model="zai-org/GLM-4.7-FP8")
     )
 
     assert app.state.active_model is not None
     assert app.state.active_model.id == "zai-org/GLM-4.7-FP8"
-    assert app.state.context_window == app.state.active_model.context_window
+    assert Settings.load() == app.state.settings
 
 
-def test_theme_change_redraws_without_requerying_terminal_background(
+def test_a_new_theme_redraws_without_asking_the_terminal_again(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
-    request_refresh = Mock()
+    app, _ = _make_app()
+    ask_background = Mock()
     invalidate = Mock()
-    monkeypatch.setattr(app._terminal, "ask_background", request_refresh)  # noqa: SLF001
+    monkeypatch.setattr(app._terminal, "ask_background", ask_background)  # noqa: SLF001
     monkeypatch.setattr(app, "invalidate", invalidate)
 
-    tui_settings.theme = "auto"
-    app.on_tui_settings_changed(
-        (SettingChange(name="theme", old_value="terminal-dark", new_value="auto"),)
-    )
+    app.update_settings(replace(app.state.settings, theme="auto"))
 
-    request_refresh.assert_not_called()
+    assert app.appearance.theme == "auto"
+    ask_background.assert_not_called()
     invalidate.assert_called_once_with()
 
 
 def test_terminal_background_response_is_stored_for_any_theme(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app, _settings, tui_settings, _service, _unsubscribe, _unsubscribe_tui = _make_app()
+    app, _ = _make_app()
     invalidate = Mock()
     monkeypatch.setattr(app, "invalidate", invalidate)
 
-    tui_settings.theme = "terminal-dark"
     app.on_terminal_background(RGBColor(0, 0, 128))
 
     assert app.appearance.terminal_background == (0, 0, 128)
     invalidate.assert_called_once_with()
-
-
-@pytest.mark.asyncio
-async def test_run_follows_settings_only_while_it_runs(monkeypatch: pytest.MonkeyPatch) -> None:
-    app, settings, tui_settings, _service, unsubscribe, unsubscribe_tui = _make_app()
-    settings.subscribe.assert_not_called()
-    tui_settings.subscribe.assert_not_called()
-
-    class _FakeApp:
-        async def run_async(self) -> None:
-            settings.subscribe.assert_called_once_with(app.on_settings_changed)
-            tui_settings.subscribe.assert_called_once_with(app.on_tui_settings_changed)
-            raise RuntimeError("boom")
-
-    monkeypatch.setattr(application, "FullScreenApplication", lambda *_args, **_kwargs: _FakeApp())
-
-    with pytest.raises(RuntimeError, match="boom"):
-        await app.run()
-
-    unsubscribe.assert_called_once_with()
-    unsubscribe_tui.assert_called_once_with()
 
 
 def _thinking_model() -> Model:
@@ -205,24 +145,26 @@ def _thinking_model() -> Model:
 
 
 def test_cycle_thinking_moves_to_the_next_level_and_wraps_around() -> None:
-    app, settings, *_ = _make_app()
+    app, _ = _make_app()
+    app.update_settings = Mock()
     model = _thinking_model()
     app.state.active_model = model
 
     app.state.thinking = model.effective_thinking_options[0]
     app.cycle_thinking()
-    settings.set.assert_called_with("thinking", model.effective_thinking_options[1].id)
+    assert app.update_settings.call_args.args[0].thinking == "low"
 
     app.state.thinking = model.effective_thinking_options[-1]
     app.cycle_thinking()
-    settings.set.assert_called_with("thinking", model.effective_thinking_options[0].id)
+    assert app.update_settings.call_args.args[0].thinking == "none"
 
 
 def test_cycle_thinking_does_nothing_without_a_model() -> None:
-    app, settings, *_ = _make_app()
+    app, _ = _make_app()
+    app.update_settings = Mock()
     app.state.active_model = None
     app.cycle_thinking()
-    settings.set.assert_not_called()
+    app.update_settings.assert_not_called()
 
 
 def _escape(app: KodaTuiApp):
@@ -231,7 +173,7 @@ def _escape(app: KodaTuiApp):
 
 
 def test_escape_sends_whats_queued_now() -> None:
-    app, *_ = _make_app()
+    app, _ = _make_app()
     app.outbox = Mock()
     app.state.responding = True
     app.state.pending_inputs = [PendingInput("next")]
@@ -243,7 +185,7 @@ def test_escape_sends_whats_queued_now() -> None:
 
 
 def test_escape_with_nothing_queued_interrupts_the_response() -> None:
-    app, *_ = _make_app()
+    app, _ = _make_app()
     app.outbox = Mock()
     app.state.responding = True
     escape = _escape(app)
@@ -254,36 +196,24 @@ def test_escape_with_nothing_queued_interrupts_the_response() -> None:
 
 
 def test_escape_is_free_for_others_while_idle() -> None:
-    app, *_ = _make_app()
+    app, _ = _make_app()
     assert not _escape(app).filter()
 
 
-async def test_every_core_setting_change_rebuilds_the_agent() -> None:
-    app, _settings, _tui_settings, connect, *_ = _make_app()
+async def test_every_settings_change_rebuilds_the_agent() -> None:
+    app, connect = _make_app()
     await _respond(app)
     app.invalidate = Mock()
 
-    change = SettingChange(name="bash_execution_sandbox", old_value="host", new_value="docker")
-    app.on_settings_changed((change,))
+    app.update_settings(replace(app.state.settings, sandbox="seatbelt"))
 
     app.invalidate.assert_called_once_with()
     await _respond(app)
     assert connect.calls == 2
 
 
-def test_any_tui_setting_change_redraws() -> None:
-    app, *_ = _make_app()
-    app.invalidate = Mock()
-
-    app.on_tui_settings_changed(
-        (SettingChange(name="queue_inputs", old_value=True, new_value=False),)
-    )
-
-    app.invalidate.assert_called_once_with()
-
-
 def test_writing_a_message_takes_back_a_press_of_ctrl_c() -> None:
-    app, *_ = _make_app()
+    app, _ = _make_app()
     app.outbox = Mock()
     app.exit_prompt.confirm()
 
@@ -294,7 +224,7 @@ def test_writing_a_message_takes_back_a_press_of_ctrl_c() -> None:
 
 
 def test_first_ctrl_c_asks_and_second_confirms() -> None:
-    app, *_ = _make_app()
+    app, _ = _make_app()
     assert app.exit_prompt.confirm() is False
     assert app.state.exit_requested
     assert app.exit_prompt.confirm() is True
@@ -305,7 +235,7 @@ async def test_the_exit_prompt_goes_away_after_the_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr("koda_tui.app.exit.EXIT_TIMEOUT", 0.01)
-    app, *_ = _make_app()
+    app, _ = _make_app()
     app.exit_prompt.confirm()
 
     await asyncio.sleep(0.02)
@@ -316,7 +246,7 @@ async def test_the_exit_prompt_goes_away_after_the_timeout(
 
 async def test_a_confirmed_exit_cancels_the_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("koda_tui.app.exit.EXIT_TIMEOUT", 0.01)
-    app, *_ = _make_app()
+    app, _ = _make_app()
     app.exit_prompt.confirm()
     assert app.exit_prompt.confirm() is True
     app.state.exit_requested = True  # As if asked again after confirming.
@@ -332,7 +262,7 @@ class TestAgent:
     """The agent the app builds for the current session, from the settings."""
 
     async def test_responding_saves_the_session(self) -> None:
-        app, *_ = _make_app()
+        app, _ = _make_app()
 
         await _respond(app)
 
@@ -340,7 +270,7 @@ class TestAgent:
         assert saved.session_id == app.state.session.session_id
 
     async def test_the_agent_is_built_once_for_concurrent_messages(self) -> None:
-        app, _settings, _tui, connect, *_ = _make_app()
+        app, connect = _make_app()
 
         await asyncio.gather(*(_respond(app) for _ in range(3)))
 
@@ -350,7 +280,7 @@ class TestAgent:
         self, tmp_path: Path
     ) -> None:
         (tmp_path / "AGENTS.md").write_text("First instructions.", encoding="utf-8")
-        app, _settings, _tui, connect, *_ = _make_app(tmp_path)
+        app, connect = _make_app(tmp_path)
         await _respond(app)
 
         (tmp_path / "AGENTS.md").write_text("Second instructions.", encoding="utf-8")
@@ -363,8 +293,9 @@ class TestAgent:
         assert "Second instructions." in (connect.llm.last_request.instructions or "")
 
     async def test_thinking_resolves_to_the_models_first_mode(self) -> None:
-        app, settings, _tui, connect, *_ = _make_app()
-        settings.provider, settings.model = "anthropic", "claude-fable-5"
+        app, connect = _make_app(
+            settings=replace(_SETTINGS, provider="anthropic", model="claude-fable-5")
+        )
 
         await _respond(app)
 
@@ -372,8 +303,7 @@ class TestAgent:
         assert connect.llm.last_request.options.thinking == "low"
 
     async def test_responding_without_a_selected_model_fails(self) -> None:
-        app, settings, *_ = _make_app()
-        settings.model = None
+        app, _ = _make_app(settings=replace(_SETTINGS, model=None))
 
         with pytest.raises(ModelSelectionMissingError):
             await _respond(app)

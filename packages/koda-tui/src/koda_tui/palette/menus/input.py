@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import replace
 from typing import TYPE_CHECKING
 
 from koda_tui import strings
@@ -25,7 +26,7 @@ class InputMenu:
         self._context = context
 
     def open(self) -> None:
-        current = self._context.settings.tui.queue_inputs
+        current = self._context.settings.queue_inputs
         items = [
             ListItem(label=label, detail=detail, current=current == queue, data=queue)
             for queue, label, detail in _INPUT_MODE_OPTIONS
@@ -38,4 +39,4 @@ class InputMenu:
         )
 
     def _select(self, queue: bool) -> None:  # noqa: FBT001 - the picked item's data
-        self._context.settings.tui.set("queue_inputs", queue)
+        self._context.update_settings(replace(self._context.settings, queue_inputs=queue))

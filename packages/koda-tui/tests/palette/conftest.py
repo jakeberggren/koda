@@ -1,4 +1,4 @@
-"""A palette context over fakes: overlays that record what opens, and settings."""
+"""A palette context over fakes: overlays that record what opens, and settings updates."""
 
 from __future__ import annotations
 
@@ -51,8 +51,9 @@ def overlays() -> Overlays:
 
 
 @pytest.fixture
-def settings() -> Mock:
-    return Mock()
+def update_settings(state: AppState) -> Mock:
+    """Takes the new settings into ``state``, as the app does."""
+    return Mock(side_effect=lambda settings: setattr(state, "settings", settings))
 
 
 @pytest.fixture
@@ -61,14 +62,18 @@ def terminal() -> Mock:
 
 
 @pytest.fixture
-def context(overlays: Overlays, settings: Mock, terminal: Mock, state: AppState) -> PaletteContext:
-    """A context over the fake overlays, mock ``settings`` and ``terminal``, and ``state``."""
+def context(
+    overlays: Overlays, update_settings: Mock, terminal: Mock, state: AppState
+) -> PaletteContext:
+    """A context over the fake overlays, mock ``update_settings`` and ``terminal``, and
+    ``state``."""
     return PaletteContext(
         overlays=cast("RealOverlays", overlays),
         catalog=Mock(),
+        credentials=Mock(),
         store=InMemorySessionStore(),
-        settings=settings,
         state=state,
+        update_settings=update_settings,
         conversation=Mock(),
         outbox=Mock(),
         terminal=terminal,
