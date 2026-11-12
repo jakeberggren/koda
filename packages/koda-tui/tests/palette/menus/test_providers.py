@@ -22,9 +22,10 @@ from koda_tui.palette.menus.providers import ProviderMenu
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from koda.llm import Catalog
     from koda.llm.auth.protocols import OAuthLoginCallbacks
+    from koda.sessions import SessionStore
     from koda_tui.messaging import Conversation, Outbox
-    from koda_tui.runtime import Runtime
     from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
     from koda_tui.terminal import Terminal
@@ -61,10 +62,6 @@ class _FakeCatalog:
     def models(self, provider: str) -> list[Model]:
         _ = provider
         return [Model(id="gpt-5.5", name="gpt-5.5", provider="openai")]
-
-
-class _FakeRuntime:
-    catalog = _FakeCatalog()
 
 
 class _FakeOverlays:
@@ -155,7 +152,8 @@ def _menu(
 ) -> ProviderMenu:
     context = PaletteContext(
         overlays=cast("Overlays", overlays),
-        runtime=cast("Runtime", _FakeRuntime()),
+        catalog=cast("Catalog", _FakeCatalog()),
+        store=cast("SessionStore", None),
         settings=cast("AppSettings", settings),
         state=cast("AppState", None),
         conversation=cast("Conversation", None),

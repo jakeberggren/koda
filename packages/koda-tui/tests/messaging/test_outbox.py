@@ -56,7 +56,9 @@ def agent() -> _Agent:
 @pytest.fixture
 def outbox(state: AppState, agent: _Agent) -> Outbox:
     conversation = Conversation(state)
-    return Outbox(state=state, conversation=conversation, runtime=agent, invalidate=lambda: None)  # type: ignore
+    return Outbox(
+        state=state, conversation=conversation, respond=agent.run, invalidate=lambda: None
+    )
 
 
 async def _until(condition: Callable[[], bool]) -> None:
@@ -213,12 +215,14 @@ def _text(message: Message) -> str:
     return message.text
 
 
-def _outbox(state: AppState, service: object) -> Outbox:
+def _outbox(state: AppState, service: AsyncMock) -> Outbox:
     conversation = Conversation(state)
-    return Outbox(state=state, conversation=conversation, runtime=service, invalidate=lambda: None)  # type: ignore
+    return Outbox(
+        state=state, conversation=conversation, respond=service.run, invalidate=lambda: None
+    )
 
 
-async def _send(state: AppState, service: object, text: str) -> None:
+async def _send(state: AppState, service: AsyncMock, text: str) -> None:
     """Submit ``text`` while idle, and wait for its response to end."""
     outbox = _outbox(state, service)
     outbox.submit(text, steer=False)

@@ -16,8 +16,8 @@ from koda.agent.events import (
     AgentTurnStarted,
 )
 from koda.agent.stream import AgentStreamAccumulator
-from koda.llm import LLM, LLMRequest
-from koda.llm import exceptions as llm_exceptions
+from koda.llm import LLM, LLMRequest, LLMRequestOptions
+from koda.llm.exceptions import EmptyMessageError
 from koda.llm.types import (
     LLMEvent,
     LLMTextDelta,
@@ -27,6 +27,7 @@ from koda.llm.types import (
     LLMToolStarted,
 )
 from koda.messages import AssistantMessage, ToolMessage, UserMessage
+from koda.prompts import SystemPrompt
 from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda.tools.executor import ToolExecutor
 from koda_common.logging import get_logger
@@ -34,7 +35,6 @@ from koda_common.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
-    from koda.agent.agent import AgentConfig
     from koda.sessions import Session, SessionStore
     from koda.sessions.session import SessionMessage
     from koda.tools import ToolConfig, ToolDefinition
@@ -101,18 +101,20 @@ class ToolRunner:
 class AgentRunner:
     """Orchestrate agent turns across model iterations and tool calls."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - built by Agent from its own parts
         self,
         *,
         llm: LLM,
-        config: AgentConfig,
         session: Session,
         store: SessionStore | None = None,
         tools: ToolConfig | None = None,
+        system_prompt: SystemPrompt | None = None,
+        options: LLMRequestOptions | None = None,
     ) -> None:
         """Create a runner for one conversation, saved to ``store`` if given."""
         self.llm = llm
-        self.config = config
+        self.system_prompt = system_prompt or SystemPrompt()
+        self.options = options or LLMRequestOptions()
         self.session = session
         self.store = store
         self.tools = tools
@@ -148,7 +150,7 @@ class AgentRunner:
 
     def resolve_instructions(self) -> str | None:
         """Render the configured system prompt."""
-        return self.config.system_prompt.render()
+        return self.system_prompt.render()
 
     def _build_request(self, tool_definitions: list[ToolDefinition] | None) -> LLMRequest:
         """Build the model request for the current session state."""
@@ -157,7 +159,7 @@ class AgentRunner:
             messages=self.session.messages,
             instructions=instructions,
             tools=tool_definitions,
-            options=self.config.request_options,
+            options=self.options,
         )
 
     @staticmethod
@@ -187,7 +189,7 @@ class AgentRunner:
         user_text = user_text.strip()
         if not user_text:
             logger.warning("run_called_with_empty_message")
-            raise llm_exceptions.EmptyMessageError
+            raise EmptyMessageError
 
         session_id = self.session.session_id
         yield AgentTurnStarted(session_id=session_id)

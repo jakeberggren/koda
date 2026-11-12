@@ -6,13 +6,12 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit.keys import Keys
 
-from koda.sessions import SessionNotFoundError
+from koda.sessions import Session, SessionNotFoundError
 from koda_common.logging import get_logger
 from koda_tui import strings
 from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, ListItem, Picker, Shortcut
 
 if TYPE_CHECKING:
-    from koda.sessions import Session
     from koda_tui.palette.context import PaletteContext
 
 
@@ -25,19 +24,20 @@ class SessionMenu:
     def __init__(self, context: PaletteContext) -> None:
         self._overlays = context.overlays
         self._outbox = context.outbox
-        self._runtime = context.runtime
+        self._state = context.state
+        self._store = context.store
         self._conversation = context.conversation
 
     def items(self) -> list[ListItem[Session]]:
         """Build session selection items."""
-        active_id = self._runtime.session.session_id
+        active_id = self._state.session.session_id
         return [
             ListItem(
                 label=_format_session_label(session),
                 data=session,
                 current=session.session_id == active_id,
             )
-            for session in self._runtime.store.list_sessions()
+            for session in self._store.list_sessions()
         ]
 
     def open(self) -> None:
@@ -69,7 +69,7 @@ class SessionMenu:
     def new(self) -> None:
         """Create and switch to a new session."""
         self._outbox.stop()
-        self._runtime.new_session()
+        self._state.session = Session()
         self._conversation.clear()
         self._overlays.close_all()
 
@@ -77,7 +77,7 @@ class SessionMenu:
         """Switch to an existing session."""
         self._outbox.stop()
         try:
-            switched = self._runtime.open_session(session.session_id)
+            switched = self._open(session)
         except SessionNotFoundError:
             log.warning("switch_session_failed", session_id=str(session.session_id))
             return
@@ -102,19 +102,27 @@ class SessionMenu:
 
     def delete(self, session: Session) -> None:
         """Delete a session."""
-        removed_active = self._runtime.session.session_id == session.session_id
+        removed_active = self._state.session.session_id == session.session_id
         if removed_active:
             self._outbox.stop()
 
         try:
-            self._runtime.delete_session(session.session_id)
+            self._store.delete_session(session.session_id)
         except SessionNotFoundError:
-            log.warning("delete_session_failed", session_id=str(session.session_id))
-            return
+            if not removed_active:  # The current session may not be saved yet.
+                log.warning("delete_session_failed", session_id=str(session.session_id))
+                return
 
         if removed_active:
+            self._state.session = Session()
             self._conversation.clear()
         self._overlays.close_all()
+
+    def _open(self, session: Session) -> Session:
+        """Make ``session`` current, loading it unless it already is."""
+        if session.session_id != self._state.session.session_id:
+            self._state.session = self._store.get_session(session.session_id)
+        return self._state.session
 
 
 def _format_session_label(session: Session) -> str:

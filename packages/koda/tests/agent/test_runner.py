@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from pydantic import BaseModel
 
-from koda.agent.agent import AgentConfig
 from koda.agent.events import (
     AgentToolCompleted,
     AgentToolResultReady,
@@ -190,7 +189,6 @@ async def test_runner_maps_provider_hosted_tool_events() -> None:
     result = ToolResult(call_id=call.call_id, output=ToolOutput(display="result"))
     runner = AgentRunner(
         llm=HostedToolLLM(call=call, result=result),
-        config=AgentConfig(),
         session=Session(),
     )
 
@@ -220,7 +218,7 @@ class TextLLM:
 async def test_runner_saves_the_session_after_each_message() -> None:
     session = Session()
     store = InMemorySessionStore()
-    runner = AgentRunner(llm=TextLLM(), config=AgentConfig(), session=session, store=store)
+    runner = AgentRunner(llm=TextLLM(), session=session, store=store)
 
     _ = [event async for event in runner.run("hello")]
 
@@ -231,7 +229,7 @@ async def test_runner_saves_the_session_after_each_message() -> None:
 @pytest.mark.asyncio
 async def test_runner_without_store_keeps_the_session_in_memory() -> None:
     session = Session()
-    runner = AgentRunner(llm=TextLLM(), config=AgentConfig(), session=session)
+    runner = AgentRunner(llm=TextLLM(), session=session)
 
     _ = [event async for event in runner.run("hello")]
 
