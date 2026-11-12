@@ -9,7 +9,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from koda.llm.apis import LLMApi
-    from koda.llm.credentials import Credentials
+    from koda.llm.auth.protocols import OAuthLoginCallbacks, ProviderAuth
+    from koda.llm.credentials import Credentials, OAuthCredential
 
 type ThinkingOptionId = str
 type AuthMethod = Literal["api-key", "oauth"]
@@ -45,17 +46,22 @@ class ThinkingOption:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Connection:
-    """One way to reach a provider: an API, an endpoint and an auth method."""
+    """One way to reach a provider: an API, an endpoint, and an API key or, with ``oauth``,
+    a browser login."""
 
     id: str
     provider: str
     api: type[LLMApi]
     base_url: str
-    auth: AuthMethod = "api-key"
+    oauth: ProviderAuth | None = None
     label: str | None = None
     description: str | None = None
     detail: str | None = None
     capabilities: dict[str, object] = field(default_factory=dict)
+
+    @property
+    def auth(self) -> AuthMethod:
+        return "oauth" if self.oauth is not None else "api-key"
 
     @property
     def credential_key(self) -> str:
@@ -66,6 +72,13 @@ class Connection:
         """Whether ``credentials`` has a credential for this connection."""
         credential = credentials.get_credential(self.credential_key)
         return credential is not None and credential.auth_type == self.auth
+
+    async def login(self, callbacks: OAuthLoginCallbacks) -> OAuthCredential:
+        """Log in through the browser; ``callbacks`` open the URL and ask for anything the
+        login needs."""
+        if self.oauth is None:
+            raise exceptions.LLMConfigurationError(f"{self.credential_key} has no browser login")
+        return await self.oauth.login(callbacks)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)

@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from koda import llm
 from koda.llm import Connection, Model, Provider
 from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.responses import OpenAIResponsesAPI
@@ -42,7 +41,7 @@ class _Credentials(dict[str, ProviderCredential]):
 
 class _FakeCatalog:
     def providers(self) -> list[Provider]:
-        return [_openai_provider()]
+        return [_openai_provider(_BrowserLogin())]
 
     def models(self, provider: str) -> list[Model]:
         _ = provider
@@ -82,26 +81,6 @@ def _record_dialogs(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(providers, "InputDialog", record("input"))
     monkeypatch.setattr(providers, "MessageDialog", record("message"))
     monkeypatch.setattr(providers, "Picker", record("picker"))
-
-
-class _Logins:
-    """The login ``llm.login`` runs in these tests, set by ``_menu``."""
-
-    current: _BrowserLogin | None = None
-
-
-_logins = _Logins()
-
-
-@pytest.fixture(autouse=True)
-def _log_in_with_the_menus_login(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def login(connection: Connection, callbacks: OAuthLoginCallbacks) -> OAuthCredential:
-        assert _logins.current is not None
-        assert connection.credential_key == _logins.current.id
-        return await _logins.current.login(callbacks)
-
-    monkeypatch.setattr(llm, "login", login)
-    _logins.current = None
 
 
 @pytest.fixture
@@ -152,9 +131,7 @@ class _FailingLogin(_BrowserLogin):
         raise RuntimeError("token exchange failed")
 
 
-def _menu(
-    overlays: _FakeOverlays, credentials: _Credentials, state: AppState, login: _BrowserLogin
-) -> ProviderMenu:
+def _menu(overlays: _FakeOverlays, credentials: _Credentials, state: AppState) -> ProviderMenu:
     context = PaletteContext(
         overlays=cast("Overlays", overlays),
         catalog=cast("Catalog", _FakeCatalog()),
@@ -166,11 +143,11 @@ def _menu(
         outbox=cast("Outbox", None),
         terminal=cast("Terminal", None),
     )
-    _logins.current = login
     return ProviderMenu(context)
 
 
-def _openai_provider(*, oauth: bool = True) -> Provider:
+def _openai_provider(oauth: _BrowserLogin | None) -> Provider:
+    """OpenAI with an API key, and with the browser login ``oauth`` if given."""
     connections = [
         Connection(
             id="api-key",
@@ -180,7 +157,7 @@ def _openai_provider(*, oauth: bool = True) -> Provider:
             label="OpenAI API key",
         )
     ]
-    if oauth:
+    if oauth is not None:
         connections.append(
             Connection(
                 id="oauth",
@@ -188,7 +165,7 @@ def _openai_provider(*, oauth: bool = True) -> Provider:
                 api=OpenAICodexResponsesAPI,
                 base_url="https://chatgpt.com/backend-api/codex",
                 label="ChatGPT Plus/Pro",
-                auth="oauth",
+                oauth=oauth,
             )
         )
     return Provider(id="openai", name="OpenAI", connections=tuple(connections))
@@ -223,7 +200,7 @@ def test_providers_with_a_connection_are_marked(
     overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
     credentials["openai:api-key"] = ApiKeyCredential(type="api_key", value="k")
-    _menu(overlays, credentials, state, _BrowserLogin()).open()
+    _menu(overlays, credentials, state).open()
     assert [item.marker for item in _items(overlays.top)] == ["✓"]
 
 
@@ -231,7 +208,7 @@ def test_several_connections_are_offered_in_a_picker(
     overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
     credentials["openai:oauth"] = _credential()
-    _menu(overlays, credentials, state, _BrowserLogin()).select(_openai_provider())
+    _menu(overlays, credentials, state).select(_openai_provider(_BrowserLogin()))
 
     kind, fields = overlays.top
     assert (kind, fields["args"][0]) == ("picker", "OpenAI")
@@ -244,7 +221,7 @@ def test_several_connections_are_offered_in_a_picker(
 def test_an_api_key_is_stored_and_picks_a_model(
     overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    _menu(overlays, credentials, state, _BrowserLogin()).select(_openai_provider())
+    _menu(overlays, credentials, state).select(_openai_provider(_BrowserLogin()))
     _pick(overlays.top, "OpenAI API key")
 
     kind, fields = overlays.top
@@ -259,15 +236,15 @@ def test_an_api_key_is_stored_and_picks_a_model(
 def test_a_single_connection_skips_the_picker(
     overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    _menu(overlays, credentials, state, _BrowserLogin()).select(_openai_provider(oauth=False))
+    _menu(overlays, credentials, state).select(_openai_provider(None))
     assert overlays.kinds == ["input"]
 
 
 async def test_a_browser_login_stores_the_credential(
     overlays: _FakeOverlays, credentials: _Credentials, state: AppState, opened_urls: list[str]
 ) -> None:
-    menu = _menu(overlays, credentials, state, _BrowserLogin())
-    menu.select(_openai_provider())
+    menu = _menu(overlays, credentials, state)
+    menu.select(_openai_provider(_BrowserLogin()))
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await _finish(menu)
 
@@ -282,8 +259,8 @@ async def test_a_login_can_be_finished_by_pasting_into_the_prompt(
     overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
     login = _PromptedLogin()
-    menu = _menu(overlays, credentials, state, login)
-    menu.select(_openai_provider())
+    menu = _menu(overlays, credentials, state)
+    menu.select(_openai_provider(login))
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await asyncio.sleep(0)
 
@@ -304,8 +281,8 @@ async def test_a_login_can_be_finished_by_pasting_into_the_prompt(
 async def test_closing_the_prompt_cancels_the_login(
     overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    menu = _menu(overlays, credentials, state, _PromptedLogin())
-    menu.select(_openai_provider())
+    menu = _menu(overlays, credentials, state)
+    menu.select(_openai_provider(_PromptedLogin()))
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await asyncio.sleep(0)
     login = menu._login
@@ -324,8 +301,8 @@ async def test_closing_the_prompt_cancels_the_login(
 async def test_a_new_login_replaces_one_under_way(
     overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    menu = _menu(overlays, credentials, state, _PromptedLogin())
-    menu.select(_openai_provider())
+    menu = _menu(overlays, credentials, state)
+    menu.select(_openai_provider(_PromptedLogin()))
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await asyncio.sleep(0)
     first = menu._login
@@ -345,8 +322,8 @@ async def test_a_new_login_replaces_one_under_way(
 async def test_a_failed_login_says_why(
     overlays: _FakeOverlays, credentials: _Credentials, state: AppState
 ) -> None:
-    menu = _menu(overlays, credentials, state, _FailingLogin())
-    menu.select(_openai_provider())
+    menu = _menu(overlays, credentials, state)
+    menu.select(_openai_provider(_FailingLogin()))
     _pick(overlays.top, "ChatGPT Plus/Pro")
     await _finish(menu)
 

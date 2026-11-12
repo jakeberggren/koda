@@ -144,8 +144,7 @@ class ProviderMenu:
 
     async def _log_in(self, selection: ProviderConnectionSelection) -> None:
         title = strings.Palette.Providers.connecting(selection.provider.name, selection.label)
-        credential = await llm.login(
-            selection.connection,
+        credential = await selection.connection.login(
             llm.OAuthLoginCallbacks(
                 on_auth_url=_open_in_browser,
                 on_prompt=lambda message: self._ask(title, message),

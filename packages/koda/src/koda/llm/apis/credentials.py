@@ -59,9 +59,11 @@ async def resolve_oauth_credential(context: LLMApiContext) -> OAuthCredential:
     if not _oauth_needs_refresh(credential):
         return credential
 
-    auth = context.auth_registry.get(credential_key)
+    oauth = context.connection.oauth
+    if oauth is None:
+        raise exceptions.LLMConfigurationError(f"{credential_key} has no browser login")
     try:
-        refreshed = await auth.refresh(credential)
+        refreshed = await oauth.refresh(credential)
     except Exception as error:
         raise exceptions.LLMAuthenticationError(context.connection.provider, error) from error
     context.credentials.set_credential(credential_key, refreshed)
