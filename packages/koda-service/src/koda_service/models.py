@@ -24,10 +24,7 @@ class ServiceStatusCode(StrEnum):
     READY = auto()
     PROVIDER_SETUP_REQUIRED = auto()
     MODEL_SELECTION_REQUIRED = auto()
-    PROVIDER_NOT_CONNECTED = auto()
     MODEL_UNAVAILABLE = auto()
-    API_KEY_NOT_CONFIGURED = auto()
-    API_KEY_EMPTY = auto()
     STARTUP_ERROR = auto()
 
 

@@ -173,7 +173,8 @@ def _build_provider(provider_id: str, provider: _ProviderFile) -> tuple[Provider
                 thinking_options=_thinking_options(provider_id, provider, model_file),
                 thinking_budget_tokens=budget.max_tokens if budget else None,
                 capabilities=model_file.capabilities,
-                connections=tuple(model_connections[key]),
+                # Prefer OAuth: a subscription over pay-per-token API keys.
+                connections=tuple(sorted(model_connections[key], key=lambda c: c.auth != "oauth")),
             )
         )
     built = Provider(

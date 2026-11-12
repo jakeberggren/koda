@@ -15,10 +15,15 @@ from koda_service.exceptions import (
     ServiceChatError,
     ServiceNotReadyError,
     ServiceSessionNotFoundError,
+    StartupError,
 )
-from koda_service.models import ChatRequest, ServiceDiagnostics, ServiceStatus
+from koda_service.models import (
+    ChatRequest,
+    ServiceDiagnostics,
+    ServiceStatus,
+    ServiceStatusCode,
+)
 from koda_service.protocols import KodaService
-from koda_service.services.local.availability import LocalAvailability
 from koda_service.services.local.runtime import LocalRuntime
 
 if TYPE_CHECKING:
@@ -48,17 +53,41 @@ class LocalKodaService(KodaService[AgentEvent, Provider, Model, Message]):
             session_store=self.session_store,
             context_manager=ContextManager.from_workspace(runtime.cwd),
         )
-        self.availability = LocalAvailability(settings=settings, runtime=self.runtime)
 
     def update_settings(self, settings: SettingsManager) -> None:
         """Replace settings and invalidate the cached agent."""
         self.settings = settings
         self.runtime.update_settings(settings)
-        self.availability = LocalAvailability(settings=settings, runtime=self.runtime)
 
     def status(self) -> ServiceStatus:
-        """Return the current service status."""
-        return self.availability.status()
+        """Return whether chat can run with the current settings, and if not, why."""
+        try:
+            return self._status()
+        except SecretsLoadError as e:
+            return ServiceStatus.from_startup_error(StartupError.from_secrets_load_error(e))
+
+    def _status(self) -> ServiceStatus:
+        if not any(model.is_connected(self.settings) for model in self.runtime.catalog.models()):
+            return ServiceStatus(
+                code=ServiceStatusCode.PROVIDER_SETUP_REQUIRED,
+                summary="Provider setup required",
+                detail="Connect provider credentials in settings to continue.",
+            )
+        provider, model_id = self.settings.provider, self.settings.model
+        if provider is None or model_id is None:
+            return ServiceStatus(
+                code=ServiceStatusCode.MODEL_SELECTION_REQUIRED,
+                summary="Model selection required",
+                detail="Select a model in settings to continue.",
+            )
+        selected = self.get_model(provider, model_id)
+        if selected is None or not selected.is_connected(self.settings):
+            return ServiceStatus(
+                code=ServiceStatusCode.MODEL_UNAVAILABLE,
+                summary="Selected model unavailable",
+                detail="Connect its provider or choose a different model in settings.",
+            )
+        return ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
 
     async def chat(self, request: ChatRequest) -> AsyncIterator[AgentEvent]:  # noqa: C901 - allow complex
         """Send a message and stream agent events."""
@@ -90,10 +119,7 @@ class LocalKodaService(KodaService[AgentEvent, Provider, Model, Message]):
             return [
                 provider
                 for provider in self.list_providers()
-                if any(
-                    self.settings.get_credential(connection.credential_key)
-                    for connection in provider.connections
-                )
+                if any(c.is_connected(self.settings) for c in provider.connections)
             ]
         except SecretsLoadError:
             return []
@@ -116,31 +142,30 @@ class LocalKodaService(KodaService[AgentEvent, Provider, Model, Message]):
         warnings = [warning.summary for warning in self.runtime.warnings]
         return ServiceDiagnostics(startup_warnings=warnings)
 
-    def _connected_keys(self) -> set[str]:
-        return {
-            connection.credential_key
-            for provider in self.list_providers()
-            for connection in provider.connections
-            if self.settings.get_credential(connection.credential_key)
-        }
-
-    def _configured_model(self, model: Model, connected: set[str]) -> Model:
-        """``model``, its detail naming its connection if its provider has several connected."""
-        if sum(key.startswith(f"{model.provider}:") for key in connected) <= 1:
-            return replace(model, detail=None)
-        return replace(model, detail=model.connection(self.settings).detail or model.detail)
-
     def list_configured_models(self) -> list[Model]:
-        """List models with a connected connection."""
+        """List models with a connected connection.
+
+        A model's detail names its connection when its provider has more than one connected.
+        """
         try:
-            connected = self._connected_keys()
-            return [
-                self._configured_model(model, connected)
+            connected = [
+                (model, model.connection(self.settings))
                 for model in self.runtime.catalog.models()
-                if any(connection.credential_key in connected for connection in model.connections)
+                if model.is_connected(self.settings)
             ]
+            several = {
+                provider.id
+                for provider in self.list_configured_providers()
+                if sum(c.is_connected(self.settings) for c in provider.connections) > 1
+            }
         except SecretsLoadError:
             return []
+        return [
+            replace(model, detail=connection.detail or model.detail)
+            if model.provider in several
+            else replace(model, detail=None)
+            for model, connection in connected
+        ]
 
     def active_session(self) -> Session | None:
         """Get the current session, if any."""

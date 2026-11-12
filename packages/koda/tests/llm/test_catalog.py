@@ -4,10 +4,11 @@ from typing import cast
 
 import pytest
 
+from koda import llm
 from koda.llm import Catalog, Credentials, exceptions
 from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.completions import OpenAICompletionsAPI
-from koda_common.settings.credentials import ApiKeyCredential, ProviderCredential
+from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 
 
 def _write_json(path: Path, data: object) -> None:
@@ -60,15 +61,26 @@ def test_builtin_openai_models_are_offered_by_their_connections() -> None:
         "gpt-5.4-nano",
         "gpt-5.3-codex",
     ]
-    assert [c.id for c in models["gpt-5.5"].connections] == ["api-key", "oauth"]
+    assert [c.id for c in models["gpt-5.5"].connections] == ["oauth", "api-key"]
     assert [c.id for c in models["gpt-5.4-nano"].connections] == ["api-key"]
+
+
+def _oauth() -> OAuthCredential:
+    return OAuthCredential(
+        type="oauth",
+        access_token="access",  # noqa: S106
+        refresh_token="refresh",  # noqa: S106
+        expires_at="0",
+    )
 
 
 def test_model_connection_prefers_oauth() -> None:
     catalog, _warnings = Catalog.load()
     model = catalog.model("openai", "gpt-5.5")
+    api_key = ApiKeyCredential(type="api_key", value="key")
+    credentials = _credentials({"openai:api-key": api_key, "openai:oauth": _oauth()})
 
-    assert model.connection(_credentials({})).id == "oauth"
+    assert model.connection(credentials).id == "oauth"
 
 
 def test_model_connection_uses_the_connection_with_a_credential() -> None:
@@ -77,6 +89,22 @@ def test_model_connection_uses_the_connection_with_a_credential() -> None:
     api_key = ApiKeyCredential(type="api_key", value="key")
 
     assert model.connection(_credentials({"openai:api-key": api_key})).id == "api-key"
+
+
+def test_model_without_a_connected_connection_is_not_connected() -> None:
+    catalog, _warnings = Catalog.load()
+    model = catalog.model("openai", "gpt-5.5")
+
+    assert not model.is_connected(_credentials({}))
+    with pytest.raises(exceptions.ProviderNotConnectedError):
+        model.connection(_credentials({}))
+
+
+async def test_connect_requires_a_connected_provider() -> None:
+    catalog, _warnings = Catalog.load()
+
+    with pytest.raises(exceptions.ProviderNotConnectedError):
+        await llm.connect(catalog.model("openai", "gpt-5.5"), _credentials({}))
 
 
 def test_unknown_model_is_not_supported() -> None:

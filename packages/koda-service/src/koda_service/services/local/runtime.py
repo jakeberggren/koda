@@ -51,9 +51,7 @@ class LocalRuntime:
         """Create the selected LLM, or return an injected test/runtime LLM."""
         if self.config.llm is not None:
             return self.config.llm
-        if self.settings.provider is None:
-            raise llm_exceptions.ProviderSelectionMissingError
-        if self.settings.model is None:
+        if self.settings.provider is None or self.settings.model is None:
             raise llm_exceptions.ModelSelectionMissingError
         model = self.catalog.model(self.settings.provider, self.settings.model)
         return await connect(model, self.settings, tracing=self.config.tracing)
@@ -104,7 +102,7 @@ class LocalRuntime:
         provider, model = self.settings.provider, self.settings.model
         if provider is None or model is None:
             if self.config.llm is None:
-                raise llm_exceptions.ProviderSelectionMissingError
+                raise llm_exceptions.ModelSelectionMissingError
             return self.settings.thinking
         try:
             return (
