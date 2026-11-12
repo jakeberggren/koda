@@ -30,9 +30,8 @@ if TYPE_CHECKING:
     from koda.agent import AgentEvent
     from koda.llm import LLM, Catalog, Credentials, Model
     from koda.sessions import SessionStore
-    from koda_common.settings import SettingChange
     from koda_tui.appearance import RGBColor
-    from koda_tui.settings import AppSettings
+    from koda_tui.settings import AppSettings, SettingChange
 
     type Connect = Callable[[Model, Credentials], Awaitable[LLM]]
 

@@ -10,11 +10,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from koda_common.settings import SecretsStore, Settings, SettingsManager, SettingsStore
+from koda_tui.settings import SecretsStore, Settings, SettingsManager, SettingsStore
 
 if TYPE_CHECKING:
-    from koda_common.settings.credentials import ProviderCredential
-    from koda_common.settings.store import JsonObject
+    from koda.llm.credentials import ProviderCredential
+    from koda_tui.settings.store import JsonObject
 
 
 @dataclass

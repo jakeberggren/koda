@@ -6,22 +6,23 @@ from functools import partial
 from pathlib import Path
 from typing import NoReturn
 
+from structlog import get_logger
+
 from koda import llm
 from koda.sessions import JsonSessionStore
-from koda_common.logging import LoggingConfig, configure_logging, get_logger
-from koda_common.settings import (
-    JsonFileSecretsStore,
-    JsonFileSettingsStore,
-    SecretsLoadError,
-    SecretsStore,
-    SettingsLoadError,
-    SettingsManager,
-    SettingsStore,
-)
 from koda_tui import strings
 from koda_tui.app import KodaTuiApp
-from koda_tui.settings import AppSettings, TuiSettingsManager
-from koda_tui.startup import StartupError
+from koda_tui.logs import LoggingConfig, configure_logging
+from koda_tui.settings import (
+    AppSettings,
+    JsonFileSecretsStore,
+    JsonFileSettingsStore,
+    SecretsStore,
+    SettingsError,
+    SettingsManager,
+    SettingsStore,
+    TuiSettingsManager,
+)
 
 
 def load_settings(settings_store: SettingsStore, secrets_store: SecretsStore) -> AppSettings:
@@ -38,8 +39,8 @@ def main() -> None:
     workspace = Path.cwd().resolve()
     try:
         settings = load_settings(JsonFileSettingsStore(), JsonFileSecretsStore())
-    except (SettingsLoadError, SecretsLoadError) as error:
-        _fail(_startup_error(error))
+    except SettingsError as error:
+        _fail(error)
     catalog, warnings = llm.Catalog.load()
     app = KodaTuiApp(
         settings,
@@ -52,14 +53,7 @@ def main() -> None:
     asyncio.run(app.run())
 
 
-def _startup_error(error: SettingsLoadError | SecretsLoadError) -> StartupError:
-    """``error`` as a start-up error, which says what to fix."""
-    if isinstance(error, SecretsLoadError):
-        return StartupError.from_secrets_load_error(error)
-    return StartupError.from_settings_load_error(error)
-
-
-def _fail(error: StartupError) -> NoReturn:
+def _fail(error: SettingsError) -> NoReturn:
     """Log ``error``, tell the user what to fix, and exit. Expected start-up failures
     are reported briefly, not as tracebacks."""
     get_logger(__name__).error("startup_failed", summary=error.summary, details=error.details)

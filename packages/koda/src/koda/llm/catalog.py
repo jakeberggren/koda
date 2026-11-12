@@ -6,6 +6,7 @@ from importlib.resources import as_file, files
 from typing import TYPE_CHECKING, Annotated
 
 from pydantic import BaseModel, Field, PlainValidator, ValidationError
+from structlog import get_logger
 
 from koda.llm import exceptions
 from koda.llm.apis import LLMApi
@@ -21,8 +22,7 @@ from koda.llm.models import (
     ThinkingOption,
     ThinkingOptionId,
 )
-from koda_common.logging import get_logger
-from koda_common.paths import model_overrides_file_path
+from koda.paths import model_overrides_file_path
 
 if TYPE_CHECKING:
     from pathlib import Path

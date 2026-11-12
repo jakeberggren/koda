@@ -13,7 +13,7 @@ from koda.llm.auth.registry import ProviderAuthRegistry
 
 if TYPE_CHECKING:
     from koda.llm.auth.protocols import OAuthLoginCallbacks
-    from koda_common.settings.credentials import OAuthCredential
+    from koda.llm.credentials import OAuthCredential
 
 
 class _ProviderAuth:

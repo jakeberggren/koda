@@ -1,4 +1,6 @@
-from typing import Annotated, Literal
+"""Provider credentials, and where they are stored."""
+
+from typing import Annotated, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
@@ -25,3 +27,15 @@ class OAuthCredential(BaseModel):
 
 
 ProviderCredential = Annotated[ApiKeyCredential | OAuthCredential, Field(discriminator="type")]
+
+
+class Credentials(Protocol):
+    """Provider credentials keyed by ``provider:connection``. Written back on OAuth refresh."""
+
+    def get_credential(self, key: str) -> ProviderCredential | None:
+        """Return the credential stored under ``key``, if any."""
+        ...
+
+    def set_credential(self, key: str, credential: ProviderCredential) -> None:
+        """Store ``credential`` under ``key``."""
+        ...

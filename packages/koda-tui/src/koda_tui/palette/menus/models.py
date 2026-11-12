@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda_common.logging import get_logger
+from structlog import get_logger
+
 from koda_tui import strings
 from koda_tui.ui.widgets import ListItem, Picker
 

@@ -7,9 +7,8 @@ from typing import TYPE_CHECKING
 from koda.llm import Model, Provider, ThinkingOption
 from koda.llm.exceptions import LLMConfigurationError
 from koda.sessions import Session
-from koda_common.settings import SecretsLoadError
 from koda_tui import strings
-from koda_tui.startup import StartupError
+from koda_tui.settings import SecretsLoadError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -18,7 +17,7 @@ if TYPE_CHECKING:
     from koda.llm import Catalog, ThinkingOptionId
     from koda.messages import TokenUsage
     from koda.tools import ToolCall, ToolOutput
-    from koda_common.settings import SettingsManager
+    from koda_tui.settings import SettingsManager
 
 
 class ResponsePhase(Enum):
@@ -146,7 +145,7 @@ class AppState:
             ]
             self.issue = self._check_selection(catalog, settings)
         except SecretsLoadError as error:
-            self.issue = StartupError.from_secrets_load_error(error).summary
+            self.issue = error.summary
         self.thinking = (
             self.active_model.resolve_thinking_option(settings.thinking)
             if self.active_model is not None

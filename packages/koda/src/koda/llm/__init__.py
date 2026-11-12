@@ -3,6 +3,12 @@ from __future__ import annotations
 from koda.llm.apis import LLMApiContext
 from koda.llm.auth.registry import ProviderAuthRegistry
 from koda.llm.catalog import Catalog, CatalogWarning
+from koda.llm.credentials import (
+    ApiKeyCredential,
+    Credentials,
+    OAuthCredential,
+    ProviderCredential,
+)
 from koda.llm.models import (
     AuthMethod,
     Connection,
@@ -12,7 +18,7 @@ from koda.llm.models import (
     ThinkingOptionId,
     resolve_thinking_mode,
 )
-from koda.llm.protocols import LLM, Credentials
+from koda.llm.protocols import LLM
 from koda.llm.types import (
     LLMEvent,
     LLMRequest,
@@ -48,6 +54,7 @@ async def connect(
 
 __all__ = [
     "LLM",
+    "ApiKeyCredential",
     "AuthMethod",
     "Catalog",
     "CatalogWarning",
@@ -59,7 +66,9 @@ __all__ = [
     "LLMRequestOptionsError",
     "LLMResponse",
     "Model",
+    "OAuthCredential",
     "Provider",
+    "ProviderCredential",
     "ThinkingMode",
     "ThinkingOption",
     "ThinkingOptionId",

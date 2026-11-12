@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Literal
-
 from pydantic import (
     AliasChoices,
     BaseModel,
@@ -10,8 +8,8 @@ from pydantic import (
 )
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-type ThinkingOptionId = str
-type ExecutionSandox = Literal["host", "seatbelt"]
+from koda.execution import Sandbox
+from koda.llm import ThinkingOptionId
 
 
 class Settings(BaseSettings):
@@ -61,7 +59,7 @@ class Settings(BaseSettings):
             "KODA_ALLOW_EXTENDED_PROMPT_RETENTION",
         ),
     )
-    bash_execution_sandbox: ExecutionSandox = Field(
+    bash_execution_sandbox: Sandbox = Field(
         default="host",
         description="Command execution backend.",
         validation_alias=AliasChoices("bash_execution_sandbox", "KODA_BASH_EXECUTION_SANDBOX"),
@@ -90,4 +88,4 @@ class PersistedSettings(BaseModel):
     thinking: ThinkingOptionId = "none"
     allow_web_search: bool = False
     allow_extended_prompt_retention: bool = False
-    bash_execution_sandbox: ExecutionSandox = "host"
+    bash_execution_sandbox: Sandbox = "host"

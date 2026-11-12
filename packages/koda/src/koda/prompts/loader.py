@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from koda.context.sources import FileContextSource
+from koda.paths import koda_home_dir
 from koda.prompts.prompt import SystemPrompt
-from koda_common.paths import koda_home_dir
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from koda_common.settings.credentials import ProviderCredential
+    from koda.llm.credentials import ProviderCredential
 
 type JsonScalar = str | int | float | bool | None
 """Primitive JSON value supported by the settings file."""

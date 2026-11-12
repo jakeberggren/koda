@@ -8,7 +8,7 @@ from koda import llm
 from koda.llm import Catalog, Credentials, exceptions
 from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.completions import OpenAICompletionsAPI
-from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
+from koda.llm.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 
 
 def _write_json(path: Path, data: object) -> None:

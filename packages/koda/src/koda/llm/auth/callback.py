@@ -8,6 +8,8 @@ from time import monotonic
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
 
+from structlog import get_logger
+
 from koda.llm.auth.exceptions import (
     OAuthCallbackCancelledError,
     OAuthCallbackCodeMissingError,
@@ -15,7 +17,6 @@ from koda.llm.auth.exceptions import (
     OAuthCallbackStateError,
     OAuthCallbackTimeoutError,
 )
-from koda_common.logging import get_logger
 
 log = get_logger(__name__)
 

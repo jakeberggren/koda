@@ -9,8 +9,8 @@ from koda.llm import exceptions
 from koda.llm.apis.base import LLMApiContext
 from koda.llm.apis.codex import CODEX_BACKEND, CODEX_ORIGINATOR, OpenAICodexResponsesAPI
 from koda.llm.auth.registry import ProviderAuthRegistry
+from koda.llm.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 from koda.llm.models import Connection, Model
-from koda_common.settings.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 
 if TYPE_CHECKING:
     from collections.abc import Callable

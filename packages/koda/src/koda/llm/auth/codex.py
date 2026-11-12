@@ -14,6 +14,7 @@ from joserfc.errors import JoseError
 from joserfc.jwk import KeySet, import_key
 from joserfc.jwt import JWTClaimsRegistry
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, ValidationError
+from structlog import get_logger
 
 from koda.llm.auth.browser import (
     AuthorizationRequest,
@@ -22,8 +23,7 @@ from koda.llm.auth.browser import (
 )
 from koda.llm.auth.exceptions import OpenAICodexAccountMissingError, OpenAICodexTokenError
 from koda.llm.auth.protocols import OAuthLoginCallbacks
-from koda_common.logging import get_logger
-from koda_common.settings.credentials import OAuthCredential
+from koda.llm.credentials import OAuthCredential
 
 if TYPE_CHECKING:
     from collections.abc import Mapping

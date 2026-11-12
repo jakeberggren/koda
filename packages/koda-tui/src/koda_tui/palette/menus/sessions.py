@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.keys import Keys
+from structlog import get_logger
 
 from koda.sessions import Session, SessionNotFoundError
-from koda_common.logging import get_logger
 from koda_tui import strings
 from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, ListItem, Picker, Shortcut
 

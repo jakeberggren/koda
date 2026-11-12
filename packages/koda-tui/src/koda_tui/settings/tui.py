@@ -6,16 +6,12 @@ from typing import TYPE_CHECKING, Annotated
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 from pydantic_core import PydanticCustomError
 
-from koda_common.settings import (
-    BaseSettingsManager,
-    SettingsManager,
-    SettingsUnknownKeysError,
-    SettingsValidationError,
-)
 from koda_tui.appearance import AUTO, THEMES
+from koda_tui.settings.errors import SettingsUnknownKeysError, SettingsValidationError
+from koda_tui.settings.manager import BaseSettingsManager, SettingsManager
 
 if TYPE_CHECKING:
-    from koda_common.settings.protocols import JsonObject, SettingsStore
+    from koda_tui.settings.protocols import JsonObject, SettingsStore
 
 
 _TUI_SECTION = "tui"

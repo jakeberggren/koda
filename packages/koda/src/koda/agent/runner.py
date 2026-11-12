@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from structlog import get_logger
+
 from koda.agent.events import (
     AgentEvent,
     AgentIterationStarted,
@@ -30,7 +32,6 @@ from koda.messages import AssistantMessage, ToolMessage, UserMessage
 from koda.prompts import SystemPrompt
 from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda.tools.executor import ToolExecutor
-from koda_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable

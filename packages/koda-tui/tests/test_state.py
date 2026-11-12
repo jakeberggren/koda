@@ -8,9 +8,9 @@ from unittest.mock import Mock
 import pytest
 
 from koda.llm import Catalog
-from koda_common.settings import SecretsPermissionError
-from koda_common.settings.credentials import ApiKeyCredential
+from koda.llm.credentials import ApiKeyCredential
 from koda_tui import strings
+from koda_tui.settings import SecretsPermissionError
 from koda_tui.state import AppState
 
 

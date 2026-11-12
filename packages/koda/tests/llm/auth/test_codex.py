@@ -24,7 +24,7 @@ from koda.llm.auth.codex import (
 )
 from koda.llm.auth.exceptions import OpenAICodexAccountMissingError, OpenAICodexTokenError
 from koda.llm.auth.protocols import OAuthLoginCallbacks
-from koda_common.settings.credentials import OAuthCredential
+from koda.llm.credentials import OAuthCredential
 
 if TYPE_CHECKING:
     from koda.llm.auth.browser import AuthorizationRequest
