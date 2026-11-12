@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from time import time
 from typing import TYPE_CHECKING, cast
 
@@ -8,7 +9,6 @@ import pytest
 from koda.llm import exceptions
 from koda.llm.apis.base import LLMApiContext
 from koda.llm.apis.codex import CODEX_BACKEND, CODEX_ORIGINATOR, OpenAICodexResponsesAPI
-from koda.llm.auth.registry import ProviderAuthRegistry
 from koda.llm.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 from koda.llm.models import Connection, Model
 
@@ -74,7 +74,7 @@ class _FakeClientFactory:
 _CONNECTION = Connection(
     id="oauth",
     provider="openai",
-    auth="oauth",
+    oauth=_FakeAuthProvider(),
     api=OpenAICodexResponsesAPI,
     base_url="https://chatgpt.com/backend-api/codex",
     capabilities={"web_search": True},
@@ -86,17 +86,17 @@ def _context(
     auth_provider: _FakeAuthProvider | None = None,
     credentials: _FakeCredentials | None = None,
 ) -> LLMApiContext:
+    connection = replace(_CONNECTION, oauth=auth_provider or _FakeAuthProvider())
     return LLMApiContext(
         model=Model(
             id="gpt-5.5",
             name="gpt-5.5",
             provider="openai",
             capabilities={"extended_prompt_retention": True},
-            connections=(_CONNECTION,),
+            connections=(connection,),
         ),
-        connection=_CONNECTION,
+        connection=connection,
         credentials=cast("Credentials", credentials or _FakeCredentials(credential)),
-        auth_registry=ProviderAuthRegistry({"openai:oauth": auth_provider or _FakeAuthProvider()}),
     )
 
 

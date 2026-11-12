@@ -10,16 +10,13 @@ from typing import TYPE_CHECKING
 
 from structlog import get_logger
 
-from koda.llm.auth.protocols import OAuthLoginCallbacks
-from koda.llm.credentials import ApiKeyCredential
+from koda import llm
 from koda_tui import strings
 from koda_tui.appearance import Icons
 from koda_tui.ui.widgets import InputDialog, ListItem, MessageDialog, Picker
 
 if TYPE_CHECKING:
-    from koda.llm import Connection, Provider
-    from koda.llm.auth.registry import ProviderAuthRegistry
-    from koda.llm.credentials import ProviderCredential
+    from koda.llm import Connection, Provider, ProviderCredential
     from koda_tui.palette.context import PaletteContext
 
 
@@ -49,11 +46,10 @@ class ProviderMenu:
     A browser login runs in the background, one at a time; closing its dialog cancels it.
     """
 
-    def __init__(self, context: PaletteContext, auth_registry: ProviderAuthRegistry) -> None:
+    def __init__(self, context: PaletteContext) -> None:
         self._overlays = context.overlays
         self._catalog = context.catalog
         self._context = context
-        self._auth_registry = auth_registry
         self._login: asyncio.Task[None] | None = None
 
     def open(self) -> None:
@@ -123,7 +119,7 @@ class ProviderMenu:
                 title=strings.Palette.Providers.enter(selection.label),
                 mask_input=True,
                 on_submit=lambda key: self._save(
-                    selection, ApiKeyCredential(type="api_key", value=key)
+                    selection, llm.ApiKeyCredential(type="api_key", value=key)
                 ),
                 on_cancel=self._overlays.close,
             ),
@@ -148,11 +144,11 @@ class ProviderMenu:
 
     async def _log_in(self, selection: ProviderConnectionSelection) -> None:
         title = strings.Palette.Providers.connecting(selection.provider.name, selection.label)
-        credential = await self._auth_registry.get(selection.credential_key).login(
-            OAuthLoginCallbacks(
+        credential = await selection.connection.login(
+            llm.OAuthLoginCallbacks(
                 on_auth_url=_open_in_browser,
                 on_prompt=lambda message: self._ask(title, message),
-            )
+            ),
         )
         self._save(selection, credential)
 

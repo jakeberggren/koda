@@ -4,22 +4,14 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-from koda.llm import (
-    CredentialsError,
-    LLMConfigurationError,
-    Model,
-    Provider,
-    ThinkingOption,
-)
+from koda.llm import Model, Provider, ThinkingOption
 from koda.sessions import Session
-from koda_tui import strings
 from koda_tui.settings import Settings
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
     from pathlib import Path
 
-    from koda.llm import Catalog, Credentials, ThinkingOptionId
+    from koda.llm import ThinkingOptionId
     from koda.messages import TokenUsage
     from koda.tools import ToolCall, ToolOutput
 
@@ -93,7 +85,6 @@ class AppState:
     pending_inputs: list[PendingInput] = field(default_factory=list)  # Steers first.
     active_model: Model | None = None
     configured_providers: list[Provider] = field(default_factory=list)
-    thinking: ThinkingOption = field(default_factory=ThinkingOption.none)
     usage: Usage | None = None
     exit_requested: bool = False
 
@@ -125,56 +116,12 @@ class AppState:
     def thinking_supported(self) -> bool:
         return self.active_model is not None and self.active_model.supports_thinking
 
-    @classmethod
-    def load(
-        cls,
-        workspace: Path,
-        settings: Settings,
-        *,
-        catalog: Catalog,
-        credentials: Credentials,
-        warnings: Sequence[str] = (),
-    ) -> AppState:
-        """The state for ``workspace`` and ``settings``, refreshed from ``catalog`` and
-        ``credentials``."""
-        state = cls(workspace=workspace, settings=settings, warnings=list(warnings))
-        state.refresh(catalog, credentials)
-        return state
-
-    def refresh(self, catalog: Catalog, credentials: Credentials) -> None:
-        """Take the providers connected now, and the model and thinking level the settings
-        pick, or what stops Koda from responding."""
-        self.configured_providers, self.active_model = [], None
-        try:
-            self.configured_providers = [
-                provider
-                for provider in catalog.providers()
-                if any(c.is_connected(credentials) for c in provider.connections)
-            ]
-            self.issue = self._check_selection(catalog, credentials)
-        except CredentialsError:
-            self.issue = strings.Screen.Status.CREDENTIALS_UNREADABLE
-        self.thinking = (
-            self.active_model.resolve_thinking_option(self.settings.thinking)
-            if self.active_model is not None
-            else ThinkingOption.none()
-        )
-
-    def _check_selection(self, catalog: Catalog, credentials: Credentials) -> str | None:
-        """Make the selected model active, or say why it can't be."""
-        settings = self.settings
-        if not self.configured_providers:
-            return strings.Screen.Status.SETUP_REQUIRED
-        if settings.provider is None or settings.model is None:
-            return strings.Screen.Status.SELECTION_REQUIRED
-        try:
-            model = catalog.model(settings.provider, settings.model)
-        except LLMConfigurationError:
-            return strings.Screen.Status.MODEL_NOT_FOUND
-        if not model.is_connected(credentials):
-            return strings.Screen.Status.MODEL_NOT_CONNECTED
-        self.active_model = model
-        return None
+    @property
+    def thinking(self) -> ThinkingOption:
+        """The thinking level the settings pick for the active model."""
+        if self.active_model is None:
+            return ThinkingOption.none()
+        return self.active_model.resolve_thinking_option(self.settings.thinking)
 
     def next_thinking(self) -> ThinkingOptionId | None:
         """The active model's thinking level after the current one, wrapping around;

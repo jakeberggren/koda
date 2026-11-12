@@ -9,9 +9,17 @@ from unittest.mock import Mock
 import pytest
 from prompt_toolkit.keys import Keys
 
-from koda.llm import Catalog, LLMConfigurationError, Model, ThinkingOption
-from koda.llm.credentials import ApiKeyCredential
+from koda.llm import (
+    ApiKeyCredential,
+    Catalog,
+    CredentialsError,
+    LLMConfigurationError,
+    Model,
+    ProviderCredential,
+    ThinkingOption,
+)
 from koda.sessions import InMemorySessionStore, Session
+from koda_tui import strings
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import RGBColor
@@ -23,19 +31,27 @@ if TYPE_CHECKING:
 
     from pydantic import BaseModel
 
-    from koda.llm import Credentials, ProviderCredential
+    from koda.llm import Credentials
     from koda.llm.types import LLMEvent, LLMRequest, LLMResponse
     from koda.messages import AssistantMessage
 
 
-class _Credentials:
-    """An API key for every connection."""
-
+class _Credentials(dict[str, ProviderCredential]):
     def get_credential(self, key: str) -> ProviderCredential | None:
-        return ApiKeyCredential(type="api_key", value="key")
+        return self.get(key)
 
     def set_credential(self, key: str, credential: ProviderCredential) -> None:
-        raise NotImplementedError
+        self[key] = credential
+
+
+class _UnreadableCredentials(_Credentials):
+    def get_credential(self, key: str) -> ProviderCredential | None:
+        raise CredentialsError(Path("credentials.json"), PermissionError("denied"))
+
+
+def _connected() -> _Credentials:
+    """An OpenAI API key."""
+    return _Credentials({"openai:api-key": ApiKeyCredential(type="api_key", value="key")})
 
 
 class _FakeLLM:
@@ -75,7 +91,9 @@ _SETTINGS = Settings(provider="openai", model="gpt-5.2", theme="terminal-dark")
 
 
 def _make_app(
-    workspace: Path = Path("/workspace"), settings: Settings = _SETTINGS
+    workspace: Path = Path("/workspace"),
+    settings: Settings = _SETTINGS,
+    credentials: _Credentials | None = None,
 ) -> tuple[KodaTuiApp, _Connect]:
     connect = _Connect()
     catalog, _warnings = Catalog.load()
@@ -83,7 +101,7 @@ def _make_app(
         settings,
         workspace,
         catalog=catalog,
-        credentials=_Credentials(),
+        credentials=_connected() if credentials is None else credentials,
         store=InMemorySessionStore(),
         connect=connect,
     )
@@ -91,7 +109,9 @@ def _make_app(
 
 
 def test_new_settings_are_saved_and_shown() -> None:
-    app, _ = _make_app()
+    credentials = _connected()
+    credentials["bergetai:api-key"] = ApiKeyCredential(type="api_key", value="key")
+    app, _ = _make_app(credentials=credentials)
     app.update_settings(
         replace(app.state.settings, provider="bergetai", model="zai-org/GLM-4.7-FP8")
     )
@@ -149,11 +169,11 @@ def test_cycle_thinking_moves_to_the_next_level_and_wraps_around() -> None:
     model = _thinking_model()
     app.state.active_model = model
 
-    app.state.thinking = model.effective_thinking_options[0]
+    app.state.settings = replace(app.state.settings, thinking="none")
     app.cycle_thinking()
     assert app.update_settings.call_args.args[0].thinking == "low"
 
-    app.state.thinking = model.effective_thinking_options[-1]
+    app.state.settings = replace(app.state.settings, thinking="high")
     app.cycle_thinking()
     assert app.update_settings.call_args.args[0].thinking == "none"
 
@@ -306,3 +326,46 @@ class TestAgent:
 
         with pytest.raises(LLMConfigurationError, match="No model selected"):
             await _respond(app)
+
+
+class TestStatus:
+    """What stops Koda from responding, and the model it responds with."""
+
+    def test_the_selected_connected_model_is_active(self) -> None:
+        app, _ = _make_app()
+
+        assert app.state.issue is None
+        assert app.state.active_model is not None
+        assert app.state.active_model.id == "gpt-5.2"
+        assert [provider.id for provider in app.state.configured_providers] == ["openai"]
+
+    def test_setup_is_required_without_credentials(self) -> None:
+        app, _ = _make_app(credentials=_Credentials())
+        assert app.state.issue == strings.Screen.Status.SETUP_REQUIRED
+
+    def test_selection_is_required_without_a_model(self) -> None:
+        app, _ = _make_app(settings=replace(_SETTINGS, model=None))
+
+        assert app.state.issue == strings.Screen.Status.SELECTION_REQUIRED
+        assert app.state.active_model is None
+
+    def test_an_unknown_model_is_not_found(self) -> None:
+        app, _ = _make_app(settings=replace(_SETTINGS, model="missing"))
+        assert app.state.issue == strings.Screen.Status.MODEL_NOT_FOUND
+
+    def test_a_model_of_an_unconnected_provider_is_not_connected(self) -> None:
+        settings = replace(_SETTINGS, provider="bergetai", model="google/gemma-4-31B-it")
+        app, _ = _make_app(settings=settings)
+        assert app.state.issue == strings.Screen.Status.MODEL_NOT_CONNECTED
+
+    def test_an_unreadable_credentials_file_is_reported(self) -> None:
+        app, _ = _make_app(credentials=_UnreadableCredentials())
+
+        assert app.state.issue == strings.Screen.Status.CREDENTIALS_UNREADABLE
+        assert app.state.configured_providers == []
+
+    def test_thinking_follows_the_settings_for_the_active_model(self) -> None:
+        settings = replace(_SETTINGS, provider="anthropic", model="claude-fable-5")
+        key = ApiKeyCredential(type="api_key", value="key")
+        app, _ = _make_app(settings=settings, credentials=_Credentials({"anthropic:api-key": key}))
+        assert app.state.thinking.id == "low"

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
 
-from koda.llm.auth.registry import ProviderAuthRegistry
 from koda_tui import strings
 from koda_tui.palette.menus.input import InputMenu
 from koda_tui.palette.menus.models import ModelMenu
@@ -63,7 +62,7 @@ class CommandPalette:
             Command(
                 text=strings.Palette.Providers,
                 group=Group.AGENT,
-                run=ProviderMenu(context, ProviderAuthRegistry.default()).open,
+                run=ProviderMenu(context).open,
             ),
             Command(
                 text=strings.Palette.Thinking,
