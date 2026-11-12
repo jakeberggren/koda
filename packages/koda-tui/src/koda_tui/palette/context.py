@@ -10,8 +10,8 @@ from koda_tui.ui.widgets import Picker
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_service import KodaService
     from koda_tui.messaging import Conversation, Outbox
+    from koda_tui.runtime import Runtime
     from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
     from koda_tui.terminal import Terminal
@@ -24,7 +24,7 @@ class PaletteContext:
     """Where menus open their pickers and dialogs, and the parts of Koda they act on."""
 
     overlays: Overlays
-    service: KodaService
+    runtime: Runtime
     settings: AppSettings
     state: AppState
     conversation: Conversation

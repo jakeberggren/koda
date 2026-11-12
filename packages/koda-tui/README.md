@@ -12,7 +12,7 @@
 </div>
 
 `koda-tui` is the terminal interface for Koda. It owns the interactive chat experience,
-turns `koda-service` stream events into UI state, and renders model and tool output in the
+runs the `koda` agent, turns its stream events into UI state, and renders model and tool output in the
 terminal.
 
 ## Core Components
@@ -22,7 +22,7 @@ terminal.
 - **Streaming coordination** for incremental text, thinking, tool, and completion updates.
 - **Palette-driven controls** for provider setup, model selection, thinking level, sessions,
   theme, scrollbar visibility, and input behavior.
-- **In-process bootstrap** that wires settings, the bundled service, and the TUI agent.
+- **Runtime** that builds the agent from the settings and runs it for the current session.
 
 ## Package Structure
 

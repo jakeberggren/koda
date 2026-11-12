@@ -23,8 +23,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from koda.llm.auth.protocols import OAuthLoginCallbacks
-    from koda_service import KodaService
     from koda_tui.messaging import Conversation, Outbox
+    from koda_tui.runtime import Runtime
     from koda_tui.settings import AppSettings
     from koda_tui.state import AppState
     from koda_tui.terminal import Terminal
@@ -54,13 +54,17 @@ class _FakeAppSettings:
         self.core = _FakeCoreSettings()
 
 
-class _FakeService:
-    def list_providers(self) -> list[Provider]:
+class _FakeCatalog:
+    def providers(self) -> list[Provider]:
         return [_openai_provider()]
 
-    def list_models(self, provider: str) -> list[Model]:
+    def models(self, provider: str) -> list[Model]:
         _ = provider
         return [Model(id="gpt-5.5", name="gpt-5.5", provider="openai")]
+
+
+class _FakeRuntime:
+    catalog = _FakeCatalog()
 
 
 class _FakeOverlays:
@@ -151,7 +155,7 @@ def _menu(
 ) -> ProviderMenu:
     context = PaletteContext(
         overlays=cast("Overlays", overlays),
-        service=cast("KodaService", _FakeService()),
+        runtime=cast("Runtime", _FakeRuntime()),
         settings=cast("AppSettings", settings),
         state=cast("AppState", None),
         conversation=cast("Conversation", None),

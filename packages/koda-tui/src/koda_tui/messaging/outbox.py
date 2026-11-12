@@ -5,15 +5,16 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from koda_service import ChatRequest
-from koda_service.exceptions import ServiceChatError
+from koda.llm import exceptions as llm_exceptions
+from koda.tools import exceptions as tool_exceptions
+from koda_tui import strings
 from koda_tui.state import ErrorMessage, PendingInput
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from koda_service import KodaService
     from koda_tui.messaging.conversation import Conversation
+    from koda_tui.runtime import Runtime
     from koda_tui.state import AppState
 
 
@@ -28,12 +29,12 @@ class Outbox:
         *,
         state: AppState,
         conversation: Conversation,
-        service: KodaService,
+        runtime: Runtime,
         invalidate: Callable[[], None],
     ) -> None:
         self._state = state
         self._conversation = conversation
-        self._service = service
+        self._runtime = runtime
         self._invalidate = invalidate
         self._sending: asyncio.Task[None] | None = None
         self._response: asyncio.Task[None] | None = None
@@ -112,14 +113,36 @@ class Outbox:
         except asyncio.CancelledError:
             if (task := asyncio.current_task()) and task.cancelling():
                 raise  # The sending itself is cancelled, not just this response.
-        except ServiceChatError as failure:
-            error = ErrorMessage(failure.summary, failure.detail)
+        except (llm_exceptions.LLMError, tool_exceptions.ToolError) as failure:
+            error = _error_message(failure)
         finally:
             self._response = None
             self._conversation.end(error)
             self._invalidate()
 
     async def _respond(self, text: str) -> None:
-        async for event in self._service.chat(ChatRequest(message=text)):
+        async for event in self._runtime.run(text):
             self._conversation.apply(event)
             self._invalidate()
+
+
+_ERRORS = strings.Screen.Chat.Errors
+
+# Why a response failed and what to do about it, by error type. The first match wins, so
+# subclasses come before their bases.
+_ERROR_MESSAGES: tuple[tuple[type[Exception], str, str | None], ...] = (
+    (llm_exceptions.LLMAuthenticationError, _ERRORS.AUTHENTICATION, _ERRORS.AUTHENTICATION_FIX),
+    (llm_exceptions.LLMRateLimitError, _ERRORS.RATE_LIMIT, _ERRORS.RATE_LIMIT_FIX),
+    (llm_exceptions.LLMConnectionError, _ERRORS.CONNECTION, _ERRORS.CONNECTION_FIX),
+    (llm_exceptions.LLMAPIError, _ERRORS.PROVIDER, None),
+    (llm_exceptions.LLMConfigurationError, _ERRORS.NOT_READY, None),
+    (tool_exceptions.ToolError, _ERRORS.TOOL, None),
+)
+
+
+def _error_message(error: Exception) -> ErrorMessage:
+    """Why a response failed, and what to do about it."""
+    for kind, summary, fix in _ERROR_MESSAGES:
+        if isinstance(error, kind):
+            return ErrorMessage(summary, f"{error}\n\n{fix}" if fix else str(error))
+    return ErrorMessage(_ERRORS.REQUEST, str(error))

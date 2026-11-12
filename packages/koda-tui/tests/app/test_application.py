@@ -9,11 +9,11 @@ from prompt_toolkit.keys import Keys
 
 from koda.llm import Model, ThinkingOption
 from koda_common.settings import SettingChange
-from koda_service import ServiceDiagnostics, ServiceStatus, ServiceStatusCode
 from koda_tui.app import application
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import RGBColor
+from koda_tui.runtime import Runtime
 from koda_tui.settings import AppSettings
 from koda_tui.state import PendingInput
 
@@ -56,47 +56,30 @@ def _make_app() -> tuple[KodaTuiApp, Mock, Mock, Mock, Mock, Mock]:
     unsubscribe_tui_settings = Mock()
     settings = _make_settings_mock(unsubscribe_settings)
     tui_settings = _make_tui_settings_mock(unsubscribe_tui_settings)
-    service = Mock(
-        spec=[
-            "ready",
-            "status",
-            "update_settings",
-            "list_models",
-            "list_providers",
-            "list_configured_providers",
-            "list_configured_models",
-            "get_model",
-            "diagnostics",
-            "chat",
-            "create_session",
-            "switch_session",
-            "delete_session",
-            "list_sessions",
-            "active_session",
-        ]
-    )
-    service.get_model.return_value = Model(
+    runtime = Mock(spec=Runtime)
+    runtime.warnings = []
+    runtime.issue.return_value = None
+    runtime.connected_providers.return_value = []
+    runtime.selected_model.return_value = Model(
         id="gpt-5.2",
         name="GPT 5.2",
         provider="openai",
         context_window=400_000,
         thinking_options=(ThinkingOption(id="none", label="None"),),
     )
-    service.status.return_value = ServiceStatus(code=ServiceStatusCode.READY, summary="Ready")
-    service.diagnostics.return_value = ServiceDiagnostics(startup_warnings=[])
     app = KodaTuiApp(
         app_settings=AppSettings(core=settings, tui=tui_settings),
-        service=service,
+        runtime=runtime,
         workspace=Path("/workspace"),
     )
-    return (app, settings, tui_settings, service, unsubscribe_settings, unsubscribe_tui_settings)
+    return (app, settings, tui_settings, runtime, unsubscribe_settings, unsubscribe_tui_settings)
 
 
 def test_batched_provider_and_model_changes_update_app_state() -> None:
-    app, settings, _tui_settings, service, _unsubscribe, _unsubscribe_tui = _make_app()
+    app, settings, _tui_settings, runtime, _unsubscribe, _unsubscribe_tui = _make_app()
     settings.provider = "bergetai"
     settings.model = "zai-org/GLM-4.7"
-    service.get_model.return_value = Model(
+    runtime.selected_model.return_value = Model(
         id="zai-org/GLM-4.7",
         name="GLM-4.7",
         provider="bergetai",
@@ -110,8 +93,7 @@ def test_batched_provider_and_model_changes_update_app_state() -> None:
         )
     )
 
-    service.update_settings.assert_called_once_with(settings)
-    service.get_model.assert_called_with("bergetai", "zai-org/GLM-4.7")
+    runtime.settings_changed.assert_called_once_with()
     assert app.state.context_window == 128_000
 
 
@@ -235,14 +217,14 @@ def test_escape_is_free_for_others_while_idle() -> None:
     assert not _escape(app).filter()
 
 
-def test_every_core_setting_change_reaches_the_service() -> None:
-    app, settings, _tui_settings, service, *_ = _make_app()
+def test_every_core_setting_change_reaches_the_runtime() -> None:
+    app, _settings, _tui_settings, runtime, *_ = _make_app()
     app.invalidate = Mock()
 
     change = SettingChange(name="bash_execution_sandbox", old_value="host", new_value="docker")
     app.on_settings_changed((change,))
 
-    service.update_settings.assert_called_once_with(settings)
+    runtime.settings_changed.assert_called_once_with()
     app.invalidate.assert_called_once_with()
 
 

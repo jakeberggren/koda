@@ -131,8 +131,8 @@ def _activity(state: AppState) -> Segment:
     """What Koda is doing now, or why it can't."""
     if state.exit_requested:
         return [(Tokens.Text.ACCENT, strings.Screen.Status.EXIT_AGAIN)]
-    if not state.service_status.is_ready:
-        return [(Tokens.Text.WARNING, state.service_status.summary)]
+    if state.issue is not None:
+        return [(Tokens.Text.WARNING, state.issue)]
     return [(Tokens.Text.ACCENT, _phase(state))]
 
 

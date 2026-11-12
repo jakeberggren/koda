@@ -134,4 +134,4 @@ class CommandPalette:
 
 
 def _ready(state: AppState) -> bool:
-    return state.service_status.is_ready
+    return state.issue is None

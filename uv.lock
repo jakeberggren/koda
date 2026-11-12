@@ -12,7 +12,6 @@ required-markers = [
 members = [
     "koda",
     "koda-common",
-    "koda-service",
     "koda-tui",
 ]
 
@@ -791,27 +790,12 @@ requires-dist = [
 ]
 
 [[package]]
-name = "koda-service"
-version = "0.8.4"
-source = { editable = "packages/koda-service" }
-dependencies = [
-    { name = "koda" },
-    { name = "koda-common" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "koda", editable = "packages/koda" },
-    { name = "koda-common", editable = "packages/koda-common" },
-]
-
-[[package]]
 name = "koda-tui"
 version = "0.8.4"
 source = { editable = "packages/koda-tui" }
 dependencies = [
+    { name = "koda" },
     { name = "koda-common" },
-    { name = "koda-service" },
     { name = "pathspec" },
     { name = "prompt-toolkit" },
     { name = "rich" },
@@ -820,8 +804,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "koda", editable = "packages/koda" },
     { name = "koda-common", editable = "packages/koda-common" },
-    { name = "koda-service", editable = "packages/koda-service" },
     { name = "pathspec", specifier = ">=1.1.1,<2" },
     { name = "prompt-toolkit", specifier = ">=3.0.52,<4" },
     { name = "rich", specifier = ">=15.0.0,<16" },

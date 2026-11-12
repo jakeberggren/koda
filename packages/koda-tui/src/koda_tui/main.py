@@ -2,9 +2,12 @@
 
 import asyncio
 import sys
+from functools import partial
 from pathlib import Path
 from typing import NoReturn
 
+from koda import llm
+from koda.sessions import JsonSessionStore
 from koda_common.logging import LoggingConfig, configure_logging, get_logger
 from koda_common.settings import (
     JsonFileSecretsStore,
@@ -15,12 +18,11 @@ from koda_common.settings import (
     SettingsManager,
     SettingsStore,
 )
-from koda_service import LocalRuntimeConfig
-from koda_service.exceptions import StartupError
-from koda_service.services.local import LocalKodaService
 from koda_tui import strings
 from koda_tui.app import KodaTuiApp
+from koda_tui.runtime import Runtime
 from koda_tui.settings import AppSettings, TuiSettingsManager
+from koda_tui.startup import StartupError
 
 
 def load_settings(settings_store: SettingsStore, secrets_store: SecretsStore) -> AppSettings:
@@ -39,11 +41,16 @@ def main() -> None:
         settings = load_settings(JsonFileSettingsStore(), JsonFileSecretsStore())
     except (SettingsLoadError, SecretsLoadError) as error:
         _fail(_startup_error(error))
-    service = LocalKodaService(
-        settings=settings.core,
-        runtime=LocalRuntimeConfig(cwd=workspace, sandbox_dir=workspace, tracing=True),
+    catalog, warnings = llm.Catalog.load()
+    runtime = Runtime(
+        settings.core,
+        workspace,
+        catalog=catalog,
+        store=JsonSessionStore(),
+        warnings=[warning.summary for warning in warnings],
+        connect=partial(llm.connect, tracing=True),
     )
-    app = KodaTuiApp(app_settings=settings, service=service, workspace=workspace)
+    app = KodaTuiApp(app_settings=settings, runtime=runtime, workspace=workspace)
     asyncio.run(app.run())
 
 

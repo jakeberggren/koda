@@ -157,11 +157,10 @@ switch models, manage sessions, and adjust TUI behavior or appearance.
 
 ### Project Structure
 
-Koda is a uv-managed monorepo with four workspace packages:
+Koda is a uv-managed monorepo with three workspace packages:
 
-- **koda** — Core agent/runtime library: agent loop, LLM abstractions, sessions, telemetry, and tools
-- **koda-service** — Service boundary and runtime used by clients
-- **koda-tui** — Interactive terminal UI built on top of the service layer
+- **koda** — Core agent library: agent loop, LLM catalog and APIs, sessions, and tools
+- **koda-tui** — Interactive terminal UI built on top of `koda`
 - **koda-common** — Shared settings, logging, and path utilities
 
 ### Development Setup

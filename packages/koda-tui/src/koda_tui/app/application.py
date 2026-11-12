@@ -25,8 +25,8 @@ if TYPE_CHECKING:
     from prompt_toolkit.styles import BaseStyle
 
     from koda_common.settings import SettingChange
-    from koda_service import KodaService
     from koda_tui.appearance import RGBColor
+    from koda_tui.runtime import Runtime
     from koda_tui.settings import AppSettings
 
 
@@ -105,13 +105,13 @@ class ExitPrompt:
 class KodaTuiApp:
     """Main TUI application."""
 
-    def __init__(self, app_settings: AppSettings, service: KodaService, workspace: Path) -> None:
+    def __init__(self, app_settings: AppSettings, runtime: Runtime, workspace: Path) -> None:
         self.app_settings = app_settings
-        self._service = service
+        self._runtime = runtime
         self._app: FullScreenApplication | None = None  # Created on run.
         self._terminal = Terminal(on_background=self.on_terminal_background)
 
-        self.state = AppState.load(workspace, service, app_settings.core)
+        self.state = AppState.load(workspace, runtime, app_settings.core)
         self.exit_prompt = ExitPrompt(self.state, invalidate=self.invalidate)
         self.appearance = Appearance(app_settings.tui.theme)
         self.screen = Screen(
@@ -124,13 +124,13 @@ class KodaTuiApp:
         self.outbox = Outbox(
             state=self.state,
             conversation=conversation,
-            service=service,
+            runtime=runtime,
             invalidate=self.invalidate,
         )
         self._palette = CommandPalette(
             PaletteContext(
                 overlays=self.screen.overlays,
-                service=service,
+                runtime=runtime,
                 settings=app_settings,
                 state=self.state,
                 conversation=conversation,
@@ -187,10 +187,10 @@ class KodaTuiApp:
         self.outbox.submit(text, steer=alternate == self.app_settings.tui.queue_inputs)
 
     def on_settings_changed(self, _changes: tuple[SettingChange, ...]) -> None:
-        """Pass the settings on to the service, which rebuilds its agent when next
-        asked, and show what they change."""
-        self._service.update_settings(self.app_settings.core)
-        self.state.refresh(self._service, self.app_settings.core)
+        """Rebuild the agent with the new settings when it next runs, and show what
+        they change."""
+        self._runtime.settings_changed()
+        self.state.refresh(self._runtime, self.app_settings.core)
         self.invalidate()
 
     def on_tui_settings_changed(self, changes: tuple[SettingChange, ...]) -> None:

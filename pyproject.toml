@@ -85,7 +85,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.isort]
-known-first-party = ["koda", "koda_common", "koda_service", "koda_tui"]
+known-first-party = ["koda", "koda_common", "koda_tui"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 5
@@ -103,10 +103,9 @@ asyncio_mode = "auto"
 testpaths = [
     "packages/koda/tests",
     "packages/koda-common/tests",
-    "packages/koda-service/tests",
     "packages/koda-tui/tests",
 ]
 markers = [
     "requires_rg: tests that require ripgrep (rg) to be installed",
 ]
-addopts = "--import-mode=importlib --cov=koda --cov=koda_common --cov=koda_service --cov=koda_tui --cov-report=term"
+addopts = "--import-mode=importlib --cov=koda --cov=koda_common --cov=koda_tui --cov-report=term"
