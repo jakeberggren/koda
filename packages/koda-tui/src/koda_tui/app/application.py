@@ -214,7 +214,6 @@ class KodaTuiApp:
                 web_search=settings.web_search,
                 extended_prompt_retention=settings.extended_prompt_retention,
             ),
-            sandbox=settings.sandbox,
         )
 
     def on_terminal_background(self, background: RGBColor) -> None:

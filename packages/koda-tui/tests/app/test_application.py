@@ -205,7 +205,7 @@ async def test_every_settings_change_rebuilds_the_agent() -> None:
     await _respond(app)
     app.invalidate = Mock()
 
-    app.update_settings(replace(app.state.settings, sandbox="seatbelt"))
+    app.update_settings(replace(app.state.settings, web_search=True))
 
     app.invalidate.assert_called_once_with()
     await _respond(app)

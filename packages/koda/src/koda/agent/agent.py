@@ -7,7 +7,7 @@ from structlog import get_logger
 
 from koda.agent.runner import AgentRunner
 from koda.context import ContextManager
-from koda.execution import HostCommandExecutor, SeatbeltCommandExecutor
+from koda.execution import HostCommandExecutor
 from koda.prompts import SystemPromptLoader
 from koda.tools import ToolConfig
 
@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from koda.agent.events import AgentEvent
-    from koda.execution import Sandbox
     from koda.llm import LLM, LLMRequestOptions
     from koda.sessions import Session, SessionStore
 
@@ -29,7 +28,7 @@ class Agent:
     Messages go to ``session``, which is saved to ``store`` after each one if given.
     """
 
-    def __init__(  # noqa: PLR0913 - each option is its own keyword argument
+    def __init__(
         self,
         llm: LLM,
         *,
@@ -37,7 +36,6 @@ class Agent:
         workspace: Path | None = None,
         store: SessionStore | None = None,
         options: LLMRequestOptions | None = None,
-        sandbox: Sandbox = "host",
     ) -> None:
         self.llm = llm
         self.session = session
@@ -46,7 +44,7 @@ class Agent:
         self.tools = ToolConfig.builtins(
             cwd=self.workspace,
             sandbox_dir=self.workspace,
-            executor=SeatbeltCommandExecutor() if sandbox == "seatbelt" else HostCommandExecutor(),
+            executor=HostCommandExecutor(),
         )
         system_prompt = ContextManager.from_workspace(self.workspace).build_system_prompt(
             SystemPromptLoader.for_workspace(self.workspace).load()
