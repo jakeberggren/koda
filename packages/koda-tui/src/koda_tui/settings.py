@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Annotated
 from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
 from pydantic_core import PydanticCustomError
 
-from koda.execution import Sandbox
 from koda.llm import ThinkingOptionId
 from koda.paths import koda_home_dir
 from koda_tui.appearance import AUTO, THEMES
@@ -50,7 +49,6 @@ class Settings(BaseModel):
     thinking: ThinkingOptionId = "none"
     web_search: bool = False
     extended_prompt_retention: bool = False
-    sandbox: Sandbox = "host"
     theme: Annotated[str, AfterValidator(_theme)] = AUTO.name
     show_scrollbar: bool = True
     queue_inputs: bool = True
