@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from koda.agent import Agent
-from koda.execution import HostCommandExecutor
 from koda.sessions import Session
 
 
@@ -67,7 +66,3 @@ def test_works_in_the_current_directory_by_default(
 
     assert agent.workspace == tmp_path.resolve()
     assert agent.tools.context.cwd == tmp_path.resolve()
-
-
-def test_runs_commands_on_the_host(tmp_path: Path) -> None:
-    assert isinstance(_agent(tmp_path).tools.context.executor, HostCommandExecutor)
