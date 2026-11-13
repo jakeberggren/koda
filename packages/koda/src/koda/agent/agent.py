@@ -7,7 +7,6 @@ from structlog import get_logger
 
 from koda.agent.runner import AgentRunner
 from koda.context import ContextManager
-from koda.execution import HostCommandExecutor
 from koda.prompts import SystemPromptLoader
 from koda.tools import ToolConfig
 
@@ -41,11 +40,7 @@ class Agent:
         self.session = session
         self.workspace = (workspace or Path.cwd()).resolve()
         self.store = store
-        self.tools = ToolConfig.builtins(
-            cwd=self.workspace,
-            sandbox_dir=self.workspace,
-            executor=HostCommandExecutor(),
-        )
+        self.tools = ToolConfig.builtins(cwd=self.workspace, sandbox_dir=self.workspace)
         system_prompt = ContextManager.from_workspace(self.workspace).build_system_prompt(
             SystemPromptLoader.for_workspace(self.workspace).load()
         )

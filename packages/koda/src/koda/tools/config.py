@@ -10,8 +10,6 @@ from koda.tools.registry import ToolRegistry
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda.execution import CommandExecutor
-
 
 @dataclass(frozen=True, slots=True)
 class ToolConfig:
@@ -26,13 +24,11 @@ class ToolConfig:
         *,
         cwd: Path,
         sandbox_dir: Path,
-        executor: CommandExecutor,
     ) -> ToolConfig:
         registry = ToolRegistry.builtins()
         context = ToolContext(
             cwd=cwd.resolve(),
             policy=ToolPolicy.create(sandbox_dir=sandbox_dir.resolve()),
             coordinator=ToolExecutionCoordinator(),
-            executor=executor,
         )
         return cls(registry=registry, context=context)

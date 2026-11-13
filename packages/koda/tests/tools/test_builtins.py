@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import stat
-from typing import TYPE_CHECKING, Never, cast
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from koda.execution.exceptions import CommandTimeoutError
-from koda.execution.host import HostCommandExecutor
 from koda.tools import (
     ToolCall,
     ToolContext,
@@ -25,27 +24,12 @@ from koda.tools.policy import ToolPolicy
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda.execution import CommandExecutor
 
-
-class _TimeoutExecutor:
-    async def run(
-        self,
-        *,
-        command: str,
-        cwd: str,
-        sandbox_dir: str,
-        timeout_seconds: float,
-    ) -> Never:
-        raise CommandTimeoutError(timeout_seconds)
-
-
-def _tool_context(sandbox_dir: Path) -> ToolContext:
+def _tool_context(workspace_dir: Path) -> ToolContext:
     return ToolContext(
-        cwd=sandbox_dir,
-        policy=ToolPolicy.create(sandbox_dir),
+        cwd=workspace_dir,
+        policy=ToolPolicy.create(workspace_dir),
         coordinator=ToolExecutionCoordinator(),
-        executor=HostCommandExecutor(),
     )
 
 
@@ -53,14 +37,14 @@ class TestReadFileTool:
     """Integration tests for read_file tool."""
 
     @pytest.mark.asyncio
-    async def test_read_file_success(self, sandbox_dir: Path) -> None:
-        """read_file tool can read files within sandbox."""
-        test_file = sandbox_dir / "test.txt"
+    async def test_read_file_success(self, workspace_dir: Path) -> None:
+        """read_file tool can read files within the workspace."""
+        test_file = workspace_dir / "test.txt"
         test_file.write_text("Hello, World!")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -76,11 +60,11 @@ class TestReadFileTool:
         assert result.output.content["text"] == "Hello, World!"
 
     @pytest.mark.asyncio
-    async def test_read_file_outside_sandbox_fails(self, sandbox_dir: Path) -> None:
-        """read_file tool fails when reading outside sandbox."""
+    async def test_read_file_outside_workspace_fails(self, workspace_dir: Path) -> None:
+        """read_file tool fails when reading outside the workspace."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -97,11 +81,11 @@ class TestReadFileTool:
         assert "/etc/passwd" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_read_file_not_found(self, sandbox_dir: Path) -> None:
+    async def test_read_file_not_found(self, workspace_dir: Path) -> None:
         """read_file tool returns error for non-existent file."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -118,14 +102,14 @@ class TestReadFileTool:
         assert "nonexistent.txt" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_read_file_display(self, sandbox_dir: Path) -> None:
+    async def test_read_file_display(self, workspace_dir: Path) -> None:
         """read_file tool sets appropriate display message."""
-        test_file = sandbox_dir / "test.txt"
+        test_file = workspace_dir / "test.txt"
         test_file.write_text("line1\nline2\nline3")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -139,14 +123,14 @@ class TestReadFileTool:
         assert result.output.display is not None
         assert "3 lines" in result.output.display
 
-    async def test_read_file_offset_limit(self, sandbox_dir: Path) -> None:
+    async def test_read_file_offset_limit(self, workspace_dir: Path) -> None:
         """read_file tool can read file contents with offset and limit."""
-        test_file = sandbox_dir / "test.txt"
+        test_file = workspace_dir / "test.txt"
         test_file.write_text("line1\nline2\nline3")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -164,14 +148,14 @@ class TestReadFileTool:
         assert result.output.display == "Read 2 lines"
 
     @pytest.mark.asyncio
-    async def test_read_file_binary_returns_tool_error(self, sandbox_dir: Path) -> None:
+    async def test_read_file_binary_returns_tool_error(self, workspace_dir: Path) -> None:
         """read_file tool rejects binary-like files instead of crashing."""
-        test_file = sandbox_dir / "binary.dat"
+        test_file = workspace_dir / "binary.dat"
         test_file.write_bytes(b"\x00\x01\x02\x03")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -187,14 +171,14 @@ class TestReadFileTool:
         assert "Failed to decode" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_read_file_accepts_utf8_bom(self, sandbox_dir: Path) -> None:
+    async def test_read_file_accepts_utf8_bom(self, workspace_dir: Path) -> None:
         """read_file accepts UTF-8 files with a BOM."""
-        test_file = sandbox_dir / "bom.txt"
+        test_file = workspace_dir / "bom.txt"
         test_file.write_bytes("hello\nworld\n".encode("utf-8-sig"))
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -210,15 +194,15 @@ class TestReadFileTool:
 
     @pytest.mark.asyncio
     async def test_read_file_reads_requested_lines_without_decoding_entire_file(
-        self, sandbox_dir: Path
+        self, workspace_dir: Path
     ) -> None:
         """read_file only decodes the requested line window."""
-        test_file = sandbox_dir / "large.txt"
+        test_file = workspace_dir / "large.txt"
         test_file.write_bytes(b"line1\nline2\n" + b"a" * 10000 + b"\x80")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -237,11 +221,11 @@ class TestWriteFileTool:
     """Integration tests for write_file tool."""
 
     @pytest.mark.asyncio
-    async def test_write_file_success(self, sandbox_dir: Path) -> None:
-        """write_file tool can create files within sandbox."""
+    async def test_write_file_success(self, workspace_dir: Path) -> None:
+        """write_file tool can create files within the workspace."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -255,16 +239,16 @@ class TestWriteFileTool:
         assert result.call_id == "call_write"
         assert result.output.is_error is False
 
-        written_file = sandbox_dir / "new_file.txt"
+        written_file = workspace_dir / "new_file.txt"
         assert written_file.exists()
         assert written_file.read_text() == "New content"
 
     @pytest.mark.asyncio
-    async def test_write_file_creates_parent_dirs(self, sandbox_dir: Path) -> None:
+    async def test_write_file_creates_parent_dirs(self, workspace_dir: Path) -> None:
         """write_file tool creates parent directories."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -276,14 +260,14 @@ class TestWriteFileTool:
         result = await executor.execute_call(call, context)
 
         assert result.output.is_error is False
-        assert (sandbox_dir / "nested" / "dir" / "file.txt").read_text() == "Nested content"
+        assert (workspace_dir / "nested" / "dir" / "file.txt").read_text() == "Nested content"
 
     @pytest.mark.asyncio
-    async def test_write_file_outside_sandbox_fails(self, sandbox_dir: Path) -> None:
-        """write_file tool fails when writing outside sandbox."""
+    async def test_write_file_outside_workspace_fails(self, workspace_dir: Path) -> None:
+        """write_file tool fails when writing outside the workspace."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -299,11 +283,11 @@ class TestWriteFileTool:
         assert "/tmp/escape.txt" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_write_file_display(self, sandbox_dir: Path) -> None:
+    async def test_write_file_display(self, workspace_dir: Path) -> None:
         """write_file tool sets appropriate display message."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -318,15 +302,15 @@ class TestWriteFileTool:
         assert "2 lines" in result.output.display
 
     @pytest.mark.asyncio
-    async def test_write_file_preserves_existing_mode(self, sandbox_dir: Path) -> None:
+    async def test_write_file_preserves_existing_mode(self, workspace_dir: Path) -> None:
         """write_file tool preserves permissions when updating an existing file."""
-        test_file = sandbox_dir / "script.sh"
+        test_file = workspace_dir / "script.sh"
         test_file.write_text("#!/bin/sh\necho old\n")
         test_file.chmod(0o755)
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -341,9 +325,9 @@ class TestWriteFileTool:
         assert stat.S_IMODE(test_file.stat().st_mode) == 0o755
 
     @pytest.mark.asyncio
-    async def test_write_file_read_only_existing_file_fails(self, sandbox_dir: Path) -> None:
+    async def test_write_file_read_only_existing_file_fails(self, workspace_dir: Path) -> None:
         """write_file tool respects read-only permissions on existing files."""
-        test_file = sandbox_dir / "locked.txt"
+        test_file = workspace_dir / "locked.txt"
         test_file.write_text("original")
         test_file.chmod(0o444)
 
@@ -352,7 +336,7 @@ class TestWriteFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         try:
@@ -376,14 +360,14 @@ class TestEditFileTool:
     """Integration tests for edit_file tool."""
 
     @pytest.mark.asyncio
-    async def test_edit_file_success(self, sandbox_dir: Path) -> None:
+    async def test_edit_file_success(self, workspace_dir: Path) -> None:
         """edit_file tool can edit file content."""
-        test_file = sandbox_dir / "test.txt"
+        test_file = workspace_dir / "test.txt"
         test_file.write_text("line1\nline2")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -404,14 +388,14 @@ class TestEditFileTool:
         assert result.output.content["path"] == "test.txt"
         assert "+line3" in result.output.content["diff"]
         assert result.output.display is not None
-        assert (sandbox_dir / "test.txt").read_text() == "line1\nline2\nline3"
+        assert (workspace_dir / "test.txt").read_text() == "line1\nline2\nline3"
 
     @pytest.mark.asyncio
-    async def test_edit_file_outside_sandbox_fails(self, sandbox_dir: Path) -> None:
-        """edit_file tool fails when editing outside sandbox."""
+    async def test_edit_file_outside_workspace_fails(self, workspace_dir: Path) -> None:
+        """edit_file tool fails when editing outside the workspace."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -427,11 +411,11 @@ class TestEditFileTool:
         assert "/etc/passwd" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_edit_file_not_found(self, sandbox_dir: Path) -> None:
+    async def test_edit_file_not_found(self, workspace_dir: Path) -> None:
         """edit_file tool returns error for missing file."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -447,13 +431,13 @@ class TestEditFileTool:
         assert "missing.txt" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_edit_file_not_a_file(self, sandbox_dir: Path) -> None:
+    async def test_edit_file_not_a_file(self, workspace_dir: Path) -> None:
         """edit_file tool returns error for directory targets."""
-        (sandbox_dir / "subdir").mkdir()
+        (workspace_dir / "subdir").mkdir()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -469,14 +453,14 @@ class TestEditFileTool:
         assert "subdir" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_edit_file_text_not_found(self, sandbox_dir: Path) -> None:
+    async def test_edit_file_text_not_found(self, workspace_dir: Path) -> None:
         """edit_file tool errors when text is missing."""
-        test_file = sandbox_dir / "test.txt"
+        test_file = workspace_dir / "test.txt"
         test_file.write_text("line1\nline2")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -492,14 +476,14 @@ class TestEditFileTool:
         assert "Text not found" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_edit_file_multiple_matches_fails(self, sandbox_dir: Path) -> None:
+    async def test_edit_file_multiple_matches_fails(self, workspace_dir: Path) -> None:
         """edit_file tool errors on multiple matches without replace_all."""
-        test_file = sandbox_dir / "test.txt"
+        test_file = workspace_dir / "test.txt"
         test_file.write_text("repeat\nrepeat\nrepeat")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -515,15 +499,15 @@ class TestEditFileTool:
         assert "Provide more context" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_edit_file_replace_all(self, sandbox_dir: Path) -> None:
+    async def test_edit_file_replace_all(self, workspace_dir: Path) -> None:
         """edit_file tool can replace all matches."""
-        test_file = sandbox_dir / "test.txt"
+        test_file = workspace_dir / "test.txt"
         test_file.write_text("repeat\nrepeat\nrepeat")
         expected_replacements = test_file.read_text().count("repeat")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -541,17 +525,19 @@ class TestEditFileTool:
 
         assert result.output.is_error is False
         assert result.output.content["replacements"] == expected_replacements
-        assert (sandbox_dir / "test.txt").read_text() == "\n".join(["done"] * expected_replacements)
+        assert (workspace_dir / "test.txt").read_text() == "\n".join(
+            ["done"] * expected_replacements
+        )
 
     @pytest.mark.asyncio
-    async def test_edit_file_no_changes(self, sandbox_dir: Path) -> None:
+    async def test_edit_file_no_changes(self, workspace_dir: Path) -> None:
         """edit_file tool returns no changes when replacement is identical."""
-        test_file = sandbox_dir / "test.txt"
+        test_file = workspace_dir / "test.txt"
         test_file.write_text("same")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -568,9 +554,9 @@ class TestEditFileTool:
         assert result.output.display == "No changes"
 
     @pytest.mark.asyncio
-    async def test_edit_file_read_only_existing_file_fails(self, sandbox_dir: Path) -> None:
+    async def test_edit_file_read_only_existing_file_fails(self, workspace_dir: Path) -> None:
         """edit_file tool respects read-only permissions on existing files."""
-        test_file = sandbox_dir / "locked.txt"
+        test_file = workspace_dir / "locked.txt"
         test_file.write_text("line1\nline2")
         test_file.chmod(0o444)
 
@@ -579,7 +565,7 @@ class TestEditFileTool:
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         try:
@@ -603,15 +589,15 @@ class TestGlobTool:
     """Integration tests for glob tool."""
 
     @pytest.mark.asyncio
-    async def test_glob_finds_files(self, sandbox_dir: Path) -> None:
+    async def test_glob_finds_files(self, workspace_dir: Path) -> None:
         """glob tool finds files matching pattern."""
-        (sandbox_dir / "file1.txt").touch()
-        (sandbox_dir / "file2.txt").touch()
-        (sandbox_dir / "other.py").touch()
+        (workspace_dir / "file1.txt").touch()
+        (workspace_dir / "file2.txt").touch()
+        (workspace_dir / "other.py").touch()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -630,19 +616,19 @@ class TestGlobTool:
         assert "other.py" not in text
 
     @pytest.mark.asyncio
-    async def test_glob_recursive_pattern(self, sandbox_dir: Path) -> None:
+    async def test_glob_recursive_pattern(self, workspace_dir: Path) -> None:
         """glob tool handles recursive ** patterns."""
-        subdir = sandbox_dir / "subdir"
+        subdir = workspace_dir / "subdir"
         subdir.mkdir()
         nested = subdir / "nested"
         nested.mkdir()
-        (sandbox_dir / "root.py").touch()
+        (workspace_dir / "root.py").touch()
         (subdir / "middle.py").touch()
         (nested / "deep.py").touch()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -660,13 +646,13 @@ class TestGlobTool:
         assert "deep.py" in text
 
     @pytest.mark.asyncio
-    async def test_glob_no_matches(self, sandbox_dir: Path) -> None:
+    async def test_glob_no_matches(self, workspace_dir: Path) -> None:
         """glob tool returns appropriate message when no files match."""
-        (sandbox_dir / "file.txt").touch()
+        (workspace_dir / "file.txt").touch()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -681,16 +667,16 @@ class TestGlobTool:
         assert "No files found" in result.output.content["text"]
 
     @pytest.mark.asyncio
-    async def test_glob_respects_limit(self, sandbox_dir: Path) -> None:
+    async def test_glob_respects_limit(self, workspace_dir: Path) -> None:
         """glob tool truncates results when exceeding limit."""
         total_files = 10
         limit = 5
         for i in range(total_files):
-            (sandbox_dir / f"file{i:02d}.txt").touch()
+            (workspace_dir / f"file{i:02d}.txt").touch()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -709,11 +695,11 @@ class TestGlobTool:
         assert f"showing first {limit}" in text
 
     @pytest.mark.asyncio
-    async def test_glob_path_not_found(self, sandbox_dir: Path) -> None:
+    async def test_glob_path_not_found(self, workspace_dir: Path) -> None:
         """glob tool returns error for non-existent path."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -729,13 +715,13 @@ class TestGlobTool:
         assert "nonexistent" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_glob_path_not_directory(self, sandbox_dir: Path) -> None:
+    async def test_glob_path_not_directory(self, workspace_dir: Path) -> None:
         """glob tool returns error when path is a file, not directory."""
-        (sandbox_dir / "file.txt").touch()
+        (workspace_dir / "file.txt").touch()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -750,11 +736,11 @@ class TestGlobTool:
         assert result.output.error_message is not None
 
     @pytest.mark.asyncio
-    async def test_glob_outside_sandbox_fails(self, sandbox_dir: Path) -> None:
-        """glob tool fails when searching outside sandbox."""
+    async def test_glob_outside_workspace_fails(self, workspace_dir: Path) -> None:
+        """glob tool fails when searching outside the workspace."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -770,14 +756,14 @@ class TestGlobTool:
         assert "/etc" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_glob_excludes_directories(self, sandbox_dir: Path) -> None:
+    async def test_glob_excludes_directories(self, workspace_dir: Path) -> None:
         """glob tool only returns files, not directories."""
-        (sandbox_dir / "file.txt").touch()
-        (sandbox_dir / "subdir").mkdir()
+        (workspace_dir / "file.txt").touch()
+        (workspace_dir / "subdir").mkdir()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -794,14 +780,14 @@ class TestGlobTool:
         assert "subdir" not in text
 
     @pytest.mark.asyncio
-    async def test_glob_display_with_matches(self, sandbox_dir: Path) -> None:
+    async def test_glob_display_with_matches(self, workspace_dir: Path) -> None:
         """glob tool sets appropriate display message when files are found."""
-        (sandbox_dir / "file1.txt").touch()
-        (sandbox_dir / "file2.txt").touch()
+        (workspace_dir / "file1.txt").touch()
+        (workspace_dir / "file2.txt").touch()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -817,11 +803,11 @@ class TestGlobTool:
         assert "*.txt" in result.output.display
 
     @pytest.mark.asyncio
-    async def test_glob_display_no_matches(self, sandbox_dir: Path) -> None:
+    async def test_glob_display_no_matches(self, workspace_dir: Path) -> None:
         """glob tool sets appropriate display message when no files match."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -837,16 +823,16 @@ class TestGlobTool:
         assert "*.xyz" in result.output.display
 
     @pytest.mark.asyncio
-    async def test_glob_display_truncated(self, sandbox_dir: Path) -> None:
+    async def test_glob_display_truncated(self, workspace_dir: Path) -> None:
         """glob tool display indicates truncation when results exceed limit."""
         total_files = 10
         limit = 5
         for i in range(total_files):
-            (sandbox_dir / f"file{i:02d}.txt").touch()
+            (workspace_dir / f"file{i:02d}.txt").touch()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -872,11 +858,11 @@ class TestBashTool:
 
     @bash_required
     @pytest.mark.asyncio
-    async def test_bash_executes_command_successfully(self, sandbox_dir: Path) -> None:
+    async def test_bash_executes_command_successfully(self, workspace_dir: Path) -> None:
         """bash tool executes a command and captures stdout."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -896,11 +882,11 @@ class TestBashTool:
 
     @bash_required
     @pytest.mark.asyncio
-    async def test_bash_captures_stderr(self, sandbox_dir: Path) -> None:
+    async def test_bash_captures_stderr(self, workspace_dir: Path) -> None:
         """bash tool captures stderr output."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -918,11 +904,11 @@ class TestBashTool:
 
     @bash_required
     @pytest.mark.asyncio
-    async def test_bash_marks_nonzero_exit_as_tool_error(self, sandbox_dir: Path) -> None:
+    async def test_bash_marks_nonzero_exit_as_tool_error(self, workspace_dir: Path) -> None:
         """bash tool marks a non-zero exit as a tool error, keeping its output."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -939,14 +925,14 @@ class TestBashTool:
 
     @bash_required
     @pytest.mark.asyncio
-    async def test_bash_respects_cwd(self, sandbox_dir: Path) -> None:
+    async def test_bash_respects_cwd(self, workspace_dir: Path) -> None:
         """bash tool executes within the requested working directory."""
-        nested = sandbox_dir / "nested"
+        nested = workspace_dir / "nested"
         nested.mkdir()
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -962,11 +948,11 @@ class TestBashTool:
         assert result.output.content["cwd"] == str(nested)
 
     @pytest.mark.asyncio
-    async def test_bash_cwd_outside_sandbox_fails(self, sandbox_dir: Path) -> None:
-        """bash tool rejects working directories outside the sandbox."""
+    async def test_bash_cwd_outside_workspace_fails(self, workspace_dir: Path) -> None:
+        """bash tool rejects working directories outside the workspace."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -982,11 +968,11 @@ class TestBashTool:
         assert "/etc" in result.output.error_message
 
     @pytest.mark.asyncio
-    async def test_bash_cwd_not_found(self, sandbox_dir: Path) -> None:
+    async def test_bash_cwd_not_found(self, workspace_dir: Path) -> None:
         """bash tool errors when cwd does not exist."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -1001,26 +987,21 @@ class TestBashTool:
         assert result.output.error_message is not None
         assert "missing" in result.output.error_message
 
+    @bash_required
     @pytest.mark.asyncio
-    async def test_bash_timeout_returns_tool_error(self, sandbox_dir: Path) -> None:
+    async def test_bash_timeout_returns_tool_error(self, workspace_dir: Path) -> None:
         """bash tool returns a tool error when execution times out."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext(
-            cwd=sandbox_dir,
-            policy=ToolPolicy.create(sandbox_dir),
-            coordinator=ToolExecutionCoordinator(),
-            executor=cast("CommandExecutor", _TimeoutExecutor()),
-        )
         executor = ToolExecutor(registry)
 
         call = ToolCall(
             tool_name="bash",
-            arguments={"command": "sleep 1", "timeout_seconds": 0.01},
+            arguments={"command": "sleep 5", "timeout_seconds": 0.1},
             call_id="call_bash_timeout",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call, _tool_context(workspace_dir))
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -1028,11 +1009,70 @@ class TestBashTool:
 
     @bash_required
     @pytest.mark.asyncio
-    async def test_bash_truncates_large_stdout_and_marks_it(self, sandbox_dir: Path) -> None:
+    async def test_bash_timeout_kills_child_processes(self, workspace_dir: Path) -> None:
+        """A timed-out command takes the processes it started down with it."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        marker = workspace_dir / "survived"
+        call = ToolCall(
+            tool_name="bash",
+            arguments={
+                "command": f"(sleep 0.5; touch {marker}) & wait",
+                "timeout_seconds": 0.1,
+            },
+            call_id="call_bash_timeout_children",
+        )
+
+        result = await ToolExecutor(registry).execute_call(call, _tool_context(workspace_dir))
+        await asyncio.sleep(1)
+
+        assert result.output.is_error is True
+        assert not marker.exists()
+
+    @pytest.mark.asyncio
+    async def test_bash_runs_non_interactive_in_its_own_session(
+        self, monkeypatch: pytest.MonkeyPatch, workspace_dir: Path
+    ) -> None:
+        """bash skips profile/rc files and gets its own process group."""
+
+        class _FakeProcess:
+            pid = 123
+            returncode = 0
+
+            async def communicate(self) -> tuple[bytes, bytes]:
+                return b"", b""
+
+            async def wait(self) -> int:
+                return 0
+
+        captured: dict[str, Any] = {}
+
+        async def _fake_create_subprocess_exec(*args: object, **kwargs: object) -> _FakeProcess:
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            return _FakeProcess()
+
+        monkeypatch.setattr("koda.tools.builtins.bash._bash_path", lambda: "/bin/bash")
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_create_subprocess_exec)
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        call = ToolCall(
+            tool_name="bash", arguments={"command": "printf test"}, call_id="call_bash_flags"
+        )
+
+        await ToolExecutor(registry).execute_call(call, _tool_context(workspace_dir))
+
+        assert captured["args"] == ("/bin/bash", "--noprofile", "--norc", "-c", "printf test")
+        assert captured["kwargs"]["cwd"] == workspace_dir
+        assert captured["kwargs"]["start_new_session"] is True
+
+    @bash_required
+    @pytest.mark.asyncio
+    async def test_bash_truncates_large_stdout_and_marks_it(self, workspace_dir: Path) -> None:
         """bash tool should truncate large stdout persisted in tool output."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         oversized = BASH_MAX_OUTPUT_CHARS + 100
@@ -1051,11 +1091,11 @@ class TestBashTool:
 
     @bash_required
     @pytest.mark.asyncio
-    async def test_bash_truncates_large_stderr_and_marks_it(self, sandbox_dir: Path) -> None:
+    async def test_bash_truncates_large_stderr_and_marks_it(self, workspace_dir: Path) -> None:
         """bash tool should truncate large stderr persisted in tool output."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         oversized = BASH_MAX_OUTPUT_CHARS + 100
@@ -1084,14 +1124,14 @@ class TestGrepTool:
     @rg_required
     @pytest.mark.requires_rg
     @pytest.mark.asyncio
-    async def test_grep_finds_matches(self, sandbox_dir: Path) -> None:
+    async def test_grep_finds_matches(self, workspace_dir: Path) -> None:
         """grep tool finds matching lines across files."""
-        (sandbox_dir / "file1.txt").write_text("hello\nworld\nhello again")
-        (sandbox_dir / "file2.txt").write_text("no match\nhello there")
+        (workspace_dir / "file1.txt").write_text("hello\nworld\nhello again")
+        (workspace_dir / "file2.txt").write_text("no match\nhello there")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -1111,13 +1151,13 @@ class TestGrepTool:
     @rg_required
     @pytest.mark.requires_rg
     @pytest.mark.asyncio
-    async def test_grep_respects_limit(self, sandbox_dir: Path) -> None:
+    async def test_grep_respects_limit(self, workspace_dir: Path) -> None:
         """grep tool truncates results when exceeding limit."""
-        (sandbox_dir / "file.txt").write_text("match\nmatch\nmatch")
+        (workspace_dir / "file.txt").write_text("match\nmatch\nmatch")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         limit = 2
@@ -1138,13 +1178,13 @@ class TestGrepTool:
     @rg_required
     @pytest.mark.requires_rg
     @pytest.mark.asyncio
-    async def test_grep_no_matches(self, sandbox_dir: Path) -> None:
+    async def test_grep_no_matches(self, workspace_dir: Path) -> None:
         """grep tool reports when no matches are found."""
-        (sandbox_dir / "file.txt").write_text("hello\nworld")
+        (workspace_dir / "file.txt").write_text("hello\nworld")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -1159,11 +1199,11 @@ class TestGrepTool:
         assert "No matches found" in result.output.content["text"]
 
     @pytest.mark.asyncio
-    async def test_grep_path_not_found(self, sandbox_dir: Path) -> None:
+    async def test_grep_path_not_found(self, workspace_dir: Path) -> None:
         """grep tool errors when path does not exist."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -1181,13 +1221,13 @@ class TestGrepTool:
     @rg_required
     @pytest.mark.requires_rg
     @pytest.mark.asyncio
-    async def test_grep_pattern_starting_with_dash(self, sandbox_dir: Path) -> None:
+    async def test_grep_pattern_starting_with_dash(self, workspace_dir: Path) -> None:
         """grep tool treats patterns starting with '-' as literals."""
-        (sandbox_dir / "file.txt").write_text("-match\nother")
+        (workspace_dir / "file.txt").write_text("-match\nother")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
@@ -1204,13 +1244,13 @@ class TestGrepTool:
     @rg_required
     @pytest.mark.requires_rg
     @pytest.mark.asyncio
-    async def test_grep_file_path_formats_relative_path(self, sandbox_dir: Path) -> None:
+    async def test_grep_file_path_formats_relative_path(self, workspace_dir: Path) -> None:
         """grep tool uses the file name when searching a single file."""
-        (sandbox_dir / "file.txt").write_text("hello\nworld")
+        (workspace_dir / "file.txt").write_text("hello\nworld")
 
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = _tool_context(sandbox_dir)
+        context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
         call = ToolCall(
