@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from koda.execution.host import HostCommandExecutor
 from koda.tools import (
     ToolContext,
     ToolExecutionCoordinator,
@@ -106,7 +105,6 @@ def context(sandbox_dir: Path, policy: ToolPolicy) -> ToolContext:
         cwd=sandbox_dir,
         policy=policy,
         coordinator=ToolExecutionCoordinator(),
-        executor=HostCommandExecutor(),
     )
 
 

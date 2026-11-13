@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import stat
-from typing import TYPE_CHECKING, Never, cast
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from koda.execution.exceptions import CommandTimeoutError
-from koda.execution.host import HostCommandExecutor
 from koda.tools import (
     ToolCall,
     ToolContext,
@@ -25,27 +24,12 @@ from koda.tools.policy import ToolPolicy
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda.execution import CommandExecutor
-
-
-class _TimeoutExecutor:
-    async def run(
-        self,
-        *,
-        command: str,
-        cwd: str,
-        sandbox_dir: str,
-        timeout_seconds: float,
-    ) -> Never:
-        raise CommandTimeoutError(timeout_seconds)
-
 
 def _tool_context(sandbox_dir: Path) -> ToolContext:
     return ToolContext(
         cwd=sandbox_dir,
         policy=ToolPolicy.create(sandbox_dir),
         coordinator=ToolExecutionCoordinator(),
-        executor=HostCommandExecutor(),
     )
 
 
@@ -1001,30 +985,81 @@ class TestBashTool:
         assert result.output.error_message is not None
         assert "missing" in result.output.error_message
 
+    @bash_required
     @pytest.mark.asyncio
     async def test_bash_timeout_returns_tool_error(self, sandbox_dir: Path) -> None:
         """bash tool returns a tool error when execution times out."""
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
-        context = ToolContext(
-            cwd=sandbox_dir,
-            policy=ToolPolicy.create(sandbox_dir),
-            coordinator=ToolExecutionCoordinator(),
-            executor=cast("CommandExecutor", _TimeoutExecutor()),
-        )
         executor = ToolExecutor(registry)
 
         call = ToolCall(
             tool_name="bash",
-            arguments={"command": "sleep 1", "timeout_seconds": 0.01},
+            arguments={"command": "sleep 5", "timeout_seconds": 0.1},
             call_id="call_bash_timeout",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call, _tool_context(sandbox_dir))
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
         assert "timed out" in result.output.error_message
+
+    @bash_required
+    @pytest.mark.asyncio
+    async def test_bash_timeout_kills_child_processes(self, sandbox_dir: Path) -> None:
+        """A timed-out command takes the processes it started down with it."""
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        marker = sandbox_dir / "survived"
+        call = ToolCall(
+            tool_name="bash",
+            arguments={
+                "command": f"(sleep 0.5; touch {marker}) & wait",
+                "timeout_seconds": 0.1,
+            },
+            call_id="call_bash_timeout_children",
+        )
+
+        result = await ToolExecutor(registry).execute_call(call, _tool_context(sandbox_dir))
+        await asyncio.sleep(1)
+
+        assert result.output.is_error is True
+        assert not marker.exists()
+
+    @pytest.mark.asyncio
+    async def test_bash_runs_non_interactive_in_its_own_session(
+        self, monkeypatch: pytest.MonkeyPatch, sandbox_dir: Path
+    ) -> None:
+        """bash skips profile/rc files and gets its own process group."""
+
+        class _FakeProcess:
+            pid = 123
+            returncode = 0
+
+            async def communicate(self) -> tuple[bytes, bytes]:
+                return b"", b""
+
+        captured: dict[str, Any] = {}
+
+        async def _fake_create_subprocess_exec(*args: object, **kwargs: object) -> _FakeProcess:
+            captured["args"] = args
+            captured["kwargs"] = kwargs
+            return _FakeProcess()
+
+        monkeypatch.setattr("koda.tools.builtins.bash._bash_path", lambda: "/bin/bash")
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_create_subprocess_exec)
+        registry = ToolRegistry()
+        registry.register_all(get_builtin_tools())
+        call = ToolCall(
+            tool_name="bash", arguments={"command": "printf test"}, call_id="call_bash_flags"
+        )
+
+        await ToolExecutor(registry).execute_call(call, _tool_context(sandbox_dir))
+
+        assert captured["args"] == ("/bin/bash", "--noprofile", "--norc", "-c", "printf test")
+        assert captured["kwargs"]["cwd"] == sandbox_dir
+        assert captured["kwargs"]["start_new_session"] is True
 
     @bash_required
     @pytest.mark.asyncio

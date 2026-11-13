@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import asyncio
+import functools
+import os
+import shutil
+import signal
+from contextlib import suppress
 from typing import TYPE_CHECKING
 
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.execution.exceptions import CommandExecutionError, CommandTimeoutError
-from koda.execution.host import BashNotFoundError as ExecutorBashNotFoundError
 from koda.tools import ToolContext, ToolOutput, exceptions
 from koda.tools.decorators import tool
 
@@ -49,6 +53,60 @@ class BashParams(BaseModel):
         gt=0,
         le=300,
         description="Maximum execution time in seconds",
+    )
+
+
+@functools.lru_cache(maxsize=1)
+def _bash_path() -> str:
+    bash = shutil.which("bash")
+    if bash is None:
+        raise BashNotFoundError
+    return bash
+
+
+async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
+    """Best-effort kill of the command and anything it spawned."""
+    if proc.returncode is not None:
+        return
+    try:
+        # The command runs in its own session, so its pid is also its process group id.
+        os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    except PermissionError:
+        with suppress(PermissionError, ProcessLookupError):
+            proc.kill()
+    with suppress(TimeoutError, ProcessLookupError):
+        await asyncio.wait_for(proc.wait(), timeout=1)
+
+
+async def _run(command: str, *, cwd: Path, timeout_seconds: float) -> tuple[str, str, int]:
+    """Run ``command`` with bash in ``cwd`` on the host; return stdout, stderr, exit code."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            _bash_path(),
+            "--noprofile",
+            "--norc",
+            "-c",
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+            start_new_session=True,  # Own process group, so a timeout can kill its children too.
+        )
+    except OSError as e:
+        raise BashError(e) from e
+
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+    except TimeoutError:
+        await _kill_process_tree(proc)
+        raise BashTimeoutError(timeout_seconds) from None
+
+    return (
+        stdout.decode("utf-8", errors="replace"),
+        stderr.decode("utf-8", errors="replace"),
+        proc.returncode if proc.returncode is not None else -1,
     )
 
 
@@ -122,24 +180,14 @@ class BashTool:
         resolved_cwd = await _resolve_cwd(params, ctx)
 
         async with ctx.coordinator.exclusive_access():
-            try:
-                result = await ctx.executor.run(
-                    command=params.command,
-                    cwd=str(resolved_cwd),
-                    sandbox_dir=str(ctx.sandbox_dir),
-                    timeout_seconds=params.timeout_seconds,
-                )
-            except ExecutorBashNotFoundError:
-                raise BashNotFoundError from None
-            except CommandTimeoutError:
-                raise BashTimeoutError(params.timeout_seconds) from None
-            except CommandExecutionError as e:
-                raise BashError(e.cause) from e
+            stdout, stderr, exit_code = await _run(
+                params.command, cwd=resolved_cwd, timeout_seconds=params.timeout_seconds
+            )
 
         return _build_output(
             params=params,
-            stdout=result.stdout,
-            stderr=result.stderr,
-            exit_code=result.exit_code,
-            cwd=result.cwd,
+            stdout=stdout,
+            stderr=stderr,
+            exit_code=exit_code,
+            cwd=str(resolved_cwd),
         )

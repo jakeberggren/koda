@@ -9,7 +9,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
     from pathlib import Path
 
-    from koda.execution import CommandExecutor
     from koda.tools.policy import ToolPolicy
 
 
@@ -93,9 +92,6 @@ class ToolContext:
 
     coordinator: ToolExecutionCoordinator
     """Coordinator for shared/exclusive access and path-level serialization."""
-
-    executor: CommandExecutor
-    """Shared command executor used by tools that run shell commands."""
 
     @property
     def sandbox_dir(self) -> Path:
