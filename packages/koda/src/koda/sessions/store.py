@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import json
+import copy
 from typing import TYPE_CHECKING, Protocol
+
+from pydantic import TypeAdapter
 
 from koda.agent.hooks import Hook
 from koda.paths import sessions_dir_path
@@ -11,6 +13,9 @@ from koda.sessions.session import Session
 if TYPE_CHECKING:
     from pathlib import Path
     from uuid import UUID
+
+
+SESSION_ADAPTER = TypeAdapter(Session)
 
 
 class SessionStore(Protocol):
@@ -41,17 +46,17 @@ class InMemorySessionStore(SessionStore):
 
     def save_session(self, session: Session) -> None:
         """Store a copy of ``session``."""
-        self._sessions[session.session_id] = session.model_copy(deep=True)
+        self._sessions[session.session_id] = copy.deepcopy(session)
 
     def get_session(self, session_id: UUID) -> Session:
         """Retrieve a copy of a session by its ID."""
         if session_id not in self._sessions:
             raise SessionNotFoundError(session_id)
-        return self._sessions[session_id].model_copy(deep=True)
+        return copy.deepcopy(self._sessions[session_id])
 
     def list_sessions(self) -> list[Session]:
         """List all sessions, newest first."""
-        sessions = [session.model_copy(deep=True) for session in self._sessions.values()]
+        sessions = [copy.deepcopy(session) for session in self._sessions.values()]
         return sorted(sessions, key=lambda s: s.created_at, reverse=True)
 
     def delete_session(self, session_id: UUID) -> None:
@@ -72,12 +77,10 @@ class JsonSessionStore(SessionStore):
         return self._dir / f"{session_id}.json"
 
     def _read(self, path: Path) -> Session:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return Session.model_validate(data)
+        return SESSION_ADAPTER.validate_json(path.read_bytes())
 
     def save_session(self, session: Session) -> None:
-        data = session.model_dump(mode="json")
-        self._path_for(session.session_id).write_text(json.dumps(data, indent=2), encoding="utf-8")
+        self._path_for(session.session_id).write_bytes(SESSION_ADAPTER.dump_json(session, indent=2))
 
     def get_session(self, session_id: UUID) -> Session:
         path = self._path_for(session_id)

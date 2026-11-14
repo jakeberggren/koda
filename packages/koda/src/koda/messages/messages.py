@@ -1,8 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from typing import Literal
-
-from pydantic import BaseModel, Field
 
 from koda.tools import ToolCall, ToolResult
 
@@ -12,10 +10,6 @@ class MessageRole(StrEnum):
     ASSISTANT = auto()
     TOOL = auto()
     INTERRUPTION = auto()
-
-
-class Message(BaseModel):
-    content: str = Field(default="")
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,25 +26,36 @@ class TokenUsage:
         return round((self.input_tokens / context_window) * 100)
 
 
-class UserMessage(Message):
-    role: Literal[MessageRole.USER] = Field(default=MessageRole.USER, frozen=True)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class UserMessage:
+    content: str
+    role: Literal[MessageRole.USER] = MessageRole.USER
 
 
-class InterruptionMessage(Message):
+@dataclass(frozen=True, slots=True, kw_only=True)
+class InterruptionMessage:
     """The user interrupted the response; the model is told so with ``content``."""
 
-    role: Literal[MessageRole.INTERRUPTION] = Field(default=MessageRole.INTERRUPTION, frozen=True)
     content: str = "The user interrupted the response."
+    role: Literal[MessageRole.INTERRUPTION] = MessageRole.INTERRUPTION
 
 
-class AssistantMessage(Message):
-    role: Literal[MessageRole.ASSISTANT] = Field(default=MessageRole.ASSISTANT, frozen=True)
-    thinking_content: str = Field(default="")
-    tool_calls: list[ToolCall] = Field(default_factory=list)
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AssistantMessage:
+    content: str = ""
+    thinking_content: str = ""
+    tool_calls: list[ToolCall] = field(default_factory=list)
     usage: TokenUsage | None = None
+    role: Literal[MessageRole.ASSISTANT] = MessageRole.ASSISTANT
 
 
-class ToolMessage(Message):
-    role: Literal[MessageRole.TOOL] = Field(default=MessageRole.TOOL, frozen=True)
-    tool_name: str = Field()
-    tool_result: ToolResult = Field()
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ToolMessage:
+    tool_name: str
+    tool_result: ToolResult
+    content: str = ""
+    role: Literal[MessageRole.TOOL] = MessageRole.TOOL
+
+
+# Everything a conversation holds; ``role`` tells them apart once saved.
+Message = UserMessage | AssistantMessage | ToolMessage | InterruptionMessage
