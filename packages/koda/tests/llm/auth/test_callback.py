@@ -12,6 +12,13 @@ from koda.llm.auth.callback import OAuthCallbackListener
 from koda.llm.auth.exceptions import OAuthCallbackCodeMissingError, OAuthCallbackTimeoutError
 
 
+@pytest.fixture(autouse=True)
+def _no_reverse_dns(monkeypatch: pytest.MonkeyPatch) -> None:
+    # HTTPServer looks up the host's FQDN on bind, which can stall for over 30s on
+    # macOS CI runners and outlast the listener timeout.
+    monkeypatch.setattr(socket, "getfqdn", lambda name="": name)
+
+
 @pytest.fixture
 def free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
