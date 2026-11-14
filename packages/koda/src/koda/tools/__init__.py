@@ -2,6 +2,7 @@ from koda.tools.base import Tool, ToolCall, ToolDefinition, ToolOutput, ToolResu
 from koda.tools.config import ToolConfig
 from koda.tools.context import ToolContext, ToolExecutionCoordinator
 from koda.tools.decorators import get_builtin_tools, tool
+from koda.tools.exceptions import ToolError
 from koda.tools.executor import ToolExecutor
 from koda.tools.registry import ToolRegistry
 
@@ -11,6 +12,7 @@ __all__ = [
     "ToolConfig",
     "ToolContext",
     "ToolDefinition",
+    "ToolError",
     "ToolExecutionCoordinator",
     "ToolExecutor",
     "ToolOutput",

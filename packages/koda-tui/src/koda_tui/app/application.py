@@ -9,7 +9,8 @@ from prompt_toolkit.filters import Condition
 from prompt_toolkit.output import ColorDepth
 
 from koda.agent import Agent
-from koda.llm import LLMConfigurationError, LLMRequestOptions
+from koda.llm import CredentialsError, LLMConfigurationError, LLMRequestOptions
+from koda_tui import strings
 from koda_tui.app.exit import ExitPrompt
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import Appearance
@@ -96,13 +97,8 @@ class KodaTuiApp:
         self._app: FullScreenApplication | None = None  # Created on run.
         self._terminal = Terminal(on_background=self.on_terminal_background)
 
-        self.state = AppState.load(
-            workspace,
-            settings,
-            catalog=catalog,
-            credentials=credentials,
-            warnings=warnings,
-        )
+        self.state = AppState(workspace=workspace, settings=settings, warnings=list(warnings))
+        self._refresh()
         self.exit_prompt = ExitPrompt(self.state, invalidate=self.invalidate)
         self.appearance = Appearance(settings.theme)
         self.screen = Screen(
@@ -181,9 +177,39 @@ class KodaTuiApp:
         settings.save()
         self.state.settings = settings
         self._agent = None
-        self.state.refresh(self._catalog, self._credentials)
+        self._refresh()
         self.appearance.theme = settings.theme
         self.invalidate()
+
+    def _refresh(self) -> None:
+        """Take the providers connected now and the model the settings pick, or say what
+        stops Koda from responding."""
+        state = self.state
+        try:
+            state.configured_providers = [
+                provider
+                for provider in self._catalog.providers()
+                if provider.is_connected(self._credentials)
+            ]
+            state.active_model, state.issue = self._selected_model()
+        except CredentialsError:
+            state.configured_providers, state.active_model = [], None
+            state.issue = strings.Screen.Status.CREDENTIALS_UNREADABLE
+
+    def _selected_model(self) -> tuple[Model | None, str | None]:
+        """The model the settings pick, or why it can't respond."""
+        settings = self.state.settings
+        if not self.state.configured_providers:
+            return None, strings.Screen.Status.SETUP_REQUIRED
+        if settings.provider is None or settings.model is None:
+            return None, strings.Screen.Status.SELECTION_REQUIRED
+        try:
+            model = self._catalog.model(settings.provider, settings.model)
+        except LLMConfigurationError:
+            return None, strings.Screen.Status.MODEL_NOT_FOUND
+        if not model.is_connected(self._credentials):
+            return None, strings.Screen.Status.MODEL_NOT_CONNECTED
+        return model, None
 
     async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
         """Send ``text`` in the current session and stream the agent's response."""

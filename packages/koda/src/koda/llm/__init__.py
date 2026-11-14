@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from koda.llm.apis import LLMApiContext
-from koda.llm.auth.registry import ProviderAuthRegistry
+from koda.llm.auth.protocols import OAuthLoginCallbacks
 from koda.llm.catalog import Catalog, CatalogWarning
 from koda.llm.credentials import (
     ApiKeyCredential,
@@ -44,7 +44,6 @@ async def connect(
     credentials: Credentials,
     *,
     tracing: bool = False,
-    auth_registry: ProviderAuthRegistry | None = None,
 ) -> LLM:
     """An LLM for ``model``, over the connection ``credentials`` can use.
 
@@ -56,7 +55,6 @@ async def connect(
             model=model,
             connection=connection,
             credentials=credentials,
-            auth_registry=auth_registry or ProviderAuthRegistry.default(),
             tracing=tracing,
         )
     )
@@ -85,6 +83,7 @@ __all__ = [
     "LLMResponse",
     "Model",
     "OAuthCredential",
+    "OAuthLoginCallbacks",
     "Provider",
     "ProviderCredential",
     "ThinkingMode",

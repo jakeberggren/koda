@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from typing import cast
+from unittest.mock import Mock
 
 import pytest
 
@@ -8,6 +9,7 @@ from koda import llm
 from koda.llm import Catalog, Credentials, exceptions
 from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.completions import OpenAICompletionsAPI
+from koda.llm.auth.codex import OpenAICodexAuth
 from koda.llm.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
 
 
@@ -297,3 +299,14 @@ def test_user_config_with_unknown_api_falls_back_with_warning(tmp_path: Path) ->
 
     assert catalog.provider("openai").name == "OpenAI"
     assert "unknown api 'unknown-api'" in (warnings[0].detail or "")
+
+
+async def test_an_oauth_connection_logs_in_through_its_api_s_browser_login() -> None:
+    catalog, _ = Catalog.load()
+    connections = {c.id: c for c in catalog.provider("openai").connections}
+
+    assert isinstance(connections["oauth"].oauth, OpenAICodexAuth)
+    assert connections["oauth"].auth == "oauth"
+    assert connections["api-key"].oauth is None
+    with pytest.raises(exceptions.LLMConfigurationError, match="has no browser login"):
+        await connections["api-key"].login(Mock())

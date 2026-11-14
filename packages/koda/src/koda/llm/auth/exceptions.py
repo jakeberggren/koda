@@ -37,29 +37,6 @@ class OAuthCallbackRedirectError(OAuthCallbackError):
         super().__init__("OAuth callback URL does not match the expected redirect")
 
 
-class AuthNameEmptyError(Exception):
-    """Raised when an auth provider id is empty."""
-
-    def __init__(self) -> None:
-        super().__init__("Auth provider id cannot be empty")
-
-
-class AuthAlreadyRegisteredError(Exception):
-    """Raised when an auth provider id is registered more than once."""
-
-    def __init__(self, auth_id: str) -> None:
-        super().__init__(f"Auth provider '{auth_id}' is already registered")
-        self.auth_id = auth_id
-
-
-class AuthNotSupportedError(Exception):
-    """Raised when an auth provider id is not registered."""
-
-    def __init__(self, auth_id: str) -> None:
-        super().__init__(f"Auth provider '{auth_id}' is not supported")
-        self.auth_id = auth_id
-
-
 class OpenAICodexAuthError(Exception):
     """Base error for OpenAI Codex OAuth failures."""
 

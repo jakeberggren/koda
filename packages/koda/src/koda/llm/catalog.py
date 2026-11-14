@@ -14,6 +14,7 @@ from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.completions import OpenAICompletionsAPI
 from koda.llm.apis.messages import AnthropicMessagesAPI
 from koda.llm.apis.responses import OpenAIResponsesAPI
+from koda.llm.auth.codex import OpenAICodexAuth
 from koda.llm.models import (
     AuthMethod,
     Connection,
@@ -26,6 +27,8 @@ from koda.paths import model_overrides_file_path
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from koda.llm.auth.protocols import ProviderAuth
 
 log = get_logger(__name__)
 
@@ -43,6 +46,19 @@ _APIS: dict[str, type[LLMApi]] = {
 class _UnknownApiError(ValueError):
     def __init__(self, name: str) -> None:
         super().__init__(f"unknown api '{name}', expected one of: {', '.join(_APIS)}")
+
+
+# The browser login of each API that connects with OAuth instead of an API key.
+_OAUTH: dict[type[LLMApi], type[ProviderAuth]] = {OpenAICodexResponsesAPI: OpenAICodexAuth}
+
+
+def _oauth(connection: _ConnectionFile) -> ProviderAuth | None:
+    if connection.auth != "oauth":
+        return None
+    flow = _OAUTH.get(connection.api)
+    if flow is None:
+        raise exceptions.LLMConfigurationError(f"{connection.api.__name__} has no browser login")
+    return flow()
 
 
 def _api(name: str) -> type[LLMApi]:
@@ -150,7 +166,7 @@ def _build_provider(provider_id: str, provider: _ProviderFile) -> tuple[Provider
             provider=provider_id,
             api=connection_file.api,
             base_url=connection_file.base_url,
-            auth=connection_file.auth,
+            oauth=_oauth(connection_file),
             label=connection_file.label,
             description=connection_file.description,
             detail=connection_file.detail,

@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from koda.llm.auth.registry import ProviderAuthRegistry
     from koda.llm.credentials import Credentials
     from koda.llm.models import Connection, Model
     from koda.llm.protocols import LLM
@@ -17,7 +16,6 @@ class LLMApiContext:
     model: Model
     connection: Connection
     credentials: Credentials
-    auth_registry: ProviderAuthRegistry
     tracing: bool = False
 
     @property

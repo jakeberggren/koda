@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from koda.llm import ApiKeyCredential, Catalog
 from koda_tui.palette.menus.models import ModelMenu
 from koda_tui.settings import Settings
-from koda_tui.state import AppState
 
 if TYPE_CHECKING:
     from koda.llm import ProviderCredential
@@ -26,14 +24,14 @@ class _Credentials:
         raise NotImplementedError
 
 
-def test_the_selected_model_is_current_whatever_the_case_of_its_saved_id(
+def test_the_active_model_is_current(
     context: PaletteContext,
 ) -> None:
     catalog, _warnings = Catalog.load()
     credentials = _Credentials()
-    settings = Settings(provider="bergetai", model="google/gemma-4-31b-it")
-    state = AppState.load(Path("/workspace"), settings, catalog=catalog, credentials=credentials)
-    context = replace(context, catalog=catalog, credentials=credentials, state=state)
+    context.state.settings = Settings(provider="bergetai", model="google/gemma-4-31b-it")
+    context.state.active_model = catalog.model("bergetai", "google/gemma-4-31b-it")
+    context = replace(context, catalog=catalog, credentials=credentials)
 
     [current] = [item for item in ModelMenu(context).items() if item.current]
     assert current.data.id == "google/gemma-4-31B-it"

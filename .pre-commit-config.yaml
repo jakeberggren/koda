@@ -62,6 +62,13 @@ repos:
         language: system
         types: [python]
 
+      - id: import-linter # import boundaries
+        name: import-linter
+        entry: uv run lint-imports
+        language: system
+        types: [python]
+        pass_filenames: false
+
       - id: pytest-koda # unit tests for koda (pre-push)
         name: pytest koda
         entry: uv run pytest packages/koda

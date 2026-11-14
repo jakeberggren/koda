@@ -15,6 +15,7 @@ from koda.messages import TokenUsage
 from koda.tools import ToolCall
 from koda_tui import strings
 from koda_tui.appearance import Tokens
+from koda_tui.settings import Settings
 from koda_tui.state import AppState, AssistantMessage, ToolMessage, Usage, UserMessage
 from koda_tui.views import status
 
@@ -36,13 +37,13 @@ def test_left_shows_workspace_model_thinking_and_usage(state: AppState) -> None:
         name="Model",
         provider="provider",
         context_window=1000,
-        thinking_options=(),
+        thinking_options=(ThinkingOption(id="medium", label="Medium"),),
     )
     usage = TokenUsage(input_tokens=120, output_tokens=0)
     state = _state(
         state,
         active_model=model,
-        thinking=ThinkingOption(id="medium", label="Medium"),
+        settings=Settings(thinking="medium"),
         usage=Usage(latest=usage, total=TokenUsage(input_tokens=34, output_tokens=15_900)),
     )
     assert _texts(status._left(state)) == [

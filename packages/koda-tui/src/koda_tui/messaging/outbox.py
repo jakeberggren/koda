@@ -13,7 +13,7 @@ from koda.llm import (
     LLMError,
     LLMRateLimitError,
 )
-from koda.tools.exceptions import ToolError
+from koda.tools import ToolError
 from koda_tui import strings
 from koda_tui.state import ErrorMessage, PendingInput
 
