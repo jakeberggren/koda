@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from koda.execution.host import HostCommandExecutor
 from koda.tools import (
     ToolContext,
     ToolExecutionCoordinator,
@@ -86,27 +85,26 @@ class CrashTool:
 
 
 @pytest.fixture
-def sandbox_dir() -> Generator[Path]:
-    """Create a temporary sandbox directory for testing."""
+def workspace_dir() -> Generator[Path]:
+    """Create a temporary workspace directory for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         # Resolve to handle macOS /var -> /private/var symlink
         yield Path(tmpdir).resolve()
 
 
 @pytest.fixture
-def policy(sandbox_dir: Path) -> ToolPolicy:
+def policy(workspace_dir: Path) -> ToolPolicy:
     """Create a ToolPolicy for testing."""
-    return ToolPolicy.create(sandbox_dir)
+    return ToolPolicy.create(workspace_dir)
 
 
 @pytest.fixture
-def context(sandbox_dir: Path, policy: ToolPolicy) -> ToolContext:
+def context(workspace_dir: Path, policy: ToolPolicy) -> ToolContext:
     """Create a ToolContext for testing."""
     return ToolContext(
-        cwd=sandbox_dir,
+        cwd=workspace_dir,
         policy=policy,
         coordinator=ToolExecutionCoordinator(),
-        executor=HostCommandExecutor(),
     )
 
 

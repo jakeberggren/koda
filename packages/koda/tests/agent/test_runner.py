@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import BaseModel
@@ -97,7 +97,6 @@ def _tool_context(tmp_path: Path) -> ToolContext:
         cwd=tmp_path,
         policy=ToolPolicy.create(tmp_path),
         coordinator=ToolExecutionCoordinator(),
-        executor=cast("Any", object()),
     )
 
 

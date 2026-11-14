@@ -48,10 +48,10 @@ packages/koda/
 │   │   ├── session.py              # Session model
 │   │   └── store.py                # In-memory and JSON session stores
 │   ├── tools/
-│   │   ├── builtins/               # read/list/glob/grep/edit/write tools
+│   │   ├── builtins/               # read/list/glob/grep/edit/write/bash tools
 │   │   ├── base.py                 # Core tool protocols and base models
 │   │   ├── config.py               # Tool configuration bundle
-│   │   ├── context.py              # Sandbox/context information
+│   │   ├── context.py              # Tool context: cwd, policy and coordination
 │   │   ├── decorators.py           # Tool registration decorators
 │   │   ├── exceptions.py           # Tool-related exceptions
 │   │   ├── executor.py             # Tool execution runtime
