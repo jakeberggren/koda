@@ -30,7 +30,6 @@ from openai.types.responses.response_function_web_search import ActionSearch
 from openai.types.responses.response_input_param import FunctionCallOutput, ResponseInputItemParam
 from pydantic import BaseModel
 
-from koda.llm import exceptions
 from koda.llm.apis.credentials import resolve_api_key_credential
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
@@ -42,7 +41,11 @@ from koda.llm.types import (
     LLMToolCompleted,
     LLMToolStarted,
 )
-from koda.llm.utils import raise_llm_error_from_openai, resolve_openai_client
+from koda.llm.utils import (
+    parse_tool_arguments,
+    raise_llm_error_from_openai,
+    resolve_openai_client,
+)
 from koda.messages import AssistantMessage, TokenUsage, ToolMessage, UserMessage
 from koda.tools import ToolCall, ToolOutput, ToolResult
 
@@ -89,16 +92,6 @@ class OpenAIResponsesAPIConfig:
 
 class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Omit, Response]):
     """Convert between Koda messages/tools/responses and OpenAI Responses types."""
-
-    @staticmethod
-    def _parse_tool_call_arguments(raw_arguments: str) -> dict[str, Any]:
-        try:
-            arguments = json.loads(raw_arguments)
-        except json.JSONDecodeError as error:
-            raise exceptions.InvalidToolCallArgumentsError from error
-        if not isinstance(arguments, dict):
-            raise exceptions.InvalidToolCallArgumentsError
-        return arguments
 
     @staticmethod
     def _to_provider_user_message(message: UserMessage) -> EasyInputMessageParam:
@@ -153,7 +146,7 @@ class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Om
             if isinstance(message, AssistantMessage):
                 result.extend(self._to_provider_assistant_message(message))
                 continue
-            raise exceptions.UnknownMessageTypeError(type(message))
+            raise TypeError(f"Unknown message type: {type(message)}")
         return result
 
     @staticmethod
@@ -183,7 +176,7 @@ class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Om
         return [
             ToolCall(
                 tool_name=output.name,
-                arguments=self._parse_tool_call_arguments(output.arguments),
+                arguments=parse_tool_arguments(output.arguments),
                 call_id=output.call_id,
             )
             for output in response.output
@@ -216,16 +209,6 @@ class OpenAIResponsesEventAdapter:
     """Convert OpenAI Responses streaming events into Koda LLM stream events."""
 
     @staticmethod
-    def _parse_tool_call_arguments(raw_arguments: str) -> dict[str, Any]:
-        try:
-            arguments = json.loads(raw_arguments)
-        except json.JSONDecodeError as error:
-            raise exceptions.InvalidToolCallArgumentsError from error
-        if not isinstance(arguments, dict):
-            raise exceptions.InvalidToolCallArgumentsError
-        return arguments
-
-    @staticmethod
     def _format_web_search(output: ResponseFunctionWebSearch) -> str | None:
         action = output.action
         if not isinstance(action, ActionSearch):
@@ -235,7 +218,7 @@ class OpenAIResponsesEventAdapter:
     def _to_function_tool_call(self, output: ResponseFunctionToolCall) -> ToolCall:
         return ToolCall(
             tool_name=output.name,
-            arguments=self._parse_tool_call_arguments(output.arguments),
+            arguments=parse_tool_arguments(output.arguments),
             call_id=output.call_id,
         )
 
@@ -410,4 +393,4 @@ class OpenAIResponsesAPI(LLM):
         schema: type[T],
     ) -> LLMResponse[T]:
         _ = request, schema
-        raise exceptions.StructuredOutputNotSupportedError
+        raise NotImplementedError

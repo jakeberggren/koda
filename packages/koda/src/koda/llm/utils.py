@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING, NoReturn
+import json
+from typing import TYPE_CHECKING, Any, NoReturn
 
 from openai import (
     APIConnectionError,
@@ -52,3 +53,19 @@ def raise_llm_error_from_openai(
         raise exceptions.LLMAPIError(backend, error) from error
     logger.error("llm_unknown_error", backend=backend, error=repr(error))
     raise exceptions.LLMAPIError(backend, error) from error
+
+
+def tool_arguments(value: object) -> dict[str, Any]:
+    """``value`` as tool call arguments, which must be a JSON object."""
+    if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
+        raise exceptions.LLMError("Tool call arguments must decode to a JSON object")
+    return value
+
+
+def parse_tool_arguments(raw: str) -> dict[str, Any]:
+    """The tool call arguments in the JSON text ``raw``."""
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise exceptions.LLMError("Tool call arguments must decode to a JSON object") from error
+    return tool_arguments(value)

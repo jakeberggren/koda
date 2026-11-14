@@ -24,7 +24,6 @@ from openai.types.chat.chat_completion_tool_union_param import ChatCompletionToo
 from openai.types.chat.chat_completion_user_message_param import ChatCompletionUserMessageParam
 from pydantic import BaseModel
 
-from koda.llm import exceptions
 from koda.llm.apis.credentials import resolve_api_key_credential
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
@@ -33,7 +32,11 @@ from koda.llm.types import (
     LLMTextDelta,
     LLMToolCallRequested,
 )
-from koda.llm.utils import raise_llm_error_from_openai, resolve_openai_client
+from koda.llm.utils import (
+    parse_tool_arguments,
+    raise_llm_error_from_openai,
+    resolve_openai_client,
+)
 from koda.messages import AssistantMessage, TokenUsage, ToolMessage, UserMessage
 from koda.tools import ToolCall
 
@@ -96,19 +99,9 @@ class _PartialToolCallState:
             return None
         return ToolCall(
             tool_name=self.tool_name,
-            arguments=_parse_tool_call_arguments(self.raw_arguments()),
+            arguments=parse_tool_arguments(self.raw_arguments()),
             call_id=self.call_id,
         )
-
-
-def _parse_tool_call_arguments(raw_arguments: str) -> dict[str, object]:
-    try:
-        parsed = json.loads(raw_arguments)
-    except json.JSONDecodeError as error:
-        raise exceptions.InvalidToolCallArgumentsError from error
-    if not isinstance(parsed, dict):
-        raise exceptions.InvalidToolCallArgumentsError
-    return parsed
 
 
 def _or_omit[T](value: T | None) -> T | Omit:
@@ -179,7 +172,7 @@ class OpenAICompletionsAdapter(
             if isinstance(message, AssistantMessage):
                 result.append(self._to_provider_assistant_message(message))
                 continue
-            raise exceptions.UnknownMessageTypeError(type(message))
+            raise TypeError(f"Unknown message type: {type(message)}")
         return result
 
     @staticmethod
@@ -255,7 +248,7 @@ class OpenAICompletionsAdapter(
                 calls.append(
                     ToolCall(
                         tool_name=tool_call.function.name,
-                        arguments=_parse_tool_call_arguments(tool_call.function.arguments),
+                        arguments=parse_tool_arguments(tool_call.function.arguments),
                         call_id=tool_call.id,
                     )
                 )
@@ -509,4 +502,4 @@ class OpenAICompletionsAPI(LLM):
         schema: type[T],
     ) -> LLMResponse[T]:
         _ = request, schema
-        raise exceptions.StructuredOutputNotSupportedError
+        raise NotImplementedError

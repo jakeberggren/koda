@@ -131,7 +131,10 @@ def _thinking_options(
     for mode_id in model.thinking.modes:
         mode = provider.thinking_modes.get(mode_id)
         if mode is None:
-            raise exceptions.ModelThinkingModeNotConfiguredError(model.id, provider_id, mode_id)
+            raise exceptions.LLMConfigurationError(
+                f"Model '{model.id}' for provider {provider_id} references unknown thinking "
+                f"mode '{mode_id}'"
+            )
         options.append(ThinkingOption(id=mode_id, label=mode.label, description=mode.description))
     return tuple(options)
 
@@ -236,7 +239,7 @@ class Catalog:
         """The provider with ``provider_id``."""
         provider = self._providers.get(_normalize(provider_id))
         if provider is None:
-            raise exceptions.ProviderNotSupportedError(provider_id)
+            raise exceptions.LLMConfigurationError(f"Provider '{provider_id}' is not supported")
         return provider
 
     def models(self, provider_id: str | None = None) -> list[Model]:
@@ -251,5 +254,7 @@ class Catalog:
         provider = self.provider(provider_id)
         model = self._models.get((provider.id, _normalize(model_id)))
         if model is None:
-            raise exceptions.ModelNotSupportedError(model_id, provider_id)
+            raise exceptions.LLMConfigurationError(
+                f"Model '{model_id}' for provider {provider_id} is not supported"
+            )
         return model

@@ -19,7 +19,6 @@ from koda.agent.events import (
 )
 from koda.agent.stream import AgentStreamAccumulator
 from koda.llm import LLM, LLMRequest, LLMRequestOptions
-from koda.llm.exceptions import EmptyMessageError
 from koda.llm.types import (
     LLMEvent,
     LLMTextDelta,
@@ -190,7 +189,7 @@ class AgentRunner:
         user_text = user_text.strip()
         if not user_text:
             logger.warning("run_called_with_empty_message")
-            raise EmptyMessageError
+            raise ValueError("Message cannot be empty")
 
         session_id = self.session.session_id
         yield AgentTurnStarted(session_id=session_id)

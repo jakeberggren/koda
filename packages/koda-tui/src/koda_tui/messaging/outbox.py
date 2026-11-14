@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from koda.llm.exceptions import (
+from koda.llm import (
     LLMAPIError,
     LLMAuthenticationError,
     LLMConfigurationError,

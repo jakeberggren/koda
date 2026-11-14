@@ -9,9 +9,8 @@ from unittest.mock import Mock
 import pytest
 from prompt_toolkit.keys import Keys
 
-from koda.llm import Catalog, Model, ThinkingOption
+from koda.llm import Catalog, LLMConfigurationError, Model, ThinkingOption
 from koda.llm.credentials import ApiKeyCredential
-from koda.llm.exceptions import ModelSelectionMissingError
 from koda.sessions import InMemorySessionStore, Session
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.app.keybindings import create_keybindings
@@ -305,5 +304,5 @@ class TestAgent:
     async def test_responding_without_a_selected_model_fails(self) -> None:
         app, _ = _make_app(settings=replace(_SETTINGS, model=None))
 
-        with pytest.raises(ModelSelectionMissingError):
+        with pytest.raises(LLMConfigurationError, match="No model selected"):
             await _respond(app)

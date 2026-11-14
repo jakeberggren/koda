@@ -10,6 +10,15 @@ from koda.llm.credentials import (
     OAuthCredential,
     ProviderCredential,
 )
+from koda.llm.exceptions import (
+    CredentialsError,
+    LLMAPIError,
+    LLMAuthenticationError,
+    LLMConfigurationError,
+    LLMConnectionError,
+    LLMError,
+    LLMRateLimitError,
+)
 from koda.llm.models import (
     AuthMethod,
     Connection,
@@ -61,8 +70,15 @@ __all__ = [
     "CatalogWarning",
     "Connection",
     "Credentials",
+    "CredentialsError",
     "JsonCredentialStore",
+    "LLMAPIError",
+    "LLMAuthenticationError",
+    "LLMConfigurationError",
+    "LLMConnectionError",
+    "LLMError",
     "LLMEvent",
+    "LLMRateLimitError",
     "LLMRequest",
     "LLMRequestOptions",
     "LLMRequestOptionsError",

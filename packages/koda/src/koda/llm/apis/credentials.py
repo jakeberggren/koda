@@ -23,7 +23,7 @@ def _resolve_credential(context: LLMApiContext) -> ProviderCredential:
     credential_key = _credential_key(context)
     credential = context.credentials.get_credential(credential_key)
     if credential is None:
-        raise exceptions.ProviderCredentialNotConfiguredError(credential_key)
+        raise exceptions.LLMConfigurationError(f"{credential_key} credential not configured")
     return credential
 
 
@@ -31,10 +31,14 @@ def resolve_api_key_credential(context: LLMApiContext) -> str:
     """Return a normalized provider API key or raise a configuration error."""
     credential = _resolve_credential(context)
     if not isinstance(credential, ApiKeyCredential):
-        raise exceptions.ApiKeyCredentialRequiredError(_credential_key(context))
+        raise exceptions.LLMConfigurationError(
+            f"{_credential_key(context)} requires an API key credential"
+        )
     normalized_api_key = credential.value.strip()
     if not normalized_api_key:
-        raise exceptions.EmptyApiKeyError(_credential_key(context))
+        raise exceptions.LLMConfigurationError(
+            f"{_credential_key(context)} API key cannot be empty"
+        )
     return normalized_api_key
 
 
@@ -51,7 +55,7 @@ async def resolve_oauth_credential(context: LLMApiContext) -> OAuthCredential:
     credential_key = _credential_key(context)
     credential = _resolve_credential(context)
     if not isinstance(credential, OAuthCredential):
-        raise exceptions.OAuthCredentialRequiredError(credential_key)
+        raise exceptions.LLMConfigurationError(f"{credential_key} requires an OAuth credential")
     if not _oauth_needs_refresh(credential):
         return credential
 
