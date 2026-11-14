@@ -14,7 +14,7 @@ def _agent(workspace: Path) -> Agent:
 
 
 def _instructions(agent: Agent) -> str:
-    instructions = agent.runner.resolve_instructions()
+    instructions = agent.instructions.render()
     assert instructions is not None
     return instructions
 

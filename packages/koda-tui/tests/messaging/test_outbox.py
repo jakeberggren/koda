@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from koda.agent import AgentTextDelta, AgentToolCallRequested, AgentToolCompleted
+from koda.agent import AgentToolCompleted, LLMTextDelta, LLMToolCallRequested
 from koda.llm.exceptions import LLMConnectionError, LLMRateLimitError
 from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda_tui.messaging import Conversation, Outbox
@@ -37,12 +37,12 @@ class _Agent:
         self.active = 0
         self.most_active = 0
 
-    async def run(self, text: str) -> AsyncIterator[AgentTextDelta]:
+    async def run(self, text: str) -> AsyncIterator[LLMTextDelta]:
         self.sent.append(text)
         self.active += 1
         self.most_active = max(self.most_active, self.active)
         try:
-            yield AgentTextDelta(text=f"reply to {text}")
+            yield LLMTextDelta(text=f"reply to {text}")
             await self.released.wait()
         finally:
             self.active -= 1
@@ -250,8 +250,8 @@ class TestSending:
         client = AsyncMock()
 
         async def mock_chat(_text: str) -> AsyncIterator:
-            yield AgentTextDelta(text="Hello ")
-            yield AgentTextDelta(text="world")
+            yield LLMTextDelta(text="Hello ")
+            yield LLMTextDelta(text="world")
 
         client.run = mock_chat
 
@@ -271,8 +271,8 @@ class TestSending:
         tool = ToolCall(tool_name="read_file", arguments={"path": "/tmp"}, call_id="c1")
 
         async def mock_chat(_text: str) -> AsyncIterator:
-            yield AgentTextDelta(text="Let me check...")
-            yield AgentToolCallRequested(call=tool)
+            yield LLMTextDelta(text="Let me check...")
+            yield LLMToolCallRequested(call=tool)
             yield AgentToolCompleted(
                 tool_name="read_file",
                 result=ToolResult(
@@ -280,7 +280,7 @@ class TestSending:
                     output=ToolOutput(content={"data": "file contents"}, display="file contents"),
                 ),
             )
-            yield AgentTextDelta(text="Done!")
+            yield LLMTextDelta(text="Done!")
 
         client.run = mock_chat
 
@@ -305,7 +305,7 @@ class TestSending:
         tool = ToolCall(tool_name="read_file", arguments={"path": "/bad"}, call_id="c1")
 
         async def mock_chat(_text: str) -> AsyncIterator:
-            yield AgentToolCallRequested(call=tool)
+            yield LLMToolCallRequested(call=tool)
             yield AgentToolCompleted(
                 tool_name="read_file",
                 result=ToolResult(
@@ -333,7 +333,7 @@ class TestSending:
         client = AsyncMock()
 
         async def mock_chat(_text: str) -> AsyncIterator:
-            yield AgentTextDelta(text="Starting...")
+            yield LLMTextDelta(text="Starting...")
             raise LLMRateLimitError("openai", RuntimeError("quota hit"))
             yield  # Make it a generator
 
@@ -389,11 +389,11 @@ class TestSending:
         client = AsyncMock()
 
         async def mock_chat(_text: str) -> AsyncIterator:
-            yield AgentTextDelta(text="Start")
+            yield LLMTextDelta(text="Start")
             # Simulate long-running stream that gets cancelled
 
             await asyncio.sleep(10)
-            yield AgentTextDelta(text="Never reached")
+            yield LLMTextDelta(text="Never reached")
 
         client.run = mock_chat
 

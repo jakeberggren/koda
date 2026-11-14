@@ -8,12 +8,14 @@ import koda.messages
 from koda.agent import (
     AgentEvent,
     AgentResponseCompleted,
-    AgentTextDelta,
-    AgentThinkingDelta,
-    AgentToolCallRequested,
     AgentToolCompleted,
     AgentToolResultReady,
     AgentToolStarted,
+    LLMTextDelta,
+    LLMThinkingDelta,
+    LLMToolCallRequested,
+    LLMToolCompleted,
+    LLMToolStarted,
 )
 from koda.sessions import sum_usage
 from koda.tools import ToolOutput
@@ -73,15 +75,15 @@ class Conversation:
     def apply(self, event: AgentEvent) -> None:  # noqa: C901 - one case per kind of event
         """Apply one event of the response in flight; other events change nothing."""
         match event:
-            case AgentTextDelta():
+            case LLMTextDelta():
                 self._stream(text=event.text)
-            case AgentThinkingDelta():
+            case LLMThinkingDelta():
                 self._stream(thinking=event.text)
             case AgentResponseCompleted():
                 self._add_usage(event.message.usage)
-            case AgentToolCallRequested() | AgentToolStarted():
+            case LLMToolCallRequested() | LLMToolStarted() | AgentToolStarted():
                 self._start_tool(event.call)
-            case AgentToolResultReady() | AgentToolCompleted():
+            case LLMToolCompleted() | AgentToolResultReady() | AgentToolCompleted():
                 self._complete_tool(event.result.call_id, event.result.output)
 
     def _add_usage(self, latest: TokenUsage | None) -> None:

@@ -3,11 +3,17 @@ from koda.sessions.exceptions import (
     SessionNotFoundError,
 )
 from koda.sessions.session import Session, sum_usage
-from koda.sessions.store import InMemorySessionStore, JsonSessionStore, SessionStore
+from koda.sessions.store import (
+    InMemorySessionStore,
+    JsonSessionStore,
+    SaveSessionHook,
+    SessionStore,
+)
 
 __all__ = [
     "InMemorySessionStore",
     "JsonSessionStore",
+    "SaveSessionHook",
     "Session",
     "SessionError",
     "SessionNotFoundError",
