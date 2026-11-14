@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import partial
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from queue import Empty, Queue
+from socketserver import TCPServer
 from time import monotonic
 from typing import TYPE_CHECKING
 from urllib.parse import parse_qs, urlparse
@@ -106,6 +107,22 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
         return
 
 
+class _LocalHTTPServer(ThreadingHTTPServer):
+    """HTTP server that skips the reverse DNS lookup ``HTTPServer`` does on bind.
+
+    ``HTTPServer.server_bind`` calls ``socket.getfqdn(host)`` only to set
+    ``server_name``, which nothing here uses. That lookup can take tens of
+    seconds on some machines, delaying the listener long enough for the
+    browser redirect to fail.
+    """
+
+    def server_bind(self) -> None:
+        TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = str(host)
+        self.server_port = int(port)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class OAuthCallbackListener:
     """One-shot localhost listener for an OAuth redirect."""
@@ -154,7 +171,7 @@ class OAuthCallbackListener:
             listener=self,
             result=result,
         )
-        server = ThreadingHTTPServer((self.host, self.port), handler)
+        server = _LocalHTTPServer((self.host, self.port), handler)
         server.timeout = self.poll_interval
         try:
             value = self._wait_for_result(

@@ -104,3 +104,27 @@ def test_receive_callback_times_out(free_port: int) -> None:
 
     with pytest.raises(OAuthCallbackTimeoutError):
         listener.receive()
+
+
+def test_listener_starts_without_a_reverse_dns_lookup(
+    free_port: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _no_lookup(name: str = "") -> str:
+        raise AssertionError(f"unexpected reverse DNS lookup for {name!r}")
+
+    monkeypatch.setattr(socket, "getfqdn", _no_lookup)
+    listener = OAuthCallbackListener(
+        port=free_port,
+        callback_path="/auth/callback",
+        state="expected-state",
+        timeout=2,
+    )
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(listener.receive)
+
+        status, _ = _read_url(
+            f"http://127.0.0.1:{free_port}/auth/callback?code=auth-code&state=expected-state"
+        )
+
+    assert status == 200
+    assert future.result(timeout=1) == "auth-code"
