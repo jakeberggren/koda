@@ -6,12 +6,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from koda.agent import Agent
-from koda.execution import HostCommandExecutor, Sandbox, SeatbeltCommandExecutor
+from koda.execution import HostCommandExecutor
 from koda.sessions import Session
 
 
-def _agent(workspace: Path, sandbox: Sandbox = "host") -> Agent:
-    return Agent(MagicMock(), session=Session(), workspace=workspace, sandbox=sandbox)
+def _agent(workspace: Path) -> Agent:
+    return Agent(MagicMock(), session=Session(), workspace=workspace)
 
 
 def _instructions(agent: Agent) -> str:
@@ -69,11 +69,5 @@ def test_works_in_the_current_directory_by_default(
     assert agent.tools.context.cwd == tmp_path.resolve()
 
 
-def test_runs_commands_on_the_host_by_default(tmp_path: Path) -> None:
+def test_runs_commands_on_the_host(tmp_path: Path) -> None:
     assert isinstance(_agent(tmp_path).tools.context.executor, HostCommandExecutor)
-
-
-def test_runs_commands_in_the_seatbelt_sandbox_when_asked(tmp_path: Path) -> None:
-    agent = _agent(tmp_path, sandbox="seatbelt")
-
-    assert isinstance(agent.tools.context.executor, SeatbeltCommandExecutor)

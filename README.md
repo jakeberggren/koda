@@ -102,16 +102,9 @@ workspace and respect `.gitignore` patterns.
 
 ### Bash and Command Execution
 
-The built-in `bash` tool supports configurable command execution modes:
-
-- `host` - Default, non-sandboxed execution on the local machine. This is
-  intended for trusted environments.
-- `seatbelt` - Runs each command with macOS `sandbox-exec`, allowing network
-  access and limiting writes to the workspace plus temporary storage.
-- `bubblewrap` - Planned Linux sandbox mode. Not yet available.
-
-Command execution mode is set with `"sandbox"` in `~/.koda/settings.json`. See the [command execution README](packages/koda/src/koda/execution/README.md)
-for details on execution modes and configuration.
+The `bash` tool runs commands on your machine with your user's permissions and
+environment. Run Koda in a container or VM when working with untrusted
+repositories.
 
 ### Project Context and System Prompt Customization
 
