@@ -22,41 +22,23 @@ terminal.
 - **Streaming coordination** for incremental text, thinking, tool, and completion updates.
 - **Palette-driven controls** for provider setup, model selection, thinking level, sessions,
   theme, scrollbar visibility, and input behavior.
-- **Runtime** that builds the agent from the settings and runs it for the current session.
+- **Settings** in `~/.koda/settings.json`, changed through the palette.
 
 ## Package Structure
 
 ```text
-packages/koda-tui/
-├── src/koda_tui/
-│   ├── __init__.py             # CLI entrypoint and app bootstrap
-│   ├── __main__.py             # Module entrypoint
-│   ├── agent.py                # TUI-specific agent builder and tool wiring
-│   ├── actions.py              # TUI actions backed by settings/service operations
-│   ├── converters.py           # Service DTO -> TUI state conversion
-│   ├── state.py                # Shared TUI state
-│   ├── app/
-│   │   ├── application.py      # App orchestration and settings synchronization
-│   │   ├── keybindings.py      # Keyboard shortcuts and submission behavior
-│   │   ├── output.py           # Synchronized terminal output
-│   │   ├── queue.py            # Queued input handling
-│   │   ├── response.py         # Response lifecycle helpers
-│   │   └── streaming.py        # Stream event processing and cancellation
-│   ├── components/
-│   │   ├── chat_area.py        # Chat transcript view
-│   │   ├── file_suggestions.py # File suggestion UI
-│   │   ├── input_area.py       # Prompt input widget
-│   │   ├── queued_inputs.py    # Queued input display
-│   │   ├── status_bar.py       # Status/footer UI
-│   │   └── __init__.py
-│   ├── rendering/
-│   │   ├── renderer.py         # Rich + prompt_toolkit rendering
-│   │   └── __init__.py
-│   ├── ui/
-│   │   ├── layout.py           # Layout composition
-│   │   ├── styles.py           # Theme-specific prompt_toolkit styles
-│   │   └── palette/            # Command palette, dialogs, and palette commands
-│   └── utils/
-│       └── model_selection.py  # Model and thinking helper utilities
-└── tests/
+packages/koda-tui/src/koda_tui/
+├── main.py         # Builds the app from its parts, sets up logging, and runs it
+├── settings.py     # Settings, loaded from and saved to ~/.koda/settings.json
+├── state.py        # AppState: what the UI shows
+├── strings.py      # All user-facing text
+├── workspace.py    # Workspace file index for @ mentions
+├── app/            # The application: wiring, the agent, keybindings, exit prompt
+├── messaging/      # Conversation (messages from agent events) and Outbox (sending)
+├── palette/        # Command palette and its menus
+├── views/          # Screen, chat, composer, pending messages, status bar
+├── rendering/      # Rich-based rendering of messages, markdown, and diffs
+├── ui/             # Primitives, widgets, and overlays on prompt_toolkit
+├── appearance/     # Themes, tokens, icons, and sizes
+└── terminal/       # Terminal protocol and key decoding
 ```

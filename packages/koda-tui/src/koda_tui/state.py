@@ -165,9 +165,9 @@ class AppState:
         try:
             model = catalog.model(settings.provider, settings.model)
         except LLMConfigurationError:
-            return strings.Screen.Status.MODEL_UNAVAILABLE
+            return strings.Screen.Status.MODEL_NOT_FOUND
         if not model.is_connected(credentials):
-            return strings.Screen.Status.MODEL_UNAVAILABLE
+            return strings.Screen.Status.MODEL_NOT_CONNECTED
         self.active_model = model
         return None
 

@@ -115,8 +115,11 @@ class Outbox:
         self._invalidate()
         error = None
         try:
-            self._response = asyncio.create_task(self._respond(text))
-            await self._response
+            if self._state.issue is not None:
+                error = ErrorMessage(self._state.issue)  # Why Koda can't respond, as in the status.
+            else:
+                self._response = asyncio.create_task(self._respond(text))
+                await self._response
         except asyncio.CancelledError:
             if (task := asyncio.current_task()) and task.cancelling():
                 raise  # The sending itself is cancelled, not just this response.

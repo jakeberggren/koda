@@ -53,13 +53,11 @@ class ModelMenu:
         self._overlays.close_all()
 
     def _item_for_model(self, model: Model, provider_name: str | None) -> ListItem[Model]:
-        settings = self._context.settings
-        is_active = settings.provider == model.provider and settings.model == model.id
         return ListItem(
             label=model.name,
             detail=self._detail(model),
             group=provider_name,
-            current=is_active,
+            current=model == self._context.state.active_model,
             data=model,
         )
 

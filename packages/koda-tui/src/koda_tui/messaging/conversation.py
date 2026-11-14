@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from koda import messages as core
+import koda.messages
 from koda.agent import (
     AgentEvent,
     AgentResponseCompleted,
@@ -128,22 +128,22 @@ class Conversation:
         return None
 
 
-def _from_history(history: Sequence[core.Message]) -> list[Message]:  # noqa: C901 - one case per kind of message
+def _from_history(history: Sequence[koda.messages.Message]) -> list[Message]:  # noqa: C901 - one case per kind of message
     """Messages for a saved history, each tool call with its result. A call without a
     result shows as done; a result with no call to show it under is left out."""
     messages: list[Message] = []
     tools: dict[str, tuple[int, ToolCall]] = {}  # By call id: where its message is, and the call.
     for item in history:
         match item:
-            case core.UserMessage():
+            case koda.messages.UserMessage():
                 messages.append(UserMessage(item.content))
-            case core.AssistantMessage():
+            case koda.messages.AssistantMessage():
                 if reply := _assistant_message(item.content, item.thinking_content):
                     messages.append(reply)
                 for call in item.tool_calls:
                     tools[call.call_id] = (len(messages), call)
                     messages.append(ToolMessage(call, ToolOutput()))
-            case core.ToolMessage() if item.tool_result.call_id in tools:
+            case koda.messages.ToolMessage() if item.tool_result.call_id in tools:
                 index, call = tools[item.tool_result.call_id]
                 messages[index] = ToolMessage(call, item.tool_result.output)
     return messages
