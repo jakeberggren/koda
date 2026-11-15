@@ -78,7 +78,8 @@ def test_escape_closes() -> None:
 def test_shortcuts_act_on_the_selected_item() -> None:
     acted: list[ListItem | None] = []
     picker, _, _ = _picker(
-        _items("Apple", "Banana"), [Shortcut(Keys.ControlD, "ctrl+d", "delete", acted.append)]
+        _items("Apple", "Banana"),
+        [Shortcut(Keys.ControlD, "ctrl+d", "delete", acted.append)],
     )
     _press(picker, Keys.Down)
     _press(picker, Keys.ControlD)

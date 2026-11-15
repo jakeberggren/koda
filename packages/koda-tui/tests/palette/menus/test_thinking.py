@@ -14,7 +14,8 @@ if TYPE_CHECKING:
 
 
 def test_lists_the_models_levels_and_sets_the_chosen_one(
-    context: PaletteContext, overlays: Overlays
+    context: PaletteContext,
+    overlays: Overlays,
 ) -> None:
     context.state.active_model = Model(
         id="m",

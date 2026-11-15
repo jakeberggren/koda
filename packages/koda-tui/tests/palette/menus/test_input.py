@@ -14,7 +14,8 @@ if TYPE_CHECKING:
 
 
 def test_lists_both_modes_and_sets_the_chosen_one(
-    context: PaletteContext, overlays: Overlays
+    context: PaletteContext,
+    overlays: Overlays,
 ) -> None:
     InputMenu(context).open()
 

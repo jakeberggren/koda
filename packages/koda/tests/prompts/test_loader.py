@@ -2,11 +2,7 @@
 
 from pathlib import Path
 
-from koda.prompts import (
-    DEFAULT_SYSTEM_PROMPT,
-    SystemPrompt,
-    SystemPromptLoader,
-)
+from koda.prompts import DEFAULT_SYSTEM_PROMPT, SystemPrompt, SystemPromptLoader
 
 
 class TestSystemPromptRender:
@@ -132,10 +128,7 @@ class TestSystemPromptLoader:
         secret.write_text("leaked", encoding="utf-8")
         (workspace / "SYSTEM.md").symlink_to(secret)
 
-        loader = SystemPromptLoader(
-            search_paths=[workspace / "."],
-            sandbox_root=workspace,
-        )
+        loader = SystemPromptLoader(search_paths=[workspace / "."], sandbox_root=workspace)
         prompt = loader.load()
 
         assert prompt.content == DEFAULT_SYSTEM_PROMPT

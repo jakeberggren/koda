@@ -33,26 +33,30 @@ def test_credentials_are_kept_in_a_file_only_the_user_can_read(tmp_path: Path) -
     path = tmp_path / "koda" / "credentials.json"
     JsonCredentialStore(path).set_credential("openai:oauth", _oauth())
     JsonCredentialStore(path).set_credential(
-        "anthropic:api-key", ApiKeyCredential(type="api_key", value="key")
+        "anthropic:api-key",
+        ApiKeyCredential(type="api_key", value="key"),
     )
 
     store = JsonCredentialStore(path)
     assert store.get_credential("openai:oauth") == _oauth()
     assert store.get_credential("anthropic:api-key") == ApiKeyCredential(
-        type="api_key", value="key"
+        type="api_key",
+        value="key",
     )
     assert path.stat().st_mode & 0o777 == 0o600
 
 
 def test_an_api_key_in_the_environment_comes_first(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     store = JsonCredentialStore(tmp_path / "credentials.json")
     store.set_credential("openai:api-key", ApiKeyCredential(type="api_key", value="stored"))
     monkeypatch.setenv("OPENAI_API_KEY", "from-env")
 
     assert store.get_credential("openai:api-key") == ApiKeyCredential(
-        type="api_key", value="from-env"
+        type="api_key",
+        value="from-env",
     )
     assert store.get_credential("openai:oauth") is None
 

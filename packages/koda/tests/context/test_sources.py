@@ -124,10 +124,7 @@ class TestProjectFileContextSource:
 
     def test_read_custom_filenames(self, tmp_path: Path) -> None:
         (tmp_path / "CUSTOM.md").write_text("Custom rule", encoding="utf-8")
-        source = ProjectFileContextSource(
-            root=tmp_path,
-            filenames=("CUSTOM.md",),
-        )
+        source = ProjectFileContextSource(root=tmp_path, filenames=("CUSTOM.md",))
 
         result = source.read()
 

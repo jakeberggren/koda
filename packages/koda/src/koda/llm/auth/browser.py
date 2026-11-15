@@ -82,7 +82,7 @@ async def complete_browser_authorization(
         state=request.state,
     )
     callback_task = asyncio.create_task(
-        asyncio.to_thread(listener.receive, cancel_event=cancel_callback)
+        asyncio.to_thread(listener.receive, cancel_event=cancel_callback),
     )
     prompt_task = asyncio.ensure_future(callbacks.on_prompt(prompt))
     try:

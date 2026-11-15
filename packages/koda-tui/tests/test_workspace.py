@@ -67,7 +67,8 @@ def test_search_respects_the_limit_and_empty_queries(workspace: Path) -> None:
 
 
 def test_search_stops_checking_paths_once_it_has_enough(
-    workspace: Path, monkeypatch: pytest.MonkeyPatch
+    workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     checked: list[str] = []
     match = workspace_module._path_segment_prefix_match  # noqa: SLF001 - counted to see the scan stop

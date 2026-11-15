@@ -112,7 +112,8 @@ class ProviderMenu:
                 title=strings.Palette.Providers.enter(selection.label),
                 mask_input=True,
                 on_submit=lambda key: self._save(
-                    selection, llm.ApiKeyCredential(type="api_key", value=key)
+                    selection,
+                    llm.ApiKeyCredential(type="api_key", value=key),
                 ),
                 on_cancel=self._overlays.close,
             ),
@@ -162,7 +163,7 @@ class ProviderMenu:
                 answer.set_result(value)
 
         self._overlays.open(
-            InputDialog(title=title, detail=message, on_submit=submit, on_cancel=self._abandon)
+            InputDialog(title=title, detail=message, on_submit=submit, on_cancel=self._abandon),
         )
         return await answer
 

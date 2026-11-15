@@ -42,7 +42,7 @@ class MultipleMatchesError(ToolError):
         self.occurrences = occurrences
         super().__init__(
             f"Text appears {occurrences} times in '{path}'. "
-            "Provide more context or set replace_all=True to edit all occurrences."
+            "Provide more context or set replace_all=True to edit all occurrences.",
         )
 
 

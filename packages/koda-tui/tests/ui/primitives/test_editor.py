@@ -38,7 +38,8 @@ def test_wrap_line_ranges_keep_trailing_space_on_non_full_line() -> None:
 
 def _editor(text: str, cursor: int | None = None) -> tuple[Window, Buffer]:
     buffer = Buffer(
-        multiline=True, document=Document(text, len(text) if cursor is None else cursor)
+        multiline=True,
+        document=Document(text, len(text) if cursor is None else cursor),
     )
     return cast("Window", to_container(Editor(buffer))), buffer
 
@@ -92,7 +93,7 @@ async def test_a_click_puts_the_cursor_under_it() -> None:
     window, buffer = _editor("hello world foo", cursor=0)
     window.content.create_content(7, 10)
     window.content.mouse_handler(
-        MouseEvent(Point(x=2, y=1), MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset())
+        MouseEvent(Point(x=2, y=1), MouseEventType.MOUSE_UP, MouseButton.LEFT, frozenset()),
     )
     assert buffer.cursor_position == 8
 

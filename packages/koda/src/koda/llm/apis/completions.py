@@ -16,9 +16,7 @@ from openai.types.chat.chat_completion_message_function_tool_call_param import (
     ChatCompletionMessageFunctionToolCallParam,
 )
 from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
-from openai.types.chat.chat_completion_system_message_param import (
-    ChatCompletionSystemMessageParam,
-)
+from openai.types.chat.chat_completion_system_message_param import ChatCompletionSystemMessageParam
 from openai.types.chat.chat_completion_tool_message_param import ChatCompletionToolMessageParam
 from openai.types.chat.chat_completion_tool_union_param import ChatCompletionToolUnionParam
 from openai.types.chat.chat_completion_user_message_param import ChatCompletionUserMessageParam
@@ -26,16 +24,8 @@ from pydantic import BaseModel
 
 from koda.llm.apis.credentials import resolve_api_key_credential
 from koda.llm.protocols import LLM, LLMAdapter
-from koda.llm.types import (
-    LLMResponse,
-    LLMResponseCompleted,
-    LLMTextDelta,
-    LLMToolCallRequested,
-)
-from koda.llm.utils import (
-    parse_tool_arguments,
-    raise_llm_error_from_openai,
-)
+from koda.llm.types import LLMResponse, LLMResponseCompleted, LLMTextDelta, LLMToolCallRequested
+from koda.llm.utils import parse_tool_arguments, raise_llm_error_from_openai
 from koda.messages import (
     AssistantMessage,
     InterruptionMessage,
@@ -118,17 +108,14 @@ class OpenAICompletionsAdapter(
         list[ChatCompletionMessageParam],
         list[ChatCompletionToolUnionParam] | Omit,
         ChatCompletion,
-    ]
+    ],
 ):
     """Convert between Koda messages/tools/responses and Chat Completions types."""
 
     @staticmethod
     def _to_provider_tool_message(message: ToolMessage) -> ChatCompletionToolMessageParam:
         tool_output = message.tool_result.output
-        payload: dict[str, Any] = {
-            "content": tool_output.content,
-            "is_error": tool_output.is_error,
-        }
+        payload: dict[str, Any] = {"content": tool_output.content, "is_error": tool_output.is_error}
         if tool_output.error_message:
             payload["error_message"] = tool_output.error_message
 
@@ -190,11 +177,7 @@ class OpenAICompletionsAdapter(
             if not (isinstance(option, dict) and option.get("type") == "null")
         ]
 
-    def _merge_single_anyof_object(
-        self,
-        result: dict[str, Any],
-        options: list[Any],
-    ) -> bool:
+    def _merge_single_anyof_object(self, result: dict[str, Any], options: list[Any]) -> bool:
         if len(options) != 1 or not isinstance(options[0], dict):
             return False
         inner = self._simplify_schema(options[0])
@@ -257,7 +240,7 @@ class OpenAICompletionsAdapter(
                         tool_name=tool_call.function.name,
                         arguments=parse_tool_arguments(tool_call.function.arguments),
                         call_id=tool_call.id,
-                    )
+                    ),
                 )
         return calls
 
@@ -410,7 +393,8 @@ class OpenAICompletionsAPI(LLM):
 
     @staticmethod
     def _resolve_prompt_cache_retention(
-        *, extended_prompt_retention: bool
+        *,
+        extended_prompt_retention: bool,
     ) -> Literal["24h"] | Omit:
         return _or_omit("24h" if extended_prompt_retention else None)
 
@@ -441,7 +425,7 @@ class OpenAICompletionsAPI(LLM):
                     request.options.parallel_tool_calls if request.tools else omit
                 ),
                 prompt_cache_retention=self._resolve_prompt_cache_retention(
-                    extended_prompt_retention=request.options.extended_prompt_retention
+                    extended_prompt_retention=request.options.extended_prompt_retention,
                 ),
                 reasoning_effort=omit,
                 temperature=_or_omit(request.options.temperature),
@@ -468,7 +452,7 @@ class OpenAICompletionsAPI(LLM):
                     request.options.parallel_tool_calls if request.tools else omit
                 ),
                 prompt_cache_retention=self._resolve_prompt_cache_retention(
-                    extended_prompt_retention=request.options.extended_prompt_retention
+                    extended_prompt_retention=request.options.extended_prompt_retention,
                 ),
                 reasoning_effort=omit,
                 stream=True,
@@ -497,7 +481,7 @@ class OpenAICompletionsAPI(LLM):
                     content="".join(text_chunks),
                     tool_calls=tool_calls,
                     usage=usage,
-                )
+                ),
             )
         except OpenAIError as error:
             raise_llm_error_from_openai(error, backend="openai-completions")

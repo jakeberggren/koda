@@ -197,11 +197,7 @@ class OpenAICodexAuth:
             raise OpenAICodexTokenError(operation, str(e)) from e
         return self._validate_model(operation, model, token)
 
-    async def _exchange_code(
-        self,
-        code: str,
-        request: AuthorizationRequest,
-    ) -> _LoginTokenResponse:
+    async def _exchange_code(self, code: str, request: AuthorizationRequest) -> _LoginTokenResponse:
         return await self._request_token(
             "exchange",
             _LoginTokenResponse,
@@ -218,10 +214,7 @@ class OpenAICodexAuth:
         return await self._request_token(
             "refresh",
             _RefreshTokenResponse,
-            lambda client: client.refresh_token(
-                TOKEN_URL,
-                refresh_token=refresh_token,
-            ),
+            lambda client: client.refresh_token(TOKEN_URL, refresh_token=refresh_token),
         )
 
     async def _jwks(self) -> KeySet:
@@ -230,7 +223,8 @@ class OpenAICodexAuth:
 
         try:
             async with httpx2.AsyncClient(
-                trust_env=False, transport=self._jwks_transport
+                trust_env=False,
+                transport=self._jwks_transport,
             ) as client:
                 response = await client.get(JWKS_URL)
                 response.raise_for_status()
@@ -246,22 +240,13 @@ class OpenAICodexAuth:
 
     async def _decode_id_token(self, id_token: str) -> JsonObject:
         try:
-            token = jwt.decode(
-                id_token,
-                await self._jwks(),
-                algorithms=ID_TOKEN_ALGORITHMS,
-            )
+            token = jwt.decode(id_token, await self._jwks(), algorithms=ID_TOKEN_ALGORITHMS)
             _id_token_claims_registry().validate(token.claims)
         except JoseError as error:
             raise OpenAICodexTokenError("credential", "id_token validation failed") from error
         return cast("JsonObject", token.claims)
 
-    async def _validate_id_token(
-        self,
-        id_token: str,
-        *,
-        nonce: str | None = None,
-    ) -> JsonObject:
+    async def _validate_id_token(self, id_token: str, *, nonce: str | None = None) -> JsonObject:
         claims = await self._decode_id_token(id_token)
         if nonce is not None and claims.get("nonce") != nonce:
             raise OpenAICodexTokenError("credential", "id_token nonce mismatch")

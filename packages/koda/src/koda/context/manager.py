@@ -57,7 +57,4 @@ class ContextManager:
             logger.debug("no_project_context_found")
             return base
         logger.info("injecting_project_context", source_count=len(self.sources))
-        return SystemPrompt(
-            content=f"{base.content}\n\n{content}",
-            source=base.source,
-        )
+        return SystemPrompt(content=f"{base.content}\n\n{content}", source=base.source)

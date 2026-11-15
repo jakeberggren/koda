@@ -36,12 +36,7 @@ def test_hidden_when_nothing_is_queued(state: AppState) -> None:
 
 def test_shows_the_count_then_the_latest_three_indented(state: AppState) -> None:
     rows = _rows(state, [PendingInput(text) for text in ["one", "two", "three", "four"]], width=80)
-    assert rows == [
-        f" {strings.Screen.Pending.queued(4)}",
-        " two",
-        " three",
-        " four",
-    ]
+    assert rows == [f" {strings.Screen.Pending.queued(4)}", " two", " three", " four"]
 
 
 def test_long_messages_wrap_by_word(state: AppState) -> None:
@@ -60,7 +55,7 @@ def test_steers_are_labelled_above_the_queue(state: AppState) -> None:
 
 def test_only_steers_shows_no_queue_count(state: AppState) -> None:
     assert _rows(state, [PendingInput("fix it", steer=True)]) == [
-        f" {strings.Screen.Pending.STEERING}fix it"
+        f" {strings.Screen.Pending.STEERING}fix it",
     ]
 
 

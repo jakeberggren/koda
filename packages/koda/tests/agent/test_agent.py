@@ -46,7 +46,8 @@ def test_workspace_system_md_replaces_the_default_prompt(tmp_path: Path) -> None
 
 
 def test_global_system_md_replaces_the_default_prompt(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     workspace, home = tmp_path / "workspace", tmp_path / "home"
     workspace.mkdir()
@@ -58,7 +59,8 @@ def test_global_system_md_replaces_the_default_prompt(
 
 
 def test_works_in_the_current_directory_by_default(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
 

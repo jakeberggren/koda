@@ -114,17 +114,15 @@ class TestExecuteCall:
 
     @pytest.mark.asyncio
     async def test_returns_correct_call_id(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """Tool execution returns ToolResult with the correct call_id."""
         registry.register(SimpleTool())
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="simple_tool",
-            arguments={"name": "World"},
-            call_id="call_123",
-        )
+        call = ToolCall(tool_name="simple_tool", arguments={"name": "World"}, call_id="call_123")
 
         result = await executor.execute_call(call, context)
 
@@ -135,16 +133,14 @@ class TestExecuteCall:
 
     @pytest.mark.asyncio
     async def test_unknown_tool_returns_error(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """Calling an unknown tool returns error ToolResult with correct call_id."""
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="nonexistent",
-            arguments={},
-            call_id="call_unknown",
-        )
+        call = ToolCall(tool_name="nonexistent", arguments={}, call_id="call_unknown")
 
         result = await executor.execute_call(call, context)
 
@@ -155,7 +151,9 @@ class TestExecuteCall:
 
     @pytest.mark.asyncio
     async def test_invalid_params_returns_error(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """Invalid parameters return error ToolResult with correct call_id."""
         registry.register(SimpleTool())
@@ -175,17 +173,15 @@ class TestExecuteCall:
 
     @pytest.mark.asyncio
     async def test_tool_error_returns_error_result(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """ToolError from tool execution returns error ToolResult."""
         registry.register(ErrorTool())
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="error_tool",
-            arguments={"name": "test"},
-            call_id="call_error",
-        )
+        call = ToolCall(tool_name="error_tool", arguments={"name": "test"}, call_id="call_error")
 
         result = await executor.execute_call(call, context)
 
@@ -196,17 +192,15 @@ class TestExecuteCall:
 
     @pytest.mark.asyncio
     async def test_unexpected_exception_propagates(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """Non-ToolError exceptions propagate out of the executor."""
         registry.register(CrashTool())
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="crash_tool",
-            arguments={"name": "boom"},
-            call_id="call_crash",
-        )
+        call = ToolCall(tool_name="crash_tool", arguments={"name": "boom"}, call_id="call_crash")
 
         with pytest.raises(ValueError, match="Unexpected failure"):
             await executor.execute_call(call, context)
@@ -225,7 +219,9 @@ class TestExecuteCalls:
 
     @pytest.mark.asyncio
     async def test_multiple_calls_preserve_call_ids(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """Multiple tool calls each return their correct call_id."""
         registry.register(SimpleTool())
@@ -264,7 +260,9 @@ class TestExecuteCalls:
 
     @pytest.mark.asyncio
     async def test_parallel_calls_share_file_lock_for_same_path(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """Parallel calls to the same path are serialized by the file coordinator."""
         tool = LockTrackingTool()
@@ -292,7 +290,9 @@ class TestExecuteCalls:
 
     @pytest.mark.asyncio
     async def test_shared_file_tools_still_run_concurrently_while_shell_waits(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """Shared file tools can overlap while exclusive shell work waits for them."""
         timeline: list[str] = []
@@ -328,7 +328,9 @@ class TestExecuteCalls:
 
     @pytest.mark.asyncio
     async def test_waiting_shell_blocks_late_shared_arrivals(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """A queued exclusive shell call should prevent later shared work from jumping ahead."""
         timeline: list[str] = []
@@ -346,7 +348,7 @@ class TestExecuteCalls:
                     call_id="call_first",
                 ),
                 context,
-            )
+            ),
         )
         await asyncio.sleep(0.005)
 
@@ -358,7 +360,7 @@ class TestExecuteCalls:
                     call_id="call_shell",
                 ),
                 context,
-            )
+            ),
         )
         await asyncio.sleep(0.005)
 
@@ -370,7 +372,7 @@ class TestExecuteCalls:
                     call_id="call_late",
                 ),
                 context,
-            )
+            ),
         )
 
         results = await asyncio.gather(first_shared, waiting_shell, late_shared)
@@ -388,7 +390,9 @@ class TestExecuteCalls:
 
     @pytest.mark.asyncio
     async def test_mixed_success_and_error(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """Mixed success and error results preserve correct call_ids."""
         registry.register(SimpleTool())

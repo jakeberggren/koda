@@ -85,7 +85,7 @@ class Agent:
         self.options = options or LLMRequestOptions()
         self.tools = ToolConfig.builtins(cwd=self.workspace, sandbox_dir=self.workspace)
         self.instructions = ContextManager.from_workspace(self.workspace).build_system_prompt(
-            SystemPromptLoader.for_workspace(self.workspace).load()
+            SystemPromptLoader.for_workspace(self.workspace).load(),
         )
         self.turn = Turn()  # The latest turn, the same object for every one; none has run yet.
         logger.info("agent_initialized", llm=type(llm).__name__)
@@ -102,7 +102,9 @@ class Agent:
                 yield event
         except (asyncio.CancelledError, GeneratorExit):
             await self._add(
-                *self._partial_response(), *self._answers(INTERRUPTED), InterruptionMessage()
+                *self._partial_response(),
+                *self._answers(INTERRUPTED),
+                InterruptionMessage(),
             )
             raise
         except Exception:
@@ -185,7 +187,7 @@ class Agent:
         if response is None or not (response.content or response.thinking_content):
             return []
         return [
-            AssistantMessage(content=response.content, thinking_content=response.thinking_content)
+            AssistantMessage(content=response.content, thinking_content=response.thinking_content),
         ]
 
     def _answers(self, reason: str) -> list[Message]:
@@ -223,7 +225,8 @@ FAILED = "Not run: the turn failed"
 
 
 def completed_response(
-    streamed: AssistantMessage, completed: LLMResponse[AssistantMessage]
+    streamed: AssistantMessage,
+    completed: LLMResponse[AssistantMessage],
 ) -> AssistantMessage | None:
     """The response once the model is done: what streamed, with the usage, and what the
     provider only sent at the end: the content if none streamed, and tool calls that didn't

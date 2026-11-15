@@ -52,7 +52,9 @@ class TestSandboxEnforcement:
     """Tests for sandbox boundary enforcement."""
 
     def test_absolute_path_outside_sandbox_rejected(
-        self, workspace_dir: Path, policy: ToolPolicy
+        self,
+        workspace_dir: Path,
+        policy: ToolPolicy,
     ) -> None:
         """Absolute paths outside the sandbox raise PathOutsideSandboxError."""
         with pytest.raises(PathOutsideSandboxError) as exc_info:
@@ -61,7 +63,9 @@ class TestSandboxEnforcement:
         assert exc_info.value.path == "/etc/passwd"
 
     def test_relative_path_escaping_sandbox_rejected(
-        self, workspace_dir: Path, policy: ToolPolicy
+        self,
+        workspace_dir: Path,
+        policy: ToolPolicy,
     ) -> None:
         """Relative paths that escape sandbox raise PathOutsideSandboxError."""
         with pytest.raises(PathOutsideSandboxError):

@@ -43,7 +43,7 @@ class ToolExecutionCoordinator:
         """Allow concurrent access unless an exclusive caller is queued or active."""
         async with self._condition:
             await self._condition.wait_for(
-                lambda: not self._exclusive_active and self._exclusive_waiters == 0
+                lambda: not self._exclusive_active and self._exclusive_waiters == 0,
             )
             self._shared_holders += 1
 
@@ -62,7 +62,7 @@ class ToolExecutionCoordinator:
             self._exclusive_waiters += 1
             try:
                 await self._condition.wait_for(
-                    lambda: not self._exclusive_active and self._shared_holders == 0
+                    lambda: not self._exclusive_active and self._shared_holders == 0,
                 )
                 self._exclusive_active = True
             finally:

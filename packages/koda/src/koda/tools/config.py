@@ -19,12 +19,7 @@ class ToolConfig:
     context: ToolContext
 
     @classmethod
-    def builtins(
-        cls,
-        *,
-        cwd: Path,
-        sandbox_dir: Path,
-    ) -> ToolConfig:
+    def builtins(cls, *, cwd: Path, sandbox_dir: Path) -> ToolConfig:
         registry = ToolRegistry.builtins()
         context = ToolContext(
             cwd=cwd.resolve(),

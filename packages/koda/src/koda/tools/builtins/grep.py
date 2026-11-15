@@ -58,10 +58,7 @@ class GrepParams(BaseModel):
         default=True,
         description="Whether the search should be case-sensitive.",
     )
-    limit: int = Field(
-        default=100,
-        description="Maximum number of matches to return.",
-    )
+    limit: int = Field(default=100, description="Maximum number of matches to return.")
 
 
 @functools.lru_cache(maxsize=1)
@@ -139,7 +136,10 @@ def _parse_rg_output(stdout: bytes, search_root: Path, limit: int) -> tuple[list
 
 
 def _format_grep_output(
-    pattern: str, matches: list[str], total_count: int, limit: int
+    pattern: str,
+    matches: list[str],
+    total_count: int,
+    limit: int,
 ) -> tuple[str, str]:
     """Format grep results into display and text output."""
     if total_count == 0:
@@ -186,7 +186,8 @@ class GrepTool:
 
             try:
                 stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(), timeout=RIPGREP_TIMEOUT_SECONDS
+                    proc.communicate(),
+                    timeout=RIPGREP_TIMEOUT_SECONDS,
                 )
             except TimeoutError:
                 proc.kill()

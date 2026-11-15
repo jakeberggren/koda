@@ -53,5 +53,5 @@ class PaletteContext:
             self.overlays.close_all()
 
         self.overlays.open(
-            Picker(title, items, on_select=chosen, heading=heading, on_close=self.overlays.close)
+            Picker(title, items, on_select=chosen, heading=heading, on_close=self.overlays.close),
         )

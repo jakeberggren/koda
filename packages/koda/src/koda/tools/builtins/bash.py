@@ -182,7 +182,9 @@ class BashTool:
 
         async with ctx.coordinator.exclusive_access():
             stdout, stderr, exit_code = await _run(
-                params.command, cwd=resolved_cwd, timeout_seconds=params.timeout_seconds
+                params.command,
+                cwd=resolved_cwd,
+                timeout_seconds=params.timeout_seconds,
             )
 
         return _build_output(

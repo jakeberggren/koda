@@ -51,7 +51,7 @@ def test_receive_callback_returns_authorization_code(free_port: int) -> None:
         future = executor.submit(listener.receive)
 
         status, body = _read_url(
-            f"http://127.0.0.1:{free_port}/auth/callback?code=auth-code&state=expected-state"
+            f"http://127.0.0.1:{free_port}/auth/callback?code=auth-code&state=expected-state",
         )
 
     assert status == 200
@@ -70,10 +70,10 @@ def test_receive_callback_ignores_state_mismatch_and_accepts_valid_callback(free
         future = executor.submit(listener.receive)
 
         status, body = _read_url(
-            f"http://127.0.0.1:{free_port}/auth/callback?code=auth-code&state=wrong-state"
+            f"http://127.0.0.1:{free_port}/auth/callback?code=auth-code&state=wrong-state",
         )
         valid_status, valid_body = _read_url(
-            f"http://127.0.0.1:{free_port}/auth/callback?code=valid-code&state=expected-state"
+            f"http://127.0.0.1:{free_port}/auth/callback?code=valid-code&state=expected-state",
         )
 
     assert status == 400

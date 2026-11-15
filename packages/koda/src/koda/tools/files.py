@@ -25,7 +25,7 @@ class TextDecodeError(exceptions.ToolError):
     def __init__(self, path: str) -> None:
         super().__init__(
             f"Failed to decode '{path}' as UTF-8 text. "
-            "The file may be binary or use an unsupported encoding."
+            "The file may be binary or use an unsupported encoding.",
         )
 
 
@@ -81,12 +81,7 @@ def _read_text_lines_sync(resolved: Path, path: str, offset: int, limit: int) ->
         raise TextDecodeError(path) from e
 
 
-async def read_text(
-    resolved: Path,
-    path: str,
-    *,
-    error: TextFileErrorType,
-) -> DecodedText:
+async def read_text(resolved: Path, path: str, *, error: TextFileErrorType) -> DecodedText:
     """Read an entire file and decode it as supported text."""
     try:
         data = await AnyioPath(resolved).read_bytes()

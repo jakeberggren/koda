@@ -58,11 +58,7 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
-type AnthropicMessagesLLMAdapter = LLMAdapter[
-    list[MessageParam],
-    list[ToolParam] | Omit,
-    Message,
-]
+type AnthropicMessagesLLMAdapter = LLMAdapter[list[MessageParam], list[ToolParam] | Omit, Message]
 
 _MIN_THINKING_BUDGET = 1024  # The least budget_tokens Anthropic accepts.
 
@@ -81,13 +77,7 @@ class AnthropicMessagesAPIConfig:
     max_output_tokens: int
 
 
-class AnthropicMessagesAdapter(
-    LLMAdapter[
-        list[MessageParam],
-        list[ToolParam] | Omit,
-        Message,
-    ]
-):
+class AnthropicMessagesAdapter(LLMAdapter[list[MessageParam], list[ToolParam] | Omit, Message]):
     """Convert between Koda messages/tools/responses and Anthropic Messages types."""
 
     @staticmethod
@@ -106,10 +96,7 @@ class AnthropicMessagesAdapter(
     @staticmethod
     def _to_tool_result_block(message: ToolMessage) -> ToolResultBlockParam:
         output = message.tool_result.output
-        result_data: dict[str, object] = {
-            "content": output.content,
-            "is_error": output.is_error,
-        }
+        result_data: dict[str, object] = {"content": output.content, "is_error": output.is_error}
         if output.error_message:
             result_data["error_message"] = output.error_message
         return {
@@ -139,10 +126,7 @@ class AnthropicMessagesAdapter(
     def to_provider_messages(self, messages: Sequence[KodaMessage]) -> list[MessageParam]:
         return [self._to_provider_message(message) for message in messages]
 
-    def to_provider_tools(
-        self,
-        tools: Sequence[ToolDefinition] | None,
-    ) -> list[ToolParam] | Omit:
+    def to_provider_tools(self, tools: Sequence[ToolDefinition] | None) -> list[ToolParam] | Omit:
         if not tools:
             return omit
         return [
@@ -193,14 +177,15 @@ class AnthropicMessagesAdapter(
 
 
 def _resolve_thinking(
-    thinking: str, max_tokens: int
+    thinking: str,
+    max_tokens: int,
 ) -> tuple[ThinkingConfigParam, OutputConfigParam | Omit]:
     """Adaptive thinking at an effort level; or, for models with manual thinking only
     ("enabled"), half the output tokens as the budget, which must stay below them."""
     if thinking == "enabled":
         if max_tokens <= _MIN_THINKING_BUDGET:
             raise exceptions.LLMConfigurationError(
-                f"thinking='enabled' needs more than {_MIN_THINKING_BUDGET} output tokens"
+                f"thinking='enabled' needs more than {_MIN_THINKING_BUDGET} output tokens",
             )
         return {
             "type": "enabled",
@@ -230,7 +215,9 @@ def _raise_anthropic_error(error: Exception, *, backend: str) -> Never:
     if isinstance(error, APIError):
         logger.error("llm_api_error", backend=backend, error=repr(error))
         raise exceptions.LLMAPIError(
-            backend, error, provider_message=provider_message(error.body)
+            backend,
+            error,
+            provider_message=provider_message(error.body),
         ) from error
     raise error
 
@@ -240,7 +227,7 @@ def _max_output_tokens(context: LLMApiContext) -> int:
     if max_output_tokens is None:
         model = context.model
         raise exceptions.LLMConfigurationError(
-            f"Model '{model.id}' for provider {model.provider} must define max_output_tokens"
+            f"Model '{model.id}' for provider {model.provider} must define max_output_tokens",
         )
     return max_output_tokens
 
@@ -260,7 +247,7 @@ class AnthropicMessagesEventAdapter:
                 tool_name=block.name,
                 arguments=tool_arguments(block.input),
                 call_id=block.id,
-            )
+            ),
         )
 
     def to_llm_event(self, event: ParsedMessageStreamEvent[Any]) -> LLMEvent | None:

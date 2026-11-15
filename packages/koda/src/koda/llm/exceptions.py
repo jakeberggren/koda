@@ -90,7 +90,9 @@ class LLMRateLimitError(LLMAPIError):
 
     def __init__(self, backend_name: str, error: Exception) -> None:
         super().__init__(
-            backend_name, error, message=f"{backend_name} rate limit exceeded: {error}"
+            backend_name,
+            error,
+            message=f"{backend_name} rate limit exceeded: {error}",
         )
 
 
@@ -99,5 +101,7 @@ class LLMAuthenticationError(LLMAPIError):
 
     def __init__(self, backend_name: str, error: Exception) -> None:
         super().__init__(
-            backend_name, error, message=f"{backend_name} authentication failed: {error}"
+            backend_name,
+            error,
+            message=f"{backend_name} authentication failed: {error}",
         )

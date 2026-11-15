@@ -60,13 +60,13 @@ def _completion_with_tool_call() -> ChatCompletion:
                                     "name": "read_file",
                                     "arguments": '{"path": "foo.py"}',
                                 },
-                            }
+                            },
                         ],
                     },
-                }
+                },
             ],
             "usage": {"prompt_tokens": 1, "completion_tokens": 2, "total_tokens": 3},
-        }
+        },
     )
 
 
@@ -87,7 +87,7 @@ def _api(client: _FakeClient) -> OpenAICompletionsAPI:
 async def test_generate_adapts_function_tool_calls() -> None:
     client = _FakeClient(_completion_with_tool_call())
     response = await _api(client).generate(
-        LLMRequest(messages=[UserMessage(content="read foo.py")])
+        LLMRequest(messages=[UserMessage(content="read foo.py")]),
     )
 
     assert response.output.tool_calls[0].tool_name == "read_file"

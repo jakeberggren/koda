@@ -57,11 +57,8 @@ class _FakeMessagesAPI:
                 "stop_reason": "end_turn",
                 "stop_sequence": None,
                 "type": "message",
-                "usage": {
-                    "input_tokens": 1,
-                    "output_tokens": 1,
-                },
-            }
+                "usage": {"input_tokens": 1, "output_tokens": 1},
+            },
         )
 
     def stream(self, **kwargs: Any) -> _FakeMessageStream:
@@ -112,18 +109,15 @@ def _message_with_tool_call() -> Message:
                     "id": "toolu_1",
                     "name": "read_file",
                     "input": {"path": "pyproject.toml"},
-                }
+                },
             ],
             "model": "claude-sonnet-4-6",
             "role": "assistant",
             "stop_reason": "tool_use",
             "stop_sequence": None,
             "type": "message",
-            "usage": {
-                "input_tokens": 1,
-                "output_tokens": 1,
-            },
-        }
+            "usage": {"input_tokens": 1, "output_tokens": 1},
+        },
     )
 
 
@@ -156,8 +150,8 @@ async def test_anthropic_tool_result_sends_structured_content_not_display() -> N
                         display="Read 2 lines",
                     ),
                 ),
-            )
-        ]
+            ),
+        ],
     )
 
     await provider.generate(request)
@@ -187,12 +181,7 @@ async def test_anthropic_thinking_requests_summarized_display() -> None:
     fake_client = _FakeClient()
     provider = _provider(fake_client)
 
-    await provider.generate(
-        LLMRequest(
-            messages=[],
-            options=LLMRequestOptions(thinking="high"),
-        )
-    )
+    await provider.generate(LLMRequest(messages=[], options=LLMRequestOptions(thinking="high")))
 
     create_kwargs = fake_client.messages.create_kwargs
     assert create_kwargs is not None
@@ -249,16 +238,16 @@ async def test_generate_stream_emits_thinking_delta() -> None:
                         "type": "thinking",
                         "thinking": "I should inspect the file.",
                         "snapshot": "I should inspect the file.",
-                    }
-                )
+                    },
+                ),
             ],
-        )
+        ),
     )
 
     events = [
         event
         async for event in provider.generate_stream(
-            LLMRequest(messages=[], options=LLMRequestOptions(thinking="high"))
+            LLMRequest(messages=[], options=LLMRequestOptions(thinking="high")),
         )
     ]
 

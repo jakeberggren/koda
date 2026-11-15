@@ -12,17 +12,15 @@ class TestErrorResultFormat:
 
     @pytest.mark.asyncio
     async def test_error_result_structure(
-        self, registry: ToolRegistry, context: ToolContext
+        self,
+        registry: ToolRegistry,
+        context: ToolContext,
     ) -> None:
         """Error results from execution have correct structure."""
         registry.register(ErrorTool())
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="error_tool",
-            arguments={"name": "test"},
-            call_id="call_123",
-        )
+        call = ToolCall(tool_name="error_tool", arguments={"name": "test"}, call_id="call_123")
 
         result = await executor.execute_call(call, context)
 

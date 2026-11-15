@@ -13,7 +13,8 @@ if TYPE_CHECKING:
 
 
 def test_choosing_passes_the_data_on_and_closes_the_palette(
-    context: PaletteContext, overlays: Overlays
+    context: PaletteContext,
+    overlays: Overlays,
 ) -> None:
     chosen: list[int] = []
     overlays.open({"title": "the palette"})

@@ -39,7 +39,7 @@ class GlobTool:
                 str(path.relative_to(resolved))
                 async for path in resolved.glob(pattern)
                 if await path.is_file()
-            ]
+            ],
         )
 
     async def execute(self, params: GlobParams, ctx: ToolContext) -> ToolOutput:

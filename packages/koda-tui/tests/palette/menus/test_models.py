@@ -24,12 +24,10 @@ class _Credentials:
         raise NotImplementedError
 
 
-def test_the_active_model_is_current(
-    context: PaletteContext,
-) -> None:
+def test_the_active_model_is_current(context: PaletteContext) -> None:
     catalog, _warnings = Catalog.load(_Credentials())
     context.state.settings = Settings(
-        agent_settings=AgentSettings(provider="bergetai", model="google/gemma-4-31b-it")
+        agent_settings=AgentSettings(provider="bergetai", model="google/gemma-4-31b-it"),
     )
     context.state.active_model = catalog.model("bergetai", "google/gemma-4-31b-it")
     context = replace(context, catalog=catalog)
