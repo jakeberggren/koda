@@ -39,7 +39,6 @@ need_cmd tar
 need_cmd uname
 need_cmd mktemp
 need_cmd jq
-command -v rg >/dev/null 2>&1 || printf 'warning: ripgrep (rg) not found; Koda's grep tool needs it\n' >&2
 
 if [[ "${REPO_OWNER}" == "YOUR_GITHUB_USER_OR_ORG" ]]; then
   error "please set REPO_OWNER in install.sh"

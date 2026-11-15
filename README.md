@@ -102,7 +102,6 @@ workspace; like `bash`, the tools can reach files outside it.
 
 `grep` and `@` file suggestions see the workspace's files by the same rules: what a
 `.gitignore` or `.ignore` excludes is left out, hidden files are included, and `.git` is not.
-`grep` needs [ripgrep](https://github.com/BurntSushi/ripgrep) (`rg`) installed.
 
 ### Bash and Command Execution
 
