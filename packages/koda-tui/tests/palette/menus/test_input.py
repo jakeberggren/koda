@@ -24,4 +24,4 @@ def test_lists_both_modes_and_sets_the_chosen_one(
         (strings.Palette.InputMode.QUEUE, True),
     ]
     overlays.pick(strings.Palette.InputMode.STEER)
-    assert not context.settings.tui.queue_inputs
+    assert not context.settings.tui_settings.queue_inputs

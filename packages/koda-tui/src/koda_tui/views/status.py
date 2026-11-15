@@ -73,7 +73,7 @@ def _model(state: AppState) -> list[Segment]:
     segments: list[Segment] = [
         [(Tokens.Text.MUTED, f"{model.provider} {Icons.DIVIDER} {model.name}")]
     ]
-    thinking = model.thinking.resolve(state.settings.agent.thinking)
+    thinking = model.thinking.resolve(state.settings.agent_settings.thinking)
     if thinking.id != "none":
         segments.append([(Tokens.Text.WARNING, thinking.label.lower())])
     return segments

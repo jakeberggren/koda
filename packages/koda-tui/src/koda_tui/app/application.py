@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import replace
 from typing import TYPE_CHECKING
 
 from prompt_toolkit.filters import Condition
@@ -68,11 +69,11 @@ class KodaTuiApp:
         self._agent = AgentRunner(self.state, catalog=catalog, store=store, connect=connect)
         self._refresh()
         self.exit_prompt = ExitPrompt(self.state, invalidate=self.invalidate)
-        self.appearance = Appearance(settings.tui.theme)
+        self.appearance = Appearance(settings.tui_settings.theme)
         self.screen = Screen(
             self.state,
             on_submit=self.submit,
-            show_scrollbar=Condition(lambda: self.state.settings.tui.show_scrollbar),
+            show_scrollbar=Condition(lambda: self.state.settings.tui_settings.show_scrollbar),
         )
         self.outbox = Outbox(state=self.state, respond=self.respond, invalidate=self.invalidate)
         self._palette = CommandPalette(
@@ -117,8 +118,9 @@ class KodaTuiApp:
         model, settings = self.state.active_model, self.state.settings
         if self.state.issue is not None or model is None:
             return
-        if (thinking := model.thinking.after(settings.agent.thinking)) is not None:
-            self.update_settings(settings.with_agent(thinking=thinking))
+        if (thinking := model.thinking.after(settings.agent_settings.thinking)) is not None:
+            agent_settings = replace(settings.agent_settings, thinking=thinking)
+            self.update_settings(replace(settings, agent_settings=agent_settings))
 
     def toggle_palette(self) -> None:
         """Open the command palette, or close it and any dialogs it opened."""
@@ -132,7 +134,10 @@ class KodaTuiApp:
         round when the input mode prefers steering. Writing a message takes back a
         press of Ctrl+C. Whether the message was taken."""
         self.exit_prompt.dismiss()
-        return self.outbox.submit(text, steer=alternate == self.state.settings.tui.queue_inputs)
+        return self.outbox.submit(
+            text,
+            steer=alternate == self.state.settings.tui_settings.queue_inputs,
+        )
 
     def respond(self, text: str) -> AsyncIterator[AgentEvent]:
         """Send ``text`` in the current session and stream the agent's response."""
@@ -145,13 +150,13 @@ class KodaTuiApp:
         self.state.settings = settings
         self._agent.reset()
         self._refresh()
-        self.appearance.theme = settings.tui.theme
+        self.appearance.theme = settings.tui_settings.theme
         self.invalidate()
 
     def _refresh(self) -> None:
         """Take the providers connected now and the model the settings pick, or say what
         stops Koda from responding."""
-        state, agent = self.state, self.state.settings.agent
+        state, agent = self.state, self.state.settings.agent_settings
         try:
             state.connected_providers = self._catalog.connected.providers
             state.active_model = self._catalog.resolve(agent.provider, agent.model)

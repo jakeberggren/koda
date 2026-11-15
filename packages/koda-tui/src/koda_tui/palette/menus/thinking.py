@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import replace
 from typing import TYPE_CHECKING
 
 from koda_tui import strings
@@ -20,7 +21,7 @@ class ThinkingMenu:
 
     def open(self) -> None:
         model = self._context.state.active_model
-        current = self._context.settings.agent.thinking
+        current = self._context.settings.agent_settings.thinking
         items: list[ListItem[ThinkingOptionId]] = [
             ListItem(
                 label=option.label,
@@ -38,4 +39,6 @@ class ThinkingMenu:
         )
 
     def _select(self, thinking: ThinkingOptionId) -> None:
-        self._context.update_settings(self._context.settings.with_agent(thinking=thinking))
+        settings = self._context.settings
+        agent_settings = replace(settings.agent_settings, thinking=thinking)
+        self._context.update_settings(replace(settings, agent_settings=agent_settings))

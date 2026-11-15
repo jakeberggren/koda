@@ -18,7 +18,7 @@ from koda.sessions import Session
 from koda.tools import ToolCall
 from koda_tui import strings
 from koda_tui.appearance import Tokens
-from koda_tui.settings import Settings
+from koda_tui.settings import AgentSettings, Settings
 from koda_tui.views import status
 
 if TYPE_CHECKING:
@@ -49,7 +49,7 @@ def test_left_shows_workspace_model_thinking_and_usage(state: AppState) -> None:
     state = _state(
         state,
         active_model=model,
-        settings=Settings().with_agent(thinking="medium"),
+        settings=Settings(agent_settings=AgentSettings(thinking="medium")),
         session=Session(messages=[earlier, AssistantMessage(content="b", usage=usage)]),
     )
     assert _texts(status._left(state)) == [

@@ -39,6 +39,8 @@ class _Credentials(dict[str, ProviderCredential]):
 
 
 class _FakeCatalog:
+    """OpenAI, with one model, and what ``credentials`` reach of it."""
+
     def __init__(self, credentials: _Credentials) -> None:
         self._credentials = credentials
 
@@ -49,7 +51,7 @@ class _FakeCatalog:
     def providers(self) -> list[Provider]:
         return [_openai_provider(_BrowserLogin())]
 
-    def models(self, provider: str) -> list[Model]:
+    def models(self, provider: str | None = None) -> list[Model]:
         _ = provider
         return [Model(id="gpt-5.5", name="gpt-5.5", provider="openai")]
 
@@ -188,7 +190,7 @@ def test_an_api_key_is_stored_and_picks_a_model(
     dialog.submit("secret")
 
     assert credentials["openai:api-key"] == ApiKeyCredential(type="api_key", value="secret")
-    assert state.settings.agent.model == "gpt-5.5"
+    assert state.settings.agent_settings.model == "gpt-5.5"
     assert overlays.stack == []
 
 
@@ -209,7 +211,7 @@ async def test_a_browser_login_stores_the_credential(
 
     assert opened_urls == ["https://auth.example"]
     assert credentials["openai:oauth"] == _credential()
-    assert state.settings.agent.model == "gpt-5.5"
+    assert state.settings.agent_settings.model == "gpt-5.5"
     assert overlays.stack == []
 
 

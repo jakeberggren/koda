@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from koda.llm import ApiKeyCredential, Catalog
 from koda_tui.palette.menus.models import ModelMenu
-from koda_tui.settings import Settings
+from koda_tui.settings import AgentSettings, Settings
 
 if TYPE_CHECKING:
     from koda.llm import ProviderCredential
@@ -28,8 +28,8 @@ def test_the_active_model_is_current(
     context: PaletteContext,
 ) -> None:
     catalog, _warnings = Catalog.load(_Credentials())
-    context.state.settings = Settings().with_agent(
-        provider="bergetai", model="google/gemma-4-31b-it"
+    context.state.settings = Settings(
+        agent_settings=AgentSettings(provider="bergetai", model="google/gemma-4-31b-it")
     )
     context.state.active_model = catalog.model("bergetai", "google/gemma-4-31b-it")
     context = replace(context, catalog=catalog)

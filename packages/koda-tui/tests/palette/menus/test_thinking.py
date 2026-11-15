@@ -29,7 +29,7 @@ def test_lists_the_models_levels_and_sets_the_chosen_one(
     items = overlays.top.items
     assert [(item.label, item.current) for item in items] == [("None", True), ("High", False)]
     overlays.pick("High")
-    assert context.settings.agent.thinking == "high"
+    assert context.settings.agent_settings.thinking == "high"
 
 
 def test_without_a_model_there_are_no_levels(context: PaletteContext, overlays: Overlays) -> None:

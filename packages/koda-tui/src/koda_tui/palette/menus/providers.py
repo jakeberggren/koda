@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import webbrowser
+from copy import replace
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -77,7 +78,7 @@ class ProviderMenu:
                         label=selection.label,
                         detail=selection.connection.description or "",
                         marker=Icons.DONE
-                        if selection.connection in self._catalog.connected
+                        if selection.connection in self._context.catalog.connected
                         else None,
                         data=selection,
                     )
@@ -95,7 +96,7 @@ class ProviderMenu:
             ListItem(
                 label=provider.name,
                 detail=provider.description or "",
-                marker=Icons.DONE if provider in self._catalog.connected else None,
+                marker=Icons.DONE if provider in self._context.catalog.connected else None,
                 data=provider,
             )
             for provider in self._catalog.providers()
@@ -122,8 +123,15 @@ class ProviderMenu:
         and close the palette."""
         self._context.credentials.set_credential(selection.credential_key, credential)
         settings = self._context.settings
-        if settings.agent.model is None and (models := self._catalog.models(selection.provider.id)):
-            settings = settings.with_agent(provider=models[0].provider, model=models[0].id)
+        if settings.agent_settings.model is None and (
+            models := self._catalog.models(selection.provider.id)
+        ):
+            agent_settings = replace(
+                settings.agent_settings,
+                provider=models[0].provider,
+                model=models[0].id,
+            )
+            settings = replace(settings, agent_settings=agent_settings)
         self._context.update_settings(settings)
         self._overlays.close_all()
 

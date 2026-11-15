@@ -322,6 +322,14 @@ class Connected:
         """Connected models, in catalog order."""
         return [model for model in self._catalog.models() if model in self]
 
+    def __contains__(self, item: Connection | Provider | Model) -> bool:
+        """Whether the credentials reach ``item``: a connection with its credential, or a
+        provider or model with any such connection."""
+        if isinstance(item, Connection):
+            credential = self._credentials.get_credential(item.credential_key)
+            return credential is not None and credential.auth_type == item.auth
+        return any(connection in self for connection in item.connections)
+
     def connections(self, item: Provider | Model) -> list[Connection]:
         """The connected connections of ``item``, in its order of preference."""
         return [connection for connection in item.connections if connection in self]
@@ -332,11 +340,3 @@ class Connected:
             if connection in self:
                 return connection
         raise exceptions.ModelNotConnected(model.provider, model.id)
-
-    def __contains__(self, item: object) -> bool:
-        if isinstance(item, Connection):
-            credential = self._credentials.get_credential(item.credential_key)
-            return credential is not None and credential.auth_type == item.auth
-        if isinstance(item, Provider | Model):
-            return any(connection in self for connection in item.connections)
-        return False

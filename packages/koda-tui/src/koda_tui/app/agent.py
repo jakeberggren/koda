@@ -71,7 +71,7 @@ class AgentRunner:
         return self._agent
 
     async def _build(self) -> Agent:
-        settings = self._state.settings.agent
+        settings = self._state.settings.agent_settings
         model = self._catalog.resolve(settings.provider, settings.model)
         return Agent(
             await self._connect(model),

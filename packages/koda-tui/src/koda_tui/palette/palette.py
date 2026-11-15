@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import replace
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
@@ -133,9 +134,10 @@ class CommandPalette:
 
     def _toggle_scrollbar(self) -> None:
         settings = self._context.settings
-        self._context.update_settings(
-            settings.with_tui(show_scrollbar=not settings.tui.show_scrollbar)
+        tui_settings = replace(
+            settings.tui_settings, show_scrollbar=not settings.tui_settings.show_scrollbar
         )
+        self._context.update_settings(replace(settings, tui_settings=tui_settings))
         self._overlays.close_all()
 
 

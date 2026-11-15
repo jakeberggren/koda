@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import replace
 from typing import TYPE_CHECKING
 
 from koda_tui import strings
@@ -28,7 +29,7 @@ class ModelMenu:
         provider_names = {p.id: p.name for p in self._catalog.providers()}
         return [
             self._item_for_model(model, provider_names.get(model.provider))
-            for model in self._catalog.connected.models
+            for model in self._context.catalog.connected.models
         ]
 
     def open(self) -> None:
@@ -45,9 +46,9 @@ class ModelMenu:
 
     def select(self, model: Model) -> None:
         """Handle model selection."""
-        self._context.update_settings(
-            self._context.settings.with_agent(provider=model.provider, model=model.id)
-        )
+        settings = self._context.settings
+        agent_settings = replace(settings.agent_settings, provider=model.provider, model=model.id)
+        self._context.update_settings(replace(settings, agent_settings=agent_settings))
         self._overlays.close_all()
 
     def _item_for_model(self, model: Model, provider_name: str | None) -> ListItem[Model]:
@@ -61,7 +62,7 @@ class ModelMenu:
 
     def _detail(self, model: Model) -> str:
         """The connection ``model`` uses, when its provider has several connected."""
-        connected = self._catalog.connected
+        connected = self._context.catalog.connected
         if len(connected.connections(self._catalog.provider(model.provider))) <= 1:
             return ""
         return connected.connection(model).detail

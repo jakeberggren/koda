@@ -27,6 +27,11 @@ def _credentials(credentials: dict[str, ProviderCredential]) -> Credentials:
     return cast("Credentials", _Credentials())
 
 
+def _catalog(credentials: dict[str, ProviderCredential]) -> Catalog:
+    catalog, _warnings = Catalog.load(_credentials(credentials))
+    return catalog
+
+
 def test_builtin_haiku_uses_binary_extended_thinking() -> None:
     catalog, _warnings = Catalog.load(_credentials({}))
     model = catalog.model("anthropic", "claude-haiku-4-5")
@@ -80,40 +85,43 @@ def _api_key() -> ApiKeyCredential:
 
 
 def test_connected_connection_prefers_oauth() -> None:
-    credentials = _credentials({"openai:api-key": _api_key(), "openai:oauth": _oauth()})
-    catalog, _warnings = Catalog.load(credentials)
+    catalog = _catalog({"openai:api-key": _api_key(), "openai:oauth": _oauth()})
+    connected = catalog.connected
     model = catalog.model("openai", "gpt-5.5")
 
-    assert catalog.connected.connection(model).id == "oauth"
-    assert [c.id for c in catalog.connected.connections(model)] == ["oauth", "api-key"]
+    assert connected.connection(model).id == "oauth"
+    assert [c.id for c in connected.connections(model)] == ["oauth", "api-key"]
 
 
 def test_connected_connection_is_the_one_with_a_credential() -> None:
-    catalog, _warnings = Catalog.load(_credentials({"openai:api-key": _api_key()}))
+    catalog = _catalog({"openai:api-key": _api_key()})
+    connected = catalog.connected
     model = catalog.model("openai", "gpt-5.5")
 
-    assert catalog.connected.connection(model).id == "api-key"
+    assert connected.connection(model).id == "api-key"
 
 
 def test_a_credential_of_the_wrong_kind_does_not_connect() -> None:
-    catalog, _warnings = Catalog.load(_credentials({"openai:oauth": _api_key()}))
+    catalog = _catalog({"openai:oauth": _api_key()})
+    connected = catalog.connected
 
-    assert catalog.provider("openai") not in catalog.connected
+    assert catalog.provider("openai") not in connected
 
 
 def test_connected_lists_what_the_credentials_reach() -> None:
-    catalog, _warnings = Catalog.load(_credentials({"openai:api-key": _api_key()}))
+    catalog = _catalog({"openai:api-key": _api_key()})
+    connected = catalog.connected
     openai = catalog.provider("openai")
 
-    assert catalog.connected.providers == [openai]
-    assert catalog.connected.models == catalog.models("openai")
-    assert openai in catalog.connected
-    assert catalog.model("openai", "gpt-5.5") in catalog.connected
+    assert connected.providers == [openai]
+    assert connected.models == catalog.models("openai")
+    assert openai in connected
+    assert catalog.model("openai", "gpt-5.5") in connected
 
 
 def test_connected_follows_the_credentials_as_they_change() -> None:
     store: dict[str, ProviderCredential] = {}
-    catalog, _warnings = Catalog.load(_credentials(store))
+    catalog = _catalog(store)
     connected = catalog.connected
 
     assert connected.providers == []
@@ -122,51 +130,52 @@ def test_connected_follows_the_credentials_as_they_change() -> None:
 
 
 def test_model_without_a_connected_connection_is_not_connected() -> None:
-    catalog, _warnings = Catalog.load(_credentials({}))
+    catalog = _catalog({})
+    connected = catalog.connected
     model = catalog.model("openai", "gpt-5.5")
 
-    assert model not in catalog.connected
+    assert model not in connected
     with pytest.raises(exceptions.ModelNotConnected, match="is not connected"):
-        catalog.connected.connection(model)
+        connected.connection(model)
 
 
 async def test_connect_requires_a_connected_provider() -> None:
-    catalog, _warnings = Catalog.load(_credentials({}))
+    catalog = _catalog({})
 
     with pytest.raises(exceptions.ModelNotConnected):
         await catalog.connect(catalog.model("openai", "gpt-5.5"))
 
 
 def test_resolve_needs_a_connected_provider() -> None:
-    catalog, _warnings = Catalog.load(_credentials({}))
+    catalog = _catalog({})
 
     with pytest.raises(exceptions.NoProviderConnected):
         catalog.resolve("openai", "gpt-5.5")
 
 
 def test_resolve_needs_a_selected_model() -> None:
-    catalog, _warnings = Catalog.load(_credentials({"openai:api-key": _api_key()}))
+    catalog = _catalog({"openai:api-key": _api_key()})
 
     with pytest.raises(exceptions.NoModelSelected):
         catalog.resolve("openai", None)
 
 
 def test_resolve_needs_a_model_the_catalog_has() -> None:
-    catalog, _warnings = Catalog.load(_credentials({"openai:api-key": _api_key()}))
+    catalog = _catalog({"openai:api-key": _api_key()})
 
     with pytest.raises(exceptions.ModelNotFound):
         catalog.resolve("openai", "missing")
 
 
 def test_resolve_needs_a_connected_model() -> None:
-    catalog, _warnings = Catalog.load(_credentials({"openai:api-key": _api_key()}))
+    catalog = _catalog({"openai:api-key": _api_key()})
 
     with pytest.raises(exceptions.ModelNotConnected):
         catalog.resolve("anthropic", "claude-haiku-4-5")
 
 
 def test_resolve_returns_the_selected_connected_model() -> None:
-    catalog, _warnings = Catalog.load(_credentials({"openai:api-key": _api_key()}))
+    catalog = _catalog({"openai:api-key": _api_key()})
 
     assert catalog.resolve("openai", "gpt-5.5") == catalog.model("openai", "gpt-5.5")
 
