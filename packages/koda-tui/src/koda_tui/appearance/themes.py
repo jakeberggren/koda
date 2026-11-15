@@ -116,8 +116,10 @@ TERMINAL_DARK = Theme(
         Tokens.Heading.H5: "italic",
         Tokens.Heading.H6: "dim",
         Tokens.Code.INLINE: "ansicyan bg:ansiblack bold",
-        Tokens.Diff.ADD: "bg:#005f00",
-        Tokens.Diff.REMOVE: "bg:#870000",
+        Tokens.Diff.ADD: "bg:#0e2705",
+        Tokens.Diff.ADD_GUTTER: "fg:#7ee787",
+        Tokens.Diff.REMOVE: "bg:#3c0e0f",
+        Tokens.Diff.REMOVE_GUTTER: "fg:#ff8182",
         # Syntax highlighting, matching Rich's ANSI themes. Classes inherit from their
         # dotted parents, so children of dim tokens reset with nodim.
         "pygments.text.whitespace": "ansibrightblack",
@@ -175,8 +177,10 @@ TERMINAL_LIGHT = Theme(
         Tokens.Heading.H5: "italic",
         Tokens.Heading.H6: "dim",
         Tokens.Code.INLINE: "ansicyan bg:ansiblack bold",
-        Tokens.Diff.ADD: "bg:#d4edda",
-        Tokens.Diff.REMOVE: "bg:#f8d7da",
+        Tokens.Diff.ADD: "bg:#e6ffec",
+        Tokens.Diff.ADD_GUTTER: "fg:#1a7f37",
+        Tokens.Diff.REMOVE: "bg:#ffebe9",
+        Tokens.Diff.REMOVE_GUTTER: "fg:#cf222e",
         # Syntax highlighting, matching Rich's ANSI themes. Classes inherit
         # from their dotted parents, so children of dim tokens reset with nodim.
         "pygments.text.whitespace": "ansigray",

@@ -45,15 +45,13 @@ def render(renderable: RenderableType, width: int) -> FormattedText:
     return FormattedText(fragments)
 
 
-def syntax(code: str, lexer: str, *, line_numbers: bool = False, start_line: int = 1) -> Syntax:
+def syntax(code: str, lexer: str) -> Syntax:
     """A Syntax renderable highlighted by tokens, over whatever background surrounds it."""
     return Syntax(
         code,
         lexer,
         theme=_SyntaxTheme(),
         background_color="default",
-        line_numbers=line_numbers,
-        start_line=start_line,
     )
 
 

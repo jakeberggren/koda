@@ -44,7 +44,9 @@ class Tokens:
 
     class Diff:
         ADD = "class:diff.add"
+        ADD_GUTTER = "class:diff.add.gutter"
         REMOVE = "class:diff.remove"
+        REMOVE_GUTTER = "class:diff.remove.gutter"
 
 
 def compose(*styles: str) -> str:

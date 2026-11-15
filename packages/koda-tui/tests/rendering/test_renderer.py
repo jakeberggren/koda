@@ -10,7 +10,7 @@ from koda.llm import LLMAPIError, LLMRateLimitError
 from koda.messages import AssistantMessage, InterruptionMessage, UserMessage
 from koda.tools import ToolCall, ToolOutput
 from koda_tui import strings
-from koda_tui.appearance import Tokens
+from koda_tui.appearance import Tokens, compose
 from koda_tui.rendering import ChatMessage, Renderer, ToolRun
 from koda_tui.rendering import rich as rich_bridge
 from koda_tui.rendering.diff import diff_blocks, diff_summary
@@ -109,6 +109,15 @@ class TestStyleClasses:
         added = "".join(fragment[1] for fragment in result if Tokens.Diff.ADD in fragment[0])
         assert any(Tokens.Diff.REMOVE in fragment[0] for fragment in result)
         assert added.rstrip("\n").endswith(" ")
+
+    def test_diff_signs_sit_in_the_gutter_not_the_code(self) -> None:
+        diff = "--- a/x.toml\n+++ b/x.toml\n@@ -9 +9 @@\n-a = 1\n+b = 2\n"
+        result = render(diff_blocks(diff), WIDTH)
+        assert (compose(Tokens.Diff.REMOVE, Tokens.Diff.REMOVE_GUTTER), " 9 - ") in result
+        assert (compose(Tokens.Diff.ADD, Tokens.Diff.ADD_GUTTER), " 9 + ") in result
+        assert not any(
+            "pygments" in style and text.startswith(("+", "-")) for style, text, *_ in result
+        )
 
 
 def test_rich_emits_no_colors_so_every_color_comes_from_a_token() -> None:
