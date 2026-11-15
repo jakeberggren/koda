@@ -95,7 +95,9 @@ class _ScriptedLLM:
         raise NotImplementedError
 
     async def generate_structured(
-        self, request: LLMRequest, schema: type[BaseModel]
+        self,
+        request: LLMRequest,
+        schema: type[BaseModel],
     ) -> LLMResponse[BaseModel]:
         raise NotImplementedError
 
@@ -198,7 +200,7 @@ async def test_tools_the_provider_runs_are_not_kept_as_messages(tmp_path: Path) 
             LLMToolStarted(call=call),
             LLMToolCompleted(tool_name="web_search", result=result),
             *_says("found"),
-        ]
+        ],
     )
     agent = _agent(tmp_path, llm)
 
@@ -297,7 +299,7 @@ async def test_the_turn_holds_the_response_while_it_streams(tmp_path: Path) -> N
             LLMTextDelta(text="Hel"),
             LLMTextDelta(text="lo"),
             LLMResponseCompleted(response=LLMResponse(output=AssistantMessage(content="Hello"))),
-        ]
+        ],
     )
     agent = _agent(tmp_path, llm)
     live = [
@@ -337,14 +339,13 @@ async def test_the_turn_keeps_the_tools_the_provider_ran(tmp_path: Path) -> None
     assert agent.turn.results == {"web": result}
 
 
-async def test_what_the_provider_only_sends_at_the_end_is_in_the_response(
-    tmp_path: Path,
-) -> None:
+async def test_what_the_provider_only_sends_at_the_end_is_in_the_response(tmp_path: Path) -> None:
     call = ToolCall(tool_name="delayed_tool", arguments={"delay": 0}, call_id="late")
     usage = TokenUsage(input_tokens=3, output_tokens=2)
     completed = AssistantMessage(content="Unstreamed answer", tool_calls=[call])
     llm = _ScriptedLLM(
-        [LLMResponseCompleted(response=LLMResponse(output=completed, usage=usage))], _says("ok")
+        [LLMResponseCompleted(response=LLMResponse(output=completed, usage=usage))],
+        _says("ok"),
     )
     agent = _agent(tmp_path, llm, _DelayedTool())
 

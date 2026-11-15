@@ -66,7 +66,9 @@ async def test_sends_right_away_when_idle(state: AppState, agent: _Agent, outbox
 
 
 async def test_a_message_isnt_taken_while_koda_cant_respond(
-    state: AppState, agent: _Agent, outbox: Outbox
+    state: AppState,
+    agent: _Agent,
+    outbox: Outbox,
 ) -> None:
     state.issue = "Provider setup required"
 

@@ -17,12 +17,7 @@ from koda.llm.apis.responses import (
     OpenAIResponsesAPIConfig,
     OpenAIResponsesEventAdapter,
 )
-from koda.llm.types import (
-    LLMRequest,
-    LLMResponseCompleted,
-    LLMThinkingDelta,
-    LLMToolCallRequested,
-)
+from koda.llm.types import LLMRequest, LLMResponseCompleted, LLMThinkingDelta, LLMToolCallRequested
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
@@ -67,14 +62,16 @@ def _response_with_tool_call(tool_call: ResponseFunctionToolCall) -> Response:
             "text": {"format": {"type": "text"}},
             "truncation": "disabled",
             "usage": None,
-        }
+        },
     )
 
 
 def _api(events: Sequence[object]) -> OpenAIResponsesAPI:
     return OpenAIResponsesAPI(
         OpenAIResponsesAPIConfig(
-            api_key="test-key", base_url="https://api.openai.com/v1", model="gpt-5.2"
+            api_key="test-key",
+            base_url="https://api.openai.com/v1",
+            model="gpt-5.2",
         ),
         client=cast("AsyncOpenAI", _FakeClient(events)),
         adapter=OpenAIResponsesAdapter(),
@@ -92,7 +89,7 @@ async def test_generate_stream_emits_function_tool_call_once() -> None:
             "type": "function_call",
             "id": "fc_1",
             "status": "completed",
-        }
+        },
     )
     completed_response = _response_with_tool_call(tool_call)
     events = [
@@ -102,14 +99,14 @@ async def test_generate_stream_emits_function_tool_call_once() -> None:
                 "output_index": 0,
                 "sequence_number": 0,
                 "type": "response.output_item.done",
-            }
+            },
         ),
         ResponseCompletedEvent.model_validate(
             {
                 "response": completed_response.model_dump(mode="json"),
                 "sequence_number": 1,
                 "type": "response.completed",
-            }
+            },
         ),
     ]
 
@@ -135,7 +132,7 @@ def test_to_llm_events_separates_reasoning_summary_parts() -> None:
             "sequence_number": 0,
             "summary_index": 0,
             "type": "response.reasoning_summary_part.added",
-        }
+        },
     )
     second_part = ResponseReasoningSummaryPartAddedEvent.model_validate(
         {
@@ -145,7 +142,7 @@ def test_to_llm_events_separates_reasoning_summary_parts() -> None:
             "sequence_number": 1,
             "summary_index": 1,
             "type": "response.reasoning_summary_part.added",
-        }
+        },
     )
 
     assert list(adapter.to_llm_events(first_part)) == []

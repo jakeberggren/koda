@@ -50,11 +50,7 @@ class _BrowserAuthorizer:
         self.code = code
         self.request: AuthorizationRequest | None = None
 
-    async def __call__(
-        self,
-        request: AuthorizationRequest,
-        callbacks: OAuthLoginCallbacks,
-    ) -> str:
+    async def __call__(self, request: AuthorizationRequest, callbacks: OAuthLoginCallbacks) -> str:
         self.request = request
         callbacks.on_auth_url(request.url)
         return self.code
@@ -73,9 +69,7 @@ def _signed_id_token(key: RSAKey, config: _IdTokenClaims) -> str:
     if config.nonce is not None:
         claims["nonce"] = config.nonce
     if config.account_id is not None:
-        claims["https://api.openai.com/auth"] = {
-            "chatgpt_account_id": config.account_id,
-        }
+        claims["https://api.openai.com/auth"] = {"chatgpt_account_id": config.account_id}
     return jwt.encode({"alg": "RS256", "kid": "test-key"}, claims, key, algorithms=["RS256"])
 
 
@@ -89,10 +83,7 @@ def _jwks_transport(key: RSAKey) -> httpx2.MockTransport:
 
 def _callbacks(opened_urls: list[str] | None = None) -> OAuthLoginCallbacks:
     urls = opened_urls if opened_urls is not None else []
-    return OAuthLoginCallbacks(
-        on_auth_url=urls.append,
-        on_prompt=AsyncMock(),
-    )
+    return OAuthLoginCallbacks(on_auth_url=urls.append, on_prompt=AsyncMock())
 
 
 def test_create_authorization_request_contains_codex_parameters() -> None:
@@ -129,10 +120,7 @@ async def test_login_exchanges_code_and_builds_credential() -> None:
                 "refresh_token": "refresh-token",
                 "id_token": _signed_id_token(
                     key,
-                    _IdTokenClaims(
-                        audience=[CLIENT_ID],
-                        nonce=browser.request.nonce,
-                    ),
+                    _IdTokenClaims(audience=[CLIENT_ID], nonce=browser.request.nonce),
                 ),
                 "expires_at": 123456,
             },
@@ -172,10 +160,7 @@ async def test_refresh_preserves_fields_omitted_by_provider() -> None:
 
     def token_handler(request: httpx2.Request) -> httpx2.Response:
         token_requests.append(request)
-        return httpx2.Response(
-            200,
-            json={"access_token": "new-access", "expires_at": 123456},
-        )
+        return httpx2.Response(200, json={"access_token": "new-access", "expires_at": 123456})
 
     auth = OpenAICodexAuth(oauth_transport=httpx2.MockTransport(token_handler))
     old_credential = OAuthCredential(
@@ -212,10 +197,7 @@ async def test_refresh_validates_new_id_token() -> None:
             json={
                 "access_token": "new-access",
                 "refresh_token": "new-refresh",
-                "id_token": _signed_id_token(
-                    key,
-                    _IdTokenClaims(account_id="new-account"),
-                ),
+                "id_token": _signed_id_token(key, _IdTokenClaims(account_id="new-account")),
                 "expires_at": 123456,
             },
         )

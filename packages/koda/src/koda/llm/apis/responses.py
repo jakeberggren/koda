@@ -23,9 +23,7 @@ from openai.types.responses import (
     ToolParam,
     WebSearchToolParam,
 )
-from openai.types.responses.response_function_tool_call_param import (
-    ResponseFunctionToolCallParam,
-)
+from openai.types.responses.response_function_tool_call_param import ResponseFunctionToolCallParam
 from openai.types.responses.response_function_web_search import ActionSearch
 from openai.types.responses.response_input_param import FunctionCallOutput, ResponseInputItemParam
 from pydantic import BaseModel
@@ -41,10 +39,7 @@ from koda.llm.types import (
     LLMToolCompleted,
     LLMToolStarted,
 )
-from koda.llm.utils import (
-    parse_tool_arguments,
-    raise_llm_error_from_openai,
-)
+from koda.llm.utils import parse_tool_arguments, raise_llm_error_from_openai
 from koda.messages import (
     AssistantMessage,
     InterruptionMessage,
@@ -124,11 +119,7 @@ class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Om
         result: list[ResponseInputItemParam] = []
         if message.content or not message.tool_calls:
             result.append(
-                EasyInputMessageParam(
-                    role="assistant",
-                    content=message.content,
-                    type="message",
-                )
+                EasyInputMessageParam(role="assistant", content=message.content, type="message"),
             )
         result.extend(
             ResponseFunctionToolCallParam(
@@ -230,7 +221,8 @@ class OpenAIResponsesEventAdapter:
         )
 
     def _events_from_output_item_done(
-        self, event: ResponseOutputItemDoneEvent
+        self,
+        event: ResponseOutputItemDoneEvent,
     ) -> Iterator[LLMEvent]:
         if isinstance(event.item, ResponseFunctionToolCall):
             yield LLMToolCallRequested(call=self._to_function_tool_call(event.item))
@@ -346,7 +338,7 @@ class OpenAIResponsesAPI(LLM):
                 model=self.config.model,
                 parallel_tool_calls=resolved_request.options.parallel_tool_calls,
                 prompt_cache_retention=self._resolve_prompt_cache_retention(
-                    extended_prompt_retention=resolved_request.options.extended_prompt_retention
+                    extended_prompt_retention=resolved_request.options.extended_prompt_retention,
                 ),
                 reasoning=_resolve_reasoning(resolved_request.options.thinking),
                 store=self.config.store,
@@ -371,7 +363,7 @@ class OpenAIResponsesAPI(LLM):
                 model=self.config.model,
                 parallel_tool_calls=resolved_request.options.parallel_tool_calls,
                 prompt_cache_retention=self._resolve_prompt_cache_retention(
-                    extended_prompt_retention=resolved_request.options.extended_prompt_retention
+                    extended_prompt_retention=resolved_request.options.extended_prompt_retention,
                 ),
                 reasoning=_resolve_reasoning(resolved_request.options.thinking),
                 store=self.config.store,
@@ -385,7 +377,7 @@ class OpenAIResponsesAPI(LLM):
             async for event in stream:
                 if isinstance(event, ResponseCompletedEvent):
                     yield LLMResponseCompleted(
-                        response=self.adapter.to_llm_response(event.response)
+                        response=self.adapter.to_llm_response(event.response),
                     )
                     continue
                 for processed_event in self.event_adapter.to_llm_events(event):

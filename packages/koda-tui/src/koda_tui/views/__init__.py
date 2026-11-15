@@ -6,11 +6,4 @@ from koda_tui.views.pending import PendingMessages
 from koda_tui.views.screen import Screen
 from koda_tui.views.status import ActivityIndicator, StatusBar
 
-__all__ = [
-    "ActivityIndicator",
-    "Chat",
-    "Composer",
-    "PendingMessages",
-    "Screen",
-    "StatusBar",
-]
+__all__ = ["ActivityIndicator", "Chat", "Composer", "PendingMessages", "Screen", "StatusBar"]

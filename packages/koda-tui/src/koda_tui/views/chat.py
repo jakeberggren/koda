@@ -43,10 +43,7 @@ class Chat:
         self._renderer = renderer
         self._kept: dict[object, tuple[object, int, StyleAndTextTuples]] = {}
         self._container = HSplit(
-            [
-                Spacer(),
-                Scroll(ScrollState(), self.blocks, gap=Spacing.GAP, scrollbar=scrollbar),
-            ],
+            [Spacer(), Scroll(ScrollState(), self.blocks, gap=Spacing.GAP, scrollbar=scrollbar)],
         )
 
     def __pt_container__(self) -> HSplit:

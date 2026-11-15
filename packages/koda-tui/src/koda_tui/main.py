@@ -54,7 +54,7 @@ def configure_logging() -> None:
             [
                 structlog.processors.CallsiteParameter.MODULE,
                 structlog.processors.CallsiteParameter.QUAL_NAME,
-            ]
+            ],
         ),
     ]
     structlog.configure(
@@ -70,7 +70,7 @@ def configure_logging() -> None:
                 structlog.stdlib.ProcessorFormatter.remove_processors_meta,
                 structlog.processors.JSONRenderer(),
             ],
-        )
+        ),
     )
     logging.basicConfig(level=os.environ.get("KODA_LOG_LEVEL", "INFO").upper(), handlers=[handler])
 

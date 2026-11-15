@@ -149,19 +149,11 @@ class OAuthCallbackListener:
             path=self.callback_path,
         )
         result: Queue[OAuthCallbackResult] = Queue(maxsize=1)
-        handler = partial(
-            OAuthCallbackHandler,
-            listener=self,
-            result=result,
-        )
+        handler = partial(OAuthCallbackHandler, listener=self, result=result)
         server = ThreadingHTTPServer((self.host, self.port), handler)
         server.timeout = self.poll_interval
         try:
-            value = self._wait_for_result(
-                server=server,
-                result=result,
-                cancel_event=cancel_event,
-            )
+            value = self._wait_for_result(server=server, result=result, cancel_event=cancel_event)
         finally:
             log.info("oauth_callback_server_closing")
             server.server_close()

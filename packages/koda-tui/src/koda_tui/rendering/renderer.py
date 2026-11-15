@@ -190,7 +190,9 @@ class BashRenderer(ToolRenderer, tool="bash"):
         failed = output.is_error
         exit_code = content.get("exit_code") if failed else None
         summary = strings.Screen.Chat.Tools.bash_summary(
-            exit_code, len(stdout.splitlines()), len(stderr.splitlines())
+            exit_code,
+            len(stdout.splitlines()),
+            len(stderr.splitlines()),
         )
         blocks: list[RenderableType] = [_result(summary)]
         show_stderr = bool(stderr) and (failed or not stdout)

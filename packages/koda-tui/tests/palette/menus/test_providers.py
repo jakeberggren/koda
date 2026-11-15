@@ -127,7 +127,7 @@ def _openai_provider(oauth: _BrowserLogin | None) -> Provider:
             api=OpenAIResponsesAPI,
             base_url="https://api.openai.com/v1",
             label="OpenAI API key",
-        )
+        ),
     ]
     if oauth is not None:
         connections.append(
@@ -138,7 +138,7 @@ def _openai_provider(oauth: _BrowserLogin | None) -> Provider:
                 base_url="https://chatgpt.com/backend-api/codex",
                 label="ChatGPT Plus/Pro",
                 oauth=oauth,
-            )
+            ),
         )
     return Provider(id="openai", name="OpenAI", connections=tuple(connections))
 
@@ -155,7 +155,9 @@ def credentials() -> _Credentials:
 
 
 def test_providers_with_a_connection_are_marked(
-    overlays: Overlays, credentials: _Credentials, state: AppState
+    overlays: Overlays,
+    credentials: _Credentials,
+    state: AppState,
 ) -> None:
     credentials["openai:api-key"] = ApiKeyCredential(type="api_key", value="k")
     _menu(overlays, credentials, state).open()
@@ -163,7 +165,9 @@ def test_providers_with_a_connection_are_marked(
 
 
 def test_several_connections_are_offered_in_a_picker(
-    overlays: Overlays, credentials: _Credentials, state: AppState
+    overlays: Overlays,
+    credentials: _Credentials,
+    state: AppState,
 ) -> None:
     credentials["openai:oauth"] = _credential()
     _menu(overlays, credentials, state).select(_openai_provider(_BrowserLogin()))
@@ -176,7 +180,9 @@ def test_several_connections_are_offered_in_a_picker(
 
 
 def test_an_api_key_is_stored_and_picks_a_model(
-    overlays: Overlays, credentials: _Credentials, state: AppState
+    overlays: Overlays,
+    credentials: _Credentials,
+    state: AppState,
 ) -> None:
     _menu(overlays, credentials, state).select(_openai_provider(_BrowserLogin()))
     overlays.pick("OpenAI API key")
@@ -195,14 +201,19 @@ def test_an_api_key_is_stored_and_picks_a_model(
 
 
 def test_a_single_connection_skips_the_picker(
-    overlays: Overlays, credentials: _Credentials, state: AppState
+    overlays: Overlays,
+    credentials: _Credentials,
+    state: AppState,
 ) -> None:
     _menu(overlays, credentials, state).select(_openai_provider(None))
     assert overlays.kinds == [InputDialog]
 
 
 async def test_a_browser_login_stores_the_credential(
-    overlays: Overlays, credentials: _Credentials, state: AppState, opened_urls: list[str]
+    overlays: Overlays,
+    credentials: _Credentials,
+    state: AppState,
+    opened_urls: list[str],
 ) -> None:
     menu = _menu(overlays, credentials, state)
     menu.select(_openai_provider(_BrowserLogin()))
@@ -217,7 +228,9 @@ async def test_a_browser_login_stores_the_credential(
 
 @pytest.mark.usefixtures("opened_urls")
 async def test_a_login_can_be_finished_by_pasting_into_the_prompt(
-    overlays: Overlays, credentials: _Credentials, state: AppState
+    overlays: Overlays,
+    credentials: _Credentials,
+    state: AppState,
 ) -> None:
     login = _PromptedLogin()
     menu = _menu(overlays, credentials, state)
@@ -240,7 +253,9 @@ async def test_a_login_can_be_finished_by_pasting_into_the_prompt(
 
 @pytest.mark.usefixtures("opened_urls")
 async def test_closing_the_prompt_cancels_the_login(
-    overlays: Overlays, credentials: _Credentials, state: AppState
+    overlays: Overlays,
+    credentials: _Credentials,
+    state: AppState,
 ) -> None:
     menu = _menu(overlays, credentials, state)
     menu.select(_openai_provider(_PromptedLogin()))
@@ -260,7 +275,9 @@ async def test_closing_the_prompt_cancels_the_login(
 
 @pytest.mark.usefixtures("opened_urls")
 async def test_a_new_login_replaces_one_under_way(
-    overlays: Overlays, credentials: _Credentials, state: AppState
+    overlays: Overlays,
+    credentials: _Credentials,
+    state: AppState,
 ) -> None:
     menu = _menu(overlays, credentials, state)
     menu.select(_openai_provider(_PromptedLogin()))
@@ -279,7 +296,9 @@ async def test_a_new_login_replaces_one_under_way(
 
 
 async def test_a_failed_login_says_why(
-    overlays: Overlays, credentials: _Credentials, state: AppState
+    overlays: Overlays,
+    credentials: _Credentials,
+    state: AppState,
 ) -> None:
     menu = _menu(overlays, credentials, state)
     menu.select(_openai_provider(_FailingLogin()))

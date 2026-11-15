@@ -146,7 +146,7 @@ def _thinking(provider_id: str, provider: _ProviderFile, model: _ModelFile) -> T
         if mode is None:
             raise exceptions.LLMConfigurationError(
                 f"Model '{model.id}' for provider {provider_id} references unknown thinking "
-                f"mode '{mode_id}'"
+                f"mode '{mode_id}'",
             )
         options.append(ThinkingOption(id=mode_id, label=mode.label, description=mode.description))
     return Thinking(tuple(options)) if options else Thinking()
@@ -188,7 +188,7 @@ def _build_provider(provider_id: str, provider: _ProviderFile) -> tuple[Provider
                 capabilities=model_file.capabilities,
                 # Prefer OAuth: a subscription over pay-per-token API keys.
                 connections=tuple(sorted(model_connections[key], key=lambda c: c.auth != "oauth")),
-            )
+            ),
         )
     built = Provider(
         id=provider_id,
@@ -234,7 +234,8 @@ class Catalog:
         ) as e:
             log.warning("llm_user_models_config_invalid", path=str(user_path), error=str(e))
             warning = CatalogWarning(
-                summary="invalid models.json", detail=f"Ignoring {user_path}: {e}"
+                summary="invalid models.json",
+                detail=f"Ignoring {user_path}: {e}",
             )
             return cls(_merge(builtin, None), credentials), [warning]
 
@@ -274,7 +275,7 @@ class Catalog:
         model = self._models.get((provider.id, _normalize(model_id)))
         if model is None:
             raise exceptions.ModelNotFound(
-                f"Model '{model_id}' for provider {provider_id} is not supported"
+                f"Model '{model_id}' for provider {provider_id} is not supported",
             )
         return model
 
@@ -301,7 +302,7 @@ class Catalog:
                 connection=connection,
                 credentials=self._credentials,
                 openai_client=resolve_openai_client(tracing=tracing),
-            )
+            ),
         )
 
 

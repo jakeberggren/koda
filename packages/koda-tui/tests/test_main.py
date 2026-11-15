@@ -18,7 +18,8 @@ def _no_logging(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_main_runs_the_app_for_the_current_directory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
     ran: list[KodaTuiApp] = []
@@ -35,7 +36,8 @@ def test_main_runs_the_app_for_the_current_directory(
 
 
 def test_main_says_what_is_wrong_with_the_settings_and_exits(
-    home: Path, capsys: pytest.CaptureFixture[str]
+    home: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     path = home / ".koda" / "settings.json"
     path.parent.mkdir(parents=True)
@@ -46,5 +48,5 @@ def test_main_says_what_is_wrong_with_the_settings_and_exits(
 
     assert exc_info.value.code == 1
     assert capsys.readouterr().err.startswith(
-        strings.App.failed_to_start(f"Invalid settings in {path}\n")
+        strings.App.failed_to_start(f"Invalid settings in {path}\n"),
     )

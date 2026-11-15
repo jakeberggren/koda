@@ -65,7 +65,6 @@ select = [
     "ASYNC", # flake8-async
 ]
 ignore = [
-    "COM812",
     "TRY003", # A message at the raise site is fine; exception types are for callers to tell apart.
 ]
 

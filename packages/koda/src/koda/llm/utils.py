@@ -34,11 +34,7 @@ def resolve_openai_client(*, tracing: bool) -> Callable[..., AsyncOpenAI]:
         return importlib.import_module("openai").AsyncOpenAI
 
 
-def raise_llm_error_from_openai(
-    error: OpenAIError,
-    *,
-    backend: str,
-) -> NoReturn:
+def raise_llm_error_from_openai(error: OpenAIError, *, backend: str) -> NoReturn:
     if isinstance(error, RateLimitError):
         logger.error("llm_rate_limit_error", backend=backend)
         raise exceptions.LLMRateLimitError(backend, error) from error
@@ -51,7 +47,9 @@ def raise_llm_error_from_openai(
     if isinstance(error, APIError):
         logger.error("llm_api_error", backend=backend, error=repr(error))
         raise exceptions.LLMAPIError(
-            backend, error, provider_message=provider_message(error.body)
+            backend,
+            error,
+            provider_message=provider_message(error.body),
         ) from error
     logger.error("llm_unknown_error", backend=backend, error=repr(error))
     raise exceptions.LLMAPIError(backend, error) from error

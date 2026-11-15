@@ -102,12 +102,7 @@ class EditorControl(BufferControl):
         return 1 if width <= 0 else len(_rows(self.buffer.document, width))
 
     @override
-    def create_content(
-        self,
-        width: int,
-        height: int,
-        preview_search: bool = False,
-    ) -> UIContent:
+    def create_content(self, width: int, height: int, preview_search: bool = False) -> UIContent:
         """The wrapped rows, drawn with the buffer's processors, such as the selection."""
         self.buffer.load_history_if_not_yet_loaded()
         document = self.buffer.document

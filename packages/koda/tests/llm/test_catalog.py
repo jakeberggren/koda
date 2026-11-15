@@ -205,11 +205,11 @@ def test_user_providers_replace_builtin_providers(tmp_path: Path) -> None:
                                 {"id": "gpt-5.4", "name": "GPT 5.4", "context_window": 1000},
                                 {"id": "gpt-5.4-mini", "name": "GPT 5.4 mini"},
                             ],
-                        }
+                        },
                     },
                     "capabilities": {"web_search": True, "reasoning": False},
-                }
-            }
+                },
+            },
         },
     )
     _write_json(
@@ -228,18 +228,11 @@ def test_user_providers_replace_builtin_providers(tmp_path: Path) -> None:
                                     "id": "GPT-5.4",
                                     "name": "Custom GPT 5.4",
                                     "max_output_tokens": 2000,
-                                    "thinking": {
-                                        "modes": [
-                                            "none",
-                                            "low",
-                                            "medium",
-                                            "high",
-                                        ],
-                                    },
+                                    "thinking": {"modes": ["none", "low", "medium", "high"]},
                                 },
                                 {"id": "gpt-5.4-nano", "name": "GPT 5.4 nano"},
                             ],
-                        }
+                        },
                     },
                     "capabilities": {"reasoning": True},
                     "thinking_modes": {
@@ -260,22 +253,17 @@ def test_user_providers_replace_builtin_providers(tmp_path: Path) -> None:
                                 {
                                     "id": "claude-sonnet-4-6",
                                     "name": "Claude Sonnet 4.6",
-                                    "thinking": {
-                                        "modes": [
-                                            "none",
-                                            "high",
-                                        ],
-                                    },
-                                }
+                                    "thinking": {"modes": ["none", "high"]},
+                                },
                             ],
-                        }
+                        },
                     },
                     "thinking_modes": {
                         "none": {"label": "Off", "description": ""},
                         "high": {"label": "High", "description": ""},
                     },
                 },
-            }
+            },
         },
     )
 
@@ -310,8 +298,8 @@ def test_user_config_with_unknown_thinking_mode_falls_back_with_warning(tmp_path
                 "openai": {
                     "name": "Proxy",
                     "connections": {"api-key": connection | {"models": [model]}},
-                }
-            }
+                },
+            },
         },
     )
 
@@ -335,11 +323,11 @@ def test_invalid_user_config_falls_back_to_builtin_with_warning(tmp_path: Path) 
                             "auth": "api-key",
                             "api": "openai-responses",
                             "base_url": "https://api.openai.com/v1",
-                        }
+                        },
                     },
                     "models": [{"id": "gpt-5", "name": "GPT-5"}],
-                }
-            }
+                },
+            },
         },
     )
     user_path.write_text('{"providers": {"openrouter": ', encoding="utf-8")

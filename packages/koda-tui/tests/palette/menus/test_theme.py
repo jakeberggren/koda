@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
 
 def test_lists_the_themes_marking_the_current_one(
-    context: PaletteContext, overlays: Overlays
+    context: PaletteContext,
+    overlays: Overlays,
 ) -> None:
     context.state.settings = Settings(tui_settings=TuiSettings(theme="terminal-light"))
     ThemeMenu(context).open()
@@ -33,7 +34,10 @@ def test_choosing_a_theme_sets_it(context: PaletteContext, overlays: Overlays) -
 
 
 def test_choosing_the_current_theme_asks_for_the_background_again(
-    context: PaletteContext, overlays: Overlays, update_settings: Mock, terminal: Mock
+    context: PaletteContext,
+    overlays: Overlays,
+    update_settings: Mock,
+    terminal: Mock,
 ) -> None:
     ThemeMenu(context).open()
     overlays.pick("Auto")

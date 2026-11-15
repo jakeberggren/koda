@@ -71,7 +71,7 @@ def _model(state: AppState) -> list[Segment]:
     if model is None:
         return []
     segments: list[Segment] = [
-        [(Tokens.Text.MUTED, f"{model.provider} {Icons.DIVIDER} {model.name}")]
+        [(Tokens.Text.MUTED, f"{model.provider} {Icons.DIVIDER} {model.name}")],
     ]
     thinking = model.thinking.resolve(state.settings.agent_settings.thinking)
     if thinking.id != "none":

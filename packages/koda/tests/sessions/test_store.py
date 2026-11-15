@@ -58,10 +58,7 @@ class TestSessionStore:
         store.save_session(older)
         store.save_session(newer)
 
-        assert [s.session_id for s in store.list_sessions()] == [
-            newer.session_id,
-            older.session_id,
-        ]
+        assert [s.session_id for s in store.list_sessions()] == [newer.session_id, older.session_id]
 
     def test_list_sessions_empty(self, store: SessionStore) -> None:
         assert store.list_sessions() == []
@@ -90,18 +87,13 @@ class TestSessionUsage:
                 UserMessage(content="next"),
                 AssistantMessage(content="two"),
                 AssistantMessage(content="three", usage=latest_usage),
-            ]
+            ],
         )
 
         assert session.usage == latest_usage
 
     def test_usage_returns_none_without_assistant_usage(self) -> None:
-        session = Session(
-            messages=[
-                UserMessage(content="hello"),
-                AssistantMessage(content="hi"),
-            ]
-        )
+        session = Session(messages=[UserMessage(content="hello"), AssistantMessage(content="hi")])
 
         assert session.usage is None
         assert session.total_usage is None
@@ -128,7 +120,7 @@ class TestSessionUsage:
                         total_tokens=24,
                     ),
                 ),
-            ]
+            ],
         )
 
         assert session.total_usage == TokenUsage(

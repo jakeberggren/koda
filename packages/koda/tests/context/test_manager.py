@@ -44,10 +44,7 @@ class TestContextManager:
 
     def test_from_workspace_custom_filenames(self, tmp_path: Path) -> None:
         (tmp_path / "RULES.md").write_text("Custom.", encoding="utf-8")
-        manager = ContextManager.from_workspace(
-            tmp_path,
-            filenames=("RULES.md",),
-        )
+        manager = ContextManager.from_workspace(tmp_path, filenames=("RULES.md",))
 
         result = manager.build_system_prompt(SystemPrompt())
 

@@ -47,10 +47,7 @@ def test_extract_authorization_code_from_callback_url() -> None:
     [
         ("auth-code", OAuthCallbackRedirectError),
         ("http://localhost/callback?state=expected-state", OAuthCallbackCodeMissingError),
-        (
-            "http://localhost/callback?code=auth-code&state=wrong-state",
-            OAuthCallbackStateError,
-        ),
+        ("http://localhost/callback?code=auth-code&state=wrong-state", OAuthCallbackStateError),
     ],
 )
 def test_extract_authorization_code_rejects_invalid_callback(

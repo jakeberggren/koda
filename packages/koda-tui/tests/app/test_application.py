@@ -76,7 +76,9 @@ class _FakeLLM:
         raise NotImplementedError
 
     async def generate_structured(
-        self, request: LLMRequest, schema: type[BaseModel]
+        self,
+        request: LLMRequest,
+        schema: type[BaseModel],
     ) -> LLMResponse[BaseModel]:
         raise NotImplementedError
 
@@ -125,7 +127,9 @@ def test_new_settings_are_saved_and_shown() -> None:
     credentials["bergetai:api-key"] = ApiKeyCredential(type="api_key", value="key")
     app, _ = _make_app(credentials=credentials)
     agent_settings = replace(
-        app.state.settings.agent_settings, provider="bergetai", model="zai-org/GLM-4.7-FP8"
+        app.state.settings.agent_settings,
+        provider="bergetai",
+        model="zai-org/GLM-4.7-FP8",
     )
     app.update_settings(replace(app.state.settings, agent_settings=agent_settings))
 
@@ -284,7 +288,8 @@ class TestAgent:
         assert connect.calls == 1
 
     async def test_a_new_session_gets_a_new_agent_with_fresh_workspace_context(
-        self, tmp_path: Path
+        self,
+        tmp_path: Path,
     ) -> None:
         (tmp_path / "AGENTS.md").write_text("First instructions.", encoding="utf-8")
         app, connect = _make_app(tmp_path)
@@ -303,10 +308,13 @@ class TestAgent:
         credentials = _connected()
         credentials["anthropic:api-key"] = ApiKeyCredential(type="api_key", value="key")
         agent_settings = replace(
-            _SETTINGS.agent_settings, provider="anthropic", model="claude-fable-5"
+            _SETTINGS.agent_settings,
+            provider="anthropic",
+            model="claude-fable-5",
         )
         app, connect = _make_app(
-            settings=replace(_SETTINGS, agent_settings=agent_settings), credentials=credentials
+            settings=replace(_SETTINGS, agent_settings=agent_settings),
+            credentials=credentials,
         )
 
         await _respond(app)
@@ -314,9 +322,7 @@ class TestAgent:
         assert connect.llm.last_request is not None
         assert connect.llm.last_request.options.thinking == "low"
 
-    async def test_responding_without_a_selected_model_fails_where_the_turn_failed(
-        self,
-    ) -> None:
+    async def test_responding_without_a_selected_model_fails_where_the_turn_failed(self) -> None:
         agent_settings = replace(_SETTINGS.agent_settings, model=None)
         app, _ = _make_app(settings=replace(_SETTINGS, agent_settings=agent_settings))
 
@@ -335,7 +341,7 @@ class TestAgent:
         [failed] = app.state.errors
         assert isinstance(failed.error, KeyError)
         assert [log["event"] for log in logs if log["log_level"] == "error"] == [
-            "turn_failed_unexpectedly"
+            "turn_failed_unexpectedly",
         ]
 
     async def test_an_expected_failure_is_shown_but_not_logged_again(self) -> None:
@@ -379,7 +385,9 @@ class TestStatus:
 
     def test_a_model_of_an_unconnected_provider_is_not_connected(self) -> None:
         agent_settings = replace(
-            _SETTINGS.agent_settings, provider="bergetai", model="google/gemma-4-31B-it"
+            _SETTINGS.agent_settings,
+            provider="bergetai",
+            model="google/gemma-4-31B-it",
         )
         app, _ = _make_app(settings=replace(_SETTINGS, agent_settings=agent_settings))
         assert app.state.issue == strings.Screen.Status.MODEL_NOT_CONNECTED

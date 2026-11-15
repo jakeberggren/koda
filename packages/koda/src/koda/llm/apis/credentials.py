@@ -32,12 +32,12 @@ def resolve_api_key_credential(context: LLMApiContext) -> str:
     credential = _resolve_credential(context)
     if not isinstance(credential, ApiKeyCredential):
         raise exceptions.LLMConfigurationError(
-            f"{_credential_key(context)} requires an API key credential"
+            f"{_credential_key(context)} requires an API key credential",
         )
     normalized_api_key = credential.value.strip()
     if not normalized_api_key:
         raise exceptions.LLMConfigurationError(
-            f"{_credential_key(context)} API key cannot be empty"
+            f"{_credential_key(context)} API key cannot be empty",
         )
     return normalized_api_key
 

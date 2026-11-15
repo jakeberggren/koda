@@ -47,11 +47,7 @@ class TestReadFileTool:
         context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="read_file",
-            arguments={"path": "test.txt"},
-            call_id="call_read",
-        )
+        call = ToolCall(tool_name="read_file", arguments={"path": "test.txt"}, call_id="call_read")
 
         result = await executor.execute_call(call, context)
 
@@ -194,7 +190,8 @@ class TestReadFileTool:
 
     @pytest.mark.asyncio
     async def test_read_file_reads_requested_lines_without_decoding_entire_file(
-        self, workspace_dir: Path
+        self,
+        workspace_dir: Path,
     ) -> None:
         """read_file only decodes the requested line window."""
         test_file = workspace_dir / "large.txt"
@@ -372,11 +369,7 @@ class TestEditFileTool:
 
         call = ToolCall(
             tool_name="edit_file",
-            arguments={
-                "path": "test.txt",
-                "old_text": "line2",
-                "new_text": "line2\nline3",
-            },
+            arguments={"path": "test.txt", "old_text": "line2", "new_text": "line2\nline3"},
             call_id="call_edit",
         )
 
@@ -526,7 +519,7 @@ class TestEditFileTool:
         assert result.output.is_error is False
         assert result.output.content["replacements"] == expected_replacements
         assert (workspace_dir / "test.txt").read_text() == "\n".join(
-            ["done"] * expected_replacements
+            ["done"] * expected_replacements,
         )
 
     @pytest.mark.asyncio
@@ -600,11 +593,7 @@ class TestGlobTool:
         context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="glob",
-            arguments={"pattern": "*.txt"},
-            call_id="call_glob",
-        )
+        call = ToolCall(tool_name="glob", arguments={"pattern": "*.txt"}, call_id="call_glob")
 
         result = await executor.execute_call(call, context)
 
@@ -655,11 +644,7 @@ class TestGlobTool:
         context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="glob",
-            arguments={"pattern": "*.xyz"},
-            call_id="call_nomatch",
-        )
+        call = ToolCall(tool_name="glob", arguments={"pattern": "*.xyz"}, call_id="call_nomatch")
 
         result = await executor.execute_call(call, context)
 
@@ -766,11 +751,7 @@ class TestGlobTool:
         context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="glob",
-            arguments={"pattern": "*"},
-            call_id="call_filesonly",
-        )
+        call = ToolCall(tool_name="glob", arguments={"pattern": "*"}, call_id="call_filesonly")
 
         result = await executor.execute_call(call, context)
 
@@ -790,11 +771,7 @@ class TestGlobTool:
         context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="glob",
-            arguments={"pattern": "*.txt"},
-            call_id="call_display",
-        )
+        call = ToolCall(tool_name="glob", arguments={"pattern": "*.txt"}, call_id="call_display")
 
         result = await executor.execute_call(call, context)
 
@@ -810,11 +787,7 @@ class TestGlobTool:
         context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="glob",
-            arguments={"pattern": "*.xyz"},
-            call_id="call_display",
-        )
+        call = ToolCall(tool_name="glob", arguments={"pattern": "*.xyz"}, call_id="call_display")
 
         result = await executor.execute_call(call, context)
 
@@ -851,10 +824,7 @@ class TestGlobTool:
 class TestBashTool:
     """Integration tests for bash tool."""
 
-    bash_required = pytest.mark.skipif(
-        shutil.which("bash") is None,
-        reason="bash is not installed",
-    )
+    bash_required = pytest.mark.skipif(shutil.which("bash") is None, reason="bash is not installed")
 
     @bash_required
     @pytest.mark.asyncio
@@ -911,11 +881,7 @@ class TestBashTool:
         context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="bash",
-            arguments={"command": "exit 7"},
-            call_id="call_bash_exit",
-        )
+        call = ToolCall(tool_name="bash", arguments={"command": "exit 7"}, call_id="call_bash_exit")
 
         result = await executor.execute_call(call, context)
 
@@ -1016,10 +982,7 @@ class TestBashTool:
         marker = workspace_dir / "survived"
         call = ToolCall(
             tool_name="bash",
-            arguments={
-                "command": f"(sleep 0.5; touch {marker}) & wait",
-                "timeout_seconds": 0.1,
-            },
+            arguments={"command": f"(sleep 0.5; touch {marker}) & wait", "timeout_seconds": 0.1},
             call_id="call_bash_timeout_children",
         )
 
@@ -1031,7 +994,9 @@ class TestBashTool:
 
     @pytest.mark.asyncio
     async def test_bash_runs_non_interactive_in_its_own_session(
-        self, monkeypatch: pytest.MonkeyPatch, workspace_dir: Path
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        workspace_dir: Path,
     ) -> None:
         """bash skips profile/rc files and gets its own process group."""
 
@@ -1057,7 +1022,9 @@ class TestBashTool:
         registry = ToolRegistry()
         registry.register_all(get_builtin_tools())
         call = ToolCall(
-            tool_name="bash", arguments={"command": "printf test"}, call_id="call_bash_flags"
+            tool_name="bash",
+            arguments={"command": "printf test"},
+            call_id="call_bash_flags",
         )
 
         await ToolExecutor(registry).execute_call(call, _tool_context(workspace_dir))
@@ -1134,11 +1101,7 @@ class TestGrepTool:
         context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="grep",
-            arguments={"pattern": "hello"},
-            call_id="call_grep",
-        )
+        call = ToolCall(tool_name="grep", arguments={"pattern": "hello"}, call_id="call_grep")
 
         result = await executor.execute_call(call, context)
 
@@ -1230,11 +1193,7 @@ class TestGrepTool:
         context = _tool_context(workspace_dir)
         executor = ToolExecutor(registry)
 
-        call = ToolCall(
-            tool_name="grep",
-            arguments={"pattern": "-match"},
-            call_id="call_grep_dash",
-        )
+        call = ToolCall(tool_name="grep", arguments={"pattern": "-match"}, call_id="call_grep_dash")
 
         result = await executor.execute_call(call, context)
 

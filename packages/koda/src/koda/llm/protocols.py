@@ -15,17 +15,11 @@ class LLM(Protocol):
     exposing provider-neutral Koda request and response types to the rest of the system.
     """
 
-    async def generate(
-        self,
-        request: LLMRequest,
-    ) -> LLMResponse[AssistantMessage]:
+    async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
         """Generate a complete assistant response for one request."""
         ...
 
-    def generate_stream(
-        self,
-        request: LLMRequest,
-    ) -> AsyncIterator[LLMEvent]:
+    def generate_stream(self, request: LLMRequest) -> AsyncIterator[LLMEvent]:
         """Generate provider-neutral stream events for one request."""
         ...
 
@@ -45,23 +39,14 @@ class LLMAdapter[ProviderMessagesT, ProviderToolsT, ProviderResponseT](Protocol)
     provider responses back into Koda's common response model.
     """
 
-    def to_provider_messages(
-        self,
-        messages: Sequence[Message],
-    ) -> ProviderMessagesT:
+    def to_provider_messages(self, messages: Sequence[Message]) -> ProviderMessagesT:
         """Convert Koda conversation messages into the provider request format."""
         ...
 
-    def to_provider_tools(
-        self,
-        tools: Sequence[ToolDefinition] | None,
-    ) -> ProviderToolsT:
+    def to_provider_tools(self, tools: Sequence[ToolDefinition] | None) -> ProviderToolsT:
         """Convert Koda tool definitions into the provider request format."""
         ...
 
-    def to_llm_response(
-        self,
-        response: ProviderResponseT,
-    ) -> LLMResponse[AssistantMessage]:
+    def to_llm_response(self, response: ProviderResponseT) -> LLMResponse[AssistantMessage]:
         """Convert a provider response into Koda's common assistant response."""
         ...

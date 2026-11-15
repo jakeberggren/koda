@@ -115,7 +115,7 @@ async def test_codex_responses_factory_builds_oauth_client() -> None:
                 metadata={"chatgpt_account_id": "account-id"},
             ),
             client=factory,
-        )
+        ),
     )
 
     assert api.config.backend == CODEX_BACKEND
@@ -125,17 +125,14 @@ async def test_codex_responses_factory_builds_oauth_client() -> None:
     assert factory.clients[0].kwargs == {
         "api_key": "access-token",
         "base_url": "https://chatgpt.com/backend-api/codex",
-        "default_headers": {
-            "chatgpt-account-id": "account-id",
-            "originator": CODEX_ORIGINATOR,
-        },
+        "default_headers": {"chatgpt-account-id": "account-id", "originator": CODEX_ORIGINATOR},
     }
 
 
 async def test_codex_responses_factory_requires_oauth_credential() -> None:
     with pytest.raises(exceptions.LLMConfigurationError, match="requires an OAuth credential"):
         await OpenAICodexResponsesAPI.from_context(
-            _context(ApiKeyCredential(type="api_key", value="api-key"))
+            _context(ApiKeyCredential(type="api_key", value="api-key")),
         )
 
 
@@ -148,8 +145,8 @@ async def test_codex_responses_factory_requires_account_id() -> None:
                     access_token="access-token",  # noqa: S106
                     refresh_token="refresh-token",  # noqa: S106
                     expires_at=str(int(time()) + 3600),
-                )
-            )
+                ),
+            ),
         )
 
 

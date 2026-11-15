@@ -33,7 +33,7 @@ class OpenAICodexResponsesAPI(OpenAIResponsesAPI):
         account_id = credential.metadata.get(CODEX_ACCOUNT_ID_METADATA_KEY)
         if not account_id:
             raise exceptions.LLMConfigurationError(
-                f"{context.connection.provider} OAuth credential must include an account id"
+                f"{context.connection.provider} OAuth credential must include an account id",
             )
 
         capabilities = context.capabilities
@@ -60,10 +60,7 @@ class OpenAICodexResponsesAPI(OpenAIResponsesAPI):
             client=context.openai_client(
                 api_key=config.api_key,
                 base_url=config.base_url,
-                default_headers={
-                    "chatgpt-account-id": account_id,
-                    "originator": CODEX_ORIGINATOR,
-                },
+                default_headers={"chatgpt-account-id": account_id, "originator": CODEX_ORIGINATOR},
             ),
             adapter=OpenAIResponsesAdapter(),
             event_adapter=OpenAIResponsesEventAdapter(),

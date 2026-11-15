@@ -135,7 +135,8 @@ class CommandPalette:
     def _toggle_scrollbar(self) -> None:
         settings = self._context.settings
         tui_settings = replace(
-            settings.tui_settings, show_scrollbar=not settings.tui_settings.show_scrollbar
+            settings.tui_settings,
+            show_scrollbar=not settings.tui_settings.show_scrollbar,
         )
         self._context.update_settings(replace(settings, tui_settings=tui_settings))
         self._overlays.close_all()

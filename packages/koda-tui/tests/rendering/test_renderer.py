@@ -64,11 +64,7 @@ class TestMessages:
 
     def test_render_tool_message(self) -> None:
         """render_message() should render tool messages."""
-        tool_call = ToolCall(
-            tool_name="search",
-            arguments={"query": "test"},
-            call_id="call_123",
-        )
+        tool_call = ToolCall(tool_name="search", arguments={"query": "test"}, call_id="call_123")
         message = ToolRun(tool_call)
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
@@ -122,10 +118,7 @@ def test_rich_emits_no_colors_so_every_color_comes_from_a_token() -> None:
         "```python\nclass A: pass\n```\n\n    indented = True\n"
     )
     diff = "--- a/foo.py\n+++ b/foo.py\n@@ -1 +1 @@\n-x = 1\n+x = 2\n"
-    renderables = [
-        Padding(Markdown(markdown), 1, style=Tokens.Surface.RAISED),
-        diff_blocks(diff),
-    ]
+    renderables = [Padding(Markdown(markdown), 1, style=Tokens.Surface.RAISED), diff_blocks(diff)]
     console = rich_bridge._Console(width=60)  # noqa: SLF001
 
     colored = [
@@ -168,11 +161,7 @@ class TestToolCalls:
 
     def test_render_tool_call_running(self) -> None:
         """A running tool call should display the tool name."""
-        tool_call = ToolCall(
-            tool_name="search",
-            arguments={},
-            call_id="call_789",
-        )
+        tool_call = ToolCall(tool_name="search", arguments={}, call_id="call_789")
         result = _tool_call(tool_call, running=True)
         content = "".join(t[1] for t in result)
         assert "search" in content

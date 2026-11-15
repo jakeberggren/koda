@@ -57,14 +57,18 @@ def _written(output: Mock) -> list:
     ],
 )
 def test_background_reply_goes_to_its_callback_not_the_keys(
-    terminal: Terminal, backgrounds: list[RGBColor], reply: str, color: tuple[int, int, int]
+    terminal: Terminal,
+    backgrounds: list[RGBColor],
+    reply: str,
+    color: tuple[int, int, int],
 ) -> None:
     assert terminal.feed(f"a{reply}b") == "ab"
     assert backgrounds == [RGBColor(*color)]
 
 
 def test_text_that_is_not_a_reply_stays_keys(
-    terminal: Terminal, backgrounds: list[RGBColor]
+    terminal: Terminal,
+    backgrounds: list[RGBColor],
 ) -> None:
     text = "no reply \x1b]11;rgb:zz/zz/zz\x07"
     assert terminal.feed(text) == text
@@ -73,7 +77,9 @@ def test_text_that_is_not_a_reply_stays_keys(
 
 @pytest.mark.parametrize("cut", range(1, len(WHITE)))
 def test_a_reply_split_across_reads_is_put_back_together(
-    terminal: Terminal, backgrounds: list[RGBColor], cut: int
+    terminal: Terminal,
+    backgrounds: list[RGBColor],
+    cut: int,
 ) -> None:
     assert terminal.feed("a" + WHITE[:cut]) == "a"
     assert terminal.feed(WHITE[cut:] + "b") == "b"
@@ -103,7 +109,8 @@ def test_a_lone_escape_is_held_back_until_flushed(terminal: Terminal) -> None:
 
 
 def test_focus_reporting_turns_on_once_and_off_on_the_final_render(
-    terminal: Terminal, output: Mock
+    terminal: Terminal,
+    output: Mock,
 ) -> None:
     running, done = Mock(is_done=False), Mock(is_done=True)
     for app in (running, running, done, done):
@@ -117,7 +124,10 @@ def test_focus_reporting_turns_on_once_and_off_on_the_final_render(
 
 @pytest.mark.parametrize("rendered", [True, False])
 def test_close_turns_focus_reporting_off_only_if_on(
-    terminal: Terminal, output: Mock, *, rendered: bool
+    terminal: Terminal,
+    output: Mock,
+    *,
+    rendered: bool,
 ) -> None:
     if rendered:
         terminal.after_render(Mock(is_done=False))
@@ -143,7 +153,8 @@ def _input(terminal: Terminal, data: str) -> TerminalInput:
 
 
 def test_input_reads_keys_without_the_replies(
-    terminal: Terminal, backgrounds: list[RGBColor]
+    terminal: Terminal,
+    backgrounds: list[RGBColor],
 ) -> None:
     assert [key.key for key in _input(terminal, WHITE + "a").read_keys()] == ["a"]
     assert backgrounds == [RGBColor(255, 255, 255)]

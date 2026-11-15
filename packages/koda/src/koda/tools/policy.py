@@ -80,7 +80,8 @@ class ToolPolicy:
             denied = parts.intersection(self.deny_path_parts)
             if denied:
                 raise exceptions.PathDeniedError(
-                    path, reason=f"path component {denied} is not allowed"
+                    path,
+                    reason=f"path component {denied} is not allowed",
                 )
 
         if self.respect_gitignore and self._is_gitignored(resolved):

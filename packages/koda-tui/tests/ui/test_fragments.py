@@ -58,10 +58,7 @@ def test_truncate_ends_crowded_text_with_its_tail(width: int, expected: list) ->
 
 def test_wrap_breaks_between_words_across_styles() -> None:
     fragments: StyleAndTextTuples = [("a", "steering: "), ("b", "keep the tests green")]
-    assert wrap(fragments, 20) == [
-        [("a", "steering: "), ("b", "keep the")],
-        [("b", "tests green")],
-    ]
+    assert wrap(fragments, 20) == [[("a", "steering: "), ("b", "keep the")], [("b", "tests green")]]
 
 
 def test_wrap_measures_cells_not_characters() -> None:

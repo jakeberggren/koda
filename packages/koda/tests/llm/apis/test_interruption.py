@@ -13,7 +13,8 @@ from koda.messages import InterruptionMessage
 
 
 @pytest.mark.parametrize(
-    "adapter", [OpenAICompletionsAdapter(), OpenAIResponsesAdapter(), AnthropicMessagesAdapter()]
+    "adapter",
+    [OpenAICompletionsAdapter(), OpenAIResponsesAdapter(), AnthropicMessagesAdapter()],
 )
 def test_an_interruption_is_sent_as_user_text(adapter: Any) -> None:
     [message] = adapter.to_provider_messages([InterruptionMessage()])

@@ -28,10 +28,7 @@ CAUSE = RuntimeError("raw details")
             ErrorText(ERRORS.AUTHENTICATION, ERRORS.AUTHENTICATION_FIX),
         ),
         (LLMRateLimitError("openai", CAUSE), ErrorText(ERRORS.RATE_LIMIT, ERRORS.RATE_LIMIT_FIX)),
-        (
-            LLMConnectionError("openai", CAUSE),
-            ErrorText(ERRORS.CONNECTION, ERRORS.CONNECTION_FIX),
-        ),
+        (LLMConnectionError("openai", CAUSE), ErrorText(ERRORS.CONNECTION, ERRORS.CONNECTION_FIX)),
         (
             LLMAPIError("codex", CAUSE, provider_message="Model not supported."),
             ErrorText(ERRORS.PROVIDER, detail="Model not supported."),

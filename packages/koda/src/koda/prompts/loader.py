@@ -38,7 +38,7 @@ class SystemPromptLoader:
         except (OSError, RuntimeError):
             return None
         if directory_resolved == sandbox_resolved or directory_resolved.is_relative_to(
-            sandbox_resolved
+            sandbox_resolved,
         ):
             return sandbox_resolved
         return None
@@ -46,10 +46,7 @@ class SystemPromptLoader:
     @classmethod
     def for_workspace(cls, workspace_root: Path) -> SystemPromptLoader:
         """Create a loader that searches the workspace then ``~/.koda``."""
-        return cls(
-            search_paths=[workspace_root, koda_home_dir()],
-            sandbox_root=workspace_root,
-        )
+        return cls(search_paths=[workspace_root, koda_home_dir()], sandbox_root=workspace_root)
 
     def load(self) -> SystemPrompt:
         """Return the loaded system prompt."""

@@ -99,10 +99,7 @@ def test_right_shows_hints_warning_and_activity(state: AppState) -> None:
             strings.Screen.Status.RESPONDING,
         ),
         ({"turn": Turn(running=True)}, strings.Screen.Status.WORKING),
-        (
-            {"turn": Turn(running=True, calls=[_CALL])},
-            strings.Screen.Status.RUNNING_TOOLS,
-        ),
+        ({"turn": Turn(running=True, calls=[_CALL])}, strings.Screen.Status.RUNNING_TOOLS),
         ({}, strings.Screen.Status.READY),
     ],
 )

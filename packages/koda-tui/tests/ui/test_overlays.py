@@ -61,7 +61,9 @@ def test_starts_closed(overlays: Overlays) -> None:
 
 
 def test_open_floats_and_focuses_only_the_top(
-    app: _App, root: FloatContainer, overlays: Overlays
+    app: _App,
+    root: FloatContainer,
+    overlays: Overlays,
 ) -> None:
     first, second = _overlay(), _overlay()
     overlays.open(first)
@@ -115,7 +117,8 @@ def test_every_change_redraws(app: _App, overlays: Overlays) -> None:
 
 @pytest.mark.asyncio  # The key processor schedules its flush timeout on the loop.
 async def test_overlay_keys_work_for_input_that_arrives_before_the_next_render(
-    app: _App, overlays: Overlays
+    app: _App,
+    overlays: Overlays,
 ) -> None:
     """Keys in the same read as the one that opened an overlay are handled before
     anything renders. They must still reach bindings on the overlay's containers,

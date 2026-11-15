@@ -6,13 +6,7 @@ from pathlib import Path
 
 from koda.agent import Turn
 from koda.llm import LLMError
-from koda.messages import (
-    AssistantMessage,
-    InterruptionMessage,
-    Message,
-    ToolMessage,
-    UserMessage,
-)
+from koda.messages import AssistantMessage, InterruptionMessage, Message, ToolMessage, UserMessage
 from koda.sessions import Session
 from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda_tui.rendering import ToolRun
@@ -35,7 +29,8 @@ def _state(*messages: Message, turn: Turn | None = None) -> AppState:
 def _answer(call: ToolCall, text: str = "ok", *, error: bool = False) -> ToolMessage:
     output = ToolOutput(display=text, is_error=error)
     return ToolMessage(
-        tool_name=call.tool_name, tool_result=ToolResult(call_id=call.call_id, output=output)
+        tool_name=call.tool_name,
+        tool_result=ToolResult(call_id=call.call_id, output=output),
     )
 
 

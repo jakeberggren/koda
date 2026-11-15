@@ -62,7 +62,10 @@ def terminal() -> Mock:
 
 @pytest.fixture
 def context(
-    overlays: Overlays, update_settings: Mock, terminal: Mock, state: AppState
+    overlays: Overlays,
+    update_settings: Mock,
+    terminal: Mock,
+    state: AppState,
 ) -> PaletteContext:
     """A context over the fake overlays, mock ``update_settings`` and ``terminal``, and
     ``state``."""

@@ -34,12 +34,12 @@ _HEX = "[0-9a-fA-F]"
 REPLY = re.compile(
     r"\x1b\[(?P<focus>[IO])"
     rf"|{re.escape(OSC11_START)}(?P<red>{_HEX}{{2,4}})/(?P<green>{_HEX}{{2,4}})/(?P<blue>{_HEX}{{2,4}})"
-    r"(?:\x1b\\|\x07)"
+    r"(?:\x1b\\|\x07)",
 )
 # The start of a background colour reply cut off by the end of a read; the ST that
 # ends it can be cut between its ESC and backslash.
 PARTIAL_OSC11 = re.compile(
-    rf"{re.escape(OSC11_START)}{_HEX}{{0,4}}(?:/{_HEX}{{0,4}}(?:/{_HEX}{{0,4}}\x1b?)?)?"
+    rf"{re.escape(OSC11_START)}{_HEX}{{0,4}}(?:/{_HEX}{{0,4}}(?:/{_HEX}{{0,4}}\x1b?)?)?",
 )
 
 
@@ -146,7 +146,7 @@ def _unfinished(text: str) -> str:
 
 def _could_become_reply(text: str) -> bool:
     return any(start.startswith(text) for start in (FOCUS_IN, FOCUS_OUT, OSC11_START)) or bool(
-        PARTIAL_OSC11.fullmatch(text)
+        PARTIAL_OSC11.fullmatch(text),
     )
 
 
