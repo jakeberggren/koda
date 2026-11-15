@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 from koda.messages import AssistantMessage, Message, TokenUsage, ToolCall, ToolMessage
@@ -10,7 +10,7 @@ _MAX_TOP_LOGPROBS = 20
 type ThinkingMode = str
 
 
-class LLMRequestOptionsError(Exception):
+class LLMOptionsError(Exception):
     """Raised when LLM request options are invalid."""
 
     def __init__(self, field_name: str, value: object, expected: str) -> None:
@@ -21,7 +21,7 @@ class LLMRequestOptionsError(Exception):
 
 
 @dataclass(frozen=True, slots=True)
-class LLMRequestOptions:
+class LLMOptions:
     max_output_tokens: int | None = None
     max_tool_calls: int | None = None
     extended_prompt_retention: bool = False
@@ -35,19 +35,19 @@ class LLMRequestOptions:
 
     def __post_init__(self) -> None:
         if self.top_logprobs is not None and not 0 <= self.top_logprobs <= _MAX_TOP_LOGPROBS:
-            raise LLMRequestOptionsError(
+            raise LLMOptionsError(
                 field_name="top_logprobs",
                 value=self.top_logprobs,
                 expected=f"an integer between 0 and {_MAX_TOP_LOGPROBS}",
             )
         if self.top_p is not None and not 0 <= self.top_p <= 1:
-            raise LLMRequestOptionsError(
+            raise LLMOptionsError(
                 field_name="top_p",
                 value=self.top_p,
                 expected="a float between 0 and 1",
             )
         if self.temperature is not None and not 0 <= self.temperature <= 1:
-            raise LLMRequestOptionsError(
+            raise LLMOptionsError(
                 field_name="temperature",
                 value=self.temperature,
                 expected="a float between 0 and 1",
@@ -59,7 +59,6 @@ class LLMRequest:
     messages: Sequence[Message]
     instructions: str | None = None
     tools: Sequence[ToolDefinition] | None = None
-    options: LLMRequestOptions = field(default_factory=LLMRequestOptions)
 
 
 @dataclass(frozen=True, slots=True)

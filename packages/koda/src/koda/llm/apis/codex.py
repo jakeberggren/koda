@@ -64,4 +64,5 @@ class OpenAICodexResponsesAPI(OpenAIResponsesAPI):
             ),
             adapter=OpenAIResponsesAdapter(),
             event_adapter=OpenAIResponsesEventAdapter(),
+            options=context.options,
         )

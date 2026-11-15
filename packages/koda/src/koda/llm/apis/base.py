@@ -11,16 +11,18 @@ if TYPE_CHECKING:
     from koda.llm.credentials import Credentials
     from koda.llm.models import Connection, Model
     from koda.llm.protocols import LLM
+    from koda.llm.types import LLMOptions
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class LLMApiContext:
     """What an API needs to build an LLM: the model, the connection and its credentials,
-    and for an OpenAI-compatible API, how to make its client."""
+    the options to ask it with, and for an OpenAI-compatible API, how to make its client."""
 
     model: Model
     connection: Connection
     credentials: Credentials
+    options: LLMOptions
     openai_client: Callable[..., AsyncOpenAI] = AsyncOpenAI
 
     @property

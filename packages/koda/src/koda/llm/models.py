@@ -46,8 +46,8 @@ class Thinking:
         """The option with ``option_id``, or the default when there's none such."""
         return next((option for option in self.options if option.id == option_id), self.options[0])
 
-    def after(self, current: ThinkingOptionId) -> ThinkingOptionId | None:
-        """The level after ``current``, wrapping around; None with nothing to choose."""
+    def next(self, current: ThinkingOptionId) -> ThinkingOptionId | None:
+        """The next level after ``current``, wrapping around; None with nothing to choose."""
         if not self.supported:
             return None
         index = self.options.index(self.resolve(current))

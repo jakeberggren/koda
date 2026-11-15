@@ -31,6 +31,7 @@ from pydantic import BaseModel
 from koda.llm.apis.credentials import resolve_api_key_credential
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
+    LLMOptions,
     LLMResponse,
     LLMResponseCompleted,
     LLMTextDelta,
@@ -271,11 +272,20 @@ class OpenAIResponsesAPI(LLM):
         client: AsyncOpenAI,
         adapter: OpenAIResponsesLLMAdapter,
         event_adapter: OpenAIResponsesEventAdapter,
+        options: LLMOptions,
     ) -> None:
         self.config = config
         self.client = client
         self.adapter = adapter
         self.event_adapter = event_adapter
+        # What the model doesn't support is asked without.
+        self.options = replace(
+            options,
+            web_search=options.web_search and config.web_search,
+            extended_prompt_retention=(
+                options.extended_prompt_retention and config.extended_prompt_retention
+            ),
+        )
 
     @classmethod
     async def from_context(cls, context: LLMApiContext) -> OpenAIResponsesAPI:
@@ -293,17 +303,8 @@ class OpenAIResponsesAPI(LLM):
             client=context.openai_client(api_key=config.api_key, base_url=config.base_url),
             adapter=OpenAIResponsesAdapter(),
             event_adapter=OpenAIResponsesEventAdapter(),
+            options=context.options,
         )
-
-    def _apply_model_features(self, request: LLMRequest) -> LLMRequest:
-        resolved_options = replace(
-            request.options,
-            web_search=request.options.web_search and self.config.web_search,
-            extended_prompt_retention=(
-                request.options.extended_prompt_retention and self.config.extended_prompt_retention
-            ),
-        )
-        return replace(request, options=resolved_options)
 
     def _resolve_prompt_cache_retention(
         self,
@@ -316,64 +317,62 @@ class OpenAIResponsesAPI(LLM):
 
     def _resolve_tools(self, request: LLMRequest) -> list[ToolParam] | Omit:
         adapted_tools = self.adapter.to_provider_tools(request.tools)
-        if not request.options.web_search:
+        if not self.options.web_search:
             return adapted_tools
         web_search_tool = WebSearchToolParam(type="web_search")
         if isinstance(adapted_tools, Omit):
             return [web_search_tool]
         return [*adapted_tools, web_search_tool]
 
-    def _resolve_truncation(self, request: LLMRequest) -> Literal["auto", "disabled"] | Omit:
+    def _resolve_truncation(self) -> Literal["auto", "disabled"] | Omit:
         if not self.config.truncation_supported:
             return omit
-        return _or_omit(request.options.truncation)
+        return _or_omit(self.options.truncation)
 
     async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
-        resolved_request = self._apply_model_features(request)
         try:
             response = await self.client.responses.create(
-                input=self.adapter.to_provider_messages(resolved_request.messages),
-                instructions=_or_omit(resolved_request.instructions),
-                max_output_tokens=_or_omit(resolved_request.options.max_output_tokens),
-                max_tool_calls=_or_omit(resolved_request.options.max_tool_calls),
+                input=self.adapter.to_provider_messages(request.messages),
+                instructions=_or_omit(request.instructions),
+                max_output_tokens=_or_omit(self.options.max_output_tokens),
+                max_tool_calls=_or_omit(self.options.max_tool_calls),
                 model=self.config.model,
-                parallel_tool_calls=resolved_request.options.parallel_tool_calls,
+                parallel_tool_calls=self.options.parallel_tool_calls,
                 prompt_cache_retention=self._resolve_prompt_cache_retention(
-                    extended_prompt_retention=resolved_request.options.extended_prompt_retention,
+                    extended_prompt_retention=self.options.extended_prompt_retention,
                 ),
-                reasoning=_resolve_reasoning(resolved_request.options.thinking),
+                reasoning=_resolve_reasoning(self.options.thinking),
                 store=self.config.store,
-                temperature=_or_omit(resolved_request.options.temperature),
-                tools=self._resolve_tools(resolved_request),
-                top_logprobs=_or_omit(resolved_request.options.top_logprobs),
-                top_p=_or_omit(resolved_request.options.top_p),
-                truncation=self._resolve_truncation(resolved_request),
+                temperature=_or_omit(self.options.temperature),
+                tools=self._resolve_tools(request),
+                top_logprobs=_or_omit(self.options.top_logprobs),
+                top_p=_or_omit(self.options.top_p),
+                truncation=self._resolve_truncation(),
             )
         except OpenAIError as error:
             raise_llm_error_from_openai(error, backend=self.config.backend)
         return self.adapter.to_llm_response(response)
 
     async def generate_stream(self, request: LLMRequest) -> AsyncIterator[LLMEvent]:
-        resolved_request = self._apply_model_features(request)
         try:
             stream = await self.client.responses.create(
-                input=self.adapter.to_provider_messages(resolved_request.messages),
-                instructions=_or_omit(resolved_request.instructions),
-                max_output_tokens=_or_omit(resolved_request.options.max_output_tokens),
-                max_tool_calls=_or_omit(resolved_request.options.max_tool_calls),
+                input=self.adapter.to_provider_messages(request.messages),
+                instructions=_or_omit(request.instructions),
+                max_output_tokens=_or_omit(self.options.max_output_tokens),
+                max_tool_calls=_or_omit(self.options.max_tool_calls),
                 model=self.config.model,
-                parallel_tool_calls=resolved_request.options.parallel_tool_calls,
+                parallel_tool_calls=self.options.parallel_tool_calls,
                 prompt_cache_retention=self._resolve_prompt_cache_retention(
-                    extended_prompt_retention=resolved_request.options.extended_prompt_retention,
+                    extended_prompt_retention=self.options.extended_prompt_retention,
                 ),
-                reasoning=_resolve_reasoning(resolved_request.options.thinking),
+                reasoning=_resolve_reasoning(self.options.thinking),
                 store=self.config.store,
                 stream=True,
-                temperature=_or_omit(resolved_request.options.temperature),
-                tools=self._resolve_tools(resolved_request),
-                top_logprobs=_or_omit(resolved_request.options.top_logprobs),
-                top_p=_or_omit(resolved_request.options.top_p),
-                truncation=self._resolve_truncation(resolved_request),
+                temperature=_or_omit(self.options.temperature),
+                tools=self._resolve_tools(request),
+                top_logprobs=_or_omit(self.options.top_logprobs),
+                top_p=_or_omit(self.options.top_p),
+                truncation=self._resolve_truncation(),
             )
             async for event in stream:
                 if isinstance(event, ResponseCompletedEvent):

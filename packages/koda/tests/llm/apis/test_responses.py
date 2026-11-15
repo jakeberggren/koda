@@ -11,6 +11,7 @@ from openai.types.responses import (
     ResponseReasoningSummaryPartAddedEvent,
 )
 
+from koda.llm import LLMOptions
 from koda.llm.apis.responses import (
     OpenAIResponsesAdapter,
     OpenAIResponsesAPI,
@@ -76,6 +77,7 @@ def _api(events: Sequence[object]) -> OpenAIResponsesAPI:
         client=cast("AsyncOpenAI", _FakeClient(events)),
         adapter=OpenAIResponsesAdapter(),
         event_adapter=OpenAIResponsesEventAdapter(),
+        options=LLMOptions(),
     )
 
 

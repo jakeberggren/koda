@@ -118,7 +118,7 @@ class KodaTuiApp:
         model, settings = self.state.active_model, self.state.settings
         if self.state.issue is not None or model is None:
             return
-        if (thinking := model.thinking.after(settings.agent_settings.thinking)) is not None:
+        if (thinking := model.thinking.next(settings.agent_settings.thinking)) is not None:
             agent_settings = replace(settings.agent_settings, thinking=thinking)
             self.update_settings(replace(settings, agent_settings=agent_settings))
 
@@ -144,11 +144,10 @@ class KodaTuiApp:
         return self._agent.respond(text)
 
     def update_settings(self, settings: Settings) -> None:
-        """Save ``settings`` and apply them: the agent is rebuilt when it next runs. Also
+        """Save ``settings`` and apply them; the next turn's agent is made with them. Also
         what to call after a credential changes, to show what it connects."""
         settings.save()
         self.state.settings = settings
-        self._agent.reset()
         self._refresh()
         self.appearance.theme = settings.tui_settings.theme
         self.invalidate()

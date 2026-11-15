@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from koda.llm import exceptions
+from koda.llm import LLMOptions, exceptions
 from koda.llm.apis.base import LLMApiContext
 from koda.llm.apis.codex import CODEX_BACKEND, CODEX_ORIGINATOR, OpenAICodexResponsesAPI
 from koda.llm.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
@@ -98,6 +98,7 @@ def _context(
         ),
         connection=connection,
         credentials=cast("Credentials", credentials or _FakeCredentials(credential)),
+        options=LLMOptions(),
         openai_client=cast("Callable[..., AsyncOpenAI]", client or _FakeClientFactory()),
     )
 

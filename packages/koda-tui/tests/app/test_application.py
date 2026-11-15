@@ -15,13 +15,14 @@ from koda.llm import (
     Catalog,
     CredentialsError,
     LLMConfigurationError,
+    LLMOptions,
     LLMRateLimitError,
     Model,
     ProviderCredential,
     Thinking,
     ThinkingOption,
 )
-from koda.sessions import InMemorySessionStore, Session
+from koda.sessions import InMemorySessionStore
 from koda_tui import strings
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.app.keybindings import create_keybindings
@@ -89,9 +90,11 @@ class _Connect:
     def __init__(self, llm: _FakeLLM) -> None:
         self.llm = llm
         self.calls = 0
+        self.options: LLMOptions | None = None
 
-    async def __call__(self, model: Model) -> _FakeLLM:
+    async def __call__(self, model: Model, options: LLMOptions) -> _FakeLLM:
         self.calls += 1
+        self.options = options
         await asyncio.sleep(0)
         return self.llm
 
@@ -241,7 +244,7 @@ def test_escape_is_free_for_others_while_idle() -> None:
     assert not _escape(app).filter()
 
 
-async def test_every_settings_change_rebuilds_the_agent() -> None:
+async def test_a_settings_change_that_changes_how_the_model_is_asked_connects_anew() -> None:
     app, connect = _make_app()
     await _respond(app)
     app.invalidate = Mock()
@@ -280,28 +283,23 @@ class TestAgent:
         [saved] = app._store.list_sessions()  # noqa: SLF001
         assert saved.session_id == app.state.session.session_id
 
-    async def test_the_agent_is_built_once_for_concurrent_messages(self) -> None:
+    async def test_the_llm_is_kept_while_the_model_and_options_stay(self) -> None:
         app, connect = _make_app()
 
-        await asyncio.gather(*(_respond(app) for _ in range(3)))
+        await _respond(app)
+        await _respond(app)
 
         assert connect.calls == 1
 
-    async def test_a_new_session_gets_a_new_agent_with_fresh_workspace_context(
-        self,
-        tmp_path: Path,
-    ) -> None:
+    async def test_each_turn_reads_the_workspace_instructions_anew(self, tmp_path: Path) -> None:
         (tmp_path / "AGENTS.md").write_text("First instructions.", encoding="utf-8")
         app, connect = _make_app(tmp_path)
         await _respond(app)
 
         (tmp_path / "AGENTS.md").write_text("Second instructions.", encoding="utf-8")
         await _respond(app)
-        assert connect.llm.last_request is not None
-        assert "First instructions." in (connect.llm.last_request.instructions or "")
 
-        app.state.session = Session()
-        await _respond(app)
+        assert connect.llm.last_request is not None
         assert "Second instructions." in (connect.llm.last_request.instructions or "")
 
     async def test_thinking_resolves_to_the_models_first_mode(self) -> None:
@@ -319,8 +317,8 @@ class TestAgent:
 
         await _respond(app)
 
-        assert connect.llm.last_request is not None
-        assert connect.llm.last_request.options.thinking == "low"
+        assert connect.options is not None
+        assert connect.options.thinking == "low"
 
     async def test_responding_without_a_selected_model_fails_where_the_turn_failed(self) -> None:
         agent_settings = replace(_SETTINGS.agent_settings, model=None)
