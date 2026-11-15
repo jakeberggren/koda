@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from koda.llm import Catalog
     from koda.llm.auth.protocols import OAuthLoginCallbacks
     from koda.sessions import SessionStore
-    from koda_tui.messaging import Conversation, Outbox
+    from koda_tui.outbox import Outbox
     from koda_tui.state import AppState
     from koda_tui.terminal import Terminal
     from koda_tui.ui.overlays import Overlays
@@ -139,7 +139,6 @@ def _menu(overlays: _FakeOverlays, credentials: _Credentials, state: AppState) -
         store=cast("SessionStore", None),
         state=state,
         update_settings=lambda settings: setattr(state, "settings", settings),
-        conversation=cast("Conversation", None),
         outbox=cast("Outbox", None),
         terminal=cast("Terminal", None),
     )

@@ -31,8 +31,9 @@ def composer(tmp_path: Path) -> Composer:
 SUBMITTED: list[tuple[str, str]] = []
 
 
-def _record(text: str, *, alternate: bool) -> None:
+def _record(text: str, *, alternate: bool) -> bool:
     SUBMITTED.append(("alternate" if alternate else "submit", text))
+    return True
 
 
 @pytest.fixture(autouse=True)

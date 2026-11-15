@@ -32,7 +32,7 @@ SUGGESTIONS = 10  # Most files suggested for an @ mention.
 
 
 class Submit(Protocol):
-    def __call__(self, text: str, /, *, alternate: bool) -> None: ...
+    def __call__(self, text: str, /, *, alternate: bool) -> bool: ...
 
 
 class Composer:
@@ -175,10 +175,9 @@ class Composer:
         return kb
 
     def _submit(self, on_submit: Submit, *, alternate: bool) -> None:
-        """Hand the text, trimmed, to ``on_submit`` and clear the composer, if there is any."""
-        if text := self.text.strip():
+        """Hand the text, trimmed, to ``on_submit``, and clear the composer if it was taken."""
+        if (text := self.text.strip()) and on_submit(text, alternate=alternate):
             self.buffer.reset()
-            on_submit(text, alternate=alternate)
 
     def _follow_mention(self, buffer: Buffer) -> None:
         """Complete the mention the cursor is in, or drop the suggestions outside one."""

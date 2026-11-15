@@ -6,14 +6,16 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
-import pytest
 from prompt_toolkit.keys import Keys
+from structlog.testing import capture_logs
 
+from koda.agent import Turn
 from koda.llm import (
     ApiKeyCredential,
     Catalog,
     CredentialsError,
     LLMConfigurationError,
+    LLMRateLimitError,
     Model,
     ProviderCredential,
     ThinkingOption,
@@ -29,6 +31,7 @@ from koda_tui.state import PendingInput
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
+    import pytest
     from pydantic import BaseModel
 
     from koda.llm import Credentials
@@ -55,13 +58,17 @@ def _connected() -> _Credentials:
 
 
 class _FakeLLM:
-    """Ends every response without output, and remembers the last request."""
+    """Ends every response without output, or fails with ``error``, and remembers the
+    last request."""
 
-    def __init__(self) -> None:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
         self.last_request: LLMRequest | None = None
 
     async def generate_stream(self, request: LLMRequest) -> AsyncIterator[LLMEvent]:
         self.last_request = request
+        if self.error is not None:
+            raise self.error
         return
         yield
 
@@ -75,10 +82,10 @@ class _FakeLLM:
 
 
 class _Connect:
-    """Connects every model to the same fake LLM, counting the connections."""
+    """Connects every model to the same fake ``llm``, counting the connections."""
 
-    def __init__(self) -> None:
-        self.llm = _FakeLLM()
+    def __init__(self, llm: _FakeLLM) -> None:
+        self.llm = llm
         self.calls = 0
 
     async def __call__(self, model: Model, credentials: Credentials) -> _FakeLLM:
@@ -94,8 +101,9 @@ def _make_app(
     workspace: Path = Path("/workspace"),
     settings: Settings = _SETTINGS,
     credentials: _Credentials | None = None,
+    llm: _FakeLLM | None = None,
 ) -> tuple[KodaTuiApp, _Connect]:
-    connect = _Connect()
+    connect = _Connect(llm or _FakeLLM())
     catalog, _warnings = Catalog.load()
     app = KodaTuiApp(
         settings,
@@ -194,7 +202,7 @@ def _escape(app: KodaTuiApp):
 def test_escape_sends_whats_queued_now() -> None:
     app, _ = _make_app()
     app.outbox = Mock()
-    app.state.responding = True
+    app.state.turn = Turn(running=True)
     app.state.pending_inputs = [PendingInput("next")]
     escape = _escape(app)
     assert escape.filter()
@@ -206,7 +214,7 @@ def test_escape_sends_whats_queued_now() -> None:
 def test_escape_with_nothing_queued_interrupts_the_response() -> None:
     app, _ = _make_app()
     app.outbox = Mock()
-    app.state.responding = True
+    app.state.turn = Turn(running=True)
     escape = _escape(app)
     assert escape.filter()
     escape.handler(Mock())
@@ -321,11 +329,39 @@ class TestAgent:
         assert connect.llm.last_request is not None
         assert connect.llm.last_request.options.thinking == "low"
 
-    async def test_responding_without_a_selected_model_fails(self) -> None:
+    async def test_responding_without_a_selected_model_fails_where_the_turn_failed(
+        self,
+    ) -> None:
         app, _ = _make_app(settings=replace(_SETTINGS, model=None))
 
-        with pytest.raises(LLMConfigurationError, match="No model selected"):
+        await _respond(app)
+
+        [failed] = app.state.errors
+        assert isinstance(failed.error, LLMConfigurationError)
+        assert failed.at == len(app.state.session.messages)
+
+    async def test_an_unexpected_failure_is_shown_and_logged(self) -> None:
+        app, _ = _make_app(llm=_FakeLLM(KeyError("max")))
+
+        with capture_logs() as logs:
             await _respond(app)
+
+        [failed] = app.state.errors
+        assert isinstance(failed.error, KeyError)
+        assert [log["event"] for log in logs if log["log_level"] == "error"] == [
+            "turn_failed_unexpectedly"
+        ]
+
+    async def test_an_expected_failure_is_shown_but_not_logged_again(self) -> None:
+        error = LLMRateLimitError("openai", RuntimeError("quota hit"))
+        app, _ = _make_app(llm=_FakeLLM(error))
+
+        with capture_logs() as logs:
+            await _respond(app)
+
+        [failed] = app.state.errors
+        assert isinstance(failed.error, LLMRateLimitError)
+        assert "turn_failed_unexpectedly" not in [log["event"] for log in logs]
 
 
 class TestStatus:
@@ -363,9 +399,3 @@ class TestStatus:
 
         assert app.state.issue == strings.Screen.Status.CREDENTIALS_UNREADABLE
         assert app.state.configured_providers == []
-
-    def test_thinking_follows_the_settings_for_the_active_model(self) -> None:
-        settings = replace(_SETTINGS, provider="anthropic", model="claude-fable-5")
-        key = ApiKeyCredential(type="api_key", value="key")
-        app, _ = _make_app(settings=settings, credentials=_Credentials({"anthropic:api-key": key}))
-        assert app.state.thinking.id == "low"

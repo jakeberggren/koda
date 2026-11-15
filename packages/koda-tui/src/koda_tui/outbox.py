@@ -5,23 +5,12 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from koda.llm import (
-    LLMAPIError,
-    LLMAuthenticationError,
-    LLMConfigurationError,
-    LLMConnectionError,
-    LLMError,
-    LLMRateLimitError,
-)
-from koda.tools import ToolError
-from koda_tui import strings
-from koda_tui.state import ErrorMessage, PendingInput
+from koda_tui.state import PendingInput
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Callable
 
     from koda.agent import AgentEvent
-    from koda_tui.messaging.conversation import Conversation
     from koda_tui.state import AppState
 
 
@@ -35,35 +24,40 @@ class Outbox:
         self,
         *,
         state: AppState,
-        conversation: Conversation,
         respond: Callable[[str], AsyncIterator[AgentEvent]],
         invalidate: Callable[[], None],
     ) -> None:
         self._state = state
-        self._conversation = conversation
         self._respond_with = respond
         self._invalidate = invalidate
         self._sending: asyncio.Task[None] | None = None
         self._response: asyncio.Task[None] | None = None
 
-    def submit(self, text: str, *, steer: bool) -> None:
-        """Send ``text``, or queue it or steer with it while Koda responds."""
+    @property
+    def responding(self) -> bool:
+        """Whether a response is in flight."""
+        return self._response is not None and not self._response.done()
+
+    def submit(self, text: str, *, steer: bool) -> bool:
+        """Send ``text``, or queue it or steer with it while Koda responds. Whether it was
+        taken: not while something stops Koda from responding, which the status shows."""
         text = text.strip()
-        if not text:
-            return
+        if not text or self._state.issue is not None:
+            return False
         queue = self._state.pending_inputs
         if steer:
             queue.insert(sum(item.steer for item in queue), PendingInput(text, steer=True))
         else:
             queue.append(PendingInput(text))
-        if steer and self._state.responding:
+        if steer and self.responding:
             self.cancel()
         self._send_queued()
         self._invalidate()
+        return True
 
     def send_now(self) -> None:
         """Interrupt the response, if there is one, and send what's queued."""
-        if self._state.responding:
+        if self.responding:
             self.cancel()
         self._send_queued()
 
@@ -90,7 +84,7 @@ class Outbox:
 
     def _send_queued(self) -> None:
         """Start sending the queue, unless it is already being sent or Koda is busy."""
-        if self._state.responding or (self._sending and not self._sending.done()):
+        if self.responding or (self._sending and not self._sending.done()):
             return
         if (text := self._next()) is not None:
             self._sending = asyncio.create_task(self._send_all(text))
@@ -110,49 +104,18 @@ class Outbox:
         return text
 
     async def _send(self, text: str) -> None:
-        """Send one message and apply its response to the conversation."""
-        self._conversation.start(text)
+        """Send one message and redraw as its response comes in."""
+        self._response = asyncio.create_task(self._respond(text))
         self._invalidate()
-        error = None
         try:
-            if self._state.issue is not None:
-                error = ErrorMessage(self._state.issue)  # Why Koda can't respond, as in the status.
-            else:
-                self._response = asyncio.create_task(self._respond(text))
-                await self._response
+            await self._response
         except asyncio.CancelledError:
             if (task := asyncio.current_task()) and task.cancelling():
                 raise  # The sending itself is cancelled, not just this response.
-        except (LLMError, ToolError) as failure:
-            error = _error_message(failure)
         finally:
             self._response = None
-            self._conversation.end(error)
             self._invalidate()
 
     async def _respond(self, text: str) -> None:
-        async for event in self._respond_with(text):
-            self._conversation.apply(event)
+        async for _event in self._respond_with(text):
             self._invalidate()
-
-
-_ERRORS = strings.Screen.Chat.Errors
-
-# Why a response failed and what to do about it, by error type. The first match wins, so
-# subclasses come before their bases.
-_ERROR_MESSAGES: tuple[tuple[type[Exception], str, str | None], ...] = (
-    (LLMAuthenticationError, _ERRORS.AUTHENTICATION, _ERRORS.AUTHENTICATION_FIX),
-    (LLMRateLimitError, _ERRORS.RATE_LIMIT, _ERRORS.RATE_LIMIT_FIX),
-    (LLMConnectionError, _ERRORS.CONNECTION, _ERRORS.CONNECTION_FIX),
-    (LLMAPIError, _ERRORS.PROVIDER, None),
-    (LLMConfigurationError, _ERRORS.NOT_READY, None),
-    (ToolError, _ERRORS.TOOL, None),
-)
-
-
-def _error_message(error: Exception) -> ErrorMessage:
-    """Why a response failed, and what to do about it."""
-    for kind, summary, fix in _ERROR_MESSAGES:
-        if isinstance(error, kind):
-            return ErrorMessage(summary, f"{error}\n\n{fix}" if fix else str(error))
-    return ErrorMessage(_ERRORS.REQUEST, str(error))

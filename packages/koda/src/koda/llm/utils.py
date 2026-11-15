@@ -50,9 +50,22 @@ def raise_llm_error_from_openai(
         raise exceptions.LLMConnectionError(backend, error) from error
     if isinstance(error, APIError):
         logger.error("llm_api_error", backend=backend, error=repr(error))
-        raise exceptions.LLMAPIError(backend, error) from error
+        raise exceptions.LLMAPIError(
+            backend, error, provider_message=provider_message(error.body)
+        ) from error
     logger.error("llm_unknown_error", backend=backend, error=repr(error))
     raise exceptions.LLMAPIError(backend, error) from error
+
+
+def provider_message(body: object) -> str | None:
+    """The provider's own explanation in an error's body: the text itself, or its
+    ``message`` or ``detail``, on its own or under ``error`` as OpenAI and Anthropic
+    answer."""
+    if isinstance(body, dict) and isinstance(error := body.get("error"), dict):
+        body = error
+    if isinstance(body, dict):
+        body = body.get("message") or body.get("detail")
+    return body.strip() or None if isinstance(body, str) else None
 
 
 def tool_arguments(value: object) -> dict[str, Any]:

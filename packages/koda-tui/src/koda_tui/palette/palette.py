@@ -68,7 +68,11 @@ class CommandPalette:
                 text=strings.Palette.Thinking,
                 group=Group.AGENT,
                 run=ThinkingMenu(context).open,
-                available=lambda state: _ready(state) and state.thinking_supported,
+                available=lambda state: (
+                    _ready(state)
+                    and state.active_model is not None
+                    and state.active_model.supports_thinking
+                ),
             ),
             Command(
                 text=strings.Palette.Models,

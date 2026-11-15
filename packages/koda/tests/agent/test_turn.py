@@ -289,3 +289,49 @@ async def test_an_interruption_keeps_what_the_model_had_written(tmp_path: Path) 
     assert isinstance(partial, AssistantMessage)
     assert partial.content == "Half a"
     assert isinstance(interruption, InterruptionMessage)
+
+
+async def test_the_turn_holds_the_response_while_it_streams(tmp_path: Path) -> None:
+    llm = _ScriptedLLM(
+        [
+            LLMTextDelta(text="Hel"),
+            LLMTextDelta(text="lo"),
+            LLMResponseCompleted(response=LLMResponse(output=AssistantMessage(content="Hello"))),
+        ]
+    )
+    agent = _agent(tmp_path, llm)
+    live = [
+        agent.turn.response.content if agent.turn.response else None
+        async for event in agent.run("hi")
+        if isinstance(event, LLMTextDelta)
+    ]
+
+    assert live == ["Hel", "Hello"]
+    assert (agent.turn.running, agent.turn.response) == (False, None)
+
+
+async def test_the_turn_holds_tool_results_until_the_session_has_them(tmp_path: Path) -> None:
+    slow = ToolCall(tool_name="delayed_tool", arguments={"delay": 0.02}, call_id="slow")
+    fast = ToolCall(tool_name="delayed_tool", arguments={"delay": 0}, call_id="fast")
+    agent = _agent(tmp_path, _ScriptedLLM(_calls(slow, fast), _says("done")), _DelayedTool())
+    held = [
+        set(agent.turn.results)
+        async for event in agent.run("go")
+        if isinstance(event, AgentToolResultReady)
+    ]
+
+    assert held == [{"fast"}, {"fast", "slow"}]
+    assert agent.turn.results == {}
+
+
+async def test_the_turn_keeps_the_tools_the_provider_ran(tmp_path: Path) -> None:
+    call = ToolCall(tool_name="web_search", arguments={"query": "koda"}, call_id="web")
+    result = ToolResult(call_id=call.call_id, output=ToolOutput(display="result"))
+    started = LLMToolStarted(call=call)
+    llm = _ScriptedLLM([started, LLMToolCompleted(tool_name="web_search", result=result)])
+    agent = _agent(tmp_path, llm)
+
+    await _run(agent)
+
+    assert agent.turn.provider_calls == [call]
+    assert agent.turn.results == {"web": result}

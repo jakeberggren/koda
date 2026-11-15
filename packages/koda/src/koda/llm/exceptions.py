@@ -30,12 +30,21 @@ class CredentialsError(LLMConfigurationError):
 
 
 class LLMAPIError(LLMError):
-    """The provider answered with an error."""
+    """The provider answered with an error. ``provider_message`` is its own explanation,
+    in plain words, when it gave one."""
 
-    def __init__(self, backend_name: str, error: Exception, *, message: str | None = None) -> None:
+    def __init__(
+        self,
+        backend_name: str,
+        error: Exception,
+        *,
+        message: str | None = None,
+        provider_message: str | None = None,
+    ) -> None:
         super().__init__(message or f"{backend_name} API error: {error}")
         self.backend_name = backend_name
         self.error = error
+        self.provider_message = provider_message
 
 
 class LLMConnectionError(LLMAPIError):

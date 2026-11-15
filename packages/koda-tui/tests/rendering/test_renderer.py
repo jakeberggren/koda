@@ -6,27 +6,23 @@ from typing import Any
 from prompt_toolkit.formatted_text import FormattedText
 from rich.padding import Padding
 
+from koda.llm import LLMAPIError, LLMRateLimitError
+from koda.messages import AssistantMessage, InterruptionMessage, UserMessage
 from koda.tools import ToolCall, ToolOutput
 from koda_tui import strings
 from koda_tui.appearance import Tokens
-from koda_tui.rendering import Renderer
+from koda_tui.rendering import ChatMessage, Renderer, ToolRun
 from koda_tui.rendering import rich as rich_bridge
 from koda_tui.rendering.diff import diff_blocks, diff_summary
 from koda_tui.rendering.markdown import Markdown
 from koda_tui.rendering.rich import render
-from koda_tui.state import (
-    AssistantMessage,
-    ErrorMessage,
-    Message,
-    ToolMessage,
-    UserMessage,
-)
+from koda_tui.state import TurnError
 
 WIDTH = 80
 TOOLS = strings.Screen.Chat.Tools
 
 
-def render_message(message: Message, width: int) -> FormattedText:
+def render_message(message: ChatMessage, width: int) -> FormattedText:
     return FormattedText(Renderer().render(message, width))
 
 
@@ -35,7 +31,7 @@ class TestMessages:
 
     def test_render_user_message(self) -> None:
         """render_message() should render user messages as markdown."""
-        message = UserMessage("Hello")
+        message = UserMessage(content="Hello")
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "Hello" in content
@@ -43,14 +39,14 @@ class TestMessages:
 
     def test_render_assistant_message(self) -> None:
         """render_message() should render assistant messages as markdown."""
-        message = AssistantMessage("I can help")
+        message = AssistantMessage(content="I can help")
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "I can help" in content
 
     def test_render_assistant_message_with_thinking(self) -> None:
         """render_message() should keep persisted thinking content visible."""
-        message = AssistantMessage("I can help", thinking="Comparing options")
+        message = AssistantMessage(content="I can help", thinking_content="Comparing options")
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "Comparing options" in content
@@ -60,7 +56,7 @@ class TestMessages:
 
     def test_render_assistant_thinking_renders_markdown(self) -> None:
         """thinking content should be rendered through markdown, not as literal markers."""
-        message = AssistantMessage("", thinking="**Exploring the meaning of 42**")
+        message = AssistantMessage(content="", thinking_content="**Exploring the meaning of 42**")
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "Exploring the meaning of 42" in content
@@ -73,30 +69,41 @@ class TestMessages:
             arguments={"query": "test"},
             call_id="call_123",
         )
-        message = ToolMessage(tool_call)
+        message = ToolRun(tool_call)
         result = render_message(message, WIDTH)
         content = "".join(t[1] for t in result)
         assert "search" in content
 
-    def test_render_error_message(self) -> None:
-        """An error shows its summary in bold above its detail."""
-        result = render_message(ErrorMessage("Rate limit exceeded.", "Try again later."), WIDTH)
+    def test_render_a_failed_turn(self) -> None:
+        """A failed turn says what went wrong in bold, then what to do, never the error's
+        own text."""
+        error = LLMRateLimitError("openai", RuntimeError("quota hit"))
+        result = render_message(TurnError(at=0, error=error), WIDTH)
         lines = [line.rstrip() for line in "".join(t[1] for t in result).splitlines()]
-        assert lines == ["Rate limit exceeded.", "", "Try again later."]
+        errors = strings.Screen.Chat.Errors
+        assert lines == [errors.RATE_LIMIT, "", errors.RATE_LIMIT_FIX]
         assert any(
             "Rate limit" in text and Tokens.Text.STRONG in style for style, text, *_ in result
         )
 
-    def test_render_error_without_detail_says_what_to_do(self) -> None:
-        result = render_message(ErrorMessage("Not set up."), WIDTH)
-        assert strings.Screen.Chat.ERROR_FALLBACK in "".join(t[1] for t in result)
+    def test_a_failed_turn_shows_the_providers_words_muted(self) -> None:
+        refused = "The 'gpt-5.5' model is not supported."
+        error = LLMAPIError("codex", RuntimeError("400"), provider_message=refused)
+        result = render_message(TurnError(at=0, error=error), WIDTH)
+        lines = [line.rstrip() for line in "".join(t[1] for t in result).splitlines()]
+        assert lines == [strings.Screen.Chat.Errors.PROVIDER, "", refused]
+        assert any(refused in text and Tokens.Text.MUTED in style for style, text, *_ in result)
+
+    def test_render_an_interruption(self) -> None:
+        result = render_message(InterruptionMessage(), WIDTH)
+        assert "".join(t[1] for t in result).strip() == strings.Screen.Chat.INTERRUPTED
 
 
 class TestStyleClasses:
     """Theme-dependent styling is emitted as style classes, not baked-in colors."""
 
     def test_code_block_emits_pygments_classes(self) -> None:
-        message = AssistantMessage("```python\nimport os\n```")
+        message = AssistantMessage(content="```python\nimport os\n```")
         result = render_message(message, WIDTH)
         assert ("class:pygments.keyword.namespace", "import") in result
 
@@ -142,7 +149,7 @@ def _tool_call(
 ) -> FormattedText:
     failed = bool(content) and content.get("exit_code", 0) != 0  # As the bash tool marks it.
     output = None if running else ToolOutput(content=content or {}, is_error=failed)
-    return render_message(ToolMessage(tool_call, output), 80)
+    return render_message(ToolRun(tool_call, output), 80)
 
 
 class TestToolCalls:
@@ -300,7 +307,7 @@ class TestToolCalls:
         tool_call = ToolCall(tool_name="read_file", arguments={"path": "a.py"}, call_id="c1")
         output = ToolOutput(is_error=True, error_message="File not found")
 
-        content = "".join(t[1] for t in render_message(ToolMessage(tool_call, output), 80))
+        content = "".join(t[1] for t in render_message(ToolRun(tool_call, output), 80))
 
         assert "✕ read_file" in content
         assert "\n  └ File not found" in content
