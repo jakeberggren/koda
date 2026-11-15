@@ -75,8 +75,8 @@ class TuiSettings(BaseModel):
 class Settings(BaseModel):
     """What the user picked: for the agent, and for the TUI. Changed by replacing it::
 
-    agent = replace(settings.agent, thinking="high")
-    settings = replace(settings, agent=agent)
+    agent_settings = replace(settings.agent_settings, thinking="high")
+    settings = replace(settings, agent_settings=agent_settings)
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")

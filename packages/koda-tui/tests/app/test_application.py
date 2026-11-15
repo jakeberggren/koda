@@ -188,12 +188,12 @@ def test_cycle_thinking_moves_to_the_next_level_and_wraps_around() -> None:
     agent_settings = replace(app.state.settings.agent_settings, thinking="none")
     app.state.settings = replace(app.state.settings, agent_settings=agent_settings)
     app.cycle_thinking()
-    assert app.update_settings.call_args.args[0].agent.thinking == "low"
+    assert app.update_settings.call_args.args[0].agent_settings.thinking == "low"
 
     agent_settings = replace(app.state.settings.agent_settings, thinking="high")
     app.state.settings = replace(app.state.settings, agent_settings=agent_settings)
     app.cycle_thinking()
-    assert app.update_settings.call_args.args[0].agent.thinking == "none"
+    assert app.update_settings.call_args.args[0].agent_settings.thinking == "none"
 
 
 def test_cycle_thinking_does_nothing_without_a_model() -> None:

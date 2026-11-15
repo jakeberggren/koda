@@ -27,7 +27,7 @@ logger = get_logger(__name__)
 
 
 class AgentRunner:
-    """Runs turns with the agent for ``state.session`` and ``state.settings.agent``: built
+    """Runs turns with the agent for ``state.session`` and ``state.settings.agent_settings``: built
     on first use, and again after ``reset`` or when the session changes."""
 
     def __init__(

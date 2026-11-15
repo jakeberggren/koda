@@ -38,7 +38,8 @@ def test_a_file_that_isnt_json_says_where(tmp_path: Path) -> None:
 def test_every_problem_is_listed(tmp_path: Path) -> None:
     path = tmp_path / "settings.json"
     path.write_text(
-        '{"tui": {"theme": "neon"}, "agent": {"web_search": "maybe"}, "not_a_setting": 1}',
+        '{"tui_settings": {"theme": "neon"}, '
+        '"agent_settings": {"web_search": "maybe"}, "not_a_setting": 1}',
         encoding="utf-8",
     )
 
@@ -47,8 +48,8 @@ def test_every_problem_is_listed(tmp_path: Path) -> None:
 
     problems = str(exc_info.value).splitlines()[1:]
     assert [problem.split(":")[0] for problem in problems] == [
-        "- agent.web_search",
-        "- tui.theme",
+        "- agent_settings.web_search",
+        "- tui_settings.theme",
         "- not_a_setting",
     ]
     assert "Input should be one of 'auto', 'terminal-dark', 'terminal-light'" in problems[1]
