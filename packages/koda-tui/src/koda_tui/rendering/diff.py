@@ -1,4 +1,5 @@
-"""Diffs: unified diffs as highlighted blocks on added and removed backgrounds."""
+"""Diffs: unified diffs as highlighted blocks on added and removed backgrounds, beside a
+gutter of line numbers and signs."""
 
 from __future__ import annotations
 
@@ -10,6 +11,8 @@ from typing import TYPE_CHECKING, Literal, NamedTuple
 from rich.console import Group
 from rich.padding import Padding
 from rich.syntax import Syntax
+from rich.table import Table
+from rich.text import Text
 
 from koda_tui import strings
 from koda_tui.appearance import Tokens
@@ -27,11 +30,18 @@ HUNK = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 ADDITION = re.compile(r"^\+(?!\+\+)", re.MULTILINE)
 DELETION = re.compile(r"^-(?!--)", re.MULTILINE)
 KINDS: dict[str, LineKind] = {"+": "add", "-": "del"}  # By first character.
+SIGNS: dict[LineKind, str] = {"add": "+", "del": "-", "context": " "}
 STYLES: dict[LineKind, str] = {"add": Tokens.Diff.ADD, "del": Tokens.Diff.REMOVE}
+GUTTERS: dict[LineKind, str] = {
+    "add": Tokens.Diff.ADD_GUTTER,
+    "del": Tokens.Diff.REMOVE_GUTTER,
+    "context": Tokens.Text.MUTED,
+}
 
 
 class _Line(NamedTuple):
-    """A line of a diff: which hunk it is in, its kind, its number, and its text."""
+    """A line of a diff: which hunk it is in, its kind, its number, and its text without
+    the sign."""
 
     hunk: int
     kind: LineKind
@@ -43,8 +53,10 @@ def diff_blocks(diff: str) -> Group:
     """``diff`` highlighted for its file's language, one block per run of same-kind
     lines in a hunk."""
     lexer = _lexer(diff)
-    runs = groupby(_lines(diff), key=attrgetter("hunk", "kind"))
-    return Group(*(_block(list(run), lexer) for _, run in runs))
+    lines = list(_lines(diff))
+    width = max((len(str(line.number)) for line in lines if line.number), default=1)
+    runs = groupby(lines, key=attrgetter("hunk", "kind"))
+    return Group(*(_block(list(run), lexer, width) for _, run in runs))
 
 
 def diff_summary(diff: str) -> str:
@@ -66,7 +78,7 @@ def _lines(diff: str) -> Iterator[_Line]:
             old, new = _hunk_start(text) or (old, new)
         elif not text.startswith(("+++", "---")):
             kind = KINDS.get(text[:1], "context")
-            yield _Line(hunk, kind, old if kind == "del" else new, text)
+            yield _Line(hunk, kind, old if kind == "del" else new, text[1:])
             old = old if kind == "add" else _next(old)
             new = new if kind == "del" else _next(new)
 
@@ -77,13 +89,24 @@ def _hunk_start(header: str) -> tuple[int, int] | None:
     return (int(match.group(1)), int(match.group(2))) if match else None
 
 
-def _block(run: list[_Line], lexer: str) -> RenderableType:
-    """A run of same-kind lines, highlighted and numbered, on its kind's background."""
-    first = run[0]
+def _block(run: list[_Line], lexer: str, width: int) -> RenderableType:
+    """A run of same-kind lines, highlighted on its kind's background, beside a gutter
+    numbering them ``width`` digits wide and signing them."""
+    kind = run[0].kind
+    gutter = "\n".join(_gutter(line, width) for line in run)
     code = "\n".join(line.text for line in run)
-    block = syntax(code, lexer, line_numbers=True, start_line=first.number or 1)
-    style = STYLES.get(first.kind)
-    return block if style is None else Padding(block, 0, style=style)
+    grid = Table.grid(expand=True)
+    grid.add_column(no_wrap=True)
+    grid.add_column(ratio=1)
+    grid.add_row(Text(gutter, style=GUTTERS[kind]), syntax(code, lexer))
+    style = STYLES.get(kind)
+    return grid if style is None else Padding(grid, 0, style=style)
+
+
+def _gutter(line: _Line, width: int) -> str:
+    """A line's number, right-aligned to ``width`` digits, and its sign."""
+    number = str(line.number) if line.number else ""
+    return f" {number:>{width}} {SIGNS[line.kind]} "
 
 
 def _next(number: int | None) -> int | None:
