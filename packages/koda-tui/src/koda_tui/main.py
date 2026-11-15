@@ -38,7 +38,12 @@ def main() -> None:
         connect=partial(catalog.connect, tracing=True),
         warnings=[warning.summary for warning in warnings],
     )
-    asyncio.run(app.run())
+    try:
+        asyncio.run(app.run())
+    except Exception:
+        structlog.get_logger(__name__).exception("stopped_unexpectedly")
+        print(strings.App.STOPPED_UNEXPECTEDLY, file=sys.stderr)
+        sys.exit(1)
 
 
 def configure_logging() -> None:
@@ -68,6 +73,7 @@ def configure_logging() -> None:
             foreign_pre_chain=shared,
             processors=[
                 structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                structlog.processors.dict_tracebacks,
                 structlog.processors.JSONRenderer(),
             ],
         ),

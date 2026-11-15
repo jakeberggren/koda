@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from copy import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from prompt_toolkit.filters import Condition
 
@@ -97,10 +98,20 @@ class KodaTuiApp:
             style=self.appearance.style,
             terminal=self._terminal,
         )
+        asyncio.get_running_loop().set_exception_handler(self._stop)
         try:
-            await self._app.run_async()
+            await self._app.run_async(set_exception_handler=False)
         finally:
             self._terminal.close()  # In case the final render failed before turning it off.
+
+    def _stop(self, loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        """A bug outside a turn, such as in a key binding, a redraw or a task, stops Koda
+        with it, for ``main`` to report; anything else goes to asyncio's own handler."""
+        error = context.get("exception")
+        if isinstance(error, Exception) and self._app and not self._app.is_done:
+            self._app.exit(exception=error)
+        else:
+            loop.default_exception_handler(context)
 
     def invalidate(self) -> None:
         """Trigger a UI refresh."""

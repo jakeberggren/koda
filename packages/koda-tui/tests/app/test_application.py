@@ -395,3 +395,27 @@ class TestStatus:
 
         assert app.state.issue == strings.Screen.Status.CREDENTIALS_UNREADABLE
         assert app.state.connected_providers == []
+
+
+class TestUnexpectedErrors:
+    """A bug outside a turn stops Koda, for main to report."""
+
+    async def test_a_bug_stops_koda_with_it(self) -> None:
+        app, _ = _make_app()
+        app._app = Mock(is_done=False)  # noqa: SLF001 - as if running
+        error = RuntimeError("boom")
+
+        app._stop(asyncio.get_running_loop(), {"exception": error})  # noqa: SLF001
+
+        app._app.exit.assert_called_once_with(exception=error)  # noqa: SLF001
+
+    async def test_anything_else_goes_to_asyncios_own_handler(self) -> None:
+        app, _ = _make_app()
+        app._app = Mock(is_done=True)  # noqa: SLF001 - already stopping
+        loop = Mock()
+        context = {"message": "at exit", "exception": RuntimeError("boom")}
+
+        app._stop(loop, context)  # noqa: SLF001
+
+        app._app.exit.assert_not_called()  # noqa: SLF001
+        loop.default_exception_handler.assert_called_once_with(context)

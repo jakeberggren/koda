@@ -50,3 +50,22 @@ def test_main_says_what_is_wrong_with_the_settings_and_exits(
     assert capsys.readouterr().err.startswith(
         strings.App.failed_to_start(f"Invalid settings in {path}\n"),
     )
+
+
+def test_main_says_koda_stopped_when_the_app_fails_and_exits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    async def _run(_app: KodaTuiApp) -> None:
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(KodaTuiApp, "run", _run)
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+
+    assert exc_info.value.code == 1
+    assert capsys.readouterr().err.strip() == strings.App.STOPPED_UNEXPECTEDLY
