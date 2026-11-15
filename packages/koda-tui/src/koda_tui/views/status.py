@@ -10,20 +10,12 @@ from prompt_toolkit.layout import ConditionalContainer, HSplit, VSplit
 
 from koda_tui import strings
 from koda_tui.appearance import Icons, Tokens
-from koda_tui.state import ResponsePhase
 from koda_tui.ui.primitives import Spacer, Spinner, Text
 from koda_tui.ui.widgets import Bar
 
 if TYPE_CHECKING:
     from koda_tui.state import AppState
     from koda_tui.ui.widgets import Segment
-
-PHASES = {
-    ResponsePhase.THINKING: strings.Screen.Status.THINKING,
-    ResponsePhase.RESPONDING: strings.Screen.Status.RESPONDING,
-    ResponsePhase.WORKING: strings.Screen.Status.WORKING,
-    ResponsePhase.TOOLS: strings.Screen.Status.RUNNING_TOOLS,
-}
 
 
 class StatusBar:
@@ -49,7 +41,7 @@ class ActivityIndicator:
         )
         self._container = ConditionalContainer(
             HSplit([row, Spacer()]),
-            filter=Condition(lambda: state.responding),
+            filter=Condition(lambda: state.turn.running),
         )
 
     def __pt_container__(self) -> ConditionalContainer:
@@ -75,20 +67,24 @@ def _location(state: AppState) -> Segment:
 
 def _model(state: AppState) -> list[Segment]:
     """The provider and model, then the thinking level when one is set."""
-    segments: list[Segment] = []
-    if state.active_model is not None:
-        model = state.active_model
-        segments.append([(Tokens.Text.MUTED, f"{model.provider} {Icons.DIVIDER} {model.name}")])
-    if state.thinking.id != "none":
-        segments.append([(Tokens.Text.WARNING, state.thinking.label.lower())])
+    model = state.active_model
+    if model is None:
+        return []
+    segments: list[Segment] = [
+        [(Tokens.Text.MUTED, f"{model.provider} {Icons.DIVIDER} {model.name}")]
+    ]
+    thinking = model.resolve_thinking_option(state.settings.thinking)
+    if thinking.id != "none":
+        segments.append([(Tokens.Text.WARNING, thinking.label.lower())])
     return segments
 
 
 def _context(state: AppState) -> list[Segment]:
     """How full the context window is, once it is known."""
-    if state.usage is None:
+    usage, model = state.session.usage, state.active_model
+    if usage is None or model is None:
         return []
-    percentage = state.usage.latest.context_window_percentage(state.context_window)
+    percentage = usage.context_window_percentage(model.context_window)
     return (
         []
         if percentage is None
@@ -98,9 +94,9 @@ def _context(state: AppState) -> list[Segment]:
 
 def _tokens(state: AppState) -> list[Segment]:
     """The tokens sent and received so far in this session."""
-    if state.usage is None:
+    total = state.session.total_usage
+    if total is None:
         return []
-    total = state.usage.total
     counts = (
         (total.input_tokens, strings.Screen.Status.INPUT_TOKENS),
         (total.output_tokens, strings.Screen.Status.OUTPUT_TOKENS),
@@ -115,7 +111,7 @@ def _tokens(state: AppState) -> list[Segment]:
 def _hints(state: AppState) -> list[Segment]:
     """Key bindings worth knowing, each as the key followed by what it does."""
     hints = [(strings.Key.CTRL_P_K, strings.Screen.Status.PALETTE)]
-    if state.thinking_supported:
+    if state.active_model is not None and state.active_model.supports_thinking:
         hints.insert(0, (strings.Key.CTRL_T, strings.Screen.Status.CYCLE_THINKING))
     return [
         [(Tokens.Text.DEFAULT, key), (Tokens.Text.MUTED, f" {action}")] for key, action in hints
@@ -137,8 +133,16 @@ def _activity(state: AppState) -> Segment:
 
 
 def _phase(state: AppState) -> str:
-    """The stage of the current response, or ready between responses."""
-    return PHASES.get(state.response_phase, strings.Screen.Status.READY)
+    """The stage of the current response: running tools first, then replying, then
+    thinking, working before anything streams; ready between responses."""
+    turn, status = state.turn, strings.Screen.Status
+    if not turn.running:
+        return status.READY
+    if turn.calls or any(call.call_id not in turn.results for call in turn.provider_calls):
+        return status.RUNNING_TOOLS
+    if turn.response is None:
+        return status.WORKING
+    return status.RESPONDING if turn.response.content else status.THINKING
 
 
 def _compact(count: int) -> str:

@@ -7,18 +7,20 @@ from typing import TYPE_CHECKING
 from prompt_toolkit import Application
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.output import ColorDepth
+from structlog import get_logger
 
 from koda.agent import Agent
-from koda.llm import CredentialsError, LLMConfigurationError, LLMRequestOptions
+from koda.llm import CredentialsError, LLMConfigurationError, LLMError, LLMRequestOptions
 from koda.sessions import SaveSessionHook
+from koda.tools import ToolError
 from koda_tui import strings
 from koda_tui.app.exit import ExitPrompt
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import Appearance
-from koda_tui.messaging import Conversation, Outbox
+from koda_tui.outbox import Outbox
 from koda_tui.palette.context import PaletteContext
 from koda_tui.palette.palette import CommandPalette
-from koda_tui.state import AppState
+from koda_tui.state import AppState, TurnError
 from koda_tui.terminal import Terminal, keys
 from koda_tui.views import Screen
 
@@ -36,6 +38,9 @@ if TYPE_CHECKING:
     from koda_tui.settings import Settings
 
     type Connect = Callable[[Model, Credentials], Awaitable[LLM]]
+
+
+logger = get_logger(__name__)
 
 
 class FullScreenApplication(Application[None]):
@@ -108,10 +113,8 @@ class KodaTuiApp:
             show_scrollbar=Condition(lambda: self.state.settings.show_scrollbar),
         )
 
-        conversation = Conversation(self.state)
         self.outbox = Outbox(
             state=self.state,
-            conversation=conversation,
             respond=self.respond,
             invalidate=self.invalidate,
         )
@@ -123,7 +126,6 @@ class KodaTuiApp:
                 store=store,
                 update_settings=self.update_settings,
                 state=self.state,
-                conversation=conversation,
                 outbox=self.outbox,
                 terminal=self._terminal,
             ),
@@ -153,10 +155,13 @@ class KodaTuiApp:
             self._app.exit()
 
     def cycle_thinking(self) -> None:
-        """Move to the active model's next thinking level, wrapping around."""
-        thinking = self.state.next_thinking()
-        if thinking is not None:
-            self.update_settings(replace(self.state.settings, thinking=thinking))
+        """Move to the active model's next thinking level, wrapping around, once Koda is
+        ready."""
+        model, settings = self.state.active_model, self.state.settings
+        if self.state.issue is not None or model is None:
+            return
+        if (thinking := model.next_thinking(settings.thinking)) is not None:
+            self.update_settings(replace(settings, thinking=thinking))
 
     def toggle_palette(self) -> None:
         """Open the command palette, or close it and any dialogs it opened."""
@@ -165,12 +170,12 @@ class KodaTuiApp:
         else:
             self._palette.open()
 
-    def submit(self, text: str, *, alternate: bool) -> None:
+    def submit(self, text: str, *, alternate: bool) -> bool:
         """While Koda responds, Enter queues and Alt+Enter steers, or the other way
         round when the input mode prefers steering. Writing a message takes back a
-        press of Ctrl+C."""
+        press of Ctrl+C. Whether the message was taken."""
         self.exit_prompt.dismiss()
-        self.outbox.submit(text, steer=alternate == self.state.settings.queue_inputs)
+        return self.outbox.submit(text, steer=alternate == self.state.settings.queue_inputs)
 
     def update_settings(self, settings: Settings) -> None:
         """Save ``settings`` and apply them: the agent is rebuilt when it next runs. Also
@@ -213,10 +218,18 @@ class KodaTuiApp:
         return model, None
 
     async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
-        """Send ``text`` in the current session and stream the agent's response."""
-        agent = await self._current_agent()
-        async for event in agent.run(text):
-            yield event
+        """Send ``text`` in the current session and stream the agent's response. This is
+        the turn's boundary: a failure ends the stream and is shown where the turn failed,
+        and one Koda didn't expect is logged."""
+        try:
+            agent = await self._current_agent()
+            async for event in agent.run(text):
+                self.state.turn = agent.turn  # A new turn with its first event.
+                yield event
+        except Exception as error:
+            self.state.errors.append(TurnError(at=len(self.state.session.messages), error=error))
+            if not isinstance(error, LLMError | ToolError):
+                logger.exception("turn_failed_unexpectedly")
 
     async def _current_agent(self) -> Agent:
         """The agent for the current session, built after the settings or session change."""

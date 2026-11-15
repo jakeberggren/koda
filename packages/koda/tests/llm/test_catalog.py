@@ -310,3 +310,15 @@ async def test_an_oauth_connection_logs_in_through_its_api_s_browser_login() -> 
     assert connections["api-key"].oauth is None
     with pytest.raises(exceptions.LLMConfigurationError, match="has no browser login"):
         await connections["api-key"].login(Mock())
+
+
+def test_thinking_moves_to_the_next_level_and_wraps_around() -> None:
+    catalog, _ = Catalog.load()
+    model = catalog.model("openai", "gpt-5.5")
+    levels = [option.id for option in model.effective_thinking_options]
+
+    assert model.next_thinking(levels[0]) == levels[1]
+    assert model.next_thinking(levels[-1]) == levels[0]
+    assert model.next_thinking("not-a-level") == model.next_thinking(
+        model.resolve_thinking_option("not-a-level").id
+    )

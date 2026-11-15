@@ -42,7 +42,7 @@ from koda.llm.types import (
     LLMThinkingDelta,
     LLMToolCallRequested,
 )
-from koda.llm.utils import tool_arguments
+from koda.llm.utils import provider_message, tool_arguments
 from koda.messages import AssistantMessage, TokenUsage, ToolMessage
 from koda.tools import ToolCall
 
@@ -229,7 +229,9 @@ def _raise_anthropic_error(error: Exception, *, backend: str) -> Never:
         raise exceptions.LLMConnectionError(backend, error) from error
     if isinstance(error, APIError):
         logger.error("llm_api_error", backend=backend, error=repr(error))
-        raise exceptions.LLMAPIError(backend, error) from error
+        raise exceptions.LLMAPIError(
+            backend, error, provider_message=provider_message(error.body)
+        ) from error
     raise error
 
 

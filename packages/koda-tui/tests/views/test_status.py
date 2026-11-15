@@ -6,18 +6,23 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from prompt_toolkit.formatted_text import fragment_list_to_text
 
+from koda.agent import Turn
 from koda.llm import Model, ThinkingOption
-from koda.messages import TokenUsage
+from koda.messages import AssistantMessage, TokenUsage
+from koda.sessions import Session
 from koda.tools import ToolCall
 from koda_tui import strings
 from koda_tui.appearance import Tokens
 from koda_tui.settings import Settings
-from koda_tui.state import AppState, AssistantMessage, ToolMessage, Usage, UserMessage
 from koda_tui.views import status
+
+if TYPE_CHECKING:
+    from koda_tui.state import AppState
 
 _CALL = ToolCall(tool_name="bash", arguments={}, call_id="call_1")
 
@@ -40,18 +45,19 @@ def test_left_shows_workspace_model_thinking_and_usage(state: AppState) -> None:
         thinking_options=(ThinkingOption(id="medium", label="Medium"),),
     )
     usage = TokenUsage(input_tokens=120, output_tokens=0)
+    earlier = AssistantMessage(content="a", usage=TokenUsage(input_tokens=14, output_tokens=15_900))
     state = _state(
         state,
         active_model=model,
         settings=Settings(thinking="medium"),
-        usage=Usage(latest=usage, total=TokenUsage(input_tokens=34, output_tokens=15_900)),
+        session=Session(messages=[earlier, AssistantMessage(content="b", usage=usage)]),
     )
     assert _texts(status._left(state)) == [
         "~/dev/koda",
         "provider · Model",
         "medium",
         f"ctx {usage.context_window_percentage(1000)}%",
-        "34 in",
+        "134 in",
         "15.9k out",
     ]
 
@@ -85,16 +91,16 @@ def test_right_shows_hints_warning_and_activity(state: AppState) -> None:
     [
         ({"exit_requested": True}, strings.Screen.Status.EXIT_AGAIN),
         (
-            {"responding": True, "messages": [AssistantMessage("", "hmm")]},
+            {"turn": Turn(running=True, response=AssistantMessage(thinking_content="hmm"))},
             strings.Screen.Status.THINKING,
         ),
         (
-            {"responding": True, "messages": [AssistantMessage("Hi")]},
+            {"turn": Turn(running=True, response=AssistantMessage(content="Hi"))},
             strings.Screen.Status.RESPONDING,
         ),
-        ({"responding": True, "messages": [UserMessage("hi")]}, strings.Screen.Status.WORKING),
+        ({"turn": Turn(running=True)}, strings.Screen.Status.WORKING),
         (
-            {"responding": True, "messages": [UserMessage("hi"), ToolMessage(_CALL)]},
+            {"turn": Turn(running=True, calls=[_CALL])},
             strings.Screen.Status.RUNNING_TOOLS,
         ),
         ({}, strings.Screen.Status.READY),

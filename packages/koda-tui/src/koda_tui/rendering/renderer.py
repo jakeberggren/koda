@@ -5,24 +5,39 @@ from __future__ import annotations
 
 import json
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
 from rich.console import Group
 from rich.padding import Padding
 from rich.text import Text
 
+from koda.messages import AssistantMessage, InterruptionMessage, UserMessage
 from koda_tui import strings
 from koda_tui.appearance import Icons, Spacing, Tokens, compose
 from koda_tui.rendering import rich
 from koda_tui.rendering.diff import diff_blocks, diff_summary
+from koda_tui.rendering.errors import describe
 from koda_tui.rendering.markdown import Markdown
-from koda_tui.state import AssistantMessage, ErrorMessage, Message, ToolMessage, UserMessage
+from koda_tui.state import TurnError
 
 if TYPE_CHECKING:
     from prompt_toolkit.formatted_text import StyleAndTextTuples
     from rich.console import RenderableType
 
     from koda.tools import ToolCall, ToolOutput
+
+
+@dataclass(frozen=True, slots=True)
+class ToolRun:
+    """A tool call and its output; no output yet while it runs."""
+
+    call: ToolCall
+    output: ToolOutput | None = None
+
+
+# What the chat shows: one message each, as the user sees it.
+type ChatMessage = UserMessage | AssistantMessage | InterruptionMessage | ToolRun | TurnError
 
 type Arguments = dict[str, object]
 
@@ -36,7 +51,7 @@ FAILED = (Icons.FAILED, Tokens.Text.ERROR)
 DONE = (Icons.DONE, Tokens.Text.SUCCESS)
 
 
-class MessageRenderer[M: Message](ABC):
+class MessageRenderer[M: ChatMessage](ABC):
     """Renders one kind of message as fragments. Each renderer writes ``renderable``;
     ``render`` turns that into fragments."""
 
@@ -49,48 +64,71 @@ class MessageRenderer[M: Message](ABC):
         """``message`` as a Rich renderable."""
 
 
-class Renderer(MessageRenderer[Message]):
+class Renderer(MessageRenderer[ChatMessage]):
     """Renders any message, by the renderer for its kind."""
 
-    def renderable(self, message: Message) -> RenderableType:
+    def renderable(self, message: ChatMessage) -> RenderableType:  # noqa: C901 - one case per kind of message
         match message:
             case UserMessage():
                 return UserRenderer().renderable(message)
             case AssistantMessage():
                 return AssistantRenderer().renderable(message)
-            case ToolMessage():
+            case InterruptionMessage():
+                return InterruptionRenderer().renderable(message)
+            case ToolRun():
                 return ToolRenderer.for_tool(message.call.tool_name).renderable(message)
-            case ErrorMessage():
+            case TurnError():
                 return ErrorRenderer().renderable(message)
 
 
 class UserRenderer(MessageRenderer[UserMessage]):
     def renderable(self, message: UserMessage) -> RenderableType:
         """The user's message on a raised block."""
-        return Padding(Markdown(message.text), USER_PADDING, style=Tokens.Surface.RAISED)
+        return Padding(Markdown(message.content), USER_PADDING, style=Tokens.Surface.RAISED)
 
 
 class AssistantRenderer(MessageRenderer[AssistantMessage]):
     def renderable(self, message: AssistantMessage) -> RenderableType:
         """The thinking, muted, then the reply, a gap apart; either may be empty."""
         parts: list[RenderableType] = []
-        if message.thinking:
-            parts.append(Markdown(message.thinking, style=THINKING_STYLE))
-        if message.text:
+        if message.thinking_content:
+            parts.append(Markdown(message.thinking_content, style=THINKING_STYLE))
+        if message.content:
             if parts:
                 parts.extend(Text() for _ in range(Spacing.GAP))
-            parts.append(Markdown(message.text))
+            parts.append(Markdown(message.content))
         return Group(*parts)
 
 
-class ErrorRenderer(MessageRenderer[ErrorMessage]):
-    def renderable(self, message: ErrorMessage) -> RenderableType:
-        """The error's summary in bold, above its detail or what to do about it."""
-        detail = message.detail or strings.Screen.Chat.ERROR_FALLBACK
-        return Markdown(f"**{message.summary}**\n\n{detail}")
+class InterruptionRenderer(MessageRenderer[InterruptionMessage]):
+    def renderable(self, message: InterruptionMessage) -> RenderableType:  # noqa: ARG002 - all look alike
+        """A muted note that the response was interrupted."""
+        return Text(strings.Screen.Chat.INTERRUPTED, style=Tokens.Text.MUTED)
 
 
-class ToolRenderer(MessageRenderer[ToolMessage]):
+class ErrorRenderer(MessageRenderer[TurnError]):
+    def renderable(self, message: TurnError) -> RenderableType:
+        """What went wrong in bold, the provider's words muted, then what to do."""
+        text = describe(message.error)
+        parts: list[RenderableType] = [Text(text.summary, style=Tokens.Text.STRONG)]
+        if text.detail:
+            parts.append(Text(text.detail, style=Tokens.Text.MUTED))
+        if text.hint:
+            parts.append(Text(text.hint))
+        return Group(*spaced(parts))
+
+
+def spaced(parts: list[RenderableType]) -> list[RenderableType]:
+    """``parts`` a gap apart."""
+    apart: list[RenderableType] = []
+    for part in parts:
+        if apart:
+            apart.extend(Text() for _ in range(Spacing.GAP))
+        apart.append(part)
+    return apart
+
+
+class ToolRenderer(MessageRenderer[ToolRun]):
     """How a tool's call is shown: its status, name and arguments, then its result.
     The defaults suit any tool; a tool's own renderer overrides what it shows differently,
     and names its tool where it subclasses this: ``class BashRenderer(ToolRenderer,
@@ -107,10 +145,10 @@ class ToolRenderer(MessageRenderer[ToolMessage]):
         """The renderer for the tool named ``name``, or this default if it has none."""
         return cls._by_tool.get(name) or ToolRenderer()
 
-    def renderable(self, message: ToolMessage) -> RenderableType:
+    def renderable(self, message: ToolRun) -> RenderableType:
         """The call's line, then its result once it has one; none means it is still
         running."""
-        output = message.result
+        output = message.output
         line = self._line(message.call, output)
         if output is None:
             return line

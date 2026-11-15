@@ -50,21 +50,23 @@ class Screen:
     class Chat:
         """The conversation."""
 
-        ERROR_FALLBACK = "Complete the required setup and try again."
+        INTERRUPTED = "Interrupted"
 
         class Errors:
             """Why a response failed, and what to do about it."""
 
             AUTHENTICATION = "Authentication failed."
-            AUTHENTICATION_FIX = "Please check your API key and try again."
+            AUTHENTICATION_FIX = "Check your API key and try again."
             RATE_LIMIT = "Rate limit exceeded."
-            RATE_LIMIT_FIX = "Please check your plan and billing details."
+            RATE_LIMIT_FIX = "Check plan and billing details."
             CONNECTION = "Connection error."
-            CONNECTION_FIX = "Please check your internet connection and try again."
+            CONNECTION_FIX = "Check internet connection and try again."
             PROVIDER = "Provider error."
-            NOT_READY = "Koda is not ready."
+            NOT_READY = "Koda not ready."
             REQUEST = "Request failed."
             TOOL = "Tool execution failed."
+            UNEXPECTED = "Something went wrong."
+            UNEXPECTED_FIX = "Try again."
 
         class Tools:
             """Tool calls and their results."""

@@ -74,7 +74,6 @@ def context(
         store=InMemorySessionStore(),
         state=state,
         update_settings=update_settings,
-        conversation=Mock(),
         outbox=Mock(),
         terminal=terminal,
     )

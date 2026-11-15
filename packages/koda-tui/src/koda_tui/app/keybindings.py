@@ -35,7 +35,7 @@ def create_keybindings(app: KodaTuiApp) -> KeyBindings:  # noqa: C901 - one hand
         if app.exit_prompt.confirm():
             app.exit()
 
-    @kb.add(Keys.Escape, filter=Condition(lambda: state.responding or bool(state.pending_inputs)))
+    @kb.add(Keys.Escape, filter=Condition(lambda: state.turn.running or bool(state.pending_inputs)))
     def _escape(_event: KeyPressEvent) -> None:
         """Send what's queued now, interrupting the response; with nothing queued, just
         interrupt it."""

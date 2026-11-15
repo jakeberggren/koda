@@ -123,6 +123,15 @@ class Model:
         resolved_id = resolve_thinking_mode(thinking_id, [option.id for option in options])
         return next(option for option in options if option.id == resolved_id)
 
+    def next_thinking(self, current: ThinkingOptionId) -> ThinkingOptionId | None:
+        """The thinking level after ``current``, wrapping around; None if the model has
+        no levels to choose between."""
+        if not self.supports_thinking:
+            return None
+        options = [option.id for option in self.effective_thinking_options]
+        index = options.index(self.resolve_thinking_option(current).id)
+        return options[(index + 1) % len(options)]
+
     def is_connected(self, credentials: Credentials) -> bool:
         """Whether any of this model's connections has a credential."""
         return any(connection.is_connected(credentials) for connection in self.connections)

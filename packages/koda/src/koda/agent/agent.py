@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -19,7 +20,7 @@ from koda.agent.events import (
 from koda.agent.stream import AgentStreamAccumulator
 from koda.context import ContextManager
 from koda.llm import LLMRequest, LLMRequestOptions
-from koda.llm.types import LLMResponseCompleted
+from koda.llm.types import LLMResponseCompleted, LLMToolCompleted, LLMToolStarted
 from koda.messages import AssistantMessage, InterruptionMessage, ToolMessage, UserMessage
 from koda.prompts import SystemPromptLoader
 from koda.tools import ToolConfig, ToolOutput, ToolResult
@@ -35,6 +36,22 @@ if TYPE_CHECKING:
     from koda.tools import ToolCall
 
 logger = get_logger(__name__)
+
+
+@dataclass
+class Turn:
+    """The agent's latest turn, while it runs and after. Never saved: once something is
+    done, it is in the session."""
+
+    running: bool = False
+    # The response streaming in, so far.
+    response: AssistantMessage | None = None
+    # Tool calls waiting for their result.
+    calls: list[ToolCall] = field(default_factory=list)
+    # Tool results that are ready, by call id, before they are added to the session in order.
+    results: dict[str, ToolResult] = field(default_factory=dict)
+    # Tools the provider ran itself, such as web search; they are part of its response.
+    provider_calls: list[ToolCall] = field(default_factory=list)
 
 
 class Agent:
@@ -62,8 +79,7 @@ class Agent:
         self.instructions = ContextManager.from_workspace(self.workspace).build_system_prompt(
             SystemPromptLoader.for_workspace(self.workspace).load()
         )
-        self._response: AgentStreamAccumulator | None = None  # The response streaming in.
-        self._unanswered: list[ToolCall] = []  # Tool calls still waiting for a result.
+        self.turn = Turn()  # The latest turn; none has run yet.
         logger.info("agent_initialized", llm=type(llm).__name__)
 
     async def run(self, text: str) -> AsyncIterator[AgentEvent]:
@@ -72,6 +88,7 @@ class Agent:
         text = text.strip()
         if not text:
             raise ValueError("Message cannot be empty")
+        self.turn = Turn(running=True)
         try:
             async for event in self._turn(text):
                 yield event
@@ -84,7 +101,8 @@ class Agent:
             await self._add(*self._answers(FAILED))
             raise
         finally:
-            self._response = None
+            self.turn.running = False
+            self.turn.response = None
 
     async def _add(self, *messages: Message) -> None:
         """Add ``messages`` to the session: a checkpoint for the hooks."""
@@ -111,12 +129,14 @@ class Agent:
                 tools=definitions,
                 options=self.options,
             )
-            self._response = AgentStreamAccumulator()
-            async for event in self._response.process_stream(self.llm.generate_stream(request)):
-                if not isinstance(event, LLMResponseCompleted):  # The agent completes it below.
-                    yield event
-            calls, message = self._response.tool_calls, assembled_response(self._response)
-            self._response = None
+            accumulator = AgentStreamAccumulator()
+            async for event in accumulator.process_stream(self.llm.generate_stream(request)):
+                if isinstance(event, LLMResponseCompleted):
+                    continue  # The agent completes the response below.
+                self._follow(event, accumulator)
+                yield event
+            calls, message = accumulator.tool_calls, assembled_response(accumulator)
+            self.turn.response = None
             if message is not None:
                 await self._add(message)
                 yield AgentResponseCompleted(message=message)
@@ -124,13 +144,28 @@ class Agent:
                 logger.info("run_completed", iterations=iteration)
                 yield AgentTurnCompleted(session_id=session_id, iterations=iteration)
                 return
-            self._unanswered = list(calls)
+            self.turn.calls = list(calls)
             async for event in self._run_tools(calls):
                 yield event
 
+    def _follow(self, event: AgentEvent, accumulator: AgentStreamAccumulator) -> None:
+        """Keep the turn up to date with a model event."""
+        turn = self.turn
+        match event:
+            case LLMToolStarted(call=call):
+                turn.provider_calls.append(call)
+            case LLMToolCompleted(result=result):
+                turn.results[result.call_id] = result
+            case _:
+                turn.response = AssistantMessage(
+                    content=accumulator.content,
+                    thinking_content=accumulator.thinking_content,
+                    tool_calls=list(accumulator.tool_calls),
+                )
+
     def _partial_response(self) -> list[Message]:
         """What the model had written of the response streaming in, if anything."""
-        response = self._response
+        response = self.turn.response
         if response is None or not (response.content or response.thinking_content):
             return []
         return [
@@ -146,9 +181,9 @@ class Agent:
                 tool_name=call.tool_name,
                 tool_result=ToolResult(call_id=call.call_id, output=output),
             )
-            for call in self._unanswered
+            for call in self.turn.calls
         ]
-        self._unanswered = []
+        self.turn.calls = []
         return answers
 
     async def _run_tools(self, calls: list[ToolCall]) -> AsyncIterator[AgentEvent]:
@@ -156,15 +191,14 @@ class Agent:
         call order."""
         for call in calls:
             yield AgentToolStarted(call=call)
-        results: dict[str, ToolResult] = {}
         executor = ToolExecutor(self.tools.registry)
         async for call, result in executor.execute_calls(calls, self.tools.context):
-            results[call.call_id] = result
+            self.turn.results[call.call_id] = result
             yield AgentToolResultReady(tool_name=call.tool_name, result=result)
         for call in calls:
-            result = results[call.call_id]
+            result = self.turn.results.pop(call.call_id)
             await self._add(ToolMessage(tool_name=call.tool_name, tool_result=result))
-            self._unanswered.remove(call)
+            self.turn.calls.remove(call)
             yield AgentToolCompleted(tool_name=call.tool_name, result=result)
 
 

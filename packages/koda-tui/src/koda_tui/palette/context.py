@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
     from koda.llm import Catalog, Credentials
     from koda.sessions import SessionStore
-    from koda_tui.messaging import Conversation, Outbox
+    from koda_tui.outbox import Outbox
     from koda_tui.settings import Settings
     from koda_tui.state import AppState
     from koda_tui.terminal import Terminal
@@ -30,7 +30,6 @@ class PaletteContext:
     store: SessionStore
     state: AppState
     update_settings: Callable[[Settings], None]  # Saves and applies them.
-    conversation: Conversation
     outbox: Outbox
     terminal: Terminal
 

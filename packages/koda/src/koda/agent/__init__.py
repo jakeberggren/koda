@@ -1,4 +1,4 @@
-from koda.agent.agent import Agent
+from koda.agent.agent import Agent, Turn
 from koda.agent.events import (
     AgentEvent,
     AgentIterationStarted,
@@ -36,4 +36,5 @@ __all__ = [
     "LLMToolCompleted",
     "LLMToolStarted",
     "SystemPrompt",
+    "Turn",
 ]

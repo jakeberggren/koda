@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from prompt_toolkit.keys import Keys
 from structlog import get_logger
 
+from koda.agent import Turn
 from koda.sessions import Session, SessionNotFoundError
 from koda_tui import strings
 from koda_tui.ui.widgets import ChoiceDialog, DialogChoice, ListItem, Picker, Shortcut
@@ -26,7 +27,6 @@ class SessionMenu:
         self._outbox = context.outbox
         self._state = context.state
         self._store = context.store
-        self._conversation = context.conversation
 
     def items(self) -> list[ListItem[Session]]:
         """Build session selection items."""
@@ -69,19 +69,18 @@ class SessionMenu:
     def new(self) -> None:
         """Create and switch to a new session."""
         self._outbox.stop()
-        self._state.session = Session()
-        self._conversation.clear()
+        self._show(Session())
         self._overlays.close_all()
 
     def switch(self, session: Session) -> None:
         """Switch to an existing session."""
-        self._outbox.stop()
-        try:
-            switched = self._open(session)
-        except SessionNotFoundError:
-            log.warning("switch_session_failed", session_id=str(session.session_id))
-            return
-        self._conversation.load(switched)
+        if session.session_id != self._state.session.session_id:
+            self._outbox.stop()
+            try:
+                self._show(self._store.get_session(session.session_id))
+            except SessionNotFoundError:
+                log.warning("switch_session_failed", session_id=str(session.session_id))
+                return
         self._overlays.close_all()
 
     def confirm_delete(self, item: ListItem[Session] | None) -> None:
@@ -114,15 +113,14 @@ class SessionMenu:
                 return
 
         if removed_active:
-            self._state.session = Session()
-            self._conversation.clear()
+            self._show(Session())
         self._overlays.close_all()
 
-    def _open(self, session: Session) -> Session:
-        """Make ``session`` current, loading it unless it already is."""
-        if session.session_id != self._state.session.session_id:
-            self._state.session = self._store.get_session(session.session_id)
-        return self._state.session
+    def _show(self, session: Session) -> None:
+        """Make ``session`` current, without the last one's turn and errors."""
+        self._state.session = session
+        self._state.turn = Turn()
+        self._state.errors = []
 
 
 def _format_session_label(session: Session) -> str:
