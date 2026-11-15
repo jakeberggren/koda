@@ -61,7 +61,7 @@ packages/koda/
 │   │   ├── executor.py             # Runs tool calls
 │   │   └── registry.py             # The tools by name
 │   ├── harness/
-│   │   ├── workspace.py            # The folder: paths, path errors and locks
+│   │   ├── workspace/              # The folder: paths, path errors and locks
 │   │   ├── prompt.py               # SYSTEM.md, AGENTS.md and CLAUDE.md
 │   │   └── toolbox/
 │   │       ├── shell.py            # bash
