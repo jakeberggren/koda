@@ -1,17 +1,19 @@
+"""The write_file tool: a new text file, with the folders it is in."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from koda.harness.toolbox.exceptions import ToolError
-from koda.harness.toolbox.files import write_text
+from koda.harness.toolbox.files.content import write_text
 from koda.messages import ToolOutput
+from koda.tools import ToolError
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda.harness.toolbox.workspace import Workspace
+    from koda.harness.workspace import Workspace
 
 
 class WriteError(ToolError):
@@ -47,8 +49,6 @@ class WriteFileTool:
     async def execute(self, params: WriteFileParams) -> ToolOutput:
         """Execute the write_file tool."""
         resolved: Path = self.workspace.resolve(params.path)
-
-        # Validate parent directory is also within sandbox
 
         async with (
             self.workspace.coordinator.shared_access(),

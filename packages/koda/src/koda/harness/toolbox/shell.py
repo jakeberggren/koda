@@ -1,3 +1,5 @@
+"""The shell tool: running a command with bash."""
+
 from __future__ import annotations
 
 import asyncio
@@ -11,26 +13,28 @@ from typing import TYPE_CHECKING
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.harness.toolbox import exceptions
+from koda.harness.workspace import NotAFolderError, PathNotFoundError
 from koda.messages import ToolOutput
+from koda.tools import ToolError
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda.harness.toolbox.workspace import Workspace
+    from koda.harness.workspace import Workspace
+
 
 BASH_TIMEOUT_SECONDS = 30.0
 BASH_MAX_OUTPUT_CHARS = 64_000
 
 
-class BashNotFoundError(exceptions.ToolError):
+class BashNotFoundError(ToolError):
     """Bash binary not found on system."""
 
     def __init__(self) -> None:
         super().__init__("bash not found.")
 
 
-class BashError(exceptions.ToolError):
+class BashError(ToolError):
     """Error launching bash."""
 
     def __init__(self, cause: Exception) -> None:
@@ -38,7 +42,7 @@ class BashError(exceptions.ToolError):
         super().__init__(f"Failed to execute bash: {cause}")
 
 
-class BashTimeoutError(exceptions.ToolError):
+class BashTimeoutError(ToolError):
     """Bash execution timed out."""
 
     def __init__(self, timeout: float) -> None:
@@ -59,14 +63,14 @@ class BashParams(BaseModel):
 
 
 @functools.lru_cache(maxsize=1)
-def _bash_path() -> str:
+def bash_path() -> str:
     bash = shutil.which("bash")
     if bash is None:
         raise BashNotFoundError
     return bash
 
 
-async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
+async def kill_process_tree(proc: asyncio.subprocess.Process) -> None:
     """Best-effort kill of the command and anything it spawned."""
     if proc.returncode is not None:
         return
@@ -82,11 +86,11 @@ async def _kill_process_tree(proc: asyncio.subprocess.Process) -> None:
         await asyncio.wait_for(proc.wait(), timeout=1)
 
 
-async def _run(command: str, *, cwd: Path, timeout_seconds: float) -> tuple[str, str, int]:
+async def run_bash(command: str, *, cwd: Path, timeout_seconds: float) -> tuple[str, str, int]:
     """Run ``command`` with bash in ``cwd`` on the host; return stdout, stderr, exit code."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            _bash_path(),
+            bash_path(),
             "--noprofile",
             "--norc",
             "-c",
@@ -102,7 +106,7 @@ async def _run(command: str, *, cwd: Path, timeout_seconds: float) -> tuple[str,
     try:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
     except TimeoutError:
-        await _kill_process_tree(proc)
+        await kill_process_tree(proc)
         raise BashTimeoutError(timeout_seconds) from None
 
     return (
@@ -112,7 +116,7 @@ async def _run(command: str, *, cwd: Path, timeout_seconds: float) -> tuple[str,
     )
 
 
-def _truncate_output(value: str, *, max_chars: int = BASH_MAX_OUTPUT_CHARS) -> tuple[str, bool]:
+def truncate_output(value: str, *, max_chars: int = BASH_MAX_OUTPUT_CHARS) -> tuple[str, bool]:
     if len(value) <= max_chars:
         return value, False
     marker = "\n\n... [truncated] ...\n\n"
@@ -125,7 +129,7 @@ def _truncate_output(value: str, *, max_chars: int = BASH_MAX_OUTPUT_CHARS) -> t
     return f"{value[:head_chars]}{marker}{value[-tail_chars:]}", True
 
 
-def _build_output(
+def build_output(
     *,
     params: BashParams,
     stdout: str,
@@ -133,8 +137,8 @@ def _build_output(
     exit_code: int,
     cwd: str,
 ) -> ToolOutput:
-    truncated_stdout, stdout_truncated = _truncate_output(stdout)
-    truncated_stderr, stderr_truncated = _truncate_output(stderr)
+    truncated_stdout, stdout_truncated = truncate_output(stdout)
+    truncated_stderr, stderr_truncated = truncate_output(stderr)
     return ToolOutput(
         content={
             "stdout": truncated_stdout,
@@ -150,15 +154,15 @@ def _build_output(
     )
 
 
-async def _resolve_cwd(params: BashParams, workspace: Workspace) -> Path:
+async def resolve_cwd(params: BashParams, workspace: Workspace) -> Path:
     resolved_cwd: Path = workspace.resolve(params.cwd)
     async_cwd = AnyioPath(resolved_cwd)
 
     if not await async_cwd.exists():
-        raise exceptions.FileNotFoundError(params.cwd)
+        raise PathNotFoundError(params.cwd)
 
     if not await async_cwd.is_dir():
-        raise exceptions.NotADirectoryError(params.cwd)
+        raise NotAFolderError(params.cwd)
 
     return resolved_cwd
 
@@ -182,16 +186,16 @@ class BashTool:
         self.workspace = workspace
 
     async def execute(self, params: BashParams) -> ToolOutput:
-        resolved_cwd = await _resolve_cwd(params, self.workspace)
+        resolved_cwd = await resolve_cwd(params, self.workspace)
 
         async with self.workspace.coordinator.exclusive_access():
-            stdout, stderr, exit_code = await _run(
+            stdout, stderr, exit_code = await run_bash(
                 params.command,
                 cwd=resolved_cwd,
                 timeout_seconds=params.timeout_seconds,
             )
 
-        return _build_output(
+        return build_output(
             params=params,
             stdout=stdout,
             stderr=stderr,

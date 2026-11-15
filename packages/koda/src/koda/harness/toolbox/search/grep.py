@@ -1,3 +1,5 @@
+"""The grep tool: finding lines in files by content, with ripgrep."""
+
 from __future__ import annotations
 
 import asyncio
@@ -10,24 +12,25 @@ from typing import TYPE_CHECKING
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.harness.toolbox import exceptions
+from koda.harness.workspace import PathNotFoundError
 from koda.messages import ToolOutput
+from koda.tools import ToolError
 
 if TYPE_CHECKING:
-    from koda.harness.toolbox.workspace import Workspace
+    from koda.harness.workspace import Workspace
 
 
 RIPGREP_TIMEOUT_SECONDS = 30.0
 
 
-class RipgrepNotFoundError(exceptions.ToolError):
+class RipgrepNotFoundError(ToolError):
     """Ripgrep binary not found on system."""
 
     def __init__(self) -> None:
         super().__init__("ripgrep (rg) not found.")
 
 
-class RipgrepError(exceptions.ToolError):
+class RipgrepError(ToolError):
     """Error executing ripgrep."""
 
     def __init__(self, error_output: str, returncode: int) -> None:
@@ -36,7 +39,7 @@ class RipgrepError(exceptions.ToolError):
         super().__init__(f"ripgrep failed (exit {returncode}): {error_output}")
 
 
-class RipgrepTimeoutError(exceptions.ToolError):
+class RipgrepTimeoutError(ToolError):
     """Ripgrep execution timed out."""
 
     def __init__(self, timeout: float) -> None:
@@ -67,7 +70,7 @@ class GrepParams(BaseModel):
 
 
 @functools.lru_cache(maxsize=1)
-def _get_rg_path() -> str:
+def get_rg_path() -> str:
     """Get path to ripgrep binary. Result is cached to avoid repeated lookups."""
     rg = shutil.which("rg")
     if rg is None:
@@ -75,7 +78,7 @@ def _get_rg_path() -> str:
     return rg
 
 
-def _build_rg_command(rg_path: str, params: GrepParams, target: Path) -> list[str]:
+def build_rg_command(rg_path: str, params: GrepParams, target: Path) -> list[str]:
     """Build ripgrep command arguments."""
     cmd = [rg_path, "--json"]
 
@@ -92,7 +95,7 @@ def _build_rg_command(rg_path: str, params: GrepParams, target: Path) -> list[st
     return cmd
 
 
-def _parse_rg_match(data: dict, search_root: Path) -> str | None:
+def parse_rg_match(data: dict, search_root: Path) -> str | None:
     """Parse a single ripgrep JSON match entry."""
     if data.get("type") != "match":
         return None
@@ -112,7 +115,7 @@ def _parse_rg_match(data: dict, search_root: Path) -> str | None:
     return f"{rel_path}:{line_number}:{line_text}"
 
 
-def _parse_json_line(line: str) -> dict | None:
+def parse_json_line(line: str) -> dict | None:
     """Parse a JSON line, returning None if invalid."""
     if not line.strip():
         return None
@@ -122,16 +125,16 @@ def _parse_json_line(line: str) -> dict | None:
         return None
 
 
-def _parse_rg_output(stdout: bytes, search_root: Path, limit: int) -> tuple[list[str], int]:
+def parse_rg_output(stdout: bytes, search_root: Path, limit: int) -> tuple[list[str], int]:
     """Parse ripgrep JSON output and return matches with total count."""
     matches: list[str] = []
     total_count = 0
 
     for line in stdout.decode("utf-8", errors="replace").splitlines():
-        data = _parse_json_line(line)
+        data = parse_json_line(line)
         if data is None:
             continue
-        match_str = _parse_rg_match(data, search_root)
+        match_str = parse_rg_match(data, search_root)
         if match_str is not None:
             total_count += 1
             if total_count <= limit:
@@ -140,7 +143,7 @@ def _parse_rg_output(stdout: bytes, search_root: Path, limit: int) -> tuple[list
     return matches, total_count
 
 
-def _format_grep_output(
+def format_grep_output(
     pattern: str,
     matches: list[str],
     total_count: int,
@@ -180,9 +183,9 @@ class GrepTool:
 
         async with self.workspace.coordinator.shared_access():
             if not await async_path.exists():
-                raise exceptions.FileNotFoundError(params.path)
+                raise PathNotFoundError(params.path)
 
-            cmd = _build_rg_command(_get_rg_path(), params, resolved)
+            cmd = build_rg_command(get_rg_path(), params, resolved)
 
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -209,7 +212,7 @@ class GrepTool:
             error_msg = stderr.decode("utf-8", errors="replace").strip()
             raise RipgrepError(error_msg, returncode)
 
-        matches, total_count = _parse_rg_output(stdout, resolved, params.limit)
-        display, text = _format_grep_output(params.pattern, matches, total_count, params.limit)
+        matches, total_count = parse_rg_output(stdout, resolved, params.limit)
+        display, text = format_grep_output(params.pattern, matches, total_count, params.limit)
 
         return ToolOutput(content={"text": text}, display=display)

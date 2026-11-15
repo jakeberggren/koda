@@ -1,1 +1,1 @@
-"""The toolbox: the tools Koda brings (files, search and the shell), bound to a folder."""
+"""The toolbox: the tools Koda brings, by what they work on: the shell, files and search."""

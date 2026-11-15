@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from koda.harness.toolbox.workspace import Workspace
+from koda.harness.workspace import Workspace
 from koda.messages import ToolCall, ToolMessage, ToolOutput
 from koda.tools import ToolExecutor, ToolRegistry
 

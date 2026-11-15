@@ -74,7 +74,7 @@ class AgentRunner:
     async def _build(self) -> Agent:
         settings = self._state.settings.agent_settings
         model = self._catalog.resolve(settings.provider, settings.model)
-        workspace = self._state.workspace
+        workspace = harness.Workspace(self._state.workspace)
         return Agent(
             await self._connect(model),
             instructions=harness.instructions(workspace),
