@@ -27,7 +27,7 @@ def test_lists_the_models_levels_and_sets_the_chosen_one(
     )
     ThinkingMenu(context).open()
 
-    items = overlays.stack[-1]["items"]
+    items = overlays.top.items
     assert [(item.label, item.current) for item in items] == [("None", True), ("High", False)]
     overlays.pick("High")
     assert context.settings.thinking == "high"
@@ -36,4 +36,4 @@ def test_lists_the_models_levels_and_sets_the_chosen_one(
 def test_without_a_model_there_are_no_levels(context: PaletteContext, overlays: Overlays) -> None:
     context.state.active_model = None
     ThinkingMenu(context).open()
-    assert overlays.stack[-1]["items"] == []
+    assert overlays.top.items == []

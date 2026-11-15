@@ -12,7 +12,6 @@ from koda.llm.apis.responses import (
     OpenAIResponsesAPIConfig,
     OpenAIResponsesEventAdapter,
 )
-from koda.llm.utils import resolve_openai_client
 
 if TYPE_CHECKING:
     from koda.llm.apis.base import LLMApiContext
@@ -56,10 +55,9 @@ class OpenAICodexResponsesAPI(OpenAIResponsesAPI):
             account_id=account_id,
             backend=config.backend,
         )
-        client_factory = resolve_openai_client(tracing=context.tracing)
         return cls(
             config,
-            client=client_factory(
+            client=context.openai_client(
                 api_key=config.api_key,
                 base_url=config.base_url,
                 default_headers={

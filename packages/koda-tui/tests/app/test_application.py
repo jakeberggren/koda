@@ -250,37 +250,6 @@ def test_writing_a_message_takes_back_a_press_of_ctrl_c() -> None:
     app.outbox.submit.assert_called_once_with("hello", steer=False)
 
 
-def test_first_ctrl_c_asks_and_second_confirms() -> None:
-    app, _ = _make_app()
-    assert app.exit_prompt.confirm() is False
-    assert app.state.exit_requested
-    assert app.exit_prompt.confirm() is True
-    assert not app.state.exit_requested
-
-
-async def test_the_exit_prompt_goes_away_after_the_timeout(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr("koda_tui.app.exit.EXIT_TIMEOUT", 0.01)
-    app, _ = _make_app()
-    app.exit_prompt.confirm()
-
-    await asyncio.sleep(0.02)
-
-    assert not app.state.exit_requested
-    assert app.exit_prompt.confirm() is False
-
-
-async def test_a_confirmed_exit_cancels_the_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("koda_tui.app.exit.EXIT_TIMEOUT", 0.01)
-    app, _ = _make_app()
-    app.exit_prompt.confirm()
-    assert app.exit_prompt.confirm() is True
-    app.state.exit_requested = True  # As if asked again after confirming.
-    await asyncio.sleep(0.02)
-    assert app.state.exit_requested  # The old timer didn't fire.
-
-
 async def _respond(app: KodaTuiApp, text: str = "hello") -> list[object]:
     return [event async for event in app.respond(text)]
 

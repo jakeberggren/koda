@@ -42,6 +42,7 @@ from koda.llm.types import (
     LLMToolStarted,
     ThinkingMode,
 )
+from koda.llm.utils import resolve_openai_client
 
 
 async def connect(
@@ -60,7 +61,7 @@ async def connect(
             model=model,
             connection=connection,
             credentials=credentials,
-            tracing=tracing,
+            openai_client=resolve_openai_client(tracing=tracing),
         )
     )
 

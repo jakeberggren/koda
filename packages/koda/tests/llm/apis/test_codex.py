@@ -85,6 +85,7 @@ def _context(
     credential: ProviderCredential | None,
     auth_provider: _FakeAuthProvider | None = None,
     credentials: _FakeCredentials | None = None,
+    client: _FakeClientFactory | None = None,
 ) -> LLMApiContext:
     connection = replace(_CONNECTION, oauth=auth_provider or _FakeAuthProvider())
     return LLMApiContext(
@@ -97,17 +98,12 @@ def _context(
         ),
         connection=connection,
         credentials=cast("Credentials", credentials or _FakeCredentials(credential)),
+        openai_client=cast("Callable[..., AsyncOpenAI]", client or _FakeClientFactory()),
     )
 
 
-async def test_codex_responses_factory_builds_oauth_client(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_codex_responses_factory_builds_oauth_client() -> None:
     factory = _FakeClientFactory()
-    monkeypatch.setattr(
-        "koda.llm.apis.codex.resolve_openai_client",
-        cast("Callable[..., Callable[..., AsyncOpenAI]]", lambda **_: factory),
-    )
 
     api = await OpenAICodexResponsesAPI.from_context(
         _context(
@@ -117,7 +113,8 @@ async def test_codex_responses_factory_builds_oauth_client(
                 refresh_token="refresh-token",  # noqa: S106
                 expires_at=str(int(time()) + 3600),
                 metadata={"chatgpt_account_id": "account-id"},
-            )
+            ),
+            client=factory,
         )
     )
 
@@ -156,14 +153,8 @@ async def test_codex_responses_factory_requires_account_id() -> None:
         )
 
 
-async def test_codex_responses_factory_refreshes_expired_oauth_credential(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_codex_responses_factory_refreshes_expired_oauth_credential() -> None:
     factory = _FakeClientFactory()
-    monkeypatch.setattr(
-        "koda.llm.apis.codex.resolve_openai_client",
-        cast("Callable[..., Callable[..., AsyncOpenAI]]", lambda **_: factory),
-    )
     expired = OAuthCredential(
         type="oauth",
         access_token="expired-access-token",  # noqa: S106
@@ -180,7 +171,7 @@ async def test_codex_responses_factory_refreshes_expired_oauth_credential(
     )
     credentials = _FakeCredentials(expired)
     auth_provider = _FakeAuthProvider(refreshed)
-    context = _context(expired, auth_provider, credentials)
+    context = _context(expired, auth_provider, credentials, factory)
 
     api = await OpenAICodexResponsesAPI.from_context(context)
 

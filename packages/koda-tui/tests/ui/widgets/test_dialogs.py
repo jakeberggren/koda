@@ -39,20 +39,17 @@ def dialog_factory():
 class TestCallbacks:
     def test_submit(self, dialog_factory) -> None:
         d, calls = dialog_factory()
-        d.input_buffer.text = "hello"
-        d._on_enter(None)
+        d.submit("hello")
         assert calls["submit"] == ["hello"]
 
     def test_submit_strips(self, dialog_factory) -> None:
         d, calls = dialog_factory()
-        d.input_buffer.text = "  hello  "
-        d._on_enter(None)
+        d.submit("  hello  ")
         assert calls["submit"] == ["hello"]
 
     def test_submit_empty_noop(self, dialog_factory) -> None:
         d, calls = dialog_factory()
-        d.input_buffer.text = "   "
-        d._on_enter(None)
+        d.submit("   ")
         assert calls["submit"] == []
 
     def test_cancel(self, dialog_factory) -> None:

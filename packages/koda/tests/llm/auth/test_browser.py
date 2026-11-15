@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock
 
 import pytest
@@ -17,6 +18,9 @@ from koda.llm.auth.exceptions import (
     OAuthCallbackStateError,
 )
 from koda.llm.auth.protocols import OAuthLoginCallbacks
+
+if TYPE_CHECKING:
+    from threading import Event
 
 
 def _request() -> AuthorizationRequest:
@@ -69,21 +73,21 @@ def test_extract_authorization_code_rejects_unexpected_redirect(value: str) -> N
         extract_authorization_code(_request(), value)
 
 
-async def test_complete_browser_authorization_uses_loopback_callback(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    opened_urls: list[str] = []
+class _Listener:
+    """The browser comes back with ``auth-code`` right away."""
 
-    def receive(self: object, *, cancel_event: object) -> str:
-        _ = self
+    def receive(self, *, cancel_event: Event | None = None) -> str:
         _ = cancel_event
         return "auth-code"
+
+
+async def test_complete_browser_authorization_uses_loopback_callback() -> None:
+    opened_urls: list[str] = []
 
     async def wait_for_prompt(_: str) -> str:
         await asyncio.Future()
         raise AssertionError
 
-    monkeypatch.setattr("koda.llm.auth.browser.OAuthCallbackListener.receive", receive)
     callbacks = OAuthLoginCallbacks(
         on_auth_url=opened_urls.append,
         on_prompt=AsyncMock(side_effect=wait_for_prompt),
@@ -94,6 +98,7 @@ async def test_complete_browser_authorization_uses_loopback_callback(
         callbacks,
         redirect=LoopbackRedirect(host="127.0.0.1", port=1455, path="/callback"),
         prompt="Paste callback URL",
+        listener=_Listener(),
     )
 
     assert code == "auth-code"

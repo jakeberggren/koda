@@ -41,7 +41,7 @@ class Shortcut[T]:
 
 class Picker[T]:
     """A search field over a list, in a panel. Typing filters the items, up and down
-    move the selection, enter picks it and escape closes.
+    move the selection, enter picks it (``select``) and escape closes (``close``).
     """
 
     def __init__(  # noqa: PLR0913 - each option is a distinct part of the picker
@@ -55,7 +55,11 @@ class Picker[T]:
         shortcuts: Sequence[Shortcut[T]] = (),
         label_width: int | None = None,
     ) -> None:
+        self.title = title
+        self.heading = heading
         self.state = ListState(items)
+        self._on_select = on_select
+        self._on_close = on_close
         self.search = Buffer(on_text_changed=lambda buffer: self.state.set_search(buffer.text))
         body: list[AnyContainer] = [
             VSplit([Prompt(), Input(self.search)], padding=Spacing.GAP),
@@ -67,13 +71,25 @@ class Picker[T]:
         self._panel = Panel(
             title,
             body,
-            on_close=on_close,
-            key_bindings=_key_bindings(self.state, on_select, shortcuts),
+            on_close=self.close,
+            key_bindings=_key_bindings(self.state, self.select, shortcuts),
             width=Width.LARGE,
         )
 
     def __pt_container__(self) -> Panel:
         return self._panel
+
+    @property
+    def items(self) -> list[ListItem[T]]:
+        return self.state.items
+
+    def select(self, item: ListItem[T]) -> None:
+        """Pick ``item``, as Enter does on the selected one."""
+        self._on_select(item)
+
+    def close(self) -> None:
+        """Close the picker, as Escape does."""
+        self._on_close()
 
 
 def _key_bindings[T](
