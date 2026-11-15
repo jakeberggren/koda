@@ -25,7 +25,7 @@ from koda.llm.types import (
     LLMToolCompleted,
     LLMToolStarted,
 )
-from koda.messages import AssistantMessage, InterruptionMessage, ToolMessage
+from koda.messages import AssistantMessage, InterruptionMessage, TokenUsage, ToolMessage
 from koda.sessions import InMemorySessionStore, SaveSessionHook, Session
 from koda.tools import (
     ToolCall,
@@ -335,3 +335,38 @@ async def test_the_turn_keeps_the_tools_the_provider_ran(tmp_path: Path) -> None
 
     assert agent.turn.provider_calls == [call]
     assert agent.turn.results == {"web": result}
+
+
+async def test_what_the_provider_only_sends_at_the_end_is_in_the_response(
+    tmp_path: Path,
+) -> None:
+    call = ToolCall(tool_name="delayed_tool", arguments={"delay": 0}, call_id="late")
+    usage = TokenUsage(input_tokens=3, output_tokens=2)
+    completed = AssistantMessage(content="Unstreamed answer", tool_calls=[call])
+    llm = _ScriptedLLM(
+        [LLMResponseCompleted(response=LLMResponse(output=completed, usage=usage))], _says("ok")
+    )
+    agent = _agent(tmp_path, llm, _DelayedTool())
+
+    await _run(agent)
+
+    response = agent.session.messages[1]
+    assert isinstance(response, AssistantMessage)
+    assert (response.content, response.tool_calls, response.usage) == (
+        "Unstreamed answer",
+        [call],
+        usage,
+    )
+
+
+async def test_the_agent_keeps_one_turn_that_starts_fresh_each_time(tmp_path: Path) -> None:
+    call = ToolCall(tool_name="web_search", arguments={"query": "koda"}, call_id="web")
+    llm = _ScriptedLLM([LLMToolStarted(call=call), *_says("found")], _says("again"))
+    agent = _agent(tmp_path, llm)
+    turn = agent.turn
+
+    await _run(agent, "search")
+    assert (agent.turn is turn, turn.running, turn.provider_calls) == (True, False, [call])
+
+    await _run(agent, "again")
+    assert (agent.turn is turn, turn.provider_calls) == (True, [])

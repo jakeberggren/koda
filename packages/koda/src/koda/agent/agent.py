@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,10 +17,18 @@ from koda.agent.events import (
     AgentTurnCompleted,
     AgentTurnStarted,
 )
-from koda.agent.stream import AgentStreamAccumulator
 from koda.context import ContextManager
 from koda.llm import LLMRequest, LLMRequestOptions
-from koda.llm.types import LLMResponseCompleted, LLMToolCompleted, LLMToolStarted
+from koda.llm.types import (
+    LLMEvent,
+    LLMResponse,
+    LLMResponseCompleted,
+    LLMTextDelta,
+    LLMThinkingDelta,
+    LLMToolCallRequested,
+    LLMToolCompleted,
+    LLMToolStarted,
+)
 from koda.messages import AssistantMessage, InterruptionMessage, ToolMessage, UserMessage
 from koda.prompts import SystemPromptLoader
 from koda.tools import ToolConfig, ToolOutput, ToolResult
@@ -79,7 +87,7 @@ class Agent:
         self.instructions = ContextManager.from_workspace(self.workspace).build_system_prompt(
             SystemPromptLoader.for_workspace(self.workspace).load()
         )
-        self.turn = Turn()  # The latest turn; none has run yet.
+        self.turn = Turn()  # The latest turn, the same object for every one; none has run yet.
         logger.info("agent_initialized", llm=type(llm).__name__)
 
     async def run(self, text: str) -> AsyncIterator[AgentEvent]:
@@ -88,7 +96,7 @@ class Agent:
         text = text.strip()
         if not text:
             raise ValueError("Message cannot be empty")
-        self.turn = Turn(running=True)
+        self._start_turn()
         try:
             async for event in self._turn(text):
                 yield event
@@ -129,14 +137,12 @@ class Agent:
                 tools=definitions,
                 options=self.options,
             )
-            accumulator = AgentStreamAccumulator()
-            async for event in accumulator.process_stream(self.llm.generate_stream(request)):
-                if isinstance(event, LLMResponseCompleted):
-                    continue  # The agent completes the response below.
-                self._follow(event, accumulator)
-                yield event
-            calls, message = accumulator.tool_calls, assembled_response(accumulator)
-            self.turn.response = None
+            async for event in self.llm.generate_stream(request):
+                self._follow(event)
+                if not isinstance(event, LLMResponseCompleted):  # Completed below, by the agent.
+                    yield event
+            message, self.turn.response = self.turn.response, None
+            calls = message.tool_calls if message else []
             if message is not None:
                 await self._add(message)
                 yield AgentResponseCompleted(message=message)
@@ -148,20 +154,30 @@ class Agent:
             async for event in self._run_tools(calls):
                 yield event
 
-    def _follow(self, event: AgentEvent, accumulator: AgentStreamAccumulator) -> None:
-        """Keep the turn up to date with a model event."""
+    def _start_turn(self) -> None:
+        """Make the turn a new one, running, with nothing in it yet."""
         turn = self.turn
+        turn.running, turn.response = True, None
+        turn.calls, turn.results, turn.provider_calls = [], {}, []
+
+    def _follow(self, event: LLMEvent) -> None:  # noqa: C901 - one case per kind of event
+        """Take a model event into the turn: the response builds up as it streams."""
+        turn = self.turn
+        response = turn.response or AssistantMessage()
         match event:
+            case LLMTextDelta(text=text):
+                turn.response = replace(response, content=response.content + text)
+            case LLMThinkingDelta(text=text):
+                thinking = response.thinking_content + text
+                turn.response = replace(response, thinking_content=thinking)
+            case LLMToolCallRequested(call=call):
+                turn.response = replace(response, tool_calls=[*response.tool_calls, call])
             case LLMToolStarted(call=call):
                 turn.provider_calls.append(call)
             case LLMToolCompleted(result=result):
                 turn.results[result.call_id] = result
-            case _:
-                turn.response = AssistantMessage(
-                    content=accumulator.content,
-                    thinking_content=accumulator.thinking_content,
-                    tool_calls=list(accumulator.tool_calls),
-                )
+            case LLMResponseCompleted(response=completed):
+                turn.response = completed_response(response, completed)
 
     def _partial_response(self) -> list[Message]:
         """What the model had written of the response streaming in, if anything."""
@@ -206,14 +222,20 @@ INTERRUPTED = "Interrupted by the user"
 FAILED = "Not run: the turn failed"
 
 
-def assembled_response(accumulator: AgentStreamAccumulator) -> AssistantMessage | None:
-    """The assistant message one model call produced, if it produced anything."""
-    if not (accumulator.content or accumulator.thinking_content or accumulator.tool_calls):
-        return None
-    completed = accumulator.completed_response
-    return AssistantMessage(
-        content=accumulator.content,
-        thinking_content=accumulator.thinking_content,
-        tool_calls=accumulator.tool_calls,
-        usage=completed.response.usage if completed else None,
+def completed_response(
+    streamed: AssistantMessage, completed: LLMResponse[AssistantMessage]
+) -> AssistantMessage | None:
+    """The response once the model is done: what streamed, with the usage, and what the
+    provider only sent at the end: the content if none streamed, and tool calls that didn't
+    stream. None if the model produced nothing."""
+    output = completed.output
+    seen = {call.call_id for call in streamed.tool_calls}
+    response = replace(
+        streamed,
+        content=streamed.content or output.content,
+        tool_calls=[*streamed.tool_calls, *(c for c in output.tool_calls if c.call_id not in seen)],
+        usage=completed.usage,
     )
+    if not (response.content or response.thinking_content or response.tool_calls):
+        return None
+    return response
