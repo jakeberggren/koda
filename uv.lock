@@ -838,6 +838,7 @@ dependencies = [
     { name = "httpx2" },
     { name = "langfuse" },
     { name = "openai" },
+    { name = "pathspec" },
     { name = "pydantic" },
     { name = "structlog" },
 ]
@@ -850,6 +851,7 @@ requires-dist = [
     { name = "httpx2", specifier = ">=2.12.0" },
     { name = "langfuse", specifier = ">=5.1,<6" },
     { name = "openai", specifier = ">=3.41,<4" },
+    { name = "pathspec", specifier = ">=1.1.1,<2" },
     { name = "pydantic", specifier = ">=2.13.3,<3" },
     { name = "structlog", specifier = ">=26.1,<27" },
 ]
@@ -860,7 +862,6 @@ version = "0.8.4"
 source = { editable = "packages/koda-tui" }
 dependencies = [
     { name = "koda" },
-    { name = "pathspec" },
     { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "rich" },
@@ -871,7 +872,6 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "koda", editable = "packages/koda" },
-    { name = "pathspec", specifier = ">=1.1.1,<2" },
     { name = "prompt-toolkit", specifier = ">=3.0.52,<4" },
     { name = "pydantic", specifier = ">=2.13.3,<3" },
     { name = "rich", specifier = ">=15.0.0,<16" },

@@ -49,6 +49,24 @@ class TestGrepTool:
     @rg_required
     @pytest.mark.requires_rg
     @pytest.mark.asyncio
+    async def test_grep_searches_the_files_the_workspace_has(self, workspace_dir: Path) -> None:
+        """grep searches what Workspace.files lists: hidden files, not ignored ones."""
+        (workspace_dir / ".gitignore").write_text("build/\n")
+        for path in [".github/ci.yml", "src/app.py", "src/gen.py", "build/out.js", ".git/config"]:
+            (workspace_dir / path).parent.mkdir(parents=True, exist_ok=True)
+            (workspace_dir / path).write_text("needle\n")
+        (workspace_dir / "src" / ".gitignore").write_text("gen.py\n")
+        workspace = Workspace(workspace_dir)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace)))
+        call = ToolCall(tool_name="grep", arguments={"pattern": "needle"}, call_id="call_grep")
+
+        text = content_text(await executor.execute_call(call), "text")
+
+        searched = {path for path in workspace.files() if path in text}
+        assert searched == {".github/ci.yml", "src/app.py"}
+        assert not any(path in text for path in ["src/gen.py", "build/out.js", ".git/config"])
+
+    @pytest.mark.asyncio
     async def test_grep_respects_limit(self, workspace_dir: Path) -> None:
         """grep tool truncates results when exceeding limit."""
         (workspace_dir / "file.txt").write_text("match\nmatch\nmatch")

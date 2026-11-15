@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 from prompt_toolkit.buffer import Buffer
-from prompt_toolkit.completion import Completer, Completion, ThreadedCompleter
+from prompt_toolkit.completion import ThreadedCompleter
 from prompt_toolkit.filters import Condition
 from prompt_toolkit.key_binding import ConditionalKeyBindings, KeyBindings, merge_key_bindings
 from prompt_toolkit.keys import Keys
@@ -16,19 +16,14 @@ from koda_tui.appearance import Spacing, Tokens
 from koda_tui.terminal.keys import ALT_ENTER
 from koda_tui.ui.primitives import Editor
 from koda_tui.ui.widgets import List, ListItem, ListState, Prompt
-from koda_tui.workspace import WorkspaceFiles
+from koda_tui.views.mentions import MentionCompleter, mention
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
-
-    from prompt_toolkit.completion import CompleteEvent
-    from prompt_toolkit.document import Document
     from prompt_toolkit.key_binding import KeyBindingsBase, KeyPressEvent
 
     from koda_tui.state import AppState
 
 MAX_ROWS = 10  # The composer grows with its text up to this many rows.
-SUGGESTIONS = 10  # Most files suggested for an @ mention.
 
 
 class Submit(Protocol):
@@ -54,7 +49,7 @@ class Composer:
         self.buffer = Buffer(
             multiline=True,
             name="input_buffer",
-            completer=ThreadedCompleter(MentionCompleter(WorkspaceFiles(state.workspace))),
+            completer=ThreadedCompleter(MentionCompleter(state)),
             on_text_changed=self._follow_mention,
             on_cursor_position_changed=self._follow_mention,
             on_completions_changed=self._show_completions,
@@ -100,7 +95,7 @@ class Composer:
 
     def is_mentioning(self) -> bool:
         """Whether the cursor is in an @ mention, so suggestions are showing."""
-        return _mention(self.buffer.document) is not None
+        return mention(self.buffer.document) is not None
 
     def has_suggestion(self) -> bool:
         """Whether a suggested file is selected."""
@@ -195,30 +190,3 @@ class Composer:
             self._suggestions.set_items(
                 [ListItem(label=c.display_text, data=c.text) for c in state.completions],
             )
-
-
-class MentionCompleter(Completer):
-    """Workspace files for the @ mention before the cursor; each puts its path after
-    the ``@``, then a space, so the cursor leaves the mention. A new mention, just
-    ``@``, looks at the files on disk again."""
-
-    def __init__(self, files: WorkspaceFiles) -> None:
-        self._files = files
-
-    def get_completions(
-        self,
-        document: Document,
-        complete_event: CompleteEvent,  # noqa: ARG002 - completes the same however asked
-    ) -> Iterator[Completion]:
-        if (query := _mention(document)) is None:
-            return
-        if not query:
-            self._files.refresh()
-        for path in self._files.search(query, SUGGESTIONS):
-            yield Completion(f"{path} ", start_position=-len(query), display=path)
-
-
-def _mention(document: Document) -> str | None:
-    """What is typed after the ``@`` of the mention before the cursor, if it's in one."""
-    word = document.get_word_before_cursor(WORD=True)
-    return word[1:] if word.startswith("@") else None

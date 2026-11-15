@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
+from koda.harness.workspace import SKIPPED
 from koda.messages import ToolOutput
 from koda.tools import ToolError
 
@@ -19,6 +20,15 @@ if TYPE_CHECKING:
 
 
 RIPGREP_TIMEOUT_SECONDS = 30.0
+# Ripgrep searches the workspace's files by its rules (see Workspace.files): hidden files
+# too, .gitignore and .ignore in a git repository or not, and none of Git's other excludes.
+FILE_RULES = (
+    "--hidden",
+    "--no-require-git",
+    "--no-ignore-global",
+    "--no-ignore-exclude",
+    *(argument for name in sorted(SKIPPED) for argument in ("--glob", f"!{name}")),
+)
 
 
 class RipgrepNotFoundError(ToolError):
@@ -78,7 +88,7 @@ def get_rg_path() -> str:
 
 def build_rg_command(rg_path: str, params: GrepParams, target: Path) -> list[str]:
     """Build ripgrep command arguments."""
-    cmd = [rg_path, "--json"]
+    cmd = [rg_path, "--json", *FILE_RULES]
 
     if not params.case_sensitive:
         cmd.append("--ignore-case")

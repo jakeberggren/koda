@@ -32,11 +32,10 @@ packages/koda-tui/src/koda_tui/
 ├── settings.py     # Settings (agent + TUI), loaded from and saved to ~/.koda/settings.json
 ├── state.py        # AppState: what the UI shows
 ├── strings.py      # All user-facing text
-├── workspace.py    # Workspace file index for @ mentions
 ├── app/            # The application: wiring, the agent, keybindings, exit prompt
 ├── outbox.py       # Outbox: sends, queues and steers what you write
 ├── palette/        # Command palette and its menus
-├── views/          # Screen, chat, composer, pending messages, status bar
+├── views/          # Screen, chat, composer and its @ mentions, pending messages, status bar
 ├── rendering/      # Rich-based rendering of messages, markdown, and diffs
 ├── ui/             # Primitives, widgets, and overlays on prompt_toolkit
 ├── appearance/     # Themes, tokens, icons, and sizes
