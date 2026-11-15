@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass, field, replace
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from structlog import get_logger
@@ -17,7 +16,6 @@ from koda.agent.events import (
     AgentTurnCompleted,
     AgentTurnStarted,
 )
-from koda.context import ContextManager
 from koda.llm import LLMRequest, LLMRequestOptions
 from koda.llm.types import (
     LLMEvent,
@@ -29,19 +27,24 @@ from koda.llm.types import (
     LLMToolCompleted,
     LLMToolStarted,
 )
-from koda.messages import AssistantMessage, InterruptionMessage, ToolMessage, UserMessage
-from koda.prompts import SystemPromptLoader
-from koda.tools import ToolConfig, ToolOutput, ToolResult
-from koda.tools.executor import ToolExecutor
+from koda.messages import (
+    AssistantMessage,
+    InterruptionMessage,
+    ToolMessage,
+    ToolOutput,
+    UserMessage,
+)
+from koda.sessions import Session
+from koda.tools import ToolExecutor, ToolRegistry
+from koda.tools.executor import answer
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
 
     from koda.agent.hooks import Hook
     from koda.llm import LLM
-    from koda.messages import Message
-    from koda.sessions import Session
-    from koda.tools import ToolCall
+    from koda.messages import Message, ToolCall
+    from koda.tools import Tool
 
 logger = get_logger(__name__)
 
@@ -56,37 +59,36 @@ class Turn:
     response: AssistantMessage | None = None
     # Tool calls waiting for their result.
     calls: list[ToolCall] = field(default_factory=list)
-    # Tool results that are ready, by call id, before they are added to the session in order.
-    results: dict[str, ToolResult] = field(default_factory=dict)
+    # Tool answers that are ready, by call id, before they are added to the session in order.
+    results: dict[str, ToolMessage] = field(default_factory=dict)
     # Tools the provider ran itself, such as web search; they are part of its response.
     provider_calls: list[ToolCall] = field(default_factory=list)
 
 
 class Agent:
-    """A Koda agent working in ``workspace``: the built-in tools, the workspace's
-    ``SYSTEM.md`` (or ``~/.koda``'s, or the default prompt), and its ``AGENTS.md``.
+    """An agent: ``llm`` with ``instructions``, able to use ``tools``. It knows nothing of
+    files or folders; the harness gives it what it needs for that.
 
-    Messages go into ``session``; ``hooks`` run each time it changes.
+    Messages go into ``session``, a new one by default; ``hooks`` run each time it changes.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - options move to how the LLM is connected, next
         self,
         llm: LLM,
         *,
-        session: Session,
-        workspace: Path | None = None,
+        instructions: str | None = None,
+        tools: Sequence[Tool] = (),
         hooks: Sequence[Hook] = (),
+        session: Session | None = None,
         options: LLMRequestOptions | None = None,
     ) -> None:
         self.llm = llm
-        self.session = session
-        self.workspace = (workspace or Path.cwd()).resolve()
+        self.instructions = instructions
+        self.tools = ToolRegistry(tools)
+        self.executor = ToolExecutor(self.tools)
         self.hooks = tuple(hooks)
+        self.session = session or Session()
         self.options = options or LLMRequestOptions()
-        self.tools = ToolConfig.builtins(cwd=self.workspace, sandbox_dir=self.workspace)
-        self.instructions = ContextManager.from_workspace(self.workspace).build_system_prompt(
-            SystemPromptLoader.for_workspace(self.workspace).load(),
-        )
         self.turn = Turn()  # The latest turn, the same object for every one; none has run yet.
         logger.info("agent_initialized", llm=type(llm).__name__)
 
@@ -128,14 +130,14 @@ class Agent:
         session_id = self.session.session_id
         await self._add(UserMessage(content=text))
         yield AgentTurnStarted(session_id=session_id)
-        definitions = self.tools.registry.get_definitions()
+        definitions = self.tools.definitions() or None
         iteration = 0
         while True:
             iteration += 1
             yield AgentIterationStarted(session_id=session_id, iteration=iteration)
             request = LLMRequest(
                 messages=self.session.messages,
-                instructions=self.instructions.render(),
+                instructions=self.instructions,
                 tools=definitions,
                 options=self.options,
             )
@@ -176,8 +178,8 @@ class Agent:
                 turn.response = replace(response, tool_calls=[*response.tool_calls, call])
             case LLMToolStarted(call=call):
                 turn.provider_calls.append(call)
-            case LLMToolCompleted(result=result):
-                turn.results[result.call_id] = result
+            case LLMToolCompleted(message=message):
+                turn.results[message.call_id] = message
             case LLMResponseCompleted(response=completed):
                 turn.response = completed_response(response, completed)
 
@@ -193,14 +195,8 @@ class Agent:
     def _answers(self, reason: str) -> list[Message]:
         """An error result for each tool call left without one: a model expects a result for
         every call it made."""
-        output = ToolOutput(is_error=True, error_message=reason)
-        answers: list[Message] = [
-            ToolMessage(
-                tool_name=call.tool_name,
-                tool_result=ToolResult(call_id=call.call_id, output=output),
-            )
-            for call in self.turn.calls
-        ]
+        output = ToolOutput.failure(reason)
+        answers: list[Message] = [answer(call, output) for call in self.turn.calls]
         self.turn.calls = []
         return answers
 
@@ -209,15 +205,14 @@ class Agent:
         call order."""
         for call in calls:
             yield AgentToolStarted(call=call)
-        executor = ToolExecutor(self.tools.registry)
-        async for call, result in executor.execute_calls(calls, self.tools.context):
-            self.turn.results[call.call_id] = result
-            yield AgentToolResultReady(tool_name=call.tool_name, result=result)
+        async for message in self.executor.execute_calls(calls):
+            self.turn.results[message.call_id] = message
+            yield AgentToolResultReady(message=message)
         for call in calls:
-            result = self.turn.results.pop(call.call_id)
-            await self._add(ToolMessage(tool_name=call.tool_name, tool_result=result))
+            message = self.turn.results.pop(call.call_id)
+            await self._add(message)
             self.turn.calls.remove(call)
-            yield AgentToolCompleted(tool_name=call.tool_name, result=result)
+            yield AgentToolCompleted(message=message)
 
 
 INTERRUPTED = "Interrupted by the user"

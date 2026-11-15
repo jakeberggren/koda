@@ -1,7 +1,6 @@
 """Tests for the chat: which rows it renders again, and which it keeps."""
 
-from koda.messages import AssistantMessage, UserMessage
-from koda.tools import ToolCall
+from koda.messages import AssistantMessage, ToolCall, UserMessage
 from koda_tui.rendering import Renderer
 from koda_tui.state import AppState
 from koda_tui.views.chat import Chat

@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolContext, ToolOutput, exceptions
-from koda.tools.decorators import tool
+from koda.harness.toolbox import exceptions
+from koda.messages import ToolOutput
+
+if TYPE_CHECKING:
+    from koda.harness.toolbox.workspace import Workspace
 
 
 class GlobParams(BaseModel):
@@ -21,7 +26,6 @@ class GlobParams(BaseModel):
     limit: int = Field(default=100, description="Maximum number of results to return.")
 
 
-@tool
 class GlobTool:
     """Tool for globbing files."""
 
@@ -42,11 +46,14 @@ class GlobTool:
             ],
         )
 
-    async def execute(self, params: GlobParams, ctx: ToolContext) -> ToolOutput:
-        resolved_path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+    def __init__(self, workspace: Workspace) -> None:
+        self.workspace = workspace
+
+    async def execute(self, params: GlobParams) -> ToolOutput:
+        resolved_path = self.workspace.resolve(params.path)
         resolved = AnyioPath(resolved_path)
 
-        async with ctx.coordinator.shared_access():
+        async with self.workspace.coordinator.shared_access():
             if not await resolved.exists():
                 raise exceptions.FileNotFoundError(params.path)
 

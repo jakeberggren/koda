@@ -43,8 +43,7 @@ from koda.llm.types import (
     LLMToolCallRequested,
 )
 from koda.llm.utils import provider_message, tool_arguments
-from koda.messages import AssistantMessage, TokenUsage, ToolMessage
-from koda.tools import ToolCall
+from koda.messages import AssistantMessage, TokenUsage, ToolCall, ToolMessage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Sequence
@@ -90,18 +89,18 @@ class AnthropicMessagesAdapter(LLMAdapter[list[MessageParam], list[ToolParam] | 
             "type": "tool_use",
             "id": call.call_id,
             "name": call.tool_name,
-            "input": call.arguments,
+            "input": dict(call.arguments),
         }
 
     @staticmethod
     def _to_tool_result_block(message: ToolMessage) -> ToolResultBlockParam:
-        output = message.tool_result.output
+        output = message.output
         result_data: dict[str, object] = {"content": output.content, "is_error": output.is_error}
         if output.error_message:
             result_data["error_message"] = output.error_message
         return {
             "type": "tool_result",
-            "tool_use_id": message.tool_result.call_id,
+            "tool_use_id": message.call_id,
             "content": json.dumps(result_data),
             "is_error": output.is_error,
         }
@@ -151,7 +150,7 @@ class AnthropicMessagesAdapter(LLMAdapter[list[MessageParam], list[ToolParam] | 
     @staticmethod
     def _tool_calls_from_response(response: Message) -> list[ToolCall]:
         return [
-            ToolCall(tool_name=block.name, arguments=block.input, call_id=block.id)
+            ToolCall(tool_name=block.name, arguments=tool_arguments(block.input), call_id=block.id)
             for block in response.content
             if isinstance(block, ToolUseBlock)
         ]

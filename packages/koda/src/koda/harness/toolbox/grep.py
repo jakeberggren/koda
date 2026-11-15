@@ -5,12 +5,17 @@ import functools
 import json
 import shutil
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolContext, ToolOutput, exceptions
-from koda.tools.decorators import tool
+from koda.harness.toolbox import exceptions
+from koda.messages import ToolOutput
+
+if TYPE_CHECKING:
+    from koda.harness.toolbox.workspace import Workspace
+
 
 RIPGREP_TIMEOUT_SECONDS = 30.0
 
@@ -155,7 +160,6 @@ def _format_grep_output(
     return display, f"{display}:\n{matches_text}"
 
 
-@tool
 class GrepTool:
     """Fast file content search using ripgrep."""
 
@@ -167,11 +171,14 @@ class GrepTool:
     )
     parameters_model: type[GrepParams] = GrepParams
 
-    async def execute(self, params: GrepParams, ctx: ToolContext) -> ToolOutput:
-        resolved: Path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+    def __init__(self, workspace: Workspace) -> None:
+        self.workspace = workspace
+
+    async def execute(self, params: GrepParams) -> ToolOutput:
+        resolved: Path = self.workspace.resolve(params.path)
         async_path = AnyioPath(resolved)
 
-        async with ctx.coordinator.shared_access():
+        async with self.workspace.coordinator.shared_access():
             if not await async_path.exists():
                 raise exceptions.FileNotFoundError(params.path)
 
@@ -181,7 +188,7 @@ class GrepTool:
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(ctx.cwd),
+                cwd=str(self.workspace.root),
             )
 
             try:

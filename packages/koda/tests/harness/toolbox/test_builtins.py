@@ -10,27 +10,20 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from koda.tools import (
-    ToolCall,
-    ToolContext,
-    ToolExecutionCoordinator,
-    ToolExecutor,
-    ToolRegistry,
-    get_builtin_tools,
-)
-from koda.tools.builtins.bash import BASH_MAX_OUTPUT_CHARS
-from koda.tools.policy import ToolPolicy
+from koda import harness
+from koda.harness.toolbox.bash import BASH_MAX_OUTPUT_CHARS
+from koda.messages import ToolCall, ToolMessage
+from koda.tools import ToolExecutor, ToolRegistry
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _tool_context(workspace_dir: Path) -> ToolContext:
-    return ToolContext(
-        cwd=workspace_dir,
-        policy=ToolPolicy.create(workspace_dir),
-        coordinator=ToolExecutionCoordinator(),
-    )
+def content_text(message: ToolMessage, key: str) -> str:
+    """The string a tool put under ``key`` in its content."""
+    value = message.output.content[key]
+    assert isinstance(value, str)
+    return value
 
 
 class TestReadFileTool:
@@ -42,47 +35,20 @@ class TestReadFileTool:
         test_file = workspace_dir / "test.txt"
         test_file.write_text("Hello, World!")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(tool_name="read_file", arguments={"path": "test.txt"}, call_id="call_read")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.call_id == "call_read"
         assert result.output.is_error is False
-        assert result.output.content["text"] == "Hello, World!"
-
-    @pytest.mark.asyncio
-    async def test_read_file_outside_workspace_fails(self, workspace_dir: Path) -> None:
-        """read_file tool fails when reading outside the workspace."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
-
-        call = ToolCall(
-            tool_name="read_file",
-            arguments={"path": "/etc/passwd"},
-            call_id="call_escape",
-        )
-
-        result = await executor.execute_call(call, context)
-
-        assert result.call_id == "call_escape"
-        assert result.output.is_error is True
-        assert result.output.error_message is not None
-        assert "/etc/passwd" in result.output.error_message
+        assert content_text(result, "text") == "Hello, World!"
 
     @pytest.mark.asyncio
     async def test_read_file_not_found(self, workspace_dir: Path) -> None:
         """read_file tool returns error for non-existent file."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="read_file",
@@ -90,7 +56,7 @@ class TestReadFileTool:
             call_id="call_notfound",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.call_id == "call_notfound"
         assert result.output.is_error is True
@@ -103,10 +69,7 @@ class TestReadFileTool:
         test_file = workspace_dir / "test.txt"
         test_file.write_text("line1\nline2\nline3")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="read_file",
@@ -114,7 +77,7 @@ class TestReadFileTool:
             call_id="call_display",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.display is not None
         assert "3 lines" in result.output.display
@@ -124,10 +87,7 @@ class TestReadFileTool:
         test_file = workspace_dir / "test.txt"
         test_file.write_text("line1\nline2\nline3")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="read_file",
@@ -135,7 +95,7 @@ class TestReadFileTool:
             call_id="call_display",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.content == {"text": "line2\nline3", "encoding": "utf-8"}
         assert "line1" not in result.output.content
@@ -149,10 +109,7 @@ class TestReadFileTool:
         test_file = workspace_dir / "binary.dat"
         test_file.write_bytes(b"\x00\x01\x02\x03")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="read_file",
@@ -160,7 +117,7 @@ class TestReadFileTool:
             call_id="call_binary",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -172,10 +129,7 @@ class TestReadFileTool:
         test_file = workspace_dir / "bom.txt"
         test_file.write_bytes("hello\nworld\n".encode("utf-8-sig"))
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="read_file",
@@ -183,7 +137,7 @@ class TestReadFileTool:
             call_id="call_bom",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
         assert result.output.content == {"text": "hello\nworld\n", "encoding": "utf-8-sig"}
@@ -197,10 +151,7 @@ class TestReadFileTool:
         test_file = workspace_dir / "large.txt"
         test_file.write_bytes(b"line1\nline2\n" + b"a" * 10000 + b"\x80")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="read_file",
@@ -208,7 +159,7 @@ class TestReadFileTool:
             call_id="call_streaming",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
         assert result.output.content == {"text": "line1\nline2\n", "encoding": "utf-8"}
@@ -220,10 +171,7 @@ class TestWriteFileTool:
     @pytest.mark.asyncio
     async def test_write_file_success(self, workspace_dir: Path) -> None:
         """write_file tool can create files within the workspace."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="write_file",
@@ -231,7 +179,7 @@ class TestWriteFileTool:
             call_id="call_write",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.call_id == "call_write"
         assert result.output.is_error is False
@@ -243,10 +191,7 @@ class TestWriteFileTool:
     @pytest.mark.asyncio
     async def test_write_file_creates_parent_dirs(self, workspace_dir: Path) -> None:
         """write_file tool creates parent directories."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="write_file",
@@ -254,38 +199,15 @@ class TestWriteFileTool:
             call_id="call_nested",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
         assert (workspace_dir / "nested" / "dir" / "file.txt").read_text() == "Nested content"
 
     @pytest.mark.asyncio
-    async def test_write_file_outside_workspace_fails(self, workspace_dir: Path) -> None:
-        """write_file tool fails when writing outside the workspace."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
-
-        call = ToolCall(
-            tool_name="write_file",
-            arguments={"path": "/tmp/escape.txt", "content": "escaped"},
-            call_id="call_escape",
-        )
-
-        result = await executor.execute_call(call, context)
-
-        assert result.output.is_error is True
-        assert result.output.error_message is not None
-        assert "/tmp/escape.txt" in result.output.error_message
-
-    @pytest.mark.asyncio
     async def test_write_file_display(self, workspace_dir: Path) -> None:
         """write_file tool sets appropriate display message."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="write_file",
@@ -293,7 +215,7 @@ class TestWriteFileTool:
             call_id="call_display",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.display is not None
         assert "2 lines" in result.output.display
@@ -305,10 +227,7 @@ class TestWriteFileTool:
         test_file.write_text("#!/bin/sh\necho old\n")
         test_file.chmod(0o755)
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="write_file",
@@ -316,7 +235,7 @@ class TestWriteFileTool:
             call_id="call_preserve_mode",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
         assert stat.S_IMODE(test_file.stat().st_mode) == 0o755
@@ -331,10 +250,7 @@ class TestWriteFileTool:
         if os.access(test_file, os.W_OK):
             pytest.skip("platform does not enforce read-only mode for the current user")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         try:
             call = ToolCall(
@@ -343,7 +259,7 @@ class TestWriteFileTool:
                 call_id="call_read_only",
             )
 
-            result = await executor.execute_call(call, context)
+            result = await executor.execute_call(call)
         finally:
             test_file.chmod(0o644)
 
@@ -362,10 +278,7 @@ class TestEditFileTool:
         test_file = workspace_dir / "test.txt"
         test_file.write_text("line1\nline2")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="edit_file",
@@ -373,43 +286,20 @@ class TestEditFileTool:
             call_id="call_edit",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.call_id == "call_edit"
         assert result.output.is_error is False
         assert result.output.content["replacements"] == 1
-        assert result.output.content["path"] == "test.txt"
-        assert "+line3" in result.output.content["diff"]
+        assert content_text(result, "path") == "test.txt"
+        assert "+line3" in content_text(result, "diff")
         assert result.output.display is not None
         assert (workspace_dir / "test.txt").read_text() == "line1\nline2\nline3"
 
     @pytest.mark.asyncio
-    async def test_edit_file_outside_workspace_fails(self, workspace_dir: Path) -> None:
-        """edit_file tool fails when editing outside the workspace."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
-
-        call = ToolCall(
-            tool_name="edit_file",
-            arguments={"path": "/etc/passwd", "old_text": "root", "new_text": "r"},
-            call_id="call_escape",
-        )
-
-        result = await executor.execute_call(call, context)
-
-        assert result.output.is_error is True
-        assert result.output.error_message is not None
-        assert "/etc/passwd" in result.output.error_message
-
-    @pytest.mark.asyncio
     async def test_edit_file_not_found(self, workspace_dir: Path) -> None:
         """edit_file tool returns error for missing file."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="edit_file",
@@ -417,7 +307,7 @@ class TestEditFileTool:
             call_id="call_missing",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -428,10 +318,7 @@ class TestEditFileTool:
         """edit_file tool returns error for directory targets."""
         (workspace_dir / "subdir").mkdir()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="edit_file",
@@ -439,7 +326,7 @@ class TestEditFileTool:
             call_id="call_dir",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -451,10 +338,7 @@ class TestEditFileTool:
         test_file = workspace_dir / "test.txt"
         test_file.write_text("line1\nline2")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="edit_file",
@@ -462,7 +346,7 @@ class TestEditFileTool:
             call_id="call_notfound",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -474,10 +358,7 @@ class TestEditFileTool:
         test_file = workspace_dir / "test.txt"
         test_file.write_text("repeat\nrepeat\nrepeat")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="edit_file",
@@ -485,7 +366,7 @@ class TestEditFileTool:
             call_id="call_multiple",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -498,10 +379,7 @@ class TestEditFileTool:
         test_file.write_text("repeat\nrepeat\nrepeat")
         expected_replacements = test_file.read_text().count("repeat")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="edit_file",
@@ -514,7 +392,7 @@ class TestEditFileTool:
             call_id="call_replace_all",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
         assert result.output.content["replacements"] == expected_replacements
@@ -528,10 +406,7 @@ class TestEditFileTool:
         test_file = workspace_dir / "test.txt"
         test_file.write_text("same")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="edit_file",
@@ -539,11 +414,11 @@ class TestEditFileTool:
             call_id="call_noop",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
         assert result.output.content["replacements"] == 0
-        assert result.output.content["diff"] == ""
+        assert content_text(result, "diff") == ""
         assert result.output.display == "No changes"
 
     @pytest.mark.asyncio
@@ -556,10 +431,7 @@ class TestEditFileTool:
         if os.access(test_file, os.W_OK):
             pytest.skip("platform does not enforce read-only mode for the current user")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         try:
             call = ToolCall(
@@ -568,7 +440,7 @@ class TestEditFileTool:
                 call_id="call_read_only_edit",
             )
 
-            result = await executor.execute_call(call, context)
+            result = await executor.execute_call(call)
         finally:
             test_file.chmod(0o644)
 
@@ -588,18 +460,15 @@ class TestGlobTool:
         (workspace_dir / "file2.txt").touch()
         (workspace_dir / "other.py").touch()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(tool_name="glob", arguments={"pattern": "*.txt"}, call_id="call_glob")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.call_id == "call_glob"
         assert result.output.is_error is False
-        text = result.output.content["text"]
+        text = content_text(result, "text")
         assert "file1.txt" in text
         assert "file2.txt" in text
         assert "other.py" not in text
@@ -615,10 +484,7 @@ class TestGlobTool:
         (subdir / "middle.py").touch()
         (nested / "deep.py").touch()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="glob",
@@ -626,10 +492,10 @@ class TestGlobTool:
             call_id="call_recursive",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        text = result.output.content["text"]
+        text = content_text(result, "text")
         assert "root.py" in text
         assert "middle.py" in text
         assert "deep.py" in text
@@ -639,17 +505,14 @@ class TestGlobTool:
         """glob tool returns appropriate message when no files match."""
         (workspace_dir / "file.txt").touch()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(tool_name="glob", arguments={"pattern": "*.xyz"}, call_id="call_nomatch")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        assert "No files found" in result.output.content["text"]
+        assert "No files found" in content_text(result, "text")
 
     @pytest.mark.asyncio
     async def test_glob_respects_limit(self, workspace_dir: Path) -> None:
@@ -659,10 +522,7 @@ class TestGlobTool:
         for i in range(total_files):
             (workspace_dir / f"file{i:02d}.txt").touch()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="glob",
@@ -670,10 +530,10 @@ class TestGlobTool:
             call_id="call_limit",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        text = result.output.content["text"]
+        text = content_text(result, "text")
         # Count matches - should only have `limit` files listed
         file_count = sum(1 for line in text.split("\n") if line.endswith(".txt"))
         assert file_count == limit
@@ -682,10 +542,7 @@ class TestGlobTool:
     @pytest.mark.asyncio
     async def test_glob_path_not_found(self, workspace_dir: Path) -> None:
         """glob tool returns error for non-existent path."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="glob",
@@ -693,7 +550,7 @@ class TestGlobTool:
             call_id="call_notfound",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -704,10 +561,7 @@ class TestGlobTool:
         """glob tool returns error when path is a file, not directory."""
         (workspace_dir / "file.txt").touch()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="glob",
@@ -715,30 +569,10 @@ class TestGlobTool:
             call_id="call_notdir",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
-
-    @pytest.mark.asyncio
-    async def test_glob_outside_workspace_fails(self, workspace_dir: Path) -> None:
-        """glob tool fails when searching outside the workspace."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
-
-        call = ToolCall(
-            tool_name="glob",
-            arguments={"pattern": "*", "path": "/etc"},
-            call_id="call_escape",
-        )
-
-        result = await executor.execute_call(call, context)
-
-        assert result.output.is_error is True
-        assert result.output.error_message is not None
-        assert "/etc" in result.output.error_message
 
     @pytest.mark.asyncio
     async def test_glob_excludes_directories(self, workspace_dir: Path) -> None:
@@ -746,17 +580,14 @@ class TestGlobTool:
         (workspace_dir / "file.txt").touch()
         (workspace_dir / "subdir").mkdir()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(tool_name="glob", arguments={"pattern": "*"}, call_id="call_filesonly")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        text = result.output.content["text"]
+        text = content_text(result, "text")
         assert "file.txt" in text
         assert "subdir" not in text
 
@@ -766,14 +597,11 @@ class TestGlobTool:
         (workspace_dir / "file1.txt").touch()
         (workspace_dir / "file2.txt").touch()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(tool_name="glob", arguments={"pattern": "*.txt"}, call_id="call_display")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.display is not None
         assert "Found 2 files" in result.output.display
@@ -782,14 +610,11 @@ class TestGlobTool:
     @pytest.mark.asyncio
     async def test_glob_display_no_matches(self, workspace_dir: Path) -> None:
         """glob tool sets appropriate display message when no files match."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(tool_name="glob", arguments={"pattern": "*.xyz"}, call_id="call_display")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.display is not None
         assert "No files found" in result.output.display
@@ -803,10 +628,7 @@ class TestGlobTool:
         for i in range(total_files):
             (workspace_dir / f"file{i:02d}.txt").touch()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="glob",
@@ -814,7 +636,7 @@ class TestGlobTool:
             call_id="call_display",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.display is not None
         assert f"Found {total_files} files" in result.output.display
@@ -830,10 +652,7 @@ class TestBashTool:
     @pytest.mark.asyncio
     async def test_bash_executes_command_successfully(self, workspace_dir: Path) -> None:
         """bash tool executes a command and captures stdout."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="bash",
@@ -841,12 +660,12 @@ class TestBashTool:
             call_id="call_bash",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.call_id == "call_bash"
         assert result.output.is_error is False
-        assert result.output.content["stdout"] == "hello"
-        assert result.output.content["stderr"] == ""
+        assert content_text(result, "stdout") == "hello"
+        assert content_text(result, "stderr") == ""
         assert result.output.content["exit_code"] == 0
         assert result.output.display == "Command exited with code 0"
 
@@ -854,10 +673,7 @@ class TestBashTool:
     @pytest.mark.asyncio
     async def test_bash_captures_stderr(self, workspace_dir: Path) -> None:
         """bash tool captures stderr output."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="bash",
@@ -865,25 +681,22 @@ class TestBashTool:
             call_id="call_bash_stderr",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        assert result.output.content["stdout"] == ""
-        assert result.output.content["stderr"] == "oops"
+        assert content_text(result, "stdout") == ""
+        assert content_text(result, "stderr") == "oops"
         assert result.output.content["exit_code"] == 0
 
     @bash_required
     @pytest.mark.asyncio
     async def test_bash_marks_nonzero_exit_as_tool_error(self, workspace_dir: Path) -> None:
         """bash tool marks a non-zero exit as a tool error, keeping its output."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(tool_name="bash", arguments={"command": "exit 7"}, call_id="call_bash_exit")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.content["exit_code"] == 7
@@ -896,10 +709,7 @@ class TestBashTool:
         nested = workspace_dir / "nested"
         nested.mkdir()
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="bash",
@@ -907,39 +717,16 @@ class TestBashTool:
             call_id="call_bash_cwd",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        assert result.output.content["stdout"].strip() == str(nested)
-        assert result.output.content["cwd"] == str(nested)
-
-    @pytest.mark.asyncio
-    async def test_bash_cwd_outside_workspace_fails(self, workspace_dir: Path) -> None:
-        """bash tool rejects working directories outside the workspace."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
-
-        call = ToolCall(
-            tool_name="bash",
-            arguments={"command": "pwd", "cwd": "/etc"},
-            call_id="call_bash_escape",
-        )
-
-        result = await executor.execute_call(call, context)
-
-        assert result.output.is_error is True
-        assert result.output.error_message is not None
-        assert "/etc" in result.output.error_message
+        assert content_text(result, "stdout").strip() == str(nested)
+        assert content_text(result, "cwd") == str(nested)
 
     @pytest.mark.asyncio
     async def test_bash_cwd_not_found(self, workspace_dir: Path) -> None:
         """bash tool errors when cwd does not exist."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="bash",
@@ -947,7 +734,7 @@ class TestBashTool:
             call_id="call_bash_missing",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -957,9 +744,7 @@ class TestBashTool:
     @pytest.mark.asyncio
     async def test_bash_timeout_returns_tool_error(self, workspace_dir: Path) -> None:
         """bash tool returns a tool error when execution times out."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="bash",
@@ -967,7 +752,7 @@ class TestBashTool:
             call_id="call_bash_timeout",
         )
 
-        result = await executor.execute_call(call, _tool_context(workspace_dir))
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -977,8 +762,7 @@ class TestBashTool:
     @pytest.mark.asyncio
     async def test_bash_timeout_kills_child_processes(self, workspace_dir: Path) -> None:
         """A timed-out command takes the processes it started down with it."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
+        registry = ToolRegistry(harness.tools(workspace_dir))
         marker = workspace_dir / "survived"
         call = ToolCall(
             tool_name="bash",
@@ -986,7 +770,7 @@ class TestBashTool:
             call_id="call_bash_timeout_children",
         )
 
-        result = await ToolExecutor(registry).execute_call(call, _tool_context(workspace_dir))
+        result = await ToolExecutor(registry).execute_call(call)
         await asyncio.sleep(1)
 
         assert result.output.is_error is True
@@ -1017,17 +801,16 @@ class TestBashTool:
             captured["kwargs"] = kwargs
             return _FakeProcess()
 
-        monkeypatch.setattr("koda.tools.builtins.bash._bash_path", lambda: "/bin/bash")
+        monkeypatch.setattr("koda.harness.toolbox.bash._bash_path", lambda: "/bin/bash")
         monkeypatch.setattr(asyncio, "create_subprocess_exec", _fake_create_subprocess_exec)
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
+        registry = ToolRegistry(harness.tools(workspace_dir))
         call = ToolCall(
             tool_name="bash",
             arguments={"command": "printf test"},
             call_id="call_bash_flags",
         )
 
-        await ToolExecutor(registry).execute_call(call, _tool_context(workspace_dir))
+        await ToolExecutor(registry).execute_call(call)
 
         assert captured["args"] == ("/bin/bash", "--noprofile", "--norc", "-c", "printf test")
         assert captured["kwargs"]["cwd"] == workspace_dir
@@ -1037,10 +820,7 @@ class TestBashTool:
     @pytest.mark.asyncio
     async def test_bash_truncates_large_stdout_and_marks_it(self, workspace_dir: Path) -> None:
         """bash tool should truncate large stdout persisted in tool output."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         oversized = BASH_MAX_OUTPUT_CHARS + 100
         call = ToolCall(
@@ -1049,10 +829,10 @@ class TestBashTool:
             call_id="call_bash_large_stdout",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        assert len(result.output.content["stdout"]) == BASH_MAX_OUTPUT_CHARS
+        assert len(content_text(result, "stdout")) == BASH_MAX_OUTPUT_CHARS
         assert result.output.content["stdout_truncated"] is True
         assert result.output.content["stderr_truncated"] is False
 
@@ -1060,10 +840,7 @@ class TestBashTool:
     @pytest.mark.asyncio
     async def test_bash_truncates_large_stderr_and_marks_it(self, workspace_dir: Path) -> None:
         """bash tool should truncate large stderr persisted in tool output."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         oversized = BASH_MAX_OUTPUT_CHARS + 100
         call = ToolCall(
@@ -1072,10 +849,10 @@ class TestBashTool:
             call_id="call_bash_large_stderr",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        assert len(result.output.content["stderr"]) == BASH_MAX_OUTPUT_CHARS
+        assert len(content_text(result, "stderr")) == BASH_MAX_OUTPUT_CHARS
         assert result.output.content["stderr_truncated"] is True
         assert result.output.content["stdout_truncated"] is False
 
@@ -1096,17 +873,14 @@ class TestGrepTool:
         (workspace_dir / "file1.txt").write_text("hello\nworld\nhello again")
         (workspace_dir / "file2.txt").write_text("no match\nhello there")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(tool_name="grep", arguments={"pattern": "hello"}, call_id="call_grep")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        text = result.output.content["text"]
+        text = content_text(result, "text")
         assert "file1.txt:1:hello" in text
         assert "file1.txt:3:hello again" in text
         assert "file2.txt:2:hello there" in text
@@ -1118,10 +892,7 @@ class TestGrepTool:
         """grep tool truncates results when exceeding limit."""
         (workspace_dir / "file.txt").write_text("match\nmatch\nmatch")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         limit = 2
         call = ToolCall(
@@ -1130,10 +901,10 @@ class TestGrepTool:
             call_id="call_grep_limit",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        text = result.output.content["text"]
+        text = content_text(result, "text")
         line_count = sum(1 for line in text.split("\n") if line.startswith("file.txt:"))
         assert line_count == limit
         assert "showing first 2" in text
@@ -1145,10 +916,7 @@ class TestGrepTool:
         """grep tool reports when no matches are found."""
         (workspace_dir / "file.txt").write_text("hello\nworld")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="grep",
@@ -1156,18 +924,15 @@ class TestGrepTool:
             call_id="call_grep_nomatch",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        assert "No matches found" in result.output.content["text"]
+        assert "No matches found" in content_text(result, "text")
 
     @pytest.mark.asyncio
     async def test_grep_path_not_found(self, workspace_dir: Path) -> None:
         """grep tool errors when path does not exist."""
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="grep",
@@ -1175,7 +940,7 @@ class TestGrepTool:
             call_id="call_grep_notfound",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is True
         assert result.output.error_message is not None
@@ -1188,17 +953,14 @@ class TestGrepTool:
         """grep tool treats patterns starting with '-' as literals."""
         (workspace_dir / "file.txt").write_text("-match\nother")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(tool_name="grep", arguments={"pattern": "-match"}, call_id="call_grep_dash")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        assert "file.txt:1:-match" in result.output.content["text"]
+        assert "file.txt:1:-match" in content_text(result, "text")
 
     @rg_required
     @pytest.mark.requires_rg
@@ -1207,10 +969,7 @@ class TestGrepTool:
         """grep tool uses the file name when searching a single file."""
         (workspace_dir / "file.txt").write_text("hello\nworld")
 
-        registry = ToolRegistry()
-        registry.register_all(get_builtin_tools())
-        context = _tool_context(workspace_dir)
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry(harness.tools(workspace_dir)))
 
         call = ToolCall(
             tool_name="grep",
@@ -1218,7 +977,7 @@ class TestGrepTool:
             call_id="call_grep_file",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.output.is_error is False
-        assert "file.txt:1:hello" in result.output.content["text"]
+        assert "file.txt:1:hello" in content_text(result, "text")

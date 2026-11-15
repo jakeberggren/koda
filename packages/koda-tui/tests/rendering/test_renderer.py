@@ -7,8 +7,7 @@ from prompt_toolkit.formatted_text import FormattedText
 from rich.padding import Padding
 
 from koda.llm import LLMAPIError, LLMRateLimitError
-from koda.messages import AssistantMessage, InterruptionMessage, UserMessage
-from koda.tools import ToolCall, ToolOutput
+from koda.messages import AssistantMessage, InterruptionMessage, ToolCall, ToolOutput, UserMessage
 from koda_tui import strings
 from koda_tui.appearance import Tokens, compose
 from koda_tui.rendering import ChatMessage, Renderer, ToolRun

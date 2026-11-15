@@ -16,8 +16,7 @@ from koda.llm.types import (
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from koda.messages import AssistantMessage
-    from koda.tools import ToolCall, ToolResult
+    from koda.messages import AssistantMessage, ToolCall, ToolMessage
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,18 +43,16 @@ class AgentToolStarted:
 
 @dataclass(frozen=True, slots=True)
 class AgentToolCompleted:
-    """Tool execution has completed."""
+    """A tool's answer was added to the session."""
 
-    tool_name: str
-    result: ToolResult
+    message: ToolMessage
 
 
 @dataclass(frozen=True, slots=True)
 class AgentToolResultReady:
-    """Tool execution result is available before ordered persistence."""
+    """A tool's answer is ready; it is added to the session in call order."""
 
-    tool_name: str
-    result: ToolResult
+    message: ToolMessage
 
 
 @dataclass(frozen=True, slots=True)

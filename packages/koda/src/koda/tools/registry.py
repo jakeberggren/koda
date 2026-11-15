@@ -1,52 +1,33 @@
 from __future__ import annotations
 
-from koda.tools import exceptions
+from typing import TYPE_CHECKING
+
 from koda.tools.base import Tool, ToolDefinition
-from koda.tools.decorators import get_builtin_tools
+from koda.tools.exceptions import ToolAlreadyRegisteredError
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
 
 
 class ToolRegistry:
-    """Registry for managing available tools."""
+    """The tools an agent can use, by name. Fixed once made."""
 
-    def __init__(self) -> None:
+    def __init__(self, tools: Iterable[Tool] = ()) -> None:
         self._tools: dict[str, Tool] = {}
-
-    @classmethod
-    def builtins(cls) -> ToolRegistry:
-        registry = cls()
-        registry.register_all(get_builtin_tools())
-        return registry
-
-    def register(self, tool: Tool) -> None:
-        """Register a tool in the registry."""
-        if tool.name in self._tools:
-            raise exceptions.ToolAlreadyRegisteredError(tool.name)
-        self._tools[tool.name] = tool
-
-    def register_all(self, tools: list[Tool]) -> None:
-        """Register multiple tools at once."""
         for tool in tools:
-            self.register(tool)
+            if tool.name in self._tools:
+                raise ToolAlreadyRegisteredError(tool.name)
+            self._tools[tool.name] = tool
+
+    def __iter__(self) -> Iterator[Tool]:
+        return iter(self._tools.values())
+
+    def __len__(self) -> int:
+        return len(self._tools)
 
     def get(self, name: str) -> Tool | None:
-        """Get a tool by name."""
         return self._tools.get(name)
 
-    def get_all(self) -> list[Tool]:
-        """Get all registered tools."""
-        return list(self._tools.values())
-
-    def get_definitions(self) -> list[ToolDefinition]:
-        """Get tool definitions for all registered tools."""
-        return [
-            ToolDefinition(
-                name=tool.name,
-                description=tool.description,
-                parameters_model=tool.parameters_model,
-            )
-            for tool in self._tools.values()
-        ]
-
-    def clear(self) -> None:
-        """Clear all registered tools."""
-        self._tools.clear()
+    def definitions(self) -> list[ToolDefinition]:
+        """The tools as a request offers them to the model."""
+        return [ToolDefinition(tool.name, tool.description, tool.parameters_model) for tool in self]

@@ -2,20 +2,10 @@
 
 from __future__ import annotations
 
-import tempfile
-from pathlib import Path
-from typing import TYPE_CHECKING
-
-import pytest
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolContext, ToolExecutionCoordinator, ToolOutput, ToolRegistry
+from koda.messages import ToolOutput
 from koda.tools.exceptions import ToolError
-from koda.tools.policy import ToolPolicy
-
-if TYPE_CHECKING:
-    from collections.abc import Generator
-
 
 # ==============================================================================
 # Test Parameter Models
@@ -48,7 +38,7 @@ class SimpleTool:
     description = "A simple test tool"
     parameters_model = SimpleParams
 
-    async def execute(self, params: SimpleParams, ctx: ToolContext) -> ToolOutput:
+    async def execute(self, params: SimpleParams) -> ToolOutput:
         return ToolOutput(content={"result": f"Hello {params.name}", "count": params.count})
 
 
@@ -59,7 +49,7 @@ class ErrorTool:
     description = "A tool that raises errors"
     parameters_model = SimpleParams
 
-    async def execute(self, params: SimpleParams, ctx: ToolContext) -> ToolOutput:
+    async def execute(self, params: SimpleParams) -> ToolOutput:
         raise ToolError(f"Intentional error for {params.name}")
 
 
@@ -70,54 +60,5 @@ class CrashTool:
     description = "A tool that raises a non-ToolError exception"
     parameters_model = SimpleParams
 
-    async def execute(self, params: SimpleParams, ctx: ToolContext) -> ToolOutput:
+    async def execute(self, params: SimpleParams) -> ToolOutput:
         raise ValueError(f"Unexpected failure for {params.name}")
-
-
-# ==============================================================================
-# Fixtures
-# ==============================================================================
-
-
-@pytest.fixture
-def workspace_dir() -> Generator[Path]:
-    """Create a temporary workspace directory for testing."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Resolve to handle macOS /var -> /private/var symlink
-        yield Path(tmpdir).resolve()
-
-
-@pytest.fixture
-def policy(workspace_dir: Path) -> ToolPolicy:
-    """Create a ToolPolicy for testing."""
-    return ToolPolicy.create(workspace_dir)
-
-
-@pytest.fixture
-def context(workspace_dir: Path, policy: ToolPolicy) -> ToolContext:
-    """Create a ToolContext for testing."""
-    return ToolContext(cwd=workspace_dir, policy=policy, coordinator=ToolExecutionCoordinator())
-
-
-@pytest.fixture
-def registry() -> ToolRegistry:
-    """Create an empty ToolRegistry."""
-    return ToolRegistry()
-
-
-@pytest.fixture
-def simple_tool() -> SimpleTool:
-    """Create a SimpleTool instance."""
-    return SimpleTool()
-
-
-@pytest.fixture
-def error_tool() -> ErrorTool:
-    """Create an ErrorTool instance."""
-    return ErrorTool()
-
-
-@pytest.fixture
-def crash_tool() -> CrashTool:
-    """Create a CrashTool instance."""
-    return CrashTool()

@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from koda.messages.messages import AssistantMessage, Message, TokenUsage
+from koda.messages.messages import AssistantMessage, Message, TokenUsage, UserMessage
 
 
 def _utcnow() -> datetime:
@@ -48,9 +48,8 @@ class Session:
     def display_name(self) -> str:
         if self.name:
             return self.name
-        if self.messages:
-            return f"{self.messages[0].content[:30]}..."
-        return "New session"
+        first = next((m.content for m in self.messages if isinstance(m, UserMessage)), None)
+        return f"{first[:30]}..." if first else "New session"
 
     @property
     def message_count(self) -> int:

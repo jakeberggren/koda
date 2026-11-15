@@ -11,11 +11,13 @@ from typing import TYPE_CHECKING
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolContext, ToolOutput, exceptions
-from koda.tools.decorators import tool
+from koda.harness.toolbox import exceptions
+from koda.messages import ToolOutput
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from koda.harness.toolbox.workspace import Workspace
 
 BASH_TIMEOUT_SECONDS = 30.0
 BASH_MAX_OUTPUT_CHARS = 64_000
@@ -148,8 +150,8 @@ def _build_output(
     )
 
 
-async def _resolve_cwd(params: BashParams, ctx: ToolContext) -> Path:
-    resolved_cwd: Path = ctx.policy.resolve_path(params.cwd, cwd=ctx.cwd)
+async def _resolve_cwd(params: BashParams, workspace: Workspace) -> Path:
+    resolved_cwd: Path = workspace.resolve(params.cwd)
     async_cwd = AnyioPath(resolved_cwd)
 
     if not await async_cwd.exists():
@@ -161,7 +163,6 @@ async def _resolve_cwd(params: BashParams, ctx: ToolContext) -> Path:
     return resolved_cwd
 
 
-@tool
 class BashTool:
     """Execute a bash command on the host."""
 
@@ -170,17 +171,20 @@ class BashTool:
         "Execute a bash command on the host. Use this for shell-based "
         "inspection and development tasks such as running tests, linters, formatters, build "
         "commands, git commands, or searching the workspace with CLI tools. The working "
-        "directory is resolved through the tool policy from the provided cwd. Commands run "
+        "directory is the given cwd, relative to the workspace. Commands run "
         "with the user's permissions and can read and modify any file the user can. Returns "
         "stdout, stderr, "
         "exit_code, command, and cwd."
     )
     parameters_model: type[BashParams] = BashParams
 
-    async def execute(self, params: BashParams, ctx: ToolContext) -> ToolOutput:
-        resolved_cwd = await _resolve_cwd(params, ctx)
+    def __init__(self, workspace: Workspace) -> None:
+        self.workspace = workspace
 
-        async with ctx.coordinator.exclusive_access():
+    async def execute(self, params: BashParams) -> ToolOutput:
+        resolved_cwd = await _resolve_cwd(params, self.workspace)
+
+        async with self.workspace.coordinator.exclusive_access():
             stdout, stderr, exit_code = await _run(
                 params.command,
                 cwd=resolved_cwd,

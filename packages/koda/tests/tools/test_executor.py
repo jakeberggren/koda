@@ -6,7 +6,9 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolCall, ToolContext, ToolExecutor, ToolOutput, ToolRegistry, ToolResult
+from koda.harness.toolbox.workspace import Workspace
+from koda.messages import ToolCall, ToolMessage, ToolOutput
+from koda.tools import ToolExecutor, ToolRegistry
 
 from .conftest import CrashTool, ErrorTool, SimpleTool
 
@@ -28,14 +30,15 @@ class LockTrackingTool:
     description = "Records concurrent access while using the file coordinator"
     parameters_model = LockingParams
 
-    def __init__(self) -> None:
+    def __init__(self, workspace: Workspace) -> None:
+        self.workspace = workspace
         self._active_by_path: dict[Path, int] = {}
         self.max_active_by_path: dict[Path, int] = {}
 
-    async def execute(self, params: LockingParams, ctx: ToolContext) -> ToolOutput:
-        resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+    async def execute(self, params: LockingParams) -> ToolOutput:
+        resolved = self.workspace.resolve(params.path)
 
-        async with ctx.coordinator.path_lock(resolved):
+        async with self.workspace.coordinator.path_lock(resolved):
             active = self._active_by_path.get(resolved, 0) + 1
             self._active_by_path[resolved] = active
             previous_max = self.max_active_by_path.get(resolved, 0)
@@ -62,14 +65,15 @@ class SharedAccessTool:
     description = "Uses shared execution access"
     parameters_model = CoordinatedParams
 
-    def __init__(self, timeline: list[str] | None = None) -> None:
+    def __init__(self, workspace: Workspace, timeline: list[str] | None = None) -> None:
+        self.workspace = workspace
         self.active = 0
         self.max_active = 0
         self.events: list[str] = []
         self.timeline = timeline if timeline is not None else []
 
-    async def execute(self, params: CoordinatedParams, ctx: ToolContext) -> ToolOutput:
-        async with ctx.coordinator.shared_access():
+    async def execute(self, params: CoordinatedParams) -> ToolOutput:
+        async with self.workspace.coordinator.shared_access():
             self.active += 1
             self.max_active = max(self.max_active, self.active)
             self.events.append(f"shared_enter:{params.label}")
@@ -91,14 +95,20 @@ class ExclusiveAccessTool:
     description = "Uses exclusive execution access"
     parameters_model = CoordinatedParams
 
-    def __init__(self, shared_tool: SharedAccessTool, timeline: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        workspace: Workspace,
+        shared_tool: SharedAccessTool,
+        timeline: list[str] | None = None,
+    ) -> None:
+        self.workspace = workspace
         self.shared_tool = shared_tool
         self.shared_active_on_entry: list[int] = []
         self.events: list[str] = []
         self.timeline = timeline if timeline is not None else []
 
-    async def execute(self, params: CoordinatedParams, ctx: ToolContext) -> ToolOutput:
-        async with ctx.coordinator.exclusive_access():
+    async def execute(self, params: CoordinatedParams) -> ToolOutput:
+        async with self.workspace.coordinator.exclusive_access():
             self.shared_active_on_entry.append(self.shared_tool.active)
             self.events.append(f"exclusive_enter:{params.label}")
             self.timeline.append(f"exclusive_enter:{params.label}")
@@ -115,18 +125,15 @@ class TestExecuteCall:
     @pytest.mark.asyncio
     async def test_returns_correct_call_id(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
     ) -> None:
-        """Tool execution returns ToolResult with the correct call_id."""
-        registry.register(SimpleTool())
-        executor = ToolExecutor(registry)
+        """Tool execution returns a ToolMessage with the correct call_id."""
+        executor = ToolExecutor(ToolRegistry([SimpleTool()]))
 
         call = ToolCall(tool_name="simple_tool", arguments={"name": "World"}, call_id="call_123")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
-        assert isinstance(result, ToolResult)
+        assert isinstance(result, ToolMessage)
         assert result.call_id == "call_123"
         assert result.output.is_error is False
         assert result.output.content["result"] == "Hello World"
@@ -134,15 +141,13 @@ class TestExecuteCall:
     @pytest.mark.asyncio
     async def test_unknown_tool_returns_error(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
     ) -> None:
-        """Calling an unknown tool returns error ToolResult with correct call_id."""
-        executor = ToolExecutor(registry)
+        """Calling an unknown tool returns an error ToolMessage with correct call_id."""
+        executor = ToolExecutor(ToolRegistry())
 
         call = ToolCall(tool_name="nonexistent", arguments={}, call_id="call_unknown")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.call_id == "call_unknown"
         assert result.output.is_error is True
@@ -152,12 +157,9 @@ class TestExecuteCall:
     @pytest.mark.asyncio
     async def test_invalid_params_returns_error(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
     ) -> None:
         """Invalid parameters return error ToolResult with correct call_id."""
-        registry.register(SimpleTool())
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry([SimpleTool()]))
 
         call = ToolCall(
             tool_name="simple_tool",
@@ -165,7 +167,7 @@ class TestExecuteCall:
             call_id="call_invalid",
         )
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.call_id == "call_invalid"
         assert result.output.is_error is True
@@ -174,16 +176,13 @@ class TestExecuteCall:
     @pytest.mark.asyncio
     async def test_tool_error_returns_error_result(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
     ) -> None:
-        """ToolError from tool execution returns error ToolResult."""
-        registry.register(ErrorTool())
-        executor = ToolExecutor(registry)
+        """ToolError from tool execution returns an error ToolMessage."""
+        executor = ToolExecutor(ToolRegistry([ErrorTool()]))
 
         call = ToolCall(tool_name="error_tool", arguments={"name": "test"}, call_id="call_error")
 
-        result = await executor.execute_call(call, context)
+        result = await executor.execute_call(call)
 
         assert result.call_id == "call_error"
         assert result.output.is_error is True
@@ -193,17 +192,14 @@ class TestExecuteCall:
     @pytest.mark.asyncio
     async def test_unexpected_exception_propagates(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
     ) -> None:
         """Non-ToolError exceptions propagate out of the executor."""
-        registry.register(CrashTool())
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry([CrashTool()]))
 
         call = ToolCall(tool_name="crash_tool", arguments={"name": "boom"}, call_id="call_crash")
 
         with pytest.raises(ValueError, match="Unexpected failure"):
-            await executor.execute_call(call, context)
+            await executor.execute_call(call)
 
 
 class TestExecuteCalls:
@@ -213,19 +209,15 @@ class TestExecuteCalls:
     async def _collect_results(
         executor: ToolExecutor,
         calls: list[ToolCall],
-        context: ToolContext,
-    ) -> list[ToolResult]:
-        return [result async for _, result in executor.execute_calls(calls, context)]
+    ) -> list[ToolMessage]:
+        return [message async for message in executor.execute_calls(calls)]
 
     @pytest.mark.asyncio
     async def test_multiple_calls_preserve_call_ids(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
     ) -> None:
         """Multiple tool calls each return their correct call_id."""
-        registry.register(SimpleTool())
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry([SimpleTool()]))
 
         calls = [
             ToolCall(tool_name="simple_tool", arguments={"name": "A"}, call_id="call_a"),
@@ -233,24 +225,25 @@ class TestExecuteCalls:
             ToolCall(tool_name="simple_tool", arguments={"name": "C"}, call_id="call_c"),
         ]
 
-        results = await self._collect_results(executor, calls, context)
+        results = await self._collect_results(executor, calls)
 
         assert len(results) == len(calls)
         call_ids = {r.call_id for r in results}
         assert call_ids == {"call_a", "call_b", "call_c"}
 
     @pytest.mark.asyncio
-    async def test_parallel_execution(self, registry: ToolRegistry, context: ToolContext) -> None:
+    async def test_parallel_execution(
+        self,
+    ) -> None:
         """Tool calls execute in parallel."""
-        registry.register(SimpleTool())
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry([SimpleTool()]))
 
         calls = [
             ToolCall(tool_name="simple_tool", arguments={"name": str(i)}, call_id=f"call_{i}")
             for i in range(10)
         ]
 
-        results = await self._collect_results(executor, calls, context)
+        results = await self._collect_results(executor, calls)
 
         assert len(results) == len(calls)
         call_ids = {result.call_id for result in results}
@@ -261,13 +254,11 @@ class TestExecuteCalls:
     @pytest.mark.asyncio
     async def test_parallel_calls_share_file_lock_for_same_path(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
+        workspace: Workspace,
     ) -> None:
         """Parallel calls to the same path are serialized by the file coordinator."""
-        tool = LockTrackingTool()
-        registry.register(tool)
-        executor = ToolExecutor(registry)
+        tool = LockTrackingTool(workspace)
+        executor = ToolExecutor(ToolRegistry([tool]))
 
         calls = [
             ToolCall(
@@ -282,25 +273,22 @@ class TestExecuteCalls:
             ),
         ]
 
-        results = await self._collect_results(executor, calls, context)
+        results = await self._collect_results(executor, calls)
 
         assert all(result.output.is_error is False for result in results)
-        resolved = context.policy.resolve_path("shared.txt", cwd=context.cwd)
+        resolved = workspace.resolve("shared.txt")
         assert tool.max_active_by_path[resolved] == 1
 
     @pytest.mark.asyncio
     async def test_shared_file_tools_still_run_concurrently_while_shell_waits(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
+        workspace: Workspace,
     ) -> None:
         """Shared file tools can overlap while exclusive shell work waits for them."""
         timeline: list[str] = []
-        shared_tool = SharedAccessTool(timeline)
-        exclusive_tool = ExclusiveAccessTool(shared_tool, timeline)
-        registry.register(shared_tool)
-        registry.register(exclusive_tool)
-        executor = ToolExecutor(registry)
+        shared_tool = SharedAccessTool(workspace, timeline)
+        exclusive_tool = ExclusiveAccessTool(workspace, shared_tool, timeline)
+        executor = ToolExecutor(ToolRegistry([shared_tool, exclusive_tool]))
 
         calls = [
             ToolCall(
@@ -320,7 +308,7 @@ class TestExecuteCalls:
             ),
         ]
 
-        results = await self._collect_results(executor, calls, context)
+        results = await self._collect_results(executor, calls)
 
         assert all(result.output.is_error is False for result in results)
         assert shared_tool.max_active == 2
@@ -329,16 +317,13 @@ class TestExecuteCalls:
     @pytest.mark.asyncio
     async def test_waiting_shell_blocks_late_shared_arrivals(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
+        workspace: Workspace,
     ) -> None:
         """A queued exclusive shell call should prevent later shared work from jumping ahead."""
         timeline: list[str] = []
-        shared_tool = SharedAccessTool(timeline)
-        exclusive_tool = ExclusiveAccessTool(shared_tool, timeline)
-        registry.register(shared_tool)
-        registry.register(exclusive_tool)
-        executor = ToolExecutor(registry)
+        shared_tool = SharedAccessTool(workspace, timeline)
+        exclusive_tool = ExclusiveAccessTool(workspace, shared_tool, timeline)
+        executor = ToolExecutor(ToolRegistry([shared_tool, exclusive_tool]))
 
         first_shared = asyncio.create_task(
             executor.execute_call(
@@ -347,7 +332,6 @@ class TestExecuteCalls:
                     arguments={"label": "first", "delay": 0.03},
                     call_id="call_first",
                 ),
-                context,
             ),
         )
         await asyncio.sleep(0.005)
@@ -359,7 +343,6 @@ class TestExecuteCalls:
                     arguments={"label": "bash", "delay": 0.01},
                     call_id="call_shell",
                 ),
-                context,
             ),
         )
         await asyncio.sleep(0.005)
@@ -371,7 +354,6 @@ class TestExecuteCalls:
                     arguments={"label": "late", "delay": 0.01},
                     call_id="call_late",
                 ),
-                context,
             ),
         )
 
@@ -391,20 +373,16 @@ class TestExecuteCalls:
     @pytest.mark.asyncio
     async def test_mixed_success_and_error(
         self,
-        registry: ToolRegistry,
-        context: ToolContext,
     ) -> None:
         """Mixed success and error results preserve correct call_ids."""
-        registry.register(SimpleTool())
-        registry.register(ErrorTool())
-        executor = ToolExecutor(registry)
+        executor = ToolExecutor(ToolRegistry([SimpleTool(), ErrorTool()]))
 
         calls = [
             ToolCall(tool_name="simple_tool", arguments={"name": "ok"}, call_id="call_ok"),
             ToolCall(tool_name="error_tool", arguments={"name": "fail"}, call_id="call_fail"),
         ]
 
-        results = await self._collect_results(executor, calls, context)
+        results = await self._collect_results(executor, calls)
 
         assert len(results) == len(calls)
 

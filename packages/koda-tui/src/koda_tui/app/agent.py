@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from structlog import get_logger
 
+from koda import harness
 from koda.agent import Agent
 from koda.llm import LLMError
 from koda.sessions import SaveSessionHook
@@ -73,10 +74,12 @@ class AgentRunner:
     async def _build(self) -> Agent:
         settings = self._state.settings.agent_settings
         model = self._catalog.resolve(settings.provider, settings.model)
+        workspace = self._state.workspace
         return Agent(
             await self._connect(model),
-            session=self._state.session,
-            workspace=self._state.workspace,
+            instructions=harness.instructions(workspace),
+            tools=harness.tools(workspace),
             hooks=[SaveSessionHook(self._store)],
+            session=self._state.session,
             options=settings.request_options(model),
         )
