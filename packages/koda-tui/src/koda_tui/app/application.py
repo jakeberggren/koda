@@ -224,7 +224,6 @@ class KodaTuiApp:
         try:
             agent = await self._current_agent()
             async for event in agent.run(text):
-                self.state.turn = agent.turn  # A new turn with its first event.
                 yield event
         except Exception as error:
             self.state.errors.append(TurnError(at=len(self.state.session.messages), error=error))
@@ -236,6 +235,7 @@ class KodaTuiApp:
         async with self._agent_lock:
             if self._agent is None or self._agent.session is not self.state.session:
                 self._agent = await self._build_agent()
+                self.state.turn = self._agent.turn  # The chat follows this agent's turns.
         return self._agent
 
     async def _build_agent(self) -> Agent:
