@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
-from anyio import Path as AnyioPath
+from anyio import to_thread
 from pydantic import BaseModel, Field
 
 from koda.messages import ToolOutput
@@ -33,27 +34,20 @@ class GlobTool:
     name: str = "glob"
     description: str = (
         "Find files matching a glob pattern. Supports recursive patterns with ** to search "
-        "subdirectories (e.g., '**/*.py'). Returns relative paths sorted alphabetically. "
+        "subdirectories (e.g., '**/*.py'). Returns relative paths sorted alphabetically, "
+        "without files the workspace's .gitignore excludes or version-control folders. "
         "Use this to discover files by name pattern before reading them."
     )
     parameters_model: type[GlobParams] = GlobParams
-
-    async def _collect_matches(self, resolved: AnyioPath, pattern: str) -> list[str]:
-        return sorted(
-            [
-                str(path.relative_to(resolved))
-                async for path in resolved.glob(pattern)
-                if await path.is_file()
-            ],
-        )
 
     def __init__(self, workspace: Workspace) -> None:
         self.workspace = workspace
 
     async def execute(self, params: GlobParams) -> ToolOutput:
-        resolved = AnyioPath(await self.workspace.folder(params.path))
+        folder = await self.workspace.folder(params.path)
         async with self.workspace.locks.shared():
-            matches = await self._collect_matches(resolved, params.pattern)
+            files = await to_thread.run_sync(self.workspace.files, folder)
+        matches = [path for path in files if glob_match(path, params.pattern)]
 
         total_count: int = len(matches)
         truncated: bool = total_count > params.limit
@@ -73,3 +67,9 @@ class GlobTool:
             text = f"{display}:\n{paths_text}"
 
         return ToolOutput(content={"text": text}, display=display)
+
+
+def glob_match(path: str, pattern: str) -> bool:
+    """Whether the relative ``path`` matches the glob ``pattern``, where ``**`` matches any
+    number of folders, none included."""
+    return PurePosixPath(path).full_match(pattern)

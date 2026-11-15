@@ -100,7 +100,7 @@ workspace; like `bash`, the tools can reach files outside it.
 | `glob` | Find files by glob pattern |
 | `bash` | Run shell commands for tests, builds, linters, git, and inspection |
 
-`grep` and `@` file suggestions see the workspace's files by the same rules: what a
+`glob`, `grep` and `@` file suggestions see the workspace's files by the same rules: what a
 `.gitignore` or `.ignore` excludes is left out, hidden files are included, and `.git` is not.
 
 ### Bash and Command Execution
