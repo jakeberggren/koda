@@ -8,21 +8,11 @@ from pydantic import BaseModel, Field
 
 from koda.harness.toolbox.files.content import write_text
 from koda.messages import ToolOutput
-from koda.tools import ToolError
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from koda.harness.workspace import Workspace
-
-
-class WriteError(ToolError):
-    """Failed to write file."""
-
-    def __init__(self, path: str, *, cause: Exception) -> None:
-        self.path = path
-        self.cause = cause
-        super().__init__(f"Failed to write '{path}': {cause}")
 
 
 class WriteFileParams(BaseModel):
@@ -51,10 +41,10 @@ class WriteFileTool:
         resolved: Path = self.workspace.resolve(params.path)
 
         async with (
-            self.workspace.coordinator.shared_access(),
-            self.workspace.coordinator.path_lock(resolved),
+            self.workspace.locks.shared(),
+            self.workspace.locks.path(resolved),
         ):
-            await write_text(resolved, params.path, params.content, error=WriteError)
+            await write_text(resolved, params.path, params.content)
 
         line_count = params.content.count("\n") + (
             1 if params.content and not params.content.endswith("\n") else 0

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import codecs
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING
 
 from anyio import Path as AnyioPath
 from anyio import to_thread
@@ -17,10 +17,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-class TextFileErrorType(Protocol):
-    """Callable error type that accepts a tool path and the underlying file failure."""
+class FileError(ToolError):
+    """The operating system failed to read or write the file."""
 
-    def __call__(self, path: str, *, cause: Exception) -> Exception: ...
+    def __init__(self, action: str, path: str, cause: OSError) -> None:
+        self.path = path
+        self.cause = cause
+        super().__init__(f"Failed to {action} '{path}': {cause}")
 
 
 class TextDecodeError(ToolError):
@@ -85,14 +88,14 @@ def read_text_lines_sync(resolved: Path, path: str, offset: int, limit: int) -> 
         raise TextDecodeError(path) from e
 
 
-async def read_text(resolved: Path, path: str, *, error: TextFileErrorType) -> DecodedText:
+async def read_text(resolved: Path, path: str) -> DecodedText:
     """Read an entire file and decode it as supported text."""
     try:
         data = await AnyioPath(resolved).read_bytes()
     except PermissionError as e:
         raise AccessDeniedError(path) from e
     except OSError as e:
-        raise error(path, cause=e) from e
+        raise FileError("read", path, e) from e
 
     return decode_text(data, path)
 
@@ -103,7 +106,6 @@ async def read_text_lines(
     *,
     offset: int,
     limit: int,
-    error: TextFileErrorType,
 ) -> DecodedText:
     """Read a bounded range of decoded text lines from a file."""
     try:
@@ -111,7 +113,7 @@ async def read_text_lines(
     except PermissionError as e:
         raise AccessDeniedError(path) from e
     except OSError as e:
-        raise error(path, cause=e) from e
+        raise FileError("read", path, e) from e
 
 
 async def write_text(
@@ -119,7 +121,6 @@ async def write_text(
     path: str,
     content: str,
     *,
-    error: TextFileErrorType,
     encoding: str = "utf-8",
 ) -> None:
     """Write text content to a file, creating parent directories when needed."""
@@ -129,4 +130,4 @@ async def write_text(
     except PermissionError as e:
         raise AccessDeniedError(path) from e
     except OSError as e:
-        raise error(path, cause=e) from e
+        raise FileError("write", path, e) from e

@@ -9,10 +9,8 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.harness.workspace import PathNotFoundError
 from koda.messages import ToolOutput
 from koda.tools import ToolError
 
@@ -178,13 +176,8 @@ class GrepTool:
         self.workspace = workspace
 
     async def execute(self, params: GrepParams) -> ToolOutput:
-        resolved: Path = self.workspace.resolve(params.path)
-        async_path = AnyioPath(resolved)
-
-        async with self.workspace.coordinator.shared_access():
-            if not await async_path.exists():
-                raise PathNotFoundError(params.path)
-
+        resolved = await self.workspace.existing(params.path)
+        async with self.workspace.locks.shared():
             cmd = build_rg_command(get_rg_path(), params, resolved)
 
             proc = await asyncio.create_subprocess_exec(

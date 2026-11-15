@@ -27,7 +27,7 @@ class LockTrackingTool:
     """Test tool that records maximum concurrency per resolved path."""
 
     name = "lock_tracking_tool"
-    description = "Records concurrent access while using the file coordinator"
+    description = "Records concurrent access while using the workspace locks"
     parameters_model = LockingParams
 
     def __init__(self, workspace: Workspace) -> None:
@@ -38,7 +38,7 @@ class LockTrackingTool:
     async def execute(self, params: LockingParams) -> ToolOutput:
         resolved = self.workspace.resolve(params.path)
 
-        async with self.workspace.coordinator.path_lock(resolved):
+        async with self.workspace.locks.path(resolved):
             active = self._active_by_path.get(resolved, 0) + 1
             self._active_by_path[resolved] = active
             previous_max = self.max_active_by_path.get(resolved, 0)
@@ -52,7 +52,7 @@ class LockTrackingTool:
 
 
 class CoordinatedParams(BaseModel):
-    """Parameters for a test tool using the execution coordinator."""
+    """Parameters for a test tool using the workspace locks."""
 
     label: str = Field(..., description="Human-readable label for event tracking")
     delay: float = Field(default=0.01, description="Artificial delay while holding the lock")
@@ -73,7 +73,7 @@ class SharedAccessTool:
         self.timeline = timeline if timeline is not None else []
 
     async def execute(self, params: CoordinatedParams) -> ToolOutput:
-        async with self.workspace.coordinator.shared_access():
+        async with self.workspace.locks.shared():
             self.active += 1
             self.max_active = max(self.max_active, self.active)
             self.events.append(f"shared_enter:{params.label}")
@@ -108,7 +108,7 @@ class ExclusiveAccessTool:
         self.timeline = timeline if timeline is not None else []
 
     async def execute(self, params: CoordinatedParams) -> ToolOutput:
-        async with self.workspace.coordinator.exclusive_access():
+        async with self.workspace.locks.exclusive():
             self.shared_active_on_entry.append(self.shared_tool.active)
             self.events.append(f"exclusive_enter:{params.label}")
             self.timeline.append(f"exclusive_enter:{params.label}")
@@ -256,7 +256,7 @@ class TestExecuteCalls:
         self,
         workspace: Workspace,
     ) -> None:
-        """Parallel calls to the same path are serialized by the file coordinator."""
+        """Parallel calls to the same path are serialized by the path lock."""
         tool = LockTrackingTool(workspace)
         executor = ToolExecutor(ToolRegistry([tool]))
 

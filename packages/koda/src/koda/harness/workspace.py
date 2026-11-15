@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from anyio import Path as AnyioPath
+
 from koda.tools import ToolError
 
 if TYPE_CHECKING:
@@ -16,15 +18,12 @@ if TYPE_CHECKING:
 
 
 @dataclass(slots=True)
-class ToolExecutionCoordinator:
-    """Coordinate concurrent tool access.
+class Locks:
+    """The locks tools take to work in the workspace in parallel: ``shared`` for tools that
+    run alongside each other (the file tools), ``exclusive`` for one that runs alone (bash,
+    which can touch any file), and one per path, so writes to a file take turns.
 
-    Lock ordering:
-    1. Acquire `shared_access()` or `exclusive_access()` first.
-    2. If path-level coordination is also needed, acquire `path_lock(path)` second.
-
-    Keeping this order consistent avoids deadlocks between cross-tool gating and
-    per-path serialization.
+    Take ``shared`` or ``exclusive`` first, then a path's lock, to avoid deadlocks.
     """
 
     _condition: asyncio.Condition = field(default_factory=asyncio.Condition)
@@ -33,8 +32,8 @@ class ToolExecutionCoordinator:
     _exclusive_active: bool = False
     _exclusive_waiters: int = 0
 
-    def path_lock(self, path: Path) -> asyncio.Lock:
-        """Return the shared in-process lock for a resolved file path."""
+    def path(self, path: Path) -> asyncio.Lock:
+        """The lock for the resolved ``path``."""
         lock = self._path_locks.get(path)
         if lock is None:
             lock = asyncio.Lock()
@@ -42,8 +41,8 @@ class ToolExecutionCoordinator:
         return lock
 
     @asynccontextmanager
-    async def shared_access(self) -> AsyncGenerator[None]:
-        """Allow concurrent access unless an exclusive caller is queued or active."""
+    async def shared(self) -> AsyncGenerator[None]:
+        """Run alongside other shared holders, once no exclusive one is running or waiting."""
         async with self._condition:
             await self._condition.wait_for(
                 lambda: not self._exclusive_active and self._exclusive_waiters == 0,
@@ -59,8 +58,8 @@ class ToolExecutionCoordinator:
                     self._condition.notify_all()
 
     @asynccontextmanager
-    async def exclusive_access(self) -> AsyncGenerator[None]:
-        """Run with exclusive access when no shared participant is active."""
+    async def exclusive(self) -> AsyncGenerator[None]:
+        """Run alone, once no shared holder is running."""
         async with self._condition:
             self._exclusive_waiters += 1
             try:
@@ -85,12 +84,38 @@ class Workspace:
     paths work as they are. It doesn't restrict where tools go: bash can go anywhere."""
 
     root: Path
-    coordinator: ToolExecutionCoordinator = field(default_factory=ToolExecutionCoordinator)
+    locks: Locks = field(default_factory=Locks)
+
+    def __post_init__(self) -> None:
+        # Absolute and with symlinks resolved, like every path ``resolve`` returns, so they
+        # compare: on macOS, /tmp is /private/tmp.
+        object.__setattr__(self, "root", self.root.resolve())
 
     def resolve(self, path: str) -> Path:
         """``path`` as an absolute path: relative to ``root`` unless it is absolute."""
         given = Path(path)
         return (given if given.is_absolute() else self.root / given).resolve()
+
+    async def existing(self, path: str) -> Path:
+        """``path`` resolved, if something exists there."""
+        resolved = self.resolve(path)
+        if not await AnyioPath(resolved).exists():
+            raise PathNotFoundError(path)
+        return resolved
+
+    async def file(self, path: str) -> Path:
+        """``path`` resolved, if it is a file."""
+        resolved = await self.existing(path)
+        if not await AnyioPath(resolved).is_file():
+            raise NotAFileError(path)
+        return resolved
+
+    async def folder(self, path: str) -> Path:
+        """``path`` resolved, if it is a folder."""
+        resolved = await self.existing(path)
+        if not await AnyioPath(resolved).is_dir():
+            raise NotAFolderError(path)
+        return resolved
 
 
 class PathNotFoundError(ToolError):

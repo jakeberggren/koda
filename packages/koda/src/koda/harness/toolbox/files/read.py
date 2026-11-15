@@ -4,25 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
 from koda.harness.toolbox.files.content import read_text_lines
-from koda.harness.workspace import NotAFileError, PathNotFoundError
 from koda.messages import ToolOutput
-from koda.tools import ToolError
 
 if TYPE_CHECKING:
     from koda.harness.workspace import Workspace
-
-
-class ReadError(ToolError):
-    """Failed to read file."""
-
-    def __init__(self, path: str, *, cause: Exception) -> None:
-        self.path = path
-        self.cause = cause
-        super().__init__(f"Failed to read '{path}': {cause}")
 
 
 class ReadFileParams(BaseModel):
@@ -48,22 +36,13 @@ class ReadFileTool:
 
     async def execute(self, params: ReadFileParams) -> ToolOutput:
         """Execute the read_file tool."""
-        resolved = self.workspace.resolve(params.path)
-        target = AnyioPath(resolved)
-
-        async with self.workspace.coordinator.shared_access():
-            if not await target.exists():
-                raise PathNotFoundError(params.path)
-
-            if not await target.is_file():
-                raise NotAFileError(params.path)
-
+        resolved = await self.workspace.file(params.path)
+        async with self.workspace.locks.shared():
             decoded = await read_text_lines(
                 resolved,
                 params.path,
                 offset=params.offset,
                 limit=params.limit,
-                error=ReadError,
             )
         text_content = decoded.text
         line_count = len(text_content.splitlines())
