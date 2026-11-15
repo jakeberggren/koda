@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import replace
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import TYPE_CHECKING
@@ -71,14 +70,14 @@ class CommandPalette:
                 available=lambda state: (
                     _ready(state)
                     and state.active_model is not None
-                    and state.active_model.supports_thinking
+                    and state.active_model.thinking.supported
                 ),
             ),
             Command(
                 text=strings.Palette.Models,
                 group=Group.AGENT,
                 run=ModelMenu(context).open,
-                available=lambda state: bool(state.configured_providers),
+                available=lambda state: bool(state.connected_providers),
             ),
             Command(
                 text=strings.Palette.NewSession,
@@ -134,7 +133,9 @@ class CommandPalette:
 
     def _toggle_scrollbar(self) -> None:
         settings = self._context.settings
-        self._context.update_settings(replace(settings, show_scrollbar=not settings.show_scrollbar))
+        self._context.update_settings(
+            settings.with_tui(show_scrollbar=not settings.tui.show_scrollbar)
+        )
         self._overlays.close_all()
 
 

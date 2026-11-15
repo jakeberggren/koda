@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 def test_lists_the_themes_marking_the_current_one(
     context: PaletteContext, overlays: Overlays
 ) -> None:
-    context.state.settings = Settings(theme="terminal-light")
+    context.state.settings = Settings().with_tui(theme="terminal-light")
     ThemeMenu(context).open()
     items = overlays.top.items
     assert [item.data for item in items] == ["auto", "terminal-dark", "terminal-light"]
@@ -29,7 +29,7 @@ def test_lists_the_themes_marking_the_current_one(
 def test_choosing_a_theme_sets_it(context: PaletteContext, overlays: Overlays) -> None:
     ThemeMenu(context).open()
     overlays.pick(strings.Palette.Themes.DARK)
-    assert context.settings.theme == "terminal-dark"
+    assert context.settings.tui.theme == "terminal-dark"
 
 
 def test_choosing_the_current_theme_asks_for_the_background_again(

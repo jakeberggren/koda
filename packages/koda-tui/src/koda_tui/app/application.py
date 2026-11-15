@@ -1,86 +1,52 @@
 from __future__ import annotations
 
-import asyncio
-from copy import replace
 from typing import TYPE_CHECKING
 
-from prompt_toolkit import Application
 from prompt_toolkit.filters import Condition
-from prompt_toolkit.output import ColorDepth
-from structlog import get_logger
 
-from koda.agent import Agent
-from koda.llm import CredentialsError, LLMConfigurationError, LLMError, LLMRequestOptions
-from koda.sessions import SaveSessionHook
-from koda.tools import ToolError
+from koda.llm import (
+    CredentialsError,
+    ModelNotConnected,
+    ModelNotFound,
+    ModelUnavailable,
+    NoModelSelected,
+    NoProviderConnected,
+)
 from koda_tui import strings
+from koda_tui.app.agent import AgentRunner
 from koda_tui.app.exit import ExitPrompt
+from koda_tui.app.fullscreen import FullScreenApplication
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import Appearance
 from koda_tui.outbox import Outbox
 from koda_tui.palette.context import PaletteContext
 from koda_tui.palette.palette import CommandPalette
-from koda_tui.state import AppState, TurnError
-from koda_tui.terminal import Terminal, keys
+from koda_tui.state import AppState
+from koda_tui.terminal import Terminal
 from koda_tui.views import Screen
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+    from collections.abc import AsyncIterator, Sequence
     from pathlib import Path
 
-    from prompt_toolkit.key_binding import KeyBindings
-    from prompt_toolkit.styles import BaseStyle
-
     from koda.agent import AgentEvent
-    from koda.llm import LLM, Catalog, Credentials, Model
+    from koda.llm import Catalog, Credentials
     from koda.sessions import SessionStore
+    from koda_tui.app.agent import Connect
     from koda_tui.appearance import RGBColor
     from koda_tui.settings import Settings
 
-    type Connect = Callable[[Model, Credentials], Awaitable[LLM]]
 
-
-logger = get_logger(__name__)
-
-
-class FullScreenApplication(Application[None]):
-    """Koda's full-screen prompt_toolkit Application, showing ``screen``."""
-
-    def __init__(
-        self,
-        screen: Screen,
-        *,
-        key_bindings: KeyBindings,
-        style: BaseStyle,
-        terminal: Terminal,
-    ) -> None:
-        keys.register()
-        super().__init__(
-            layout=screen.layout,
-            key_bindings=key_bindings,
-            style=style,
-            full_screen=True,
-            color_depth=ColorDepth.TRUE_COLOR,
-            mouse_support=True,
-            input=terminal.input(),
-        )
-        self.ttimeoutlen = 0.01  # Raw terminal Esc sequence timeout.
-        self.timeoutlen = 0.05  # Key-binding prefix timeout, e.g. Esc before Alt chords.
-        self.after_render += terminal.after_render
-
-    def _on_resize(self) -> None:
-        """Handle terminal resize events without flashing a blank frame."""
-        if self.full_screen:
-            # prompt_toolkit's default full-screen path calls renderer.erase(),
-            # which flushes a visible blank frame on every resize signal.
-            # This prevents screen flickering on resize.
-            self.invalidate()
-            return
-        super()._on_resize()
+ISSUES: dict[type[ModelUnavailable], str] = {
+    NoProviderConnected: strings.Screen.Status.SETUP_REQUIRED,
+    NoModelSelected: strings.Screen.Status.SELECTION_REQUIRED,
+    ModelNotFound: strings.Screen.Status.MODEL_NOT_FOUND,
+    ModelNotConnected: strings.Screen.Status.MODEL_NOT_CONNECTED,
+}
 
 
 class KodaTuiApp:
-    """Main TUI application."""
+    """Main TUI application: wires the parts together and holds the app-wide commands."""
 
     def __init__(  # noqa: PLR0913 - the parts main builds, each its own keyword argument
         self,
@@ -94,30 +60,21 @@ class KodaTuiApp:
         warnings: Sequence[str] = (),
     ) -> None:
         self._catalog = catalog
-        self._credentials = credentials
         self._store = store
-        self._connect = connect
-        self._agent: Agent | None = None  # Built on first use, for the current session.
-        # OAuth refresh tokens rotate, so concurrent first messages must build it once.
-        self._agent_lock = asyncio.Lock()
         self._app: FullScreenApplication | None = None  # Created on run.
         self._terminal = Terminal(on_background=self.on_terminal_background)
 
         self.state = AppState(workspace=workspace, settings=settings, warnings=list(warnings))
+        self._agent = AgentRunner(self.state, catalog=catalog, store=store, connect=connect)
         self._refresh()
         self.exit_prompt = ExitPrompt(self.state, invalidate=self.invalidate)
-        self.appearance = Appearance(settings.theme)
+        self.appearance = Appearance(settings.tui.theme)
         self.screen = Screen(
             self.state,
             on_submit=self.submit,
-            show_scrollbar=Condition(lambda: self.state.settings.show_scrollbar),
+            show_scrollbar=Condition(lambda: self.state.settings.tui.show_scrollbar),
         )
-
-        self.outbox = Outbox(
-            state=self.state,
-            respond=self.respond,
-            invalidate=self.invalidate,
-        )
+        self.outbox = Outbox(state=self.state, respond=self.respond, invalidate=self.invalidate)
         self._palette = CommandPalette(
             PaletteContext(
                 overlays=self.screen.overlays,
@@ -160,8 +117,8 @@ class KodaTuiApp:
         model, settings = self.state.active_model, self.state.settings
         if self.state.issue is not None or model is None:
             return
-        if (thinking := model.next_thinking(settings.thinking)) is not None:
-            self.update_settings(replace(settings, thinking=thinking))
+        if (thinking := model.thinking.after(settings.agent.thinking)) is not None:
+            self.update_settings(settings.with_agent(thinking=thinking))
 
     def toggle_palette(self) -> None:
         """Open the command palette, or close it and any dialogs it opened."""
@@ -175,85 +132,35 @@ class KodaTuiApp:
         round when the input mode prefers steering. Writing a message takes back a
         press of Ctrl+C. Whether the message was taken."""
         self.exit_prompt.dismiss()
-        return self.outbox.submit(text, steer=alternate == self.state.settings.queue_inputs)
+        return self.outbox.submit(text, steer=alternate == self.state.settings.tui.queue_inputs)
+
+    def respond(self, text: str) -> AsyncIterator[AgentEvent]:
+        """Send ``text`` in the current session and stream the agent's response."""
+        return self._agent.respond(text)
 
     def update_settings(self, settings: Settings) -> None:
         """Save ``settings`` and apply them: the agent is rebuilt when it next runs. Also
         what to call after a credential changes, to show what it connects."""
         settings.save()
         self.state.settings = settings
-        self._agent = None
+        self._agent.reset()
         self._refresh()
-        self.appearance.theme = settings.theme
+        self.appearance.theme = settings.tui.theme
         self.invalidate()
 
     def _refresh(self) -> None:
         """Take the providers connected now and the model the settings pick, or say what
         stops Koda from responding."""
-        state = self.state
+        state, agent = self.state, self.state.settings.agent
         try:
-            state.configured_providers = [
-                provider
-                for provider in self._catalog.providers()
-                if provider.is_connected(self._credentials)
-            ]
-            state.active_model, state.issue = self._selected_model()
+            state.connected_providers = self._catalog.connected.providers
+            state.active_model = self._catalog.resolve(agent.provider, agent.model)
+            state.issue = None
+        except ModelUnavailable as unavailable:
+            state.active_model, state.issue = None, ISSUES[type(unavailable)]
         except CredentialsError:
-            state.configured_providers, state.active_model = [], None
+            state.connected_providers, state.active_model = [], None
             state.issue = strings.Screen.Status.CREDENTIALS_UNREADABLE
-
-    def _selected_model(self) -> tuple[Model | None, str | None]:
-        """The model the settings pick, or why it can't respond."""
-        settings = self.state.settings
-        if not self.state.configured_providers:
-            return None, strings.Screen.Status.SETUP_REQUIRED
-        if settings.provider is None or settings.model is None:
-            return None, strings.Screen.Status.SELECTION_REQUIRED
-        try:
-            model = self._catalog.model(settings.provider, settings.model)
-        except LLMConfigurationError:
-            return None, strings.Screen.Status.MODEL_NOT_FOUND
-        if not model.is_connected(self._credentials):
-            return None, strings.Screen.Status.MODEL_NOT_CONNECTED
-        return model, None
-
-    async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
-        """Send ``text`` in the current session and stream the agent's response. This is
-        the turn's boundary: a failure ends the stream and is shown where the turn failed,
-        and one Koda didn't expect is logged."""
-        try:
-            agent = await self._current_agent()
-            async for event in agent.run(text):
-                yield event
-        except Exception as error:
-            self.state.errors.append(TurnError(at=len(self.state.session.messages), error=error))
-            if not isinstance(error, LLMError | ToolError):
-                logger.exception("turn_failed_unexpectedly")
-
-    async def _current_agent(self) -> Agent:
-        """The agent for the current session, built after the settings or session change."""
-        async with self._agent_lock:
-            if self._agent is None or self._agent.session is not self.state.session:
-                self._agent = await self._build_agent()
-                self.state.turn = self._agent.turn  # The chat follows this agent's turns.
-        return self._agent
-
-    async def _build_agent(self) -> Agent:
-        settings = self.state.settings
-        if settings.provider is None or settings.model is None:
-            raise LLMConfigurationError("No model selected")
-        model = self._catalog.model(settings.provider, settings.model)
-        return Agent(
-            await self._connect(model, self._credentials),
-            session=self.state.session,
-            workspace=self.state.workspace,
-            hooks=[SaveSessionHook(self._store)],
-            options=LLMRequestOptions(
-                thinking=model.resolve_thinking_option(settings.thinking).id,
-                web_search=settings.web_search,
-                extended_prompt_retention=settings.extended_prompt_retention,
-            ),
-        )
 
     def on_terminal_background(self, background: RGBColor) -> None:
         self.appearance.terminal_background = background

@@ -1,14 +1,15 @@
-"""Settings: the model Koda uses, how it thinks, and how the TUI looks, in
+"""Settings: the agent's, and how the TUI looks and takes input, in
 ``~/.koda/settings.json``."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated
+from copy import replace
+from typing import TYPE_CHECKING, Annotated, Any
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 from pydantic_core import PydanticCustomError
 
-from koda.llm import ThinkingOptionId
+from koda.agent import AgentSettings
 from koda.paths import koda_home_dir
 from koda_tui.appearance import AUTO, THEMES
 
@@ -39,19 +40,32 @@ def _theme(value: str) -> str:
     return value
 
 
-class Settings(BaseModel):
-    """What the user picked. Changed by replacing it: ``copy.replace(settings, ...)``."""
+class TuiSettings(BaseModel):
+    """How the TUI looks and takes input."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    provider: str | None = None
-    model: str | None = None
-    thinking: ThinkingOptionId = "none"
-    web_search: bool = False
-    extended_prompt_retention: bool = False
     theme: Annotated[str, AfterValidator(_theme)] = AUTO.name
     show_scrollbar: bool = True
     queue_inputs: bool = True
+
+
+class Settings(BaseModel):
+    """What the user picked: for the agent, and for the TUI. Changed by replacing it,
+    through ``with_agent`` and ``with_tui``."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    agent: AgentSettings = Field(default_factory=AgentSettings)
+    tui: TuiSettings = Field(default_factory=TuiSettings)
+
+    def with_agent(self, **changes: Any) -> Settings:
+        """These settings, with ``changes`` to the agent's."""
+        return replace(self, agent=replace(self.agent, **changes))
+
+    def with_tui(self, **changes: Any) -> Settings:
+        """These settings, with ``changes`` to the TUI's."""
+        return replace(self, tui=replace(self.tui, **changes))
 
     @classmethod
     def load(cls, path: Path | None = None) -> Settings:

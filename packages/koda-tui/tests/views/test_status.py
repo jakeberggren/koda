@@ -12,7 +12,7 @@ import pytest
 from prompt_toolkit.formatted_text import fragment_list_to_text
 
 from koda.agent import Turn
-from koda.llm import Model, ThinkingOption
+from koda.llm import Model, Thinking, ThinkingOption
 from koda.messages import AssistantMessage, TokenUsage
 from koda.sessions import Session
 from koda.tools import ToolCall
@@ -42,14 +42,14 @@ def test_left_shows_workspace_model_thinking_and_usage(state: AppState) -> None:
         name="Model",
         provider="provider",
         context_window=1000,
-        thinking_options=(ThinkingOption(id="medium", label="Medium"),),
+        thinking=Thinking((ThinkingOption(id="medium", label="Medium"),)),
     )
     usage = TokenUsage(input_tokens=120, output_tokens=0)
     earlier = AssistantMessage(content="a", usage=TokenUsage(input_tokens=14, output_tokens=15_900))
     state = _state(
         state,
         active_model=model,
-        settings=Settings(thinking="medium"),
+        settings=Settings().with_agent(thinking="medium"),
         session=Session(messages=[earlier, AssistantMessage(content="b", usage=usage)]),
     )
     assert _texts(status._left(state)) == [
@@ -75,7 +75,7 @@ def test_right_shows_hints_warning_and_activity(state: AppState) -> None:
         id="m",
         name="Model",
         provider="provider",
-        thinking_options=(ThinkingOption(id="medium", label="Medium"),),
+        thinking=Thinking((ThinkingOption(id="medium", label="Medium"),)),
     )
     state = _state(state, active_model=model, warnings=["Config has unknown keys"])
     assert _texts(status._right(state)) == [

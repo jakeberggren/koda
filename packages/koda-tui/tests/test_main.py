@@ -39,7 +39,7 @@ def test_main_says_what_is_wrong_with_the_settings_and_exits(
 ) -> None:
     path = home / ".koda" / "settings.json"
     path.parent.mkdir(parents=True)
-    path.write_text('{"theme": "neon", "not_a_setting": 1}', encoding="utf-8")
+    path.write_text('{"tui": {"theme": "neon"}, "not_a_setting": 1}', encoding="utf-8")
 
     with pytest.raises(SystemExit) as exc_info:
         main()

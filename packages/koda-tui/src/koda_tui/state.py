@@ -42,5 +42,5 @@ class AppState:
     errors: list[TurnError] = field(default_factory=list)  # Turns that failed in this session.
     pending_inputs: list[PendingInput] = field(default_factory=list)  # Steers first.
     active_model: Model | None = None
-    configured_providers: list[Provider] = field(default_factory=list)
+    connected_providers: list[Provider] = field(default_factory=list)
     exit_requested: bool = False

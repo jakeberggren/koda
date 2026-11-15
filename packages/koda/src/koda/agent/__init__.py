@@ -10,6 +10,7 @@ from koda.agent.events import (
     AgentTurnStarted,
 )
 from koda.agent.hooks import Hook
+from koda.agent.settings import AgentSettings
 from koda.llm import (
     LLMTextDelta,
     LLMThinkingDelta,
@@ -24,6 +25,7 @@ __all__ = [
     "AgentEvent",
     "AgentIterationStarted",
     "AgentResponseCompleted",
+    "AgentSettings",
     "AgentToolCompleted",
     "AgentToolResultReady",
     "AgentToolStarted",

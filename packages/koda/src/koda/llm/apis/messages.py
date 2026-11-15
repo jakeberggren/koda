@@ -64,6 +64,8 @@ type AnthropicMessagesLLMAdapter = LLMAdapter[
     Message,
 ]
 
+_MIN_THINKING_BUDGET = 1024  # The least budget_tokens Anthropic accepts.
+
 _ADAPTIVE_OUTPUT_CONFIGS: dict[str, OutputConfigParam] = {
     level: {"effort": level} for level in ("low", "medium", "high", "xhigh", "max")
 }
@@ -77,7 +79,6 @@ class AnthropicMessagesAPIConfig:
     base_url: str
     model: str
     max_output_tokens: int
-    thinking_budget_tokens: int | None = None
 
 
 class AnthropicMessagesAdapter(
@@ -192,19 +193,18 @@ class AnthropicMessagesAdapter(
 
 
 def _resolve_thinking(
-    *,
-    thinking: str,
-    budget_tokens: int | None,
-    max_tokens: int,
+    thinking: str, max_tokens: int
 ) -> tuple[ThinkingConfigParam, OutputConfigParam | Omit]:
+    """Adaptive thinking at an effort level; or, for models with manual thinking only
+    ("enabled"), half the output tokens as the budget, which must stay below them."""
     if thinking == "enabled":
-        if budget_tokens is None:
+        if max_tokens <= _MIN_THINKING_BUDGET:
             raise exceptions.LLMConfigurationError(
-                "thinking='enabled' requires budget_tokens to be configured for this model"
+                f"thinking='enabled' needs more than {_MIN_THINKING_BUDGET} output tokens"
             )
         return {
             "type": "enabled",
-            "budget_tokens": min(budget_tokens, max_tokens - 1),
+            "budget_tokens": max(_MIN_THINKING_BUDGET, max_tokens // 2),
             "display": "summarized",
         }, omit
     output_config = _ADAPTIVE_OUTPUT_CONFIGS.get(thinking)
@@ -297,7 +297,6 @@ class AnthropicMessagesAPI(LLM):
             base_url=context.connection.base_url,
             model=context.model.id,
             max_output_tokens=_max_output_tokens(context),
-            thinking_budget_tokens=context.model.thinking_budget_tokens,
         )
         return cls(
             config,
@@ -315,11 +314,7 @@ class AnthropicMessagesAPI(LLM):
 
     async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
         max_tokens = _coalesce(request.options.max_output_tokens, self.config.max_output_tokens)
-        thinking, output_config = _resolve_thinking(
-            thinking=request.options.thinking,
-            budget_tokens=self.config.thinking_budget_tokens,
-            max_tokens=max_tokens,
-        )
+        thinking, output_config = _resolve_thinking(request.options.thinking, max_tokens)
         try:
             response = await self.client.messages.create(
                 cache_control={"type": "ephemeral", "ttl": "1h"},
@@ -337,11 +332,7 @@ class AnthropicMessagesAPI(LLM):
 
     async def generate_stream(self, request: LLMRequest) -> AsyncIterator[LLMEvent]:  # noqa: C901
         max_tokens = _coalesce(request.options.max_output_tokens, self.config.max_output_tokens)
-        thinking, output_config = _resolve_thinking(
-            thinking=request.options.thinking,
-            budget_tokens=self.config.thinking_budget_tokens,
-            max_tokens=max_tokens,
-        )
+        thinking, output_config = _resolve_thinking(request.options.thinking, max_tokens)
         emitted_tool_call_ids: set[str] = set()
         try:
             async with self.client.messages.stream(

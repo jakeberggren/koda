@@ -27,11 +27,12 @@ class _Credentials:
 def test_the_active_model_is_current(
     context: PaletteContext,
 ) -> None:
-    catalog, _warnings = Catalog.load()
-    credentials = _Credentials()
-    context.state.settings = Settings(provider="bergetai", model="google/gemma-4-31b-it")
+    catalog, _warnings = Catalog.load(_Credentials())
+    context.state.settings = Settings().with_agent(
+        provider="bergetai", model="google/gemma-4-31b-it"
+    )
     context.state.active_model = catalog.model("bergetai", "google/gemma-4-31b-it")
-    context = replace(context, catalog=catalog, credentials=credentials)
+    context = replace(context, catalog=catalog)
 
     [current] = [item for item in ModelMenu(context).items() if item.current]
     assert current.data.id == "google/gemma-4-31B-it"

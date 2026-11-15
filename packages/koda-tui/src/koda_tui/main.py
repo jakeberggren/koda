@@ -27,14 +27,15 @@ def main() -> None:
         settings = Settings.load()
     except SettingsError as error:
         _fail(error)
-    catalog, warnings = llm.Catalog.load()
+    credentials = llm.JsonCredentialStore()
+    catalog, warnings = llm.Catalog.load(credentials)
     app = KodaTuiApp(
         settings,
         workspace,
         catalog=catalog,
-        credentials=llm.JsonCredentialStore(),
+        credentials=credentials,
         store=JsonSessionStore(),
-        connect=partial(llm.connect, tracing=True),
+        connect=partial(catalog.connect, tracing=True),
         warnings=[warning.summary for warning in warnings],
     )
     asyncio.run(app.run())

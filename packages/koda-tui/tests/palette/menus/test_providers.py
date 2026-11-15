@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from koda.llm import Connection, Model, Provider
+from koda.llm import Connected, Connection, Model, Provider
 from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.responses import OpenAIResponsesAPI
 from koda.llm.credentials import ApiKeyCredential, OAuthCredential, ProviderCredential
@@ -39,6 +39,13 @@ class _Credentials(dict[str, ProviderCredential]):
 
 
 class _FakeCatalog:
+    def __init__(self, credentials: _Credentials) -> None:
+        self._credentials = credentials
+
+    @property
+    def connected(self) -> Connected:
+        return Connected(cast("Catalog", self), self._credentials)
+
     def providers(self) -> list[Provider]:
         return [_openai_provider(_BrowserLogin())]
 
@@ -98,7 +105,7 @@ class _FailingLogin(_BrowserLogin):
 def _menu(overlays: Overlays, credentials: _Credentials, state: AppState) -> ProviderMenu:
     context = PaletteContext(
         overlays=cast("RealOverlays", overlays),
-        catalog=cast("Catalog", _FakeCatalog()),
+        catalog=cast("Catalog", _FakeCatalog(credentials)),
         credentials=credentials,
         store=cast("SessionStore", None),
         state=state,
@@ -181,7 +188,7 @@ def test_an_api_key_is_stored_and_picks_a_model(
     dialog.submit("secret")
 
     assert credentials["openai:api-key"] == ApiKeyCredential(type="api_key", value="secret")
-    assert state.settings.model == "gpt-5.5"
+    assert state.settings.agent.model == "gpt-5.5"
     assert overlays.stack == []
 
 
@@ -202,7 +209,7 @@ async def test_a_browser_login_stores_the_credential(
 
     assert opened_urls == ["https://auth.example"]
     assert credentials["openai:oauth"] == _credential()
-    assert state.settings.model == "gpt-5.5"
+    assert state.settings.agent.model == "gpt-5.5"
     assert overlays.stack == []
 
 

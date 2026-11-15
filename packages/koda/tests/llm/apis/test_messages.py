@@ -8,6 +8,7 @@ from anthropic.lib.streaming import MessageStreamEvent
 from anthropic.types import Message
 from pydantic import TypeAdapter
 
+from koda.llm import LLMConfigurationError
 from koda.llm.apis.messages import (
     AnthropicMessagesAdapter,
     AnthropicMessagesAPI,
@@ -126,18 +127,13 @@ def _message_with_tool_call() -> Message:
     )
 
 
-def _provider(
-    client: _FakeClient,
-    *,
-    thinking_budget_tokens: int | None = None,
-) -> AnthropicMessagesAPI:
+def _provider(client: _FakeClient, *, max_output_tokens: int = 1024) -> AnthropicMessagesAPI:
     return AnthropicMessagesAPI(
         AnthropicMessagesAPIConfig(
             api_key="test-key",
             base_url="https://api.anthropic.com",
             model="claude-sonnet-4-6",
-            max_output_tokens=1024,
-            thinking_budget_tokens=thinking_budget_tokens,
+            max_output_tokens=max_output_tokens,
         ),
         client=cast("AsyncAnthropic", client),
         adapter=AnthropicMessagesAdapter(),
@@ -204,24 +200,40 @@ async def test_anthropic_thinking_requests_summarized_display() -> None:
     assert create_kwargs["output_config"] == {"effort": "high"}
 
 
-@pytest.mark.asyncio
-async def test_anthropic_extended_thinking_budget_is_less_than_max_tokens() -> None:
+async def _thinking_sent(max_output_tokens: int, thinking: str = "enabled") -> object:
     fake_client = _FakeClient()
-    provider = _provider(fake_client, thinking_budget_tokens=4096)
+    provider = _provider(fake_client, max_output_tokens=max_output_tokens)
+    await provider.generate(LLMRequest(messages=[], options=LLMRequestOptions(thinking=thinking)))
+    assert fake_client.messages.create_kwargs is not None
+    return fake_client.messages.create_kwargs["thinking"]
 
-    await provider.generate(
-        LLMRequest(
-            messages=[],
-            options=LLMRequestOptions(thinking="enabled", max_output_tokens=1024),
-        )
-    )
 
-    create_kwargs = fake_client.messages.create_kwargs
-    assert create_kwargs is not None
-    assert create_kwargs["max_tokens"] == 1024
-    assert create_kwargs["thinking"] == {
+@pytest.mark.asyncio
+async def test_manual_thinking_budgets_half_the_output_tokens() -> None:
+    assert await _thinking_sent(64_000) == {
         "type": "enabled",
-        "budget_tokens": 1023,
+        "budget_tokens": 32_000,
+        "display": "summarized",
+    }
+
+
+@pytest.mark.asyncio
+async def test_manual_thinking_budget_is_at_least_the_api_minimum() -> None:
+    thinking = await _thinking_sent(1500)
+    assert isinstance(thinking, dict)
+    assert thinking["budget_tokens"] == 1024
+
+
+@pytest.mark.asyncio
+async def test_manual_thinking_needs_room_for_the_minimum_budget() -> None:
+    with pytest.raises(LLMConfigurationError, match="needs more than 1024 output tokens"):
+        await _thinking_sent(1024)
+
+
+@pytest.mark.asyncio
+async def test_adaptive_thinking_sends_no_budget() -> None:
+    assert await _thinking_sent(64_000, thinking="high") == {
+        "type": "adaptive",
         "display": "summarized",
     }
 

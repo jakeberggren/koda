@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from koda.llm.apis import LLMApiContext
 from koda.llm.auth.protocols import OAuthLoginCallbacks
-from koda.llm.catalog import Catalog, CatalogWarning
+from koda.llm.catalog import Catalog, CatalogWarning, Connected
 from koda.llm.credentials import (
     ApiKeyCredential,
     Credentials,
@@ -18,15 +17,20 @@ from koda.llm.exceptions import (
     LLMConnectionError,
     LLMError,
     LLMRateLimitError,
+    ModelNotConnected,
+    ModelNotFound,
+    ModelUnavailable,
+    NoModelSelected,
+    NoProviderConnected,
 )
 from koda.llm.models import (
     AuthMethod,
     Connection,
     Model,
     Provider,
+    Thinking,
     ThinkingOption,
     ThinkingOptionId,
-    resolve_thinking_mode,
 )
 from koda.llm.protocols import LLM
 from koda.llm.types import (
@@ -42,29 +46,6 @@ from koda.llm.types import (
     LLMToolStarted,
     ThinkingMode,
 )
-from koda.llm.utils import resolve_openai_client
-
-
-async def connect(
-    model: Model,
-    credentials: Credentials,
-    *,
-    tracing: bool = False,
-) -> LLM:
-    """An LLM for ``model``, over the connection ``credentials`` can use.
-
-    With ``tracing``, OpenAI-compatible clients are traced to Langfuse.
-    """
-    connection = model.connection(credentials)
-    return await connection.api.from_context(
-        LLMApiContext(
-            model=model,
-            connection=connection,
-            credentials=credentials,
-            openai_client=resolve_openai_client(tracing=tracing),
-        )
-    )
-
 
 __all__ = [
     "LLM",
@@ -72,6 +53,7 @@ __all__ = [
     "AuthMethod",
     "Catalog",
     "CatalogWarning",
+    "Connected",
     "Connection",
     "Credentials",
     "CredentialsError",
@@ -93,13 +75,17 @@ __all__ = [
     "LLMToolCompleted",
     "LLMToolStarted",
     "Model",
+    "ModelNotConnected",
+    "ModelNotFound",
+    "ModelUnavailable",
+    "NoModelSelected",
+    "NoProviderConnected",
     "OAuthCredential",
     "OAuthLoginCallbacks",
     "Provider",
     "ProviderCredential",
+    "Thinking",
     "ThinkingMode",
     "ThinkingOption",
     "ThinkingOptionId",
-    "connect",
-    "resolve_thinking_mode",
 ]
