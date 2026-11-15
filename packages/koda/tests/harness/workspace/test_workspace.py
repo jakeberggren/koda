@@ -1,4 +1,4 @@
-"""Tests for the workspace: how the tools resolve paths."""
+"""Tests for the workspace: its root, and how paths in it resolve."""
 
 from __future__ import annotations
 
