@@ -3,7 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
+from openai import AsyncOpenAI
+
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from koda.llm.credentials import Credentials
     from koda.llm.models import Connection, Model
     from koda.llm.protocols import LLM
@@ -11,12 +15,13 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class LLMApiContext:
-    """What an API needs to build an LLM: the model, the connection and its credentials."""
+    """What an API needs to build an LLM: the model, the connection and its credentials,
+    and for an OpenAI-compatible API, how to make its client."""
 
     model: Model
     connection: Connection
     credentials: Credentials
-    tracing: bool = False
+    openai_client: Callable[..., AsyncOpenAI] = AsyncOpenAI
 
     @property
     def capabilities(self) -> dict[str, object]:

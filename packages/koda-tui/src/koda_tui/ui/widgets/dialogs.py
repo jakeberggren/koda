@@ -89,18 +89,25 @@ class MessageDialog:
     """Dialog for showing a non-input message; Enter or Escape closes it."""
 
     def __init__(self, title: str, detail: str, on_close: Callable[[], None]) -> None:
+        self.title = title
+        self.detail = detail
+        self._on_close = on_close
         kb = KeyBindings()
-        kb.add(Keys.Enter)(lambda _event: on_close())
+        kb.add(Keys.Enter)(lambda _event: self.close())
         self._panel = Panel(
             title,
             [Text(detail, style=Tokens.Text.MUTED, overflow=Overflow.WRAP, focusable=True)],
-            on_close=on_close,
+            on_close=self.close,
             key_bindings=kb,
             width=Width.MEDIUM,
         )
 
     def __pt_container__(self) -> Panel:
         return self._panel
+
+    def close(self) -> None:
+        """Close the dialog, as Enter and Escape do."""
+        self._on_close()
 
 
 class InputDialog:
@@ -115,11 +122,15 @@ class InputDialog:
         detail: str | None = None,
         mask_input: bool = False,
     ) -> None:
+        self.title = title
+        self.detail = detail
+        self.masked = mask_input
         self._on_submit = on_submit
+        self._on_cancel = on_cancel
         self.input_buffer = Buffer()
 
         kb = KeyBindings()
-        kb.add(Keys.Enter)(self._on_enter)
+        kb.add(Keys.Enter)(lambda _event: self.submit(self.input_buffer.text))
         detail_rows = (
             [Text(detail, style=Tokens.Text.MUTED, overflow=Overflow.WRAP), Spacer()]
             if detail
@@ -128,7 +139,7 @@ class InputDialog:
         self._panel = Panel(
             title,
             [*detail_rows, Input(self.input_buffer, masked=mask_input)],
-            on_close=on_cancel,
+            on_close=self.cancel,
             key_bindings=kb,
             width=Width.SMALL,
         )
@@ -136,7 +147,11 @@ class InputDialog:
     def __pt_container__(self) -> Panel:
         return self._panel
 
-    def _on_enter(self, _event: KeyPressEvent) -> None:
-        text = self.input_buffer.text.strip()
-        if text:
+    def submit(self, text: str) -> None:
+        """Submit ``text``, trimmed, as Enter does with what was typed; blank text isn't."""
+        if text := text.strip():
             self._on_submit(text)
+
+    def cancel(self) -> None:
+        """Close the dialog without submitting, as Escape does."""
+        self._on_cancel()

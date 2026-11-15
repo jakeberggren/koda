@@ -11,16 +11,23 @@ if TYPE_CHECKING:
 
     from koda_tui.state import AppState
 
-EXIT_TIMEOUT = 3.0  # Seconds a second Ctrl+C has to come within to exit.
+EXIT_TIMEOUT = 3.0  # Seconds a second Ctrl+C has to come within to exit, by default.
 
 
 class ExitPrompt:
     """Asks for a second Ctrl+C before exiting, through ``state.exit_requested``,
-    until ``EXIT_TIMEOUT`` runs out."""
+    until ``timeout`` seconds run out."""
 
-    def __init__(self, state: AppState, *, invalidate: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        state: AppState,
+        *,
+        invalidate: Callable[[], None],
+        timeout: float = EXIT_TIMEOUT,
+    ) -> None:
         self._state = state
         self._invalidate = invalidate
+        self._timeout = timeout
         self._dismissals = 0  # A timeout only dismisses the ask it was started for.
 
     def confirm(self) -> bool:
@@ -31,7 +38,7 @@ class ExitPrompt:
         self._state.exit_requested = True
         dismissals = self._dismissals
         with suppress(RuntimeError):  # Without a running loop, it asks until dismissed.
-            asyncio.get_running_loop().call_later(EXIT_TIMEOUT, self._expire, dismissals)
+            asyncio.get_running_loop().call_later(self._timeout, self._expire, dismissals)
         self._invalidate()
         return False
 

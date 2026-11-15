@@ -21,7 +21,7 @@ def test_lists_the_themes_marking_the_current_one(
 ) -> None:
     context.state.settings = Settings(theme="terminal-light")
     ThemeMenu(context).open()
-    items = overlays.stack[-1]["items"]
+    items = overlays.top.items
     assert [item.data for item in items] == ["auto", "terminal-dark", "terminal-light"]
     assert [item.current for item in items] == [False, False, True]
 

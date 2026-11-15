@@ -44,7 +44,6 @@ from koda.llm.types import (
 from koda.llm.utils import (
     parse_tool_arguments,
     raise_llm_error_from_openai,
-    resolve_openai_client,
 )
 from koda.messages import (
     AssistantMessage,
@@ -296,10 +295,9 @@ class OpenAIResponsesAPI(LLM):
             web_search=bool(capabilities.get("web_search", False)),
             extended_prompt_retention=bool(capabilities.get("extended_prompt_retention", False)),
         )
-        client_factory = resolve_openai_client(tracing=context.tracing)
         return cls(
             config,
-            client=client_factory(api_key=config.api_key, base_url=config.base_url),
+            client=context.openai_client(api_key=config.api_key, base_url=config.base_url),
             adapter=OpenAIResponsesAdapter(),
             event_adapter=OpenAIResponsesEventAdapter(),
         )

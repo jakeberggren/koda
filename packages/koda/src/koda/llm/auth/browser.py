@@ -4,7 +4,7 @@ import asyncio
 from contextlib import suppress
 from dataclasses import dataclass
 from threading import Event
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 from urllib.parse import urlparse
 
 from koda.llm.auth.callback import OAuthCallbackListener, extract_callback_code
@@ -12,6 +12,12 @@ from koda.llm.auth.exceptions import OAuthCallbackCancelledError, OAuthCallbackR
 
 if TYPE_CHECKING:
     from koda.llm.auth.protocols import OAuthLoginCallbacks
+
+
+class CallbackListener(Protocol):
+    """Waits for the browser to come back with an authorization code."""
+
+    def receive(self, *, cancel_event: Event | None = None) -> str: ...
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -62,12 +68,14 @@ async def complete_browser_authorization(
     *,
     redirect: LoopbackRedirect,
     prompt: str,
+    listener: CallbackListener | None = None,
 ) -> str:
-    """Open a browser login and return the first valid callback or pasted code."""
+    """Open a browser login and return the first valid callback or pasted code. The
+    callback comes to ``listener``, by default one on ``redirect``."""
 
     callbacks.on_auth_url(request.url)
     cancel_callback = Event()
-    listener = OAuthCallbackListener(
+    listener = listener or OAuthCallbackListener(
         host=redirect.host,
         port=redirect.port,
         callback_path=redirect.path,

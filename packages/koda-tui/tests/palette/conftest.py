@@ -1,14 +1,13 @@
-"""A palette context over fakes: overlays that record what opens, and settings updates."""
+"""A palette context over fakes: overlays that keep what opens, and settings updates."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import Mock
 
 import pytest
 
 from koda.sessions import InMemorySessionStore
-from koda_tui.palette import context as context_module
 from koda_tui.palette.context import PaletteContext
 
 if TYPE_CHECKING:
@@ -17,12 +16,12 @@ if TYPE_CHECKING:
 
 
 class Overlays:
-    """A stack of what was opened; a picker is recorded as its arguments."""
+    """A stack of the widgets the menus open, the real ones."""
 
     def __init__(self) -> None:
-        self.stack: list[dict] = []
+        self.stack: list[Any] = []
 
-    def open(self, overlay: dict) -> None:
+    def open(self, overlay: object) -> None:
         self.stack.append(overlay)
 
     def close(self) -> None:
@@ -31,18 +30,18 @@ class Overlays:
     def close_all(self) -> None:
         self.stack.clear()
 
-    def pick(self, label: str) -> None:
-        """Choose the item labelled ``label`` in the top picker."""
-        top = self.stack[-1]
-        top["on_select"](next(item for item in top["items"] if item.label == label))
+    @property
+    def top(self) -> Any:
+        return self.stack[-1]
 
+    @property
+    def kinds(self) -> list[type]:
+        return [type(overlay) for overlay in self.stack]
 
-@pytest.fixture(autouse=True)
-def _record_pickers(monkeypatch: pytest.MonkeyPatch) -> None:
-    def picker(title: str, items: list, **fields: object) -> dict:
-        return {"title": title, "items": items, **fields}
-
-    monkeypatch.setattr(context_module, "Picker", picker)
+    def pick(self, label: str, picker: Any = None) -> None:
+        """Choose the item labelled ``label`` in ``picker``, the top one by default."""
+        picker = picker or self.top
+        picker.select(next(item for item in picker.items if item.label == label))
 
 
 @pytest.fixture
