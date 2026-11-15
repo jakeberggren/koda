@@ -46,7 +46,13 @@ from koda.llm.utils import (
     raise_llm_error_from_openai,
     resolve_openai_client,
 )
-from koda.messages import AssistantMessage, TokenUsage, ToolMessage, UserMessage
+from koda.messages import (
+    AssistantMessage,
+    InterruptionMessage,
+    TokenUsage,
+    ToolMessage,
+    UserMessage,
+)
 from koda.tools import ToolCall, ToolOutput, ToolResult
 
 if TYPE_CHECKING:
@@ -94,7 +100,9 @@ class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Om
     """Convert between Koda messages/tools/responses and OpenAI Responses types."""
 
     @staticmethod
-    def _to_provider_user_message(message: UserMessage) -> EasyInputMessageParam:
+    def _to_provider_user_message(
+        message: UserMessage | InterruptionMessage,
+    ) -> EasyInputMessageParam:
         return EasyInputMessageParam(role="user", content=message.content, type="message")
 
     @staticmethod
@@ -137,7 +145,7 @@ class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Om
     def to_provider_messages(self, messages: Sequence[Message]) -> ResponseInputParam:
         result: ResponseInputParam = []
         for message in messages:
-            if isinstance(message, UserMessage):
+            if isinstance(message, UserMessage | InterruptionMessage):
                 result.append(self._to_provider_user_message(message))
                 continue
             if isinstance(message, ToolMessage):

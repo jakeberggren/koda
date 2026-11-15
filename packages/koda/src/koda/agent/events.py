@@ -1,7 +1,17 @@
+"""What the agent streams: the model's events as they come, and the agent's own."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from koda.llm.types import (
+    LLMTextDelta,
+    LLMThinkingDelta,
+    LLMToolCallRequested,
+    LLMToolCompleted,
+    LLMToolStarted,
+)
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -23,27 +33,6 @@ class AgentIterationStarted:
 
     session_id: UUID
     iteration: int
-
-
-@dataclass(frozen=True, slots=True)
-class AgentTextDelta:
-    """Assistant text streamed from the current model iteration."""
-
-    text: str
-
-
-@dataclass(frozen=True, slots=True)
-class AgentThinkingDelta:
-    """Assistant thinking text streamed from the current model iteration."""
-
-    text: str
-
-
-@dataclass(frozen=True, slots=True)
-class AgentToolCallRequested:
-    """The model requested a tool call."""
-
-    call: ToolCall
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,7 +60,7 @@ class AgentToolResultReady:
 
 @dataclass(frozen=True, slots=True)
 class AgentResponseCompleted:
-    """An assistant message was completed and persisted."""
+    """An assistant message was completed."""
 
     message: AssistantMessage
 
@@ -85,12 +74,14 @@ class AgentTurnCompleted:
 
 
 AgentEvent = (
-    AgentTurnStarted
+    LLMTextDelta
+    | LLMThinkingDelta
+    | LLMToolCallRequested
+    | LLMToolStarted  # A tool the provider runs, such as web search.
+    | LLMToolCompleted
+    | AgentTurnStarted
     | AgentIterationStarted
-    | AgentTextDelta
-    | AgentThinkingDelta
-    | AgentToolCallRequested
-    | AgentToolStarted
+    | AgentToolStarted  # A tool Koda runs.
     | AgentToolResultReady
     | AgentToolCompleted
     | AgentResponseCompleted

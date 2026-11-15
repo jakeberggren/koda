@@ -10,6 +10,7 @@ from prompt_toolkit.output import ColorDepth
 
 from koda.agent import Agent
 from koda.llm import CredentialsError, LLMConfigurationError, LLMRequestOptions
+from koda.sessions import SaveSessionHook
 from koda_tui import strings
 from koda_tui.app.exit import ExitPrompt
 from koda_tui.app.keybindings import create_keybindings
@@ -233,7 +234,7 @@ class KodaTuiApp:
             await self._connect(model, self._credentials),
             session=self.state.session,
             workspace=self.state.workspace,
-            store=self._store,
+            hooks=[SaveSessionHook(self._store)],
             options=LLMRequestOptions(
                 thinking=model.resolve_thinking_option(settings.thinking).id,
                 web_search=settings.web_search,

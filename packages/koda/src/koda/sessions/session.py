@@ -4,10 +4,16 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from koda.messages.messages import AssistantMessage, TokenUsage, ToolMessage, UserMessage
+from koda.messages.messages import (
+    AssistantMessage,
+    InterruptionMessage,
+    TokenUsage,
+    ToolMessage,
+    UserMessage,
+)
 
 SessionMessage = Annotated[
-    AssistantMessage | ToolMessage | UserMessage,
+    AssistantMessage | ToolMessage | UserMessage | InterruptionMessage,
     Field(discriminator="role"),
 ]
 
@@ -43,6 +49,10 @@ class Session(BaseModel):
     created_at: datetime = Field(default_factory=_utcnow)
     messages: list[SessionMessage] = Field(default_factory=list)
     name: str | None = None
+
+    def add(self, message: SessionMessage) -> None:
+        """Add ``message`` to the conversation."""
+        self.messages.append(message)
 
     @property
     def display_name(self) -> str:

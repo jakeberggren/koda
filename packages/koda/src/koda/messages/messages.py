@@ -11,6 +11,7 @@ class MessageRole(StrEnum):
     USER = auto()
     ASSISTANT = auto()
     TOOL = auto()
+    INTERRUPTION = auto()
 
 
 class Message(BaseModel):
@@ -33,6 +34,13 @@ class TokenUsage:
 
 class UserMessage(Message):
     role: Literal[MessageRole.USER] = Field(default=MessageRole.USER, frozen=True)
+
+
+class InterruptionMessage(Message):
+    """The user interrupted the response; the model is told so with ``content``."""
+
+    role: Literal[MessageRole.INTERRUPTION] = Field(default=MessageRole.INTERRUPTION, frozen=True)
+    content: str = "The user interrupted the response."
 
 
 class AssistantMessage(Message):

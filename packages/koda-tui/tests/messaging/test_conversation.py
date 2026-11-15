@@ -5,11 +5,11 @@ import pytest
 from koda import messages as core
 from koda.agent import (
     AgentResponseCompleted,
-    AgentTextDelta,
-    AgentThinkingDelta,
-    AgentToolCallRequested,
     AgentToolCompleted,
     AgentToolResultReady,
+    LLMTextDelta,
+    LLMThinkingDelta,
+    LLMToolCallRequested,
 )
 from koda.messages import TokenUsage
 from koda.sessions import Session
@@ -70,8 +70,8 @@ class TestResponse:
         assert state.response_phase is ResponsePhase.WORKING
         assert len(state.messages) == 1  # User message added
 
-        conversation.apply(AgentTextDelta(text="Hello "))
-        conversation.apply(AgentTextDelta(text="world"))
+        conversation.apply(LLMTextDelta(text="Hello "))
+        conversation.apply(LLMTextDelta(text="world"))
         assert _text(state.messages[-1]) == "Hello world"
         assert state.response_phase is ResponsePhase.RESPONDING
 
@@ -85,9 +85,9 @@ class TestResponse:
     ) -> None:
         """Thinking content should persist on the finalized assistant message."""
         conversation.start("user message")
-        conversation.apply(AgentThinkingDelta(text="Comparing approaches"))
+        conversation.apply(LLMThinkingDelta(text="Comparing approaches"))
         assert state.response_phase is ResponsePhase.THINKING
-        conversation.apply(AgentTextDelta(text="Final answer"))
+        conversation.apply(LLMTextDelta(text="Final answer"))
         assert state.response_phase is ResponsePhase.RESPONDING
 
         conversation.end()
@@ -101,7 +101,7 @@ class TestResponse:
         tool = ToolCall(tool_name="read_file", arguments={"path": "/tmp/a"}, call_id="c1")
 
         conversation.start("msg")
-        conversation.apply(AgentToolCallRequested(call=tool))
+        conversation.apply(LLMToolCallRequested(call=tool))
         expected_messages = 2  # user + tool
 
         assert state.response_phase is ResponsePhase.TOOLS
@@ -138,8 +138,8 @@ class TestResponse:
         tool_b = ToolCall(tool_name="grep", arguments={}, call_id="b")
 
         conversation.start("msg")
-        conversation.apply(AgentToolCallRequested(call=tool_a))
-        conversation.apply(AgentToolCallRequested(call=tool_b))
+        conversation.apply(LLMToolCallRequested(call=tool_a))
+        conversation.apply(LLMToolCallRequested(call=tool_b))
 
         assert state.response_phase is ResponsePhase.TOOLS
         assert _running(state) == [tool_a, tool_b]
@@ -171,8 +171,8 @@ class TestResponse:
         result_b = ToolResult(call_id="b", output=ToolOutput(display="matched"))
 
         conversation.start("msg")
-        conversation.apply(AgentToolCallRequested(call=tool_a))
-        conversation.apply(AgentToolCallRequested(call=tool_b))
+        conversation.apply(LLMToolCallRequested(call=tool_a))
+        conversation.apply(LLMToolCallRequested(call=tool_b))
 
         conversation.apply(AgentToolResultReady(tool_name="grep", result=result_b))
 
@@ -192,8 +192,8 @@ class TestResponse:
         tool_b = ToolCall(tool_name="grep", arguments={}, call_id="b")
 
         conversation.start("msg")
-        conversation.apply(AgentToolCallRequested(call=tool_a))
-        conversation.apply(AgentToolCallRequested(call=tool_b))
+        conversation.apply(LLMToolCallRequested(call=tool_a))
+        conversation.apply(LLMToolCallRequested(call=tool_b))
         conversation.end()
 
         assert _running(state) == []
@@ -208,7 +208,7 @@ class TestResponse:
         tool = ToolCall(tool_name="read_file", arguments={}, call_id="c1")
 
         conversation.start("msg")
-        conversation.apply(AgentToolCallRequested(call=tool))
+        conversation.apply(LLMToolCallRequested(call=tool))
         conversation.apply(
             _done(
                 "c1", ToolOutput(display="not found", is_error=True, error_message="missing file")
@@ -227,7 +227,7 @@ class TestResponse:
         tool = ToolCall(tool_name="read_file", arguments={}, call_id="c1")
 
         conversation.start("msg")
-        conversation.apply(AgentToolCallRequested(call=tool))
+        conversation.apply(LLMToolCallRequested(call=tool))
         conversation.apply(_done("c1", ToolOutput()))
 
         assert _running(state) == []
@@ -238,9 +238,9 @@ class TestResponse:
     ) -> None:
         """Starting a tool should keep the reply streamed so far as a message."""
         conversation.start("msg")
-        conversation.apply(AgentTextDelta(text="partial text"))
+        conversation.apply(LLMTextDelta(text="partial text"))
         tool = ToolCall(tool_name="search", arguments={}, call_id="c1")
-        conversation.apply(AgentToolCallRequested(call=tool))
+        conversation.apply(LLMToolCallRequested(call=tool))
 
         # Streaming content saved as assistant message
         assert isinstance(state.messages[1], AssistantMessage)
@@ -254,10 +254,10 @@ class TestResponse:
     ) -> None:
         """Whitespace-only text before a tool should not create a blank assistant row."""
         conversation.start("msg")
-        conversation.apply(AgentTextDelta(text="\n\n"))
+        conversation.apply(LLMTextDelta(text="\n\n"))
         tool = ToolCall(tool_name="search", arguments={}, call_id="c1")
 
-        conversation.apply(AgentToolCallRequested(call=tool))
+        conversation.apply(LLMToolCallRequested(call=tool))
 
         assert len(state.messages) == 2
         assert isinstance(state.messages[1], ToolMessage)
@@ -268,7 +268,7 @@ class TestResponse:
     ) -> None:
         """Whitespace-only final content should not persist as an assistant message."""
         conversation.start("msg")
-        conversation.apply(AgentTextDelta(text=" \n\t"))
+        conversation.apply(LLMTextDelta(text=" \n\t"))
 
         conversation.end()
 
@@ -280,10 +280,10 @@ class TestResponse:
     ) -> None:
         """Starting a tool should keep the streamed thinking on that message."""
         conversation.start("msg")
-        conversation.apply(AgentThinkingDelta(text="Need to search first"))
+        conversation.apply(LLMThinkingDelta(text="Need to search first"))
         tool = ToolCall(tool_name="search", arguments={}, call_id="c1")
 
-        conversation.apply(AgentToolCallRequested(call=tool))
+        conversation.apply(LLMToolCallRequested(call=tool))
 
         assert isinstance(state.messages[1], AssistantMessage)
         assert _reply(state.messages[1]).thinking == "Need to search first"
@@ -297,8 +297,8 @@ class TestResponse:
         tool = ToolCall(tool_name="search", arguments={}, call_id="c1")
 
         conversation.start("msg")
-        conversation.apply(AgentToolCallRequested(call=tool))
-        conversation.apply(AgentToolCallRequested(call=tool))
+        conversation.apply(LLMToolCallRequested(call=tool))
+        conversation.apply(LLMToolCallRequested(call=tool))
 
         assert _running(state) == [tool]
         assert len(state.messages) == 2
@@ -312,8 +312,8 @@ class TestResponse:
         tool = ToolCall(tool_name="search", arguments={}, call_id="c1")
 
         conversation.start("msg")
-        conversation.apply(AgentToolCallRequested(call=tool))
-        conversation.apply(AgentTextDelta(text="Buffered answer"))
+        conversation.apply(LLMToolCallRequested(call=tool))
+        conversation.apply(LLMTextDelta(text="Buffered answer"))
 
         conversation.apply(_done("c1", ToolOutput()))
 
@@ -326,8 +326,8 @@ class TestResponse:
         tool = ToolCall(tool_name="search", arguments={}, call_id="c1")
 
         conversation.start("msg")
-        conversation.apply(AgentToolCallRequested(call=tool))
-        conversation.apply(AgentThinkingDelta(text="Need one more step"))
+        conversation.apply(LLMToolCallRequested(call=tool))
+        conversation.apply(LLMThinkingDelta(text="Need one more step"))
 
         conversation.apply(_done("c1", ToolOutput()))
 
@@ -396,8 +396,8 @@ class TestResponse:
     ) -> None:
         """AgentResponseCompleted should not replace the buffered assistant content path."""
         conversation.start("msg")
-        conversation.apply(AgentThinkingDelta(text="partial thinking"))
-        conversation.apply(AgentTextDelta(text="partial content"))
+        conversation.apply(LLMThinkingDelta(text="partial thinking"))
+        conversation.apply(LLMTextDelta(text="partial content"))
 
         conversation.apply(
             AgentResponseCompleted(

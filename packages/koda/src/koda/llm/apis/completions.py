@@ -37,7 +37,13 @@ from koda.llm.utils import (
     raise_llm_error_from_openai,
     resolve_openai_client,
 )
-from koda.messages import AssistantMessage, TokenUsage, ToolMessage, UserMessage
+from koda.messages import (
+    AssistantMessage,
+    InterruptionMessage,
+    TokenUsage,
+    ToolMessage,
+    UserMessage,
+)
 from koda.tools import ToolCall
 
 if TYPE_CHECKING:
@@ -134,7 +140,9 @@ class OpenAICompletionsAdapter(
         )
 
     @staticmethod
-    def _to_provider_user_message(message: UserMessage) -> ChatCompletionUserMessageParam:
+    def _to_provider_user_message(
+        message: UserMessage | InterruptionMessage,
+    ) -> ChatCompletionUserMessageParam:
         return ChatCompletionUserMessageParam(role="user", content=message.content)
 
     @staticmethod
@@ -166,7 +174,7 @@ class OpenAICompletionsAdapter(
             if isinstance(message, ToolMessage):
                 result.append(self._to_provider_tool_message(message))
                 continue
-            if isinstance(message, UserMessage):
+            if isinstance(message, UserMessage | InterruptionMessage):
                 result.append(self._to_provider_user_message(message))
                 continue
             if isinstance(message, AssistantMessage):

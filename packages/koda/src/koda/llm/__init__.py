@@ -35,6 +35,11 @@ from koda.llm.types import (
     LLMRequestOptions,
     LLMRequestOptionsError,
     LLMResponse,
+    LLMTextDelta,
+    LLMThinkingDelta,
+    LLMToolCallRequested,
+    LLMToolCompleted,
+    LLMToolStarted,
     ThinkingMode,
 )
 
@@ -81,6 +86,11 @@ __all__ = [
     "LLMRequestOptions",
     "LLMRequestOptionsError",
     "LLMResponse",
+    "LLMTextDelta",
+    "LLMThinkingDelta",
+    "LLMToolCallRequested",
+    "LLMToolCompleted",
+    "LLMToolStarted",
     "Model",
     "OAuthCredential",
     "OAuthLoginCallbacks",

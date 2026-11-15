@@ -1,5 +1,6 @@
 from koda.messages.messages import (
     AssistantMessage,
+    InterruptionMessage,
     Message,
     MessageRole,
     TokenUsage,
@@ -9,6 +10,7 @@ from koda.messages.messages import (
 
 __all__ = [
     "AssistantMessage",
+    "InterruptionMessage",
     "Message",
     "MessageRole",
     "TokenUsage",
