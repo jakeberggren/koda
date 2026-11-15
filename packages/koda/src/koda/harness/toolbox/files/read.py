@@ -1,3 +1,5 @@
+"""The read_file tool: a window of lines from a text file."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -5,12 +7,13 @@ from typing import TYPE_CHECKING
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.harness.toolbox.exceptions import FileNotFoundError, NotAFileError, ToolError
-from koda.harness.toolbox.files import read_text_lines
+from koda.harness.toolbox.files.content import read_text_lines
+from koda.harness.workspace import NotAFileError, PathNotFoundError
 from koda.messages import ToolOutput
+from koda.tools import ToolError
 
 if TYPE_CHECKING:
-    from koda.harness.toolbox.workspace import Workspace
+    from koda.harness.workspace import Workspace
 
 
 class ReadError(ToolError):
@@ -50,7 +53,7 @@ class ReadFileTool:
 
         async with self.workspace.coordinator.shared_access():
             if not await target.exists():
-                raise FileNotFoundError(params.path)
+                raise PathNotFoundError(params.path)
 
             if not await target.is_file():
                 raise NotAFileError(params.path)

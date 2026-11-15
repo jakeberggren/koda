@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda.harness.toolbox.workspace import Workspace
+    from koda.harness.workspace import Workspace
 
 
 def test_a_relative_path_is_relative_to_the_root(workspace: Workspace, workspace_dir: Path) -> None:

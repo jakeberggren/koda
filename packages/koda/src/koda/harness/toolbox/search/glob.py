@@ -1,3 +1,5 @@
+"""The glob tool: finding files by name."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -5,11 +7,11 @@ from typing import TYPE_CHECKING
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.harness.toolbox import exceptions
+from koda.harness.workspace import NotAFolderError, PathNotFoundError
 from koda.messages import ToolOutput
 
 if TYPE_CHECKING:
-    from koda.harness.toolbox.workspace import Workspace
+    from koda.harness.workspace import Workspace
 
 
 class GlobParams(BaseModel):
@@ -55,10 +57,10 @@ class GlobTool:
 
         async with self.workspace.coordinator.shared_access():
             if not await resolved.exists():
-                raise exceptions.FileNotFoundError(params.path)
+                raise PathNotFoundError(params.path)
 
             if not await resolved.is_dir():
-                raise exceptions.NotADirectoryError(params.path)
+                raise NotAFolderError(params.path)
 
             matches = await self._collect_matches(resolved, params.pattern)
 

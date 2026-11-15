@@ -1,3 +1,6 @@
+"""File contents as text: read whole or as a window of lines, and written, in UTF-8 (with
+or without a BOM). Binary files are refused."""
+
 from __future__ import annotations
 
 import codecs
@@ -7,7 +10,8 @@ from typing import TYPE_CHECKING, Protocol
 from anyio import Path as AnyioPath
 from anyio import to_thread
 
-from koda.harness.toolbox import exceptions
+from koda.harness.workspace import AccessDeniedError
+from koda.tools import ToolError
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -19,7 +23,7 @@ class TextFileErrorType(Protocol):
     def __call__(self, path: str, *, cause: Exception) -> Exception: ...
 
 
-class TextDecodeError(exceptions.ToolError):
+class TextDecodeError(ToolError):
     """Failed to decode a file as UTF-8 text."""
 
     def __init__(self, path: str) -> None:
@@ -40,7 +44,7 @@ class DecodedText:
 SUPPORTED_TEXT_ENCODINGS = ("utf-8", "utf-8-sig")
 
 
-def _decode_text(data: bytes, path: str) -> DecodedText:
+def decode_text(data: bytes, path: str) -> DecodedText:
     """Decode full file contents as UTF-8 text, allowing a UTF-8 BOM."""
     if b"\x00" in data:
         raise TextDecodeError(path)
@@ -52,7 +56,7 @@ def _decode_text(data: bytes, path: str) -> DecodedText:
     raise TextDecodeError(path)
 
 
-def _detect_text_encoding(sample: bytes, path: str) -> str:
+def detect_text_encoding(sample: bytes, path: str) -> str:
     """Pick the UTF-8 variant to use for text decoding."""
     if b"\x00" in sample:
         raise TextDecodeError(path)
@@ -61,10 +65,10 @@ def _detect_text_encoding(sample: bytes, path: str) -> str:
     return "utf-8"
 
 
-def _read_text_lines_sync(resolved: Path, path: str, offset: int, limit: int) -> DecodedText:
+def read_text_lines_sync(resolved: Path, path: str, offset: int, limit: int) -> DecodedText:
     """Read a bounded line window from a text file using synchronous I/O."""
     with resolved.open("rb") as handle:
-        encoding = _detect_text_encoding(handle.read(8192), path)
+        encoding = detect_text_encoding(handle.read(8192), path)
     try:
         with resolved.open("r", encoding=encoding) as handle:
             lines: list[str] = []
@@ -86,11 +90,11 @@ async def read_text(resolved: Path, path: str, *, error: TextFileErrorType) -> D
     try:
         data = await AnyioPath(resolved).read_bytes()
     except PermissionError as e:
-        raise exceptions.PermissionError(path) from e
+        raise AccessDeniedError(path) from e
     except OSError as e:
         raise error(path, cause=e) from e
 
-    return _decode_text(data, path)
+    return decode_text(data, path)
 
 
 async def read_text_lines(
@@ -103,9 +107,9 @@ async def read_text_lines(
 ) -> DecodedText:
     """Read a bounded range of decoded text lines from a file."""
     try:
-        return await to_thread.run_sync(_read_text_lines_sync, resolved, path, offset, limit)
+        return await to_thread.run_sync(read_text_lines_sync, resolved, path, offset, limit)
     except PermissionError as e:
-        raise exceptions.PermissionError(path) from e
+        raise AccessDeniedError(path) from e
     except OSError as e:
         raise error(path, cause=e) from e
 
@@ -123,6 +127,6 @@ async def write_text(
         await AnyioPath(resolved.parent).mkdir(parents=True, exist_ok=True)
         await AnyioPath(resolved).write_text(content, encoding=encoding)
     except PermissionError as e:
-        raise exceptions.PermissionError(path) from e
+        raise AccessDeniedError(path) from e
     except OSError as e:
         raise error(path, cause=e) from e

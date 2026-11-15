@@ -12,6 +12,8 @@ from koda.paths import koda_home_dir
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from koda.harness.workspace import Workspace
+
 logger = get_logger(__name__)
 
 DEFAULT_PROMPT = (
@@ -27,11 +29,11 @@ DEFAULT_PROMPT = (
 PROJECT_FILES = ("AGENTS.md", "CLAUDE.md")
 
 
-def instructions(path: Path) -> str:
-    """The system prompt for working in ``path``."""
-    path = path.resolve()
-    system = read(path / "SYSTEM.md") or read(koda_home_dir() / "SYSTEM.md") or DEFAULT_PROMPT
-    project = [text for name in PROJECT_FILES if (text := read(path / name))]
+def instructions(workspace: Workspace) -> str:
+    """The system prompt for working in ``workspace``."""
+    root = workspace.root
+    system = read(root / "SYSTEM.md") or read(koda_home_dir() / "SYSTEM.md") or DEFAULT_PROMPT
+    project = [text for name in PROJECT_FILES if (text := read(root / name))]
     return "\n\n".join([system, *project])
 
 

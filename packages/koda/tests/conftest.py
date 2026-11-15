@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel
 
-from koda.harness.toolbox.workspace import Workspace
+from koda.harness.workspace import Workspace
 from koda.tools import base as tools_base
 
 
