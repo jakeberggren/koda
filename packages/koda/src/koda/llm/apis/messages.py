@@ -36,6 +36,7 @@ from koda.llm import exceptions
 from koda.llm.apis.credentials import resolve_api_key_credential
 from koda.llm.protocols import LLM, LLMAdapter
 from koda.llm.types import (
+    LLMOptions,
     LLMResponse,
     LLMResponseCompleted,
     LLMTextDelta,
@@ -269,11 +270,13 @@ class AnthropicMessagesAPI(LLM):
         client: AsyncAnthropic,
         adapter: AnthropicMessagesLLMAdapter,
         event_adapter: AnthropicMessagesEventAdapter,
+        options: LLMOptions,
     ) -> None:
         self.config = config
         self.client = client
         self.adapter = adapter
         self.event_adapter = event_adapter
+        self.options = options
 
     @classmethod
     async def from_context(cls, context: LLMApiContext) -> AnthropicMessagesAPI:
@@ -289,6 +292,7 @@ class AnthropicMessagesAPI(LLM):
             client=AsyncAnthropic(api_key=config.api_key, base_url=config.base_url),
             adapter=AnthropicMessagesAdapter(),
             event_adapter=AnthropicMessagesEventAdapter(),
+            options=context.options,
         )
 
     @staticmethod
@@ -299,8 +303,8 @@ class AnthropicMessagesAPI(LLM):
         return [call for call in response.output.tool_calls if call.call_id not in emitted_ids]
 
     async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
-        max_tokens = _coalesce(request.options.max_output_tokens, self.config.max_output_tokens)
-        thinking, output_config = _resolve_thinking(request.options.thinking, max_tokens)
+        max_tokens = _coalesce(self.options.max_output_tokens, self.config.max_output_tokens)
+        thinking, output_config = _resolve_thinking(self.options.thinking, max_tokens)
         try:
             response = await self.client.messages.create(
                 cache_control={"type": "ephemeral", "ttl": "1h"},
@@ -317,8 +321,8 @@ class AnthropicMessagesAPI(LLM):
         return self.adapter.to_llm_response(response)
 
     async def generate_stream(self, request: LLMRequest) -> AsyncIterator[LLMEvent]:  # noqa: C901
-        max_tokens = _coalesce(request.options.max_output_tokens, self.config.max_output_tokens)
-        thinking, output_config = _resolve_thinking(request.options.thinking, max_tokens)
+        max_tokens = _coalesce(self.options.max_output_tokens, self.config.max_output_tokens)
+        thinking, output_config = _resolve_thinking(self.options.thinking, max_tokens)
         emitted_tool_call_ids: set[str] = set()
         try:
             async with self.client.messages.stream(

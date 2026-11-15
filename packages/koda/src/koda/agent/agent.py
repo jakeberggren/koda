@@ -16,7 +16,7 @@ from koda.agent.events import (
     AgentTurnCompleted,
     AgentTurnStarted,
 )
-from koda.llm import LLMRequest, LLMRequestOptions
+from koda.llm import LLMRequest
 from koda.llm.types import (
     LLMEvent,
     LLMResponse,
@@ -72,7 +72,7 @@ class Agent:
     Messages go into ``session``, a new one by default; ``hooks`` run each time it changes.
     """
 
-    def __init__(  # noqa: PLR0913 - options move to how the LLM is connected, next
+    def __init__(
         self,
         llm: LLM,
         *,
@@ -80,7 +80,6 @@ class Agent:
         tools: Sequence[Tool] = (),
         hooks: Sequence[Hook] = (),
         session: Session | None = None,
-        options: LLMRequestOptions | None = None,
     ) -> None:
         self.llm = llm
         self.instructions = instructions
@@ -88,9 +87,7 @@ class Agent:
         self.executor = ToolExecutor(self.tools)
         self.hooks = tuple(hooks)
         self.session = session or Session()
-        self.options = options or LLMRequestOptions()
         self.turn = Turn()  # The latest turn, the same object for every one; none has run yet.
-        logger.info("agent_initialized", llm=type(llm).__name__)
 
     async def run(self, text: str) -> AsyncIterator[AgentEvent]:
         """Send ``text`` and stream the turn. An interrupted turn is kept in the session as
@@ -139,7 +136,6 @@ class Agent:
                 messages=self.session.messages,
                 instructions=self.instructions,
                 tools=definitions,
-                options=self.options,
             )
             async for event in self.llm.generate_stream(request):
                 self._follow(event)

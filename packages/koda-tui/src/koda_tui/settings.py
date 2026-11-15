@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Annotated
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 from pydantic_core import PydanticCustomError
 
-from koda.llm import LLMRequestOptions, ThinkingOptionId
+from koda.llm import LLMOptions, ThinkingOptionId
 from koda.paths import koda_home_dir
 from koda_tui.appearance import AUTO, THEMES
 
@@ -52,10 +52,10 @@ class AgentSettings(BaseModel):
     web_search: bool = False
     extended_prompt_retention: bool = False
 
-    def request_options(self, model: Model) -> LLMRequestOptions:
+    def request_options(self, model: Model) -> LLMOptions:
         """The options to ask ``model`` with: the thinking level it supports nearest
         the one picked."""
-        return LLMRequestOptions(
+        return LLMOptions(
             thinking=model.thinking.resolve(self.thinking).id,
             web_search=self.web_search,
             extended_prompt_retention=self.extended_prompt_retention,

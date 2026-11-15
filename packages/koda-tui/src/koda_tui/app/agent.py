@@ -1,8 +1,7 @@
-"""The agent runner: the agent for the current session, and the turns it runs."""
+"""The agent runner: the turns of the current session, each with an agent of its own."""
 
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING
 
 from structlog import get_logger
@@ -18,18 +17,18 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Awaitable, Callable
 
     from koda.agent import AgentEvent
-    from koda.llm import LLM, Catalog, Model
+    from koda.llm import LLM, Catalog, LLMOptions, Model
     from koda.sessions import SessionStore
     from koda_tui.state import AppState
 
-    type Connect = Callable[[Model], Awaitable[LLM]]
+    type Connect = Callable[[Model, LLMOptions], Awaitable[LLM]]
 
 logger = get_logger(__name__)
 
 
 class AgentRunner:
-    """Runs turns with the agent for ``state.session`` and ``state.settings.agent_settings``: built
-    on first use, and again after ``reset`` or when the session changes."""
+    """Runs turns with an agent for ``state.session`` and ``state.settings.agent_settings``,
+    made anew for each turn."""
 
     def __init__(
         self,
@@ -43,20 +42,16 @@ class AgentRunner:
         self._catalog = catalog
         self._store = store
         self._connect = connect
-        self._agent: Agent | None = None
-        # OAuth refresh tokens rotate, so concurrent first messages must build it once.
-        self._lock = asyncio.Lock()
-
-    def reset(self) -> None:
-        """Build a new agent for the next turn, as when the settings change."""
-        self._agent = None
+        self._llm: LLM | None = None
+        self._llm_for: tuple[Model, LLMOptions] | None = None  # What it was connected for.
 
     async def respond(self, text: str) -> AsyncIterator[AgentEvent]:
         """Send ``text`` in the current session and stream the agent's response. This is
         the turn's boundary: a failure ends the stream and is shown where the turn failed,
         and one Koda didn't expect is logged."""
         try:
-            agent = await self._current()
+            agent = await self._agent()
+            self._state.turn = agent.turn  # The chat follows this turn.
             async for event in agent.run(text):
                 yield event
         except Exception as error:
@@ -64,22 +59,22 @@ class AgentRunner:
             if not isinstance(error, LLMError | ToolError):
                 logger.exception("turn_failed_unexpectedly")
 
-    async def _current(self) -> Agent:
-        async with self._lock:
-            if self._agent is None or self._agent.session is not self._state.session:
-                self._agent = await self._build()
-                self._state.turn = self._agent.turn  # The chat follows this agent's turns.
-        return self._agent
-
-    async def _build(self) -> Agent:
+    async def _agent(self) -> Agent:
+        """An agent for this turn, with the settings, session and workspace as they are now.
+        The LLM is kept while the model and options stay the same, so its connections are
+        reused."""
         settings = self._state.settings.agent_settings
         model = self._catalog.resolve(settings.provider, settings.model)
+        options = settings.request_options(model)
+        llm = self._llm
+        if llm is None or self._llm_for != (model, options):
+            llm = await self._connect(model, options)
+            self._llm, self._llm_for = llm, (model, options)
         workspace = harness.Workspace(self._state.workspace)
         return Agent(
-            await self._connect(model),
+            llm,
             instructions=harness.instructions(workspace),
             tools=harness.tools(workspace),
             hooks=[SaveSessionHook(self._store)],
             session=self._state.session,
-            options=settings.request_options(model),
         )

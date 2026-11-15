@@ -16,8 +16,8 @@ from koda.llm.apis.messages import (
     AnthropicMessagesEventAdapter,
 )
 from koda.llm.types import (
+    LLMOptions,
     LLMRequest,
-    LLMRequestOptions,
     LLMResponseCompleted,
     LLMThinkingDelta,
     LLMToolCallRequested,
@@ -120,7 +120,12 @@ def _message_with_tool_call() -> Message:
     )
 
 
-def _provider(client: _FakeClient, *, max_output_tokens: int = 1024) -> AnthropicMessagesAPI:
+def _provider(
+    client: _FakeClient,
+    *,
+    max_output_tokens: int = 1024,
+    options: LLMOptions = LLMOptions(),
+) -> AnthropicMessagesAPI:
     return AnthropicMessagesAPI(
         AnthropicMessagesAPIConfig(
             api_key="test-key",
@@ -131,6 +136,7 @@ def _provider(client: _FakeClient, *, max_output_tokens: int = 1024) -> Anthropi
         client=cast("AsyncAnthropic", client),
         adapter=AnthropicMessagesAdapter(),
         event_adapter=AnthropicMessagesEventAdapter(),
+        options=options,
     )
 
 
@@ -176,9 +182,9 @@ async def test_anthropic_tool_result_sends_structured_content_not_display() -> N
 @pytest.mark.asyncio
 async def test_anthropic_thinking_requests_summarized_display() -> None:
     fake_client = _FakeClient()
-    provider = _provider(fake_client)
+    provider = _provider(fake_client, options=LLMOptions(thinking="high"))
 
-    await provider.generate(LLMRequest(messages=[], options=LLMRequestOptions(thinking="high")))
+    await provider.generate(LLMRequest(messages=[]))
 
     create_kwargs = fake_client.messages.create_kwargs
     assert create_kwargs is not None
@@ -188,8 +194,9 @@ async def test_anthropic_thinking_requests_summarized_display() -> None:
 
 async def _thinking_sent(max_output_tokens: int, thinking: str = "enabled") -> object:
     fake_client = _FakeClient()
-    provider = _provider(fake_client, max_output_tokens=max_output_tokens)
-    await provider.generate(LLMRequest(messages=[], options=LLMRequestOptions(thinking=thinking)))
+    options = LLMOptions(thinking=thinking)
+    provider = _provider(fake_client, max_output_tokens=max_output_tokens, options=options)
+    await provider.generate(LLMRequest(messages=[]))
     assert fake_client.messages.create_kwargs is not None
     return fake_client.messages.create_kwargs["thinking"]
 
@@ -239,14 +246,10 @@ async def test_generate_stream_emits_thinking_delta() -> None:
                 ),
             ],
         ),
+        options=LLMOptions(thinking="high"),
     )
 
-    events = [
-        event
-        async for event in provider.generate_stream(
-            LLMRequest(messages=[], options=LLMRequestOptions(thinking="high")),
-        )
-    ]
+    events = [event async for event in provider.generate_stream(LLMRequest(messages=[]))]
 
     assert isinstance(events[0], LLMThinkingDelta)
     assert events[0].text == "I should inspect the file."

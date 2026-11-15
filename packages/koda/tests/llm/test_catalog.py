@@ -376,9 +376,9 @@ def test_thinking_moves_to_the_next_level_and_wraps_around() -> None:
     model = catalog.model("openai", "gpt-5.5")
     levels = [option.id for option in model.thinking.options]
 
-    assert model.thinking.after(levels[0]) == levels[1]
-    assert model.thinking.after(levels[-1]) == levels[0]
-    assert model.thinking.after("not-a-level") == levels[1]
+    assert model.thinking.next(levels[0]) == levels[1]
+    assert model.thinking.next(levels[-1]) == levels[0]
+    assert model.thinking.next("not-a-level") == levels[1]
 
 
 def test_a_model_without_levels_can_only_not_think() -> None:
@@ -387,7 +387,7 @@ def test_a_model_without_levels_can_only_not_think() -> None:
     assert [option.id for option in thinking.options] == ["none"]
     assert not thinking.supported
     assert thinking.resolve("high").id == "none"
-    assert thinking.after("none") is None
+    assert thinking.next("none") is None
 
 
 def test_thinking_needs_an_option() -> None:

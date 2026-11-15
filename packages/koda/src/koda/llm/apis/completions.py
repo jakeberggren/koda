@@ -24,7 +24,13 @@ from pydantic import BaseModel
 
 from koda.llm.apis.credentials import resolve_api_key_credential
 from koda.llm.protocols import LLM, LLMAdapter
-from koda.llm.types import LLMResponse, LLMResponseCompleted, LLMTextDelta, LLMToolCallRequested
+from koda.llm.types import (
+    LLMOptions,
+    LLMResponse,
+    LLMResponseCompleted,
+    LLMTextDelta,
+    LLMToolCallRequested,
+)
 from koda.llm.utils import parse_tool_arguments, raise_llm_error_from_openai
 from koda.messages import (
     AssistantMessage,
@@ -361,11 +367,13 @@ class OpenAICompletionsAPI(LLM):
         client: AsyncOpenAI,
         adapter: OpenAICompletionsLLMAdapter,
         event_adapter: OpenAICompletionsEventAdapter,
+        options: LLMOptions,
     ) -> None:
         self.config = config
         self.client = client
         self.adapter = adapter
         self.event_adapter = event_adapter
+        self.options = options
 
     @classmethod
     async def from_context(cls, context: LLMApiContext) -> OpenAICompletionsAPI:
@@ -380,6 +388,7 @@ class OpenAICompletionsAPI(LLM):
             client=context.openai_client(api_key=config.api_key, base_url=config.base_url),
             adapter=OpenAICompletionsAdapter(),
             event_adapter=OpenAICompletionsEventAdapter(),
+            options=context.options,
         )
 
     def _resolve_messages(self, request: LLMRequest) -> list[ChatCompletionMessageParam]:
@@ -417,21 +426,19 @@ class OpenAICompletionsAPI(LLM):
     async def generate(self, request: LLMRequest) -> LLMResponse[AssistantMessage]:
         try:
             response = await self.client.chat.completions.create(
-                logprobs=self._resolve_logprobs(top_logprobs=request.options.top_logprobs),
+                logprobs=self._resolve_logprobs(top_logprobs=self.options.top_logprobs),
                 messages=self._resolve_messages(request),
-                max_completion_tokens=_or_omit(request.options.max_output_tokens),
+                max_completion_tokens=_or_omit(self.options.max_output_tokens),
                 model=self.config.model,
-                parallel_tool_calls=(
-                    request.options.parallel_tool_calls if request.tools else omit
-                ),
+                parallel_tool_calls=(self.options.parallel_tool_calls if request.tools else omit),
                 prompt_cache_retention=self._resolve_prompt_cache_retention(
-                    extended_prompt_retention=request.options.extended_prompt_retention,
+                    extended_prompt_retention=self.options.extended_prompt_retention,
                 ),
                 reasoning_effort=omit,
-                temperature=_or_omit(request.options.temperature),
+                temperature=_or_omit(self.options.temperature),
                 tools=self.adapter.to_provider_tools(request.tools),
-                top_logprobs=_or_omit(request.options.top_logprobs),
-                top_p=_or_omit(request.options.top_p),
+                top_logprobs=_or_omit(self.options.top_logprobs),
+                top_p=_or_omit(self.options.top_p),
             )
         except OpenAIError as error:
             raise_llm_error_from_openai(error, backend="openai-completions")
@@ -444,23 +451,21 @@ class OpenAICompletionsAPI(LLM):
         usage: TokenUsage | None = None
         try:
             stream = await self.client.chat.completions.create(
-                logprobs=self._resolve_logprobs(top_logprobs=request.options.top_logprobs),
+                logprobs=self._resolve_logprobs(top_logprobs=self.options.top_logprobs),
                 messages=self._resolve_messages(request),
-                max_completion_tokens=_or_omit(request.options.max_output_tokens),
+                max_completion_tokens=_or_omit(self.options.max_output_tokens),
                 model=self.config.model,
-                parallel_tool_calls=(
-                    request.options.parallel_tool_calls if request.tools else omit
-                ),
+                parallel_tool_calls=(self.options.parallel_tool_calls if request.tools else omit),
                 prompt_cache_retention=self._resolve_prompt_cache_retention(
-                    extended_prompt_retention=request.options.extended_prompt_retention,
+                    extended_prompt_retention=self.options.extended_prompt_retention,
                 ),
                 reasoning_effort=omit,
                 stream=True,
                 stream_options={"include_usage": True},
-                temperature=_or_omit(request.options.temperature),
+                temperature=_or_omit(self.options.temperature),
                 tools=self.adapter.to_provider_tools(request.tools),
-                top_logprobs=_or_omit(request.options.top_logprobs),
-                top_p=_or_omit(request.options.top_p),
+                top_logprobs=_or_omit(self.options.top_logprobs),
+                top_p=_or_omit(self.options.top_p),
             )
             async for chunk in stream:
                 if chunk.usage is not None:

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from openai.types.chat import ChatCompletion
 
+from koda.llm import LLMOptions
 from koda.llm.apis.completions import (
     OpenAICompletionsAdapter,
     OpenAICompletionsAPI,
@@ -80,6 +81,7 @@ def _api(client: _FakeClient) -> OpenAICompletionsAPI:
         client=cast("AsyncOpenAI", client),
         adapter=OpenAICompletionsAdapter(),
         event_adapter=OpenAICompletionsEventAdapter(),
+        options=LLMOptions(),
     )
 
 

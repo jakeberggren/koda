@@ -24,6 +24,7 @@ from koda.llm.models import (
     ThinkingOption,
     ThinkingOptionId,
 )
+from koda.llm.types import LLMOptions
 from koda.llm.utils import resolve_openai_client
 from koda.paths import model_overrides_file_path
 
@@ -290,8 +291,14 @@ class Catalog:
             raise exceptions.ModelNotConnected(model.provider, model.id)
         return model
 
-    async def connect(self, model: Model, *, tracing: bool = False) -> LLM:
-        """An LLM for ``model``, over its first connected connection.
+    async def connect(
+        self,
+        model: Model,
+        options: LLMOptions = LLMOptions(),
+        *,
+        tracing: bool = False,
+    ) -> LLM:
+        """An LLM for ``model``, over its first connected connection, asked with ``options``.
 
         With ``tracing``, OpenAI-compatible clients are traced to Langfuse.
         """
@@ -301,6 +308,7 @@ class Catalog:
                 model=model,
                 connection=connection,
                 credentials=self._credentials,
+                options=options,
                 openai_client=resolve_openai_client(tracing=tracing),
             ),
         )
