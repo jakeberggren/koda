@@ -37,7 +37,9 @@ class Common:
 
 
 class App:
-    """Outside the TUI: what is printed when Koda can't start."""
+    """Outside the TUI: what is printed when Koda can't start, or stops."""
+
+    STOPPED_UNEXPECTEDLY = "Koda stopped because of an unexpected error."
 
     @staticmethod
     def failed_to_start(error: object) -> str:
