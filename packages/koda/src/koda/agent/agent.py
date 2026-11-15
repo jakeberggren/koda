@@ -30,8 +30,8 @@ if TYPE_CHECKING:
 
     from koda.agent.hooks import Hook
     from koda.llm import LLM
+    from koda.messages import Message
     from koda.sessions import Session
-    from koda.sessions.session import SessionMessage
     from koda.tools import ToolCall
 
 logger = get_logger(__name__)
@@ -77,16 +77,16 @@ class Agent:
                 yield event
         except (asyncio.CancelledError, GeneratorExit):
             await self._add(
-                *self._partial_response(), *self._answers(_INTERRUPTED), InterruptionMessage()
+                *self._partial_response(), *self._answers(INTERRUPTED), InterruptionMessage()
             )
             raise
         except Exception:
-            await self._add(*self._answers(_FAILED))
+            await self._add(*self._answers(FAILED))
             raise
         finally:
             self._response = None
 
-    async def _add(self, *messages: SessionMessage) -> None:
+    async def _add(self, *messages: Message) -> None:
         """Add ``messages`` to the session: a checkpoint for the hooks."""
         if not messages:
             return
@@ -115,7 +115,7 @@ class Agent:
             async for event in self._response.process_stream(self.llm.generate_stream(request)):
                 if not isinstance(event, LLMResponseCompleted):  # The agent completes it below.
                     yield event
-            calls, message = self._response.tool_calls, _response(self._response)
+            calls, message = self._response.tool_calls, assembled_response(self._response)
             self._response = None
             if message is not None:
                 await self._add(message)
@@ -128,7 +128,7 @@ class Agent:
             async for event in self._run_tools(calls):
                 yield event
 
-    def _partial_response(self) -> list[SessionMessage]:
+    def _partial_response(self) -> list[Message]:
         """What the model had written of the response streaming in, if anything."""
         response = self._response
         if response is None or not (response.content or response.thinking_content):
@@ -137,11 +137,11 @@ class Agent:
             AssistantMessage(content=response.content, thinking_content=response.thinking_content)
         ]
 
-    def _answers(self, reason: str) -> list[SessionMessage]:
+    def _answers(self, reason: str) -> list[Message]:
         """An error result for each tool call left without one: a model expects a result for
         every call it made."""
         output = ToolOutput(is_error=True, error_message=reason)
-        answers: list[SessionMessage] = [
+        answers: list[Message] = [
             ToolMessage(
                 tool_name=call.tool_name,
                 tool_result=ToolResult(call_id=call.call_id, output=output),
@@ -168,11 +168,11 @@ class Agent:
             yield AgentToolCompleted(tool_name=call.tool_name, result=result)
 
 
-_INTERRUPTED = "Interrupted by the user"
-_FAILED = "Not run: the turn failed"
+INTERRUPTED = "Interrupted by the user"
+FAILED = "Not run: the turn failed"
 
 
-def _response(accumulator: AgentStreamAccumulator) -> AssistantMessage | None:
+def assembled_response(accumulator: AgentStreamAccumulator) -> AssistantMessage | None:
     """The assistant message one model call produced, if it produced anything."""
     if not (accumulator.content or accumulator.thinking_content or accumulator.tool_calls):
         return None

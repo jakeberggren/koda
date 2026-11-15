@@ -49,16 +49,7 @@ class _UnknownApiError(ValueError):
 
 
 # The browser login of each API that connects with OAuth instead of an API key.
-_OAUTH: dict[type[LLMApi], type[ProviderAuth]] = {OpenAICodexResponsesAPI: OpenAICodexAuth}
-
-
-def _oauth(connection: _ConnectionFile) -> ProviderAuth | None:
-    if connection.auth != "oauth":
-        return None
-    flow = _OAUTH.get(connection.api)
-    if flow is None:
-        raise exceptions.LLMConfigurationError(f"{connection.api.__name__} has no browser login")
-    return flow()
+OAUTH_LOGINS: dict[type[LLMApi], type[ProviderAuth]] = {OpenAICodexResponsesAPI: OpenAICodexAuth}
 
 
 def _api(name: str) -> type[LLMApi]:
@@ -103,6 +94,16 @@ class _ConnectionFile(BaseModel):
     base_url: str
     capabilities: dict[str, object] = Field(default_factory=dict)
     models: list[_ModelFile] = Field(default_factory=list)
+
+    @property
+    def oauth(self) -> ProviderAuth | None:
+        """The browser login, for an OAuth connection."""
+        if self.auth != "oauth":
+            return None
+        login = OAUTH_LOGINS.get(self.api)
+        if login is None:
+            raise exceptions.LLMConfigurationError(f"{self.api.__name__} has no browser login")
+        return login()
 
 
 class _ProviderFile(BaseModel):
@@ -166,7 +167,7 @@ def _build_provider(provider_id: str, provider: _ProviderFile) -> tuple[Provider
             provider=provider_id,
             api=connection_file.api,
             base_url=connection_file.base_url,
-            oauth=_oauth(connection_file),
+            oauth=connection_file.oauth,
             label=connection_file.label,
             description=connection_file.description,
             detail=connection_file.detail,

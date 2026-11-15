@@ -1,21 +1,8 @@
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Annotated
 
-from pydantic import BaseModel, Field
-
-from koda.messages.messages import (
-    AssistantMessage,
-    InterruptionMessage,
-    TokenUsage,
-    ToolMessage,
-    UserMessage,
-)
-
-SessionMessage = Annotated[
-    AssistantMessage | ToolMessage | UserMessage | InterruptionMessage,
-    Field(discriminator="role"),
-]
+from koda.messages.messages import AssistantMessage, Message, TokenUsage
 
 
 def _utcnow() -> datetime:
@@ -44,13 +31,16 @@ def sum_usage(current: TokenUsage | None, delta: TokenUsage | None) -> TokenUsag
     )
 
 
-class Session(BaseModel):
-    session_id: uuid.UUID = Field(default_factory=uuid.uuid4)
-    created_at: datetime = Field(default_factory=_utcnow)
-    messages: list[SessionMessage] = Field(default_factory=list)
+@dataclass(kw_only=True)
+class Session:
+    """A conversation: what the model sees, and what is saved."""
+
+    session_id: uuid.UUID = field(default_factory=uuid.uuid4)
+    created_at: datetime = field(default_factory=_utcnow)
+    messages: list[Message] = field(default_factory=list)
     name: str | None = None
 
-    def add(self, message: SessionMessage) -> None:
+    def add(self, message: Message) -> None:
         """Add ``message`` to the conversation."""
         self.messages.append(message)
 

@@ -50,7 +50,7 @@ class Credentials(Protocol):
         ...
 
 
-_FILE = TypeAdapter(dict[str, ProviderCredential])
+CREDENTIALS_ADAPTER = TypeAdapter(dict[str, ProviderCredential])
 
 
 class JsonCredentialStore:
@@ -62,7 +62,7 @@ class JsonCredentialStore:
         self._credentials: dict[str, ProviderCredential] | None = None  # Read on first use.
 
     def get_credential(self, key: str) -> ProviderCredential | None:
-        if api_key := _environment_api_key(key):
+        if api_key := environment_api_key(key):
             return ApiKeyCredential(type="api_key", value=api_key)
         return self._load().get(key)
 
@@ -70,13 +70,13 @@ class JsonCredentialStore:
         credentials = {**self._load(), key: credential}
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.touch(mode=0o600, exist_ok=True)
-        self.path.write_bytes(_FILE.dump_json(credentials, indent=2))
+        self.path.write_bytes(CREDENTIALS_ADAPTER.dump_json(credentials, indent=2))
         self._credentials = credentials
 
     def _load(self) -> dict[str, ProviderCredential]:
         if self._credentials is None:
             try:
-                self._credentials = _FILE.validate_json(self.path.read_bytes())
+                self._credentials = CREDENTIALS_ADAPTER.validate_json(self.path.read_bytes())
             except FileNotFoundError:
                 self._credentials = {}
             except (OSError, ValidationError) as error:
@@ -84,7 +84,7 @@ class JsonCredentialStore:
         return self._credentials
 
 
-def _environment_api_key(key: str) -> str | None:
+def environment_api_key(key: str) -> str | None:
     """The API key for ``key`` in the environment: OPENAI_API_KEY for ``openai:api-key``."""
     provider, _, connection = key.partition(":")
     if connection != "api-key":
