@@ -11,30 +11,38 @@
 </pre>
 </div>
 
-`koda` is the core library for the Koda coding assistant. It contains the agent loop,
-LLM abstractions, session model, and tool framework used by higher-level
-packages such as `koda-tui`.
+`koda` is the core library for the Koda coding assistant, in two layers:
 
-## Responsibilities
+- **The kernel**: the agent loop, LLMs, tools, messages and sessions.
+- **The harness** (`koda.harness`): what makes the agent a coding agent. the
+  workspace, the system prompt for it and the built-in tools.
 
-- Run the agent loop and manage tool-call iterations.
-- Define provider-agnostic LLM protocols, models, events, and registries.
-- Provide built-in provider integrations for OpenAI and BergetAI.
-- Model internal conversation messages and session persistence.
-- Optionally trace OpenAI-compatible calls to Langfuse (configured via `LANGFUSE_*` env vars).
-- Expose the tool framework and built-in filesystem-oriented tools.
+```python
+from koda import harness
+from koda.agent import Agent
+
+workspace = harness.Workspace(path)
+agent = Agent(
+    llm,
+    instructions=harness.instructions(workspace),
+    tools=harness.tools(workspace),
+)
+```
 
 ## Package Structure
 
 ```text
 packages/koda/
 ├── src/koda/
-│   ├── agents/
-│   │   └── agent.py                # Core agent loop
+│   ├── agent/
+│   │   ├── agent.py                # The agent loop and its turn
+│   │   ├── events.py               # What the agent streams
+│   │   └── hooks.py                # Hooks run when the session changes
 │   ├── llm/
 │   │   ├── apis/                   # Anthropic Messages and OpenAI Responses/Completions/Codex
 │   │   ├── auth/                   # OAuth login and refresh
 │   │   ├── catalog.py              # Providers and models from models.json
+│   │   ├── credentials.py          # Stored API keys and logins
 │   │   ├── exceptions.py           # LLM-related exceptions
 │   │   ├── models.py               # Provider, Connection and Model
 │   │   ├── models.json             # Bundled catalog
@@ -42,31 +50,35 @@ packages/koda/
 │   │   ├── types.py                # Requests, responses, stream events
 │   │   └── utils.py                # Shared LLM helper utilities
 │   ├── messages/
-│   │   └── messages.py             # Internal message types
+│   │   └── messages.py             # Messages, tool calls and tool output
 │   ├── sessions/
 │   │   ├── exceptions.py           # Session-related exceptions
 │   │   ├── session.py              # Session model
 │   │   └── store.py                # In-memory and JSON session stores
 │   ├── tools/
-│   │   ├── builtins/               # read/list/glob/grep/edit/write/bash tools
-│   │   ├── base.py                 # Core tool protocols and base models
-│   │   ├── config.py               # Tool configuration bundle
-│   │   ├── context.py              # Tool context: cwd, policy and coordination
-│   │   ├── decorators.py           # Tool registration decorators
-│   │   ├── exceptions.py           # Tool-related exceptions
-│   │   ├── executor.py             # Tool execution runtime
-│   │   ├── policy.py               # Tool access policy helpers
-│   │   └── registry.py             # Tool registration
-│   └── __init__.py
+│   │   ├── base.py                 # The Tool protocol and ToolDefinition
+│   │   ├── exceptions.py           # ToolError
+│   │   ├── executor.py             # Runs tool calls
+│   │   └── registry.py             # The tools by name
+│   ├── harness/
+│   │   ├── workspace.py            # The folder: paths, path errors and locks
+│   │   ├── prompt.py               # SYSTEM.md, AGENTS.md and CLAUDE.md
+│   │   └── toolbox/
+│   │       ├── shell.py            # bash
+│   │       ├── files/              # read_file, write_file, edit_file
+│   │       └── search/             # glob, grep
+│   └── paths.py                    # ~/.koda
 └── tests/
 ```
 
 ## Public Surface
 
-The package re-exports its main building blocks from the following modules:
+- `koda.agent` for `Agent`, its events and hooks
+- `koda.llm` for the catalog, LLM protocols, requests, responses and events
+- `koda.messages` for messages, tool calls and tool output
+- `koda.sessions` for sessions and their stores
+- `koda.tools` for the `Tool` protocol, `ToolRegistry`, `ToolExecutor` and `ToolError`
+- `koda.harness` for `Workspace`, `instructions()` and `tools()`
 
-- `koda.llm` for the catalog, `connect()`, LLM protocols, requests, responses and events
-- `koda.sessions` for session management and persistence
-- `koda.messages` for internal message models
-- `koda.tools` for the tool framework and built-in tool registration helpers
-- `koda.agent` for the core `Agent` implementation
+LLM calls through OpenAI-compatible APIs can be traced to Langfuse, configured via the
+`LANGFUSE_*` environment variables.

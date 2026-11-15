@@ -13,7 +13,7 @@
 
 Koda is a minimal coding assistant that can navigate, understand, and modify codebases.
 Koda currently runs through `koda-tui`, a purpose-built prompt-toolkit TUI built on top of Koda's
-service layer and core agent runtime.
+core library.
 
 ## Installation and Usage
 
@@ -88,8 +88,8 @@ environment variable, such as `OPENROUTER_API_KEY` for the example above.
 ## Agent
 
 Koda runs with a small set of built-in tools for reading, searching, editing, and
-executing commands in the current workspace. File-oriented tools are scoped to the
-workspace and respect `.gitignore` patterns.
+executing commands in the current workspace. Relative paths are resolved against the
+workspace; like `bash`, the tools can reach files outside it.
 
 | Tool | Purpose |
 | ---- | ------- |
@@ -151,7 +151,7 @@ switch models, manage sessions, and adjust TUI behavior or appearance.
 
 Koda is a uv-managed monorepo with two workspace packages:
 
-- **koda** — Core agent library: agent loop, LLM catalog and APIs, sessions, and tools
+- **koda** — Core library: the agent kernel (agent loop, LLM catalog and APIs, tools, sessions) and the harness (workspace, system prompt, built-in tools)
 - **koda-tui** — Interactive terminal UI built on top of `koda`
 
 ### Development Setup

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.harness.workspace import NotAFolderError, PathNotFoundError
 from koda.messages import ToolOutput
 
 if TYPE_CHECKING:
@@ -52,16 +51,8 @@ class GlobTool:
         self.workspace = workspace
 
     async def execute(self, params: GlobParams) -> ToolOutput:
-        resolved_path = self.workspace.resolve(params.path)
-        resolved = AnyioPath(resolved_path)
-
-        async with self.workspace.coordinator.shared_access():
-            if not await resolved.exists():
-                raise PathNotFoundError(params.path)
-
-            if not await resolved.is_dir():
-                raise NotAFolderError(params.path)
-
+        resolved = AnyioPath(await self.workspace.folder(params.path))
+        async with self.workspace.locks.shared():
             matches = await self._collect_matches(resolved, params.pattern)
 
         total_count: int = len(matches)

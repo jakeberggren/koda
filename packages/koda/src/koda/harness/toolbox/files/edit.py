@@ -5,27 +5,14 @@ from __future__ import annotations
 from difflib import unified_diff
 from typing import TYPE_CHECKING
 
-from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
 from koda.harness.toolbox.files.content import read_text, write_text
-from koda.harness.workspace import NotAFileError, PathNotFoundError
 from koda.messages import ToolOutput
 from koda.tools import ToolError
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from koda.harness.workspace import Workspace
-
-
-class EditError(ToolError):
-    """Failed to edit file."""
-
-    def __init__(self, path: str, *, cause: Exception) -> None:
-        self.path = path
-        self.cause = cause
-        super().__init__(f"Failed to edit '{path}': {cause}")
 
 
 class TextNotFoundError(ToolError):
@@ -92,19 +79,12 @@ class EditFileTool:
 
     async def execute(self, params: EditFileParams) -> ToolOutput:
         """Execute the edit_file tool."""
-        resolved_path: Path = self.workspace.resolve(params.path)
-        target = AnyioPath(resolved_path)
-
-        if not await target.exists():
-            raise PathNotFoundError(params.path)
-        if not await target.is_file():
-            raise NotAFileError(params.path)
-
+        resolved_path = await self.workspace.file(params.path)
         async with (
-            self.workspace.coordinator.shared_access(),
-            self.workspace.coordinator.path_lock(resolved_path),
+            self.workspace.locks.shared(),
+            self.workspace.locks.path(resolved_path),
         ):
-            decoded = await read_text(resolved_path, params.path, error=EditError)
+            decoded = await read_text(resolved_path, params.path)
             updated, replacements_made = self._apply_replacement(decoded.text, params)
 
             if updated != decoded.text:
@@ -112,7 +92,6 @@ class EditFileTool:
                     resolved_path,
                     params.path,
                     updated,
-                    error=EditError,
                     encoding=decoded.encoding,
                 )
 

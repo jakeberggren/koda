@@ -10,10 +10,8 @@ import signal
 from contextlib import suppress
 from typing import TYPE_CHECKING
 
-from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.harness.workspace import NotAFolderError, PathNotFoundError
 from koda.messages import ToolOutput
 from koda.tools import ToolError
 
@@ -154,19 +152,6 @@ def build_output(
     )
 
 
-async def resolve_cwd(params: BashParams, workspace: Workspace) -> Path:
-    resolved_cwd: Path = workspace.resolve(params.cwd)
-    async_cwd = AnyioPath(resolved_cwd)
-
-    if not await async_cwd.exists():
-        raise PathNotFoundError(params.cwd)
-
-    if not await async_cwd.is_dir():
-        raise NotAFolderError(params.cwd)
-
-    return resolved_cwd
-
-
 class BashTool:
     """Execute a bash command on the host."""
 
@@ -186,9 +171,9 @@ class BashTool:
         self.workspace = workspace
 
     async def execute(self, params: BashParams) -> ToolOutput:
-        resolved_cwd = await resolve_cwd(params, self.workspace)
+        resolved_cwd = await self.workspace.folder(params.cwd)
 
-        async with self.workspace.coordinator.exclusive_access():
+        async with self.workspace.locks.exclusive():
             stdout, stderr, exit_code = await run_bash(
                 params.command,
                 cwd=resolved_cwd,
