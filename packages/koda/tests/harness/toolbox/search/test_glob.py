@@ -41,6 +41,24 @@ class TestGlobTool:
         assert "other.py" not in text
 
     @pytest.mark.asyncio
+    async def test_glob_leaves_out_ignored_files_and_version_control(
+        self,
+        workspace_dir: Path,
+    ) -> None:
+        """glob tool leaves out what the workspace's .gitignore excludes, and .git."""
+        (workspace_dir / ".gitignore").write_text("node_modules/\n")
+        for path in ["src/app.js", "node_modules/lib/index.js", ".git/hooks/pre-commit.js"]:
+            (workspace_dir / path).parent.mkdir(parents=True, exist_ok=True)
+            (workspace_dir / path).touch()
+
+        executor = ToolExecutor(ToolRegistry(harness.tools(Workspace(workspace_dir))))
+        call = ToolCall(tool_name="glob", arguments={"pattern": "**/*.js"}, call_id="call_glob")
+
+        result = await executor.execute_call(call)
+
+        assert content_text(result, "text").splitlines()[1:] == ["src/app.js"]
+
+    @pytest.mark.asyncio
     async def test_glob_recursive_pattern(self, workspace_dir: Path) -> None:
         """glob tool handles recursive ** patterns."""
         subdir = workspace_dir / "subdir"
