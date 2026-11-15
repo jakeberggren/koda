@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
-from typing import TYPE_CHECKING, Any, NoReturn
+from typing import TYPE_CHECKING, NoReturn
 
 from openai import (
     APIConnectionError,
@@ -20,6 +20,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from openai import AsyncOpenAI
+
+    from koda.messages import JsonValue
 
 logger = get_logger(__name__)
 
@@ -66,14 +68,14 @@ def provider_message(body: object) -> str | None:
     return body.strip() or None if isinstance(body, str) else None
 
 
-def tool_arguments(value: object) -> dict[str, Any]:
+def tool_arguments(value: object) -> dict[str, JsonValue]:
     """``value`` as tool call arguments, which must be a JSON object."""
     if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
         raise exceptions.LLMError("Tool call arguments must decode to a JSON object")
     return value
 
 
-def parse_tool_arguments(raw: str) -> dict[str, Any]:
+def parse_tool_arguments(raw: str) -> dict[str, JsonValue]:
     """The tool call arguments in the JSON text ``raw``."""
     try:
         value = json.loads(raw)

@@ -30,10 +30,10 @@ from koda.messages import (
     AssistantMessage,
     InterruptionMessage,
     TokenUsage,
+    ToolCall,
     ToolMessage,
     UserMessage,
 )
-from koda.tools import ToolCall
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -114,14 +114,14 @@ class OpenAICompletionsAdapter(
 
     @staticmethod
     def _to_provider_tool_message(message: ToolMessage) -> ChatCompletionToolMessageParam:
-        tool_output = message.tool_result.output
+        tool_output = message.output
         payload: dict[str, Any] = {"content": tool_output.content, "is_error": tool_output.is_error}
         if tool_output.error_message:
             payload["error_message"] = tool_output.error_message
 
         return ChatCompletionToolMessageParam(
             role="tool",
-            tool_call_id=message.tool_result.call_id,
+            tool_call_id=message.call_id,
             content=json.dumps(payload),
         )
 

@@ -6,8 +6,13 @@ from typing import TYPE_CHECKING
 
 from prompt_toolkit.layout import HSplit
 
-from koda.messages import AssistantMessage, InterruptionMessage, ToolMessage, UserMessage
-from koda.tools import ToolOutput
+from koda.messages import (
+    AssistantMessage,
+    InterruptionMessage,
+    ToolMessage,
+    ToolOutput,
+    UserMessage,
+)
 from koda_tui.appearance import Spacing
 from koda_tui.rendering import ToolRun
 from koda_tui.ui.primitives import Scroll, ScrollState, Spacer
@@ -16,7 +21,7 @@ if TYPE_CHECKING:
     from prompt_toolkit.filters import FilterOrBool
     from prompt_toolkit.formatted_text import StyleAndTextTuples
 
-    from koda.tools import ToolCall
+    from koda.messages import ToolCall
     from koda_tui.rendering import ChatMessage, Renderer
     from koda_tui.state import AppState
 
@@ -92,10 +97,10 @@ def from_session(state: AppState) -> tuple[list[ChatMessage], Calls, int]:  # no
         match message:
             case AssistantMessage():
                 add_response(shown, calls, message)
-            case ToolMessage(tool_result=result):
-                if answered := calls.pop(result.call_id, None):
+            case ToolMessage(call_id=call_id, output=output):
+                if answered := calls.pop(call_id, None):
                     row, call = answered
-                    shown[row] = ToolRun(call, result.output)
+                    shown[row] = ToolRun(call, output)
             case UserMessage():
                 shown.append(message)
                 start = len(shown)
@@ -120,8 +125,8 @@ NO_OUTPUT = ToolOutput()  # A call whose output wasn't kept.
 def output_of(call: ToolCall, state: AppState) -> ToolOutput | None:
     """The output of a call the session doesn't have: ready in the turn, still running, or
     not kept."""
-    if result := state.turn.results.get(call.call_id):
-        return result.output
+    if answer := state.turn.results.get(call.call_id):
+        return answer.output
     return None if state.turn.running else NO_OUTPUT
 
 

@@ -4,70 +4,54 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
-from structlog import get_logger
 
-from koda.tools import exceptions as tool_exceptions
-from koda.tools.base import ToolCall, ToolOutput, ToolResult
-
-logger = get_logger(__name__)
+from koda.messages import ToolCall, ToolMessage, ToolOutput
+from koda.tools.exceptions import ToolError
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
-    from koda.tools.context import ToolContext
     from koda.tools.registry import ToolRegistry
 
 
 class ToolExecutor:
-    """Executes tool calls using a ToolRegistry."""
+    """Runs the model's tool calls with the tools in ``registry``."""
 
-    def __init__(self, tool_registry: ToolRegistry) -> None:
-        self.tool_registry = tool_registry
+    def __init__(self, registry: ToolRegistry) -> None:
+        self.registry = registry
 
-    async def execute_call(self, tool_call: ToolCall, ctx: ToolContext) -> ToolResult:
-        tool = self.tool_registry.get(tool_call.tool_name)
-        if not tool:
-            logger.warning("tool_not_found", tool_name=tool_call.tool_name)
-            return ToolResult(
-                output=ToolOutput(
-                    is_error=True,
-                    error_message=f"Tool '{tool_call.tool_name}' not found",
-                ),
-                call_id=tool_call.call_id,
-            )
-        logger.info("executing_tool", tool_name=tool_call.tool_name, arguments=tool_call.arguments)
-        try:
-            params = tool.parameters_model.model_validate(tool_call.arguments)
-        except ValidationError as e:
-            logger.warning("tool_validation_error", tool_name=tool_call.tool_name, error=repr(e))
-            return ToolResult(
-                output=ToolOutput(is_error=True, error_message=str(e)),
-                call_id=tool_call.call_id,
-            )
-        try:
-            output = await tool.execute(params, ctx)
-        except tool_exceptions.ToolError as e:
-            logger.warning("tool_execution_error", tool_name=tool_call.tool_name, error=repr(e))
-            return ToolResult(
-                output=ToolOutput(is_error=True, error_message=str(e)),
-                call_id=tool_call.call_id,
-            )
-        logger.info("tool_executed", tool_name=tool_call.tool_name, is_error=output.is_error)
-        return ToolResult(output=output, call_id=tool_call.call_id)
+    async def execute_call(self, call: ToolCall) -> ToolMessage:
+        """Run ``call``. What the model can fix (an unknown tool, bad arguments, a ToolError)
+        is answered as an error for it."""
+        return answer(call, await self._run(call))
 
-    async def execute_calls(
-        self,
-        tool_calls: list[ToolCall],
-        ctx: ToolContext,
-    ) -> AsyncIterator[tuple[ToolCall, ToolResult]]:
-        tasks = {asyncio.create_task(self.execute_call(call, ctx)): call for call in tool_calls}
-        pending = set(tasks)
+    async def execute_calls(self, calls: list[ToolCall]) -> AsyncIterator[ToolMessage]:
+        """Run ``calls`` at the same time; each answer comes as soon as it is ready."""
+        pending = {asyncio.create_task(self.execute_call(call)) for call in calls}
 
         try:
             while pending:
                 done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
                 for task in done:
-                    yield tasks[task], task.result()
+                    yield task.result()
         finally:
             for task in pending:
                 task.cancel()
+
+    async def _run(self, call: ToolCall) -> ToolOutput:
+        tool = self.registry.get(call.tool_name)
+        if tool is None:
+            return ToolOutput.failure(f"Tool '{call.tool_name}' not found")
+        try:
+            params = tool.parameters_model.model_validate(call.arguments)
+        except ValidationError as error:
+            return ToolOutput.failure(str(error))
+        try:
+            return await tool.execute(params)
+        except ToolError as error:
+            return ToolOutput.failure(str(error))
+
+
+def answer(call: ToolCall, output: ToolOutput) -> ToolMessage:
+    """``output`` as the answer to ``call``."""
+    return ToolMessage(tool_name=call.tool_name, call_id=call.call_id, output=output)

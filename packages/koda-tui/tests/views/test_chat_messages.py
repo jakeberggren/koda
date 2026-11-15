@@ -6,9 +6,16 @@ from pathlib import Path
 
 from koda.agent import Turn
 from koda.llm import LLMError
-from koda.messages import AssistantMessage, InterruptionMessage, Message, ToolMessage, UserMessage
+from koda.messages import (
+    AssistantMessage,
+    InterruptionMessage,
+    Message,
+    ToolCall,
+    ToolMessage,
+    ToolOutput,
+    UserMessage,
+)
 from koda.sessions import Session
-from koda.tools import ToolCall, ToolOutput, ToolResult
 from koda_tui.rendering import ToolRun
 from koda_tui.state import AppState, TurnError
 from koda_tui.views.chat import NO_OUTPUT, chat_messages
@@ -28,10 +35,7 @@ def _state(*messages: Message, turn: Turn | None = None) -> AppState:
 
 def _answer(call: ToolCall, text: str = "ok", *, error: bool = False) -> ToolMessage:
     output = ToolOutput(display=text, is_error=error)
-    return ToolMessage(
-        tool_name=call.tool_name,
-        tool_result=ToolResult(call_id=call.call_id, output=output),
-    )
+    return ToolMessage(tool_name=call.tool_name, call_id=call.call_id, output=output)
 
 
 class TestSession:
@@ -45,7 +49,7 @@ class TestSession:
     def test_a_blank_reply_is_left_out_but_its_calls_are_shown(self) -> None:
         state = _state(AssistantMessage(content=" \n", tool_calls=[READ]), _answer(READ))
 
-        assert chat_messages(state) == [ToolRun(READ, _answer(READ).tool_result.output)]
+        assert chat_messages(state) == [ToolRun(READ, _answer(READ).output)]
 
     def test_each_call_is_shown_with_its_output(self) -> None:
         reply = AssistantMessage(content="Reading", tool_calls=[READ, GREP])
@@ -53,8 +57,8 @@ class TestSession:
 
         assert chat_messages(_state(reply, grep, read)) == [
             reply,
-            ToolRun(READ, read.tool_result.output),
-            ToolRun(GREP, grep.tool_result.output),
+            ToolRun(READ, read.output),
+            ToolRun(GREP, grep.output),
         ]
 
     def test_a_call_whose_output_wasnt_kept_shows_as_done(self) -> None:
@@ -85,7 +89,11 @@ class TestTurn:
 
     def test_a_call_runs_until_its_output_is_ready(self) -> None:
         reply = AssistantMessage(tool_calls=[READ, GREP])
-        ready = ToolResult(call_id=GREP.call_id, output=ToolOutput(display="found"))
+        ready = ToolMessage(
+            tool_name=GREP.tool_name,
+            call_id=GREP.call_id,
+            output=ToolOutput(display="found"),
+        )
         state = _state(reply, turn=Turn(running=True, results={GREP.call_id: ready}))
 
         assert chat_messages(state) == [ToolRun(READ), ToolRun(GREP, ready.output)]

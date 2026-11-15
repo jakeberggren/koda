@@ -22,10 +22,12 @@ from koda_tui.rendering.markdown import Markdown
 from koda_tui.state import TurnError
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from prompt_toolkit.formatted_text import StyleAndTextTuples
     from rich.console import RenderableType
 
-    from koda.tools import ToolCall, ToolOutput
+    from koda.messages import JsonValue, ToolCall, ToolOutput
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +41,7 @@ class ToolRun:
 # What the chat shows: one message each, as the user sees it.
 type ChatMessage = UserMessage | AssistantMessage | InterruptionMessage | ToolRun | TurnError
 
-type Arguments = dict[str, object]
+type Arguments = Mapping[str, JsonValue]
 
 USER_PADDING = (Spacing.GAP, 0, Spacing.GAP, Spacing.INSET)  # Top, right, bottom, left.
 THINKING_STYLE = compose(Tokens.Text.MUTED, Tokens.Text.EMPHASIS)
@@ -188,7 +190,8 @@ class BashRenderer(ToolRenderer, tool="bash"):
         stdout = _text(content.get("stdout", ""))
         stderr = _text(content.get("stderr", ""))
         failed = output.is_error
-        exit_code = content.get("exit_code") if failed else None
+        code = content.get("exit_code")
+        exit_code = code if failed and isinstance(code, int) else None
         summary = strings.Screen.Chat.Tools.bash_summary(
             exit_code,
             len(stdout.splitlines()),

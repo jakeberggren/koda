@@ -4,15 +4,14 @@ from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolOutput
-from koda.tools.decorators import tool
-from koda.tools.exceptions import ToolError
-from koda.tools.files import write_text
+from koda.harness.toolbox.exceptions import ToolError
+from koda.harness.toolbox.files import write_text
+from koda.messages import ToolOutput
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda.tools.context import ToolContext
+    from koda.harness.toolbox.workspace import Workspace
 
 
 class WriteError(ToolError):
@@ -31,7 +30,6 @@ class WriteFileParams(BaseModel):
     content: str = Field(..., description="Content to write to the file")
 
 
-@tool
 class WriteFileTool:
     """Tool for writing file contents."""
 
@@ -43,14 +41,19 @@ class WriteFileTool:
     )
     parameters_model: type[WriteFileParams] = WriteFileParams
 
-    async def execute(self, params: WriteFileParams, ctx: ToolContext) -> ToolOutput:
+    def __init__(self, workspace: Workspace) -> None:
+        self.workspace = workspace
+
+    async def execute(self, params: WriteFileParams) -> ToolOutput:
         """Execute the write_file tool."""
-        resolved: Path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+        resolved: Path = self.workspace.resolve(params.path)
 
         # Validate parent directory is also within sandbox
-        ctx.policy.resolve_path(str(resolved.parent), cwd=ctx.cwd)
 
-        async with ctx.coordinator.shared_access(), ctx.coordinator.path_lock(resolved):
+        async with (
+            self.workspace.coordinator.shared_access(),
+            self.workspace.coordinator.path_lock(resolved),
+        ):
             await write_text(resolved, params.path, params.content, error=WriteError)
 
         line_count = params.content.count("\n") + (

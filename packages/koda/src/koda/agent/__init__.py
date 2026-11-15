@@ -17,7 +17,6 @@ from koda.llm import (
     LLMToolCompleted,
     LLMToolStarted,
 )
-from koda.prompts import SystemPrompt
 
 __all__ = [
     "Agent",
@@ -35,6 +34,5 @@ __all__ = [
     "LLMToolCallRequested",
     "LLMToolCompleted",
     "LLMToolStarted",
-    "SystemPrompt",
     "Turn",
 ]

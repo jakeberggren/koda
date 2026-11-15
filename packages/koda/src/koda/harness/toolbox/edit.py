@@ -6,15 +6,14 @@ from typing import TYPE_CHECKING
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolOutput
-from koda.tools.decorators import tool
-from koda.tools.exceptions import FileNotFoundError, NotAFileError, ToolError
-from koda.tools.files import read_text, write_text
+from koda.harness.toolbox.exceptions import FileNotFoundError, NotAFileError, ToolError
+from koda.harness.toolbox.files import read_text, write_text
+from koda.messages import ToolOutput
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from koda.tools.context import ToolContext
+    from koda.harness.toolbox.workspace import Workspace
 
 
 class EditError(ToolError):
@@ -55,7 +54,6 @@ class EditFileParams(BaseModel):
     replace_all: bool = Field(default=False, description="Replace all occurrences")
 
 
-@tool
 class EditFileTool:
     """Tool for editing file contents."""
 
@@ -86,11 +84,13 @@ class EditFileTool:
         )
         return "".join(diff_lines)
 
-    async def execute(self, params: EditFileParams, ctx: ToolContext) -> ToolOutput:
+    def __init__(self, workspace: Workspace) -> None:
+        self.workspace = workspace
+
+    async def execute(self, params: EditFileParams) -> ToolOutput:
         """Execute the edit_file tool."""
-        resolved_path: Path = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+        resolved_path: Path = self.workspace.resolve(params.path)
         # Validate we are within the sandbox
-        ctx.policy.resolve_path(str(resolved_path.parent), cwd=ctx.cwd)
         target = AnyioPath(resolved_path)
 
         if not await target.exists():
@@ -98,7 +98,10 @@ class EditFileTool:
         if not await target.is_file():
             raise NotAFileError(params.path)
 
-        async with ctx.coordinator.shared_access(), ctx.coordinator.path_lock(resolved_path):
+        async with (
+            self.workspace.coordinator.shared_access(),
+            self.workspace.coordinator.path_lock(resolved_path),
+        ):
             decoded = await read_text(resolved_path, params.path, error=EditError)
             updated, replacements_made = self._apply_replacement(decoded.text, params)
 

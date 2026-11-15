@@ -5,13 +5,12 @@ from typing import TYPE_CHECKING
 from anyio import Path as AnyioPath
 from pydantic import BaseModel, Field
 
-from koda.tools import ToolOutput
-from koda.tools.decorators import tool
-from koda.tools.exceptions import FileNotFoundError, NotAFileError, ToolError
-from koda.tools.files import read_text_lines
+from koda.harness.toolbox.exceptions import FileNotFoundError, NotAFileError, ToolError
+from koda.harness.toolbox.files import read_text_lines
+from koda.messages import ToolOutput
 
 if TYPE_CHECKING:
-    from koda.tools.context import ToolContext
+    from koda.harness.toolbox.workspace import Workspace
 
 
 class ReadError(ToolError):
@@ -31,7 +30,6 @@ class ReadFileParams(BaseModel):
     limit: int = Field(100, gt=0, description="Number of lines to read")
 
 
-@tool
 class ReadFileTool:
     """Tool for reading file contents."""
 
@@ -42,12 +40,15 @@ class ReadFileTool:
     )
     parameters_model: type[ReadFileParams] = ReadFileParams
 
-    async def execute(self, params: ReadFileParams, ctx: ToolContext) -> ToolOutput:
+    def __init__(self, workspace: Workspace) -> None:
+        self.workspace = workspace
+
+    async def execute(self, params: ReadFileParams) -> ToolOutput:
         """Execute the read_file tool."""
-        resolved = ctx.policy.resolve_path(params.path, cwd=ctx.cwd)
+        resolved = self.workspace.resolve(params.path)
         target = AnyioPath(resolved)
 
-        async with ctx.coordinator.shared_access():
+        async with self.workspace.coordinator.shared_access():
             if not await target.exists():
                 raise FileNotFoundError(params.path)
 

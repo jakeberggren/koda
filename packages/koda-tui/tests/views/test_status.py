@@ -13,9 +13,8 @@ from prompt_toolkit.formatted_text import fragment_list_to_text
 
 from koda.agent import Turn
 from koda.llm import Model, Thinking, ThinkingOption
-from koda.messages import AssistantMessage, TokenUsage
+from koda.messages import AssistantMessage, TokenUsage, ToolCall
 from koda.sessions import Session
-from koda.tools import ToolCall
 from koda_tui import strings
 from koda_tui.appearance import Tokens
 from koda_tui.settings import AgentSettings, Settings

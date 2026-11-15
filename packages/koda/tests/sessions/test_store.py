@@ -5,7 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from koda.messages import AssistantMessage, TokenUsage, ToolMessage, UserMessage
+from koda.messages import (
+    AssistantMessage,
+    TokenUsage,
+    ToolCall,
+    ToolMessage,
+    ToolOutput,
+    UserMessage,
+)
 from koda.sessions import (
     InMemorySessionStore,
     JsonSessionStore,
@@ -13,7 +20,6 @@ from koda.sessions import (
     SessionNotFoundError,
     SessionStore,
 )
-from koda.tools.base import ToolCall, ToolOutput, ToolResult
 
 
 @pytest.fixture(params=["memory", "json"])
@@ -154,9 +160,9 @@ class TestJsonSessionStore:
             tool_calls=[tool_call],
         )
         tool_msg = ToolMessage(
-            content="file contents here",
             tool_name="read_file",
-            tool_result=ToolResult(output=ToolOutput(content={"text": "hello"}), call_id="tc_1"),
+            call_id="tc_1",
+            output=ToolOutput(content={"text": "hello"}),
         )
 
         session.messages.extend([assistant_msg, tool_msg])
@@ -171,8 +177,8 @@ class TestJsonSessionStore:
         assert reloaded.messages[0].tool_calls[0].tool_name == "read_file"
         assert reloaded.messages[0].tool_calls[0].call_id == "tc_1"
 
-        # ToolMessage.tool_result preserved
+        # ToolMessage output preserved
         assert isinstance(reloaded.messages[1], ToolMessage)
         assert reloaded.messages[1].tool_name == "read_file"
-        assert reloaded.messages[1].tool_result.call_id == "tc_1"
-        assert reloaded.messages[1].tool_result.output.content == {"text": "hello"}
+        assert reloaded.messages[1].call_id == "tc_1"
+        assert reloaded.messages[1].output.content == {"text": "hello"}

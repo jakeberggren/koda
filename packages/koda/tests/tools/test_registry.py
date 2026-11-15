@@ -1,4 +1,4 @@
-"""Tests for tools/registry.py - ToolRegistry operations."""
+"""Tests for tools/registry.py: the tools an agent can use, by name."""
 
 import pytest
 
@@ -8,49 +8,26 @@ from koda.tools.exceptions import ToolAlreadyRegisteredError
 from .conftest import ErrorTool, SimpleParams, SimpleTool
 
 
-class TestToolRegistry:
-    """Tests for ToolRegistry operations."""
+def test_tools_are_found_by_name() -> None:
+    simple, error = SimpleTool(), ErrorTool()
+    registry = ToolRegistry([simple, error])
 
-    def test_register_and_get(self, registry: ToolRegistry, simple_tool: SimpleTool) -> None:
-        """Tools can be registered and retrieved by name."""
-        registry.register(simple_tool)
-        retrieved = registry.get("simple_tool")
+    assert registry.get("simple_tool") is simple
+    assert registry.get("error_tool") is error
+    assert registry.get("missing") is None
+    assert list(registry) == [simple, error]
 
-        assert retrieved is simple_tool
 
-    def test_register_all(self, registry: ToolRegistry) -> None:
-        """Multiple tools can be registered at once."""
-        registry.register_all([SimpleTool(), ErrorTool()])
+def test_two_tools_with_one_name_are_refused() -> None:
+    with pytest.raises(ToolAlreadyRegisteredError) as exc_info:
+        ToolRegistry([SimpleTool(), SimpleTool()])
 
-        assert registry.get("simple_tool") is not None
-        assert registry.get("error_tool") is not None
+    assert exc_info.value.name == "simple_tool"
 
-    def test_duplicate_registration_raises(self, registry: ToolRegistry) -> None:
-        """Registering the same tool twice raises ToolAlreadyRegisteredError."""
-        registry.register(SimpleTool())
 
-        with pytest.raises(ToolAlreadyRegisteredError) as exc_info:
-            registry.register(SimpleTool())
+def test_definitions_describe_the_tools() -> None:
+    [definition] = ToolRegistry([SimpleTool()]).definitions()
 
-        assert exc_info.value.name == "simple_tool"
-
-    def test_get_definitions(self, registry: ToolRegistry, simple_tool: SimpleTool) -> None:
-        """get_definitions returns correct ToolDefinitions."""
-        registry.register(simple_tool)
-
-        definitions = registry.get_definitions()
-
-        assert len(definitions) == 1
-        assert definitions[0].name == "simple_tool"
-        assert definitions[0].description == "A simple test tool"
-        assert definitions[0].parameters_model is SimpleParams
-
-    def test_clear(self, registry: ToolRegistry, simple_tool: SimpleTool) -> None:
-        """clear removes all registered tools."""
-        registry.register(simple_tool)
-        assert registry.get("simple_tool") is not None
-
-        registry.clear()
-
-        assert registry.get("simple_tool") is None
-        assert registry.get_all() == []
+    assert definition.name == "simple_tool"
+    assert definition.description == "A simple test tool"
+    assert definition.parameters_model is SimpleParams

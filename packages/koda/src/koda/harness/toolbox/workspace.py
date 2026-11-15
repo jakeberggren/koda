@@ -1,15 +1,15 @@
+"""Workspace: the folder the tools work in, and the locks that let them work in parallel."""
+
 from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
-    from pathlib import Path
-
-    from koda.tools.policy import ToolPolicy
 
 
 @dataclass(slots=True)
@@ -77,23 +77,14 @@ class ToolExecutionCoordinator:
 
 
 @dataclass(frozen=True, slots=True)
-class ToolContext:
-    """Execution context available to all tools.
+class Workspace:
+    """The folder Koda works in. Tools resolve relative paths against ``root``; absolute
+    paths work as they are. It doesn't restrict where tools go: bash can go anywhere."""
 
-    This is intentionally small and focused. Add fields here when multiple tools
-    need the same shared dependency/configuration.
-    """
+    root: Path
+    coordinator: ToolExecutionCoordinator = field(default_factory=ToolExecutionCoordinator)
 
-    cwd: Path
-    """Current working directory used for resolving relative paths."""
-
-    policy: ToolPolicy
-    """Policy object that enforces sandboxing and other safety limits."""
-
-    coordinator: ToolExecutionCoordinator
-    """Coordinator for shared/exclusive access and path-level serialization."""
-
-    @property
-    def sandbox_dir(self) -> Path:
-        """Root directory that tools are allowed to access."""
-        return self.policy.sandbox_dir
+    def resolve(self, path: str) -> Path:
+        """``path`` as an absolute path: relative to ``root`` unless it is absolute."""
+        given = Path(path)
+        return (given if given.is_absolute() else self.root / given).resolve()

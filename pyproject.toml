@@ -116,6 +116,12 @@ addopts = "--import-mode=importlib --cov=koda --cov=koda_tui --cov-report=term"
 root_packages = ["koda", "koda_tui"]
 
 [[tool.importlinter.contracts]]
+name = "The kernel never imports the harness"
+type = "forbidden"
+source_modules = ["koda.agent", "koda.llm", "koda.messages", "koda.sessions", "koda.tools"]
+forbidden_modules = ["koda.harness"]
+
+[[tool.importlinter.contracts]]
 name = "The TUI imports koda's packages, not the modules inside them"
 type = "forbidden"
 source_modules = ["koda_tui"]

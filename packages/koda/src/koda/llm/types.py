@@ -2,8 +2,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
-from koda.messages import AssistantMessage, Message, TokenUsage
-from koda.tools import ToolCall, ToolDefinition, ToolResult
+from koda.messages import AssistantMessage, Message, TokenUsage, ToolCall, ToolMessage
+from koda.tools import ToolDefinition
 
 _MAX_TOP_LOGPROBS = 20
 
@@ -93,8 +93,7 @@ class LLMToolStarted:
 
 @dataclass(frozen=True, slots=True)
 class LLMToolCompleted:
-    tool_name: str
-    result: ToolResult
+    message: ToolMessage
 
 
 @dataclass(frozen=True, slots=True)

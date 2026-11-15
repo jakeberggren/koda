@@ -22,8 +22,7 @@ from koda.llm.types import (
     LLMThinkingDelta,
     LLMToolCallRequested,
 )
-from koda.messages import ToolMessage
-from koda.tools import ToolOutput, ToolResult
+from koda.messages import ToolMessage, ToolOutput
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
@@ -143,12 +142,10 @@ async def test_anthropic_tool_result_sends_structured_content_not_display() -> N
         messages=[
             ToolMessage(
                 tool_name="read_file",
-                tool_result=ToolResult(
-                    call_id="toolu_1",
-                    output=ToolOutput(
-                        content={"text": '[project]\nname = "koda"', "encoding": "utf-8"},
-                        display="Read 2 lines",
-                    ),
+                call_id="toolu_1",
+                output=ToolOutput(
+                    content={"text": '[project]\nname = "koda"', "encoding": "utf-8"},
+                    display="Read 2 lines",
                 ),
             ),
         ],

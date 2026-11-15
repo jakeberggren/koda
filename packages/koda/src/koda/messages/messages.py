@@ -1,8 +1,12 @@
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum, auto
 from typing import Literal
 
-from koda.tools import ToolCall, ToolResult
+# What JSON holds: what the model sends a tool, and what a tool sends back.
+type JsonValue = str | int | float | bool | Sequence[JsonValue] | Mapping[str, JsonValue] | None
 
 
 class MessageRole(StrEnum):
@@ -24,6 +28,30 @@ class TokenUsage:
         if context_window is None or context_window <= 0 or self.input_tokens is None:
             return None
         return round((self.input_tokens / context_window) * 100)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ToolCall:
+    """The model asking for a tool to run with ``arguments``; its result answers ``call_id``."""
+
+    tool_name: str
+    arguments: Mapping[str, JsonValue]
+    call_id: str
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ToolOutput:
+    """What a tool sends back: ``content`` for the model, ``display`` for people."""
+
+    content: Mapping[str, JsonValue] = field(default_factory=dict)
+    display: str | None = None
+    is_error: bool = False
+    error_message: str | None = None
+
+    @classmethod
+    def failure(cls, message: str) -> ToolOutput:
+        """An output saying the tool couldn't do what was asked, and why."""
+        return cls(is_error=True, error_message=message)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -51,9 +79,11 @@ class AssistantMessage:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ToolMessage:
+    """A tool's ``output``, answering the call with ``call_id``."""
+
     tool_name: str
-    tool_result: ToolResult
-    content: str = ""
+    call_id: str
+    output: ToolOutput
     role: Literal[MessageRole.TOOL] = MessageRole.TOOL
 
 

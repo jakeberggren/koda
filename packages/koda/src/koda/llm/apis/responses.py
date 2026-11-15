@@ -44,10 +44,11 @@ from koda.messages import (
     AssistantMessage,
     InterruptionMessage,
     TokenUsage,
+    ToolCall,
     ToolMessage,
+    ToolOutput,
     UserMessage,
 )
-from koda.tools import ToolCall, ToolOutput, ToolResult
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -101,7 +102,7 @@ class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Om
 
     @staticmethod
     def _to_provider_tool_message(message: ToolMessage) -> FunctionCallOutput:
-        tool_output = message.tool_result.output
+        tool_output = message.output
         output_data: dict[str, Any] = {
             "content": tool_output.content,
             "is_error": tool_output.is_error,
@@ -109,7 +110,7 @@ class OpenAIResponsesAdapter(LLMAdapter[ResponseInputParam, list[ToolParam] | Om
         if tool_output.error_message:
             output_data["error_message"] = tool_output.error_message
         return FunctionCallOutput(
-            call_id=message.tool_result.call_id,
+            call_id=message.call_id,
             output=json.dumps(output_data),
             type="function_call_output",
         )
@@ -233,8 +234,8 @@ class OpenAIResponsesEventAdapter:
             display=self._format_web_search(event.item),
             is_error=event.item.status == "failed",
         )
-        result = ToolResult(output=output, call_id=event.item.id)
-        yield LLMToolCompleted(tool_name="web_search", result=result)
+        message = ToolMessage(tool_name="web_search", call_id=event.item.id, output=output)
+        yield LLMToolCompleted(message=message)
 
     def to_llm_events(self, event: ResponseStreamEvent) -> Iterator[LLMEvent]:  # noqa: C901
         if isinstance(event, ResponseTextDeltaEvent):
