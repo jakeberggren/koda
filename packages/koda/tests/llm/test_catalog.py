@@ -5,8 +5,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from koda import llm
-from koda.llm import Catalog, Credentials, exceptions
+from koda.llm import Catalog, Credentials, Thinking, exceptions
 from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.completions import OpenAICompletionsAPI
 from koda.llm.auth.codex import OpenAICodexAuth
@@ -28,16 +27,21 @@ def _credentials(credentials: dict[str, ProviderCredential]) -> Credentials:
     return cast("Credentials", _Credentials())
 
 
+def _catalog(credentials: dict[str, ProviderCredential]) -> Catalog:
+    catalog, _warnings = Catalog.load(_credentials(credentials))
+    return catalog
+
+
 def test_builtin_haiku_uses_binary_extended_thinking() -> None:
-    catalog, _warnings = Catalog.load()
+    catalog, _warnings = Catalog.load(_credentials({}))
     model = catalog.model("anthropic", "claude-haiku-4-5")
 
-    assert [option.id for option in model.thinking_options] == ["none", "enabled"]
-    assert [option.label for option in model.thinking_options] == ["Off", "On"]
+    assert [option.id for option in model.thinking.options] == ["none", "enabled"]
+    assert [option.label for option in model.thinking.options] == ["Off", "On"]
 
 
 def test_builtin_bergetai_uses_openai_completions_api() -> None:
-    catalog, _warnings = Catalog.load()
+    catalog, _warnings = Catalog.load(_credentials({}))
     model = catalog.model("bergetai", "google/gemma-4-31B-it")
 
     [connection] = model.connections
@@ -49,7 +53,7 @@ def test_builtin_bergetai_uses_openai_completions_api() -> None:
 
 
 def test_builtin_openai_models_are_offered_by_their_connections() -> None:
-    catalog, _warnings = Catalog.load()
+    catalog, _warnings = Catalog.load(_credentials({}))
     oauth = next(c for c in catalog.provider("openai").connections if c.id == "oauth")
     models = {model.id: model for model in catalog.models("openai")}
 
@@ -76,43 +80,110 @@ def _oauth() -> OAuthCredential:
     )
 
 
-def test_model_connection_prefers_oauth() -> None:
-    catalog, _warnings = Catalog.load()
+def _api_key() -> ApiKeyCredential:
+    return ApiKeyCredential(type="api_key", value="key")
+
+
+def test_connected_connection_prefers_oauth() -> None:
+    catalog = _catalog({"openai:api-key": _api_key(), "openai:oauth": _oauth()})
+    connected = catalog.connected
     model = catalog.model("openai", "gpt-5.5")
-    api_key = ApiKeyCredential(type="api_key", value="key")
-    credentials = _credentials({"openai:api-key": api_key, "openai:oauth": _oauth()})
 
-    assert model.connection(credentials).id == "oauth"
+    assert connected.connection(model).id == "oauth"
+    assert [c.id for c in connected.connections(model)] == ["oauth", "api-key"]
 
 
-def test_model_connection_uses_the_connection_with_a_credential() -> None:
-    catalog, _warnings = Catalog.load()
+def test_connected_connection_is_the_one_with_a_credential() -> None:
+    catalog = _catalog({"openai:api-key": _api_key()})
+    connected = catalog.connected
     model = catalog.model("openai", "gpt-5.5")
-    api_key = ApiKeyCredential(type="api_key", value="key")
 
-    assert model.connection(_credentials({"openai:api-key": api_key})).id == "api-key"
+    assert connected.connection(model).id == "api-key"
+
+
+def test_a_credential_of_the_wrong_kind_does_not_connect() -> None:
+    catalog = _catalog({"openai:oauth": _api_key()})
+    connected = catalog.connected
+
+    assert catalog.provider("openai") not in connected
+
+
+def test_connected_lists_what_the_credentials_reach() -> None:
+    catalog = _catalog({"openai:api-key": _api_key()})
+    connected = catalog.connected
+    openai = catalog.provider("openai")
+
+    assert connected.providers == [openai]
+    assert connected.models == catalog.models("openai")
+    assert openai in connected
+    assert catalog.model("openai", "gpt-5.5") in connected
+
+
+def test_connected_follows_the_credentials_as_they_change() -> None:
+    store: dict[str, ProviderCredential] = {}
+    catalog = _catalog(store)
+    connected = catalog.connected
+
+    assert connected.providers == []
+    store["openai:api-key"] = _api_key()
+    assert connected.providers == [catalog.provider("openai")]
 
 
 def test_model_without_a_connected_connection_is_not_connected() -> None:
-    catalog, _warnings = Catalog.load()
+    catalog = _catalog({})
+    connected = catalog.connected
     model = catalog.model("openai", "gpt-5.5")
 
-    assert not model.is_connected(_credentials({}))
-    with pytest.raises(exceptions.LLMConfigurationError, match="is not connected"):
-        model.connection(_credentials({}))
+    assert model not in connected
+    with pytest.raises(exceptions.ModelNotConnected, match="is not connected"):
+        connected.connection(model)
 
 
 async def test_connect_requires_a_connected_provider() -> None:
-    catalog, _warnings = Catalog.load()
+    catalog = _catalog({})
 
-    with pytest.raises(exceptions.LLMConfigurationError, match="is not connected"):
-        await llm.connect(catalog.model("openai", "gpt-5.5"), _credentials({}))
+    with pytest.raises(exceptions.ModelNotConnected):
+        await catalog.connect(catalog.model("openai", "gpt-5.5"))
+
+
+def test_resolve_needs_a_connected_provider() -> None:
+    catalog = _catalog({})
+
+    with pytest.raises(exceptions.NoProviderConnected):
+        catalog.resolve("openai", "gpt-5.5")
+
+
+def test_resolve_needs_a_selected_model() -> None:
+    catalog = _catalog({"openai:api-key": _api_key()})
+
+    with pytest.raises(exceptions.NoModelSelected):
+        catalog.resolve("openai", None)
+
+
+def test_resolve_needs_a_model_the_catalog_has() -> None:
+    catalog = _catalog({"openai:api-key": _api_key()})
+
+    with pytest.raises(exceptions.ModelNotFound):
+        catalog.resolve("openai", "missing")
+
+
+def test_resolve_needs_a_connected_model() -> None:
+    catalog = _catalog({"openai:api-key": _api_key()})
+
+    with pytest.raises(exceptions.ModelNotConnected):
+        catalog.resolve("anthropic", "claude-haiku-4-5")
+
+
+def test_resolve_returns_the_selected_connected_model() -> None:
+    catalog = _catalog({"openai:api-key": _api_key()})
+
+    assert catalog.resolve("openai", "gpt-5.5") == catalog.model("openai", "gpt-5.5")
 
 
 def test_unknown_model_is_not_supported() -> None:
-    catalog, _warnings = Catalog.load()
+    catalog, _warnings = Catalog.load(_credentials({}))
 
-    with pytest.raises(exceptions.LLMConfigurationError, match="is not supported"):
+    with pytest.raises(exceptions.ModelNotFound, match="is not supported"):
         catalog.model("openai", "missing")
 
 
@@ -208,7 +279,7 @@ def test_user_providers_replace_builtin_providers(tmp_path: Path) -> None:
         },
     )
 
-    catalog, warnings = Catalog.from_files(builtin_path, user_path)
+    catalog, warnings = Catalog.from_files(_credentials({}), builtin_path, user_path)
     assert warnings == []
 
     provider = catalog.provider(" OPENAI ")
@@ -219,7 +290,7 @@ def test_user_providers_replace_builtin_providers(tmp_path: Path) -> None:
     assert [model.id for model in catalog.models("openai")] == ["GPT-5.4", "gpt-5.4-nano"]
     model = catalog.model("openai", " gpt-5.4 ")
     assert model.name == "Custom GPT 5.4"
-    assert [option.label for option in model.thinking_options] == ["Off", "Low", "Medium", "High"]
+    assert [option.label for option in model.thinking.options] == ["Off", "Low", "Medium", "High"]
     assert catalog.models("anthropic")[0].id == "claude-sonnet-4-6"
 
 
@@ -244,7 +315,7 @@ def test_user_config_with_unknown_thinking_mode_falls_back_with_warning(tmp_path
         },
     )
 
-    catalog, warnings = Catalog.from_files(builtin_path, user_path)
+    catalog, warnings = Catalog.from_files(_credentials({}), builtin_path, user_path)
 
     assert catalog.provider("openai").name == "OpenAI"
     assert [warning.summary for warning in warnings] == ["invalid models.json"]
@@ -273,7 +344,7 @@ def test_invalid_user_config_falls_back_to_builtin_with_warning(tmp_path: Path) 
     )
     user_path.write_text('{"providers": {"openrouter": ', encoding="utf-8")
 
-    catalog, warnings = Catalog.from_files(builtin_path, user_path)
+    catalog, warnings = Catalog.from_files(_credentials({}), builtin_path, user_path)
 
     assert catalog.provider("openai").name == "OpenAI"
     with pytest.raises(exceptions.LLMConfigurationError, match="is not supported"):
@@ -295,14 +366,14 @@ def test_user_config_with_unknown_api_falls_back_with_warning(tmp_path: Path) ->
         {"providers": {"openai": {"name": "Proxy", "connections": {"api-key": unknown}}}},
     )
 
-    catalog, warnings = Catalog.from_files(builtin_path, user_path)
+    catalog, warnings = Catalog.from_files(_credentials({}), builtin_path, user_path)
 
     assert catalog.provider("openai").name == "OpenAI"
     assert "unknown api 'unknown-api'" in (warnings[0].detail or "")
 
 
 async def test_an_oauth_connection_logs_in_through_its_api_s_browser_login() -> None:
-    catalog, _ = Catalog.load()
+    catalog, _ = Catalog.load(_credentials({}))
     connections = {c.id: c for c in catalog.provider("openai").connections}
 
     assert isinstance(connections["oauth"].oauth, OpenAICodexAuth)
@@ -313,12 +384,24 @@ async def test_an_oauth_connection_logs_in_through_its_api_s_browser_login() -> 
 
 
 def test_thinking_moves_to_the_next_level_and_wraps_around() -> None:
-    catalog, _ = Catalog.load()
+    catalog, _ = Catalog.load(_credentials({}))
     model = catalog.model("openai", "gpt-5.5")
-    levels = [option.id for option in model.effective_thinking_options]
+    levels = [option.id for option in model.thinking.options]
 
-    assert model.next_thinking(levels[0]) == levels[1]
-    assert model.next_thinking(levels[-1]) == levels[0]
-    assert model.next_thinking("not-a-level") == model.next_thinking(
-        model.resolve_thinking_option("not-a-level").id
-    )
+    assert model.thinking.after(levels[0]) == levels[1]
+    assert model.thinking.after(levels[-1]) == levels[0]
+    assert model.thinking.after("not-a-level") == levels[1]
+
+
+def test_a_model_without_levels_can_only_not_think() -> None:
+    thinking = Thinking()
+
+    assert [option.id for option in thinking.options] == ["none"]
+    assert not thinking.supported
+    assert thinking.resolve("high").id == "none"
+    assert thinking.after("none") is None
+
+
+def test_thinking_needs_an_option() -> None:
+    with pytest.raises(ValueError, match="at least one option"):
+        Thinking(())

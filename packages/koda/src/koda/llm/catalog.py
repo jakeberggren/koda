@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, PlainValidator, ValidationError
 from structlog import get_logger
 
 from koda.llm import exceptions
-from koda.llm.apis import LLMApi
+from koda.llm.apis import LLMApi, LLMApiContext
 from koda.llm.apis.codex import OpenAICodexResponsesAPI
 from koda.llm.apis.completions import OpenAICompletionsAPI
 from koda.llm.apis.messages import AnthropicMessagesAPI
@@ -20,15 +20,19 @@ from koda.llm.models import (
     Connection,
     Model,
     Provider,
+    Thinking,
     ThinkingOption,
     ThinkingOptionId,
 )
+from koda.llm.utils import resolve_openai_client
 from koda.paths import model_overrides_file_path
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from koda.llm.auth.protocols import ProviderAuth
+    from koda.llm.credentials import Credentials
+    from koda.llm.protocols import LLM
 
 log = get_logger(__name__)
 
@@ -60,11 +64,6 @@ def _api(name: str) -> type[LLMApi]:
         raise _UnknownApiError(name) from None
 
 
-class _ThinkingBudgetFile(BaseModel):
-    min_tokens: int | None = None
-    max_tokens: int | None = None
-
-
 class _ThinkingModeFile(BaseModel):
     label: str
     description: str | None = None
@@ -72,13 +71,11 @@ class _ThinkingModeFile(BaseModel):
 
 class _ThinkingFile(BaseModel):
     modes: list[ThinkingOptionId] = Field(default_factory=list)
-    budget_tokens: _ThinkingBudgetFile | None = None
 
 
 class _ModelFile(BaseModel):
     id: str
     name: str
-    detail: str | None = None
     context_window: int | None = None
     max_output_tokens: int | None = None
     capabilities: dict[str, object] = Field(default_factory=dict)
@@ -88,7 +85,7 @@ class _ModelFile(BaseModel):
 class _ConnectionFile(BaseModel):
     auth: AuthMethod = "api-key"
     label: str | None = None
-    detail: str | None = None
+    detail: str = ""
     description: str | None = None
     api: Annotated[type[LLMApi], PlainValidator(_api)]
     base_url: str
@@ -141,9 +138,8 @@ def _merge(builtin: _CatalogFile, user: _CatalogFile | None) -> dict[str, _Provi
     return providers
 
 
-def _thinking_options(
-    provider_id: str, provider: _ProviderFile, model: _ModelFile
-) -> tuple[ThinkingOption, ...]:
+def _thinking(provider_id: str, provider: _ProviderFile, model: _ModelFile) -> Thinking:
+    """The model's thinking levels; only "none" when it declares none."""
     options = []
     for mode_id in model.thinking.modes:
         mode = provider.thinking_modes.get(mode_id)
@@ -153,7 +149,7 @@ def _thinking_options(
                 f"mode '{mode_id}'"
             )
         options.append(ThinkingOption(id=mode_id, label=mode.label, description=mode.description))
-    return tuple(options)
+    return Thinking(tuple(options)) if options else Thinking()
 
 
 def _build_provider(provider_id: str, provider: _ProviderFile) -> tuple[Provider, list[Model]]:
@@ -181,17 +177,14 @@ def _build_provider(provider_id: str, provider: _ProviderFile) -> tuple[Provider
 
     models = []
     for key, model_file in model_files.items():
-        budget = model_file.thinking.budget_tokens
         models.append(
             Model(
                 id=model_file.id,
                 name=model_file.name,
                 provider=provider_id,
-                detail=model_file.detail,
                 context_window=model_file.context_window,
                 max_output_tokens=model_file.max_output_tokens,
-                thinking_options=_thinking_options(provider_id, provider, model_file),
-                thinking_budget_tokens=budget.max_tokens if budget else None,
+                thinking=_thinking(provider_id, provider, model_file),
                 capabilities=model_file.capabilities,
                 # Prefer OAuth: a subscription over pay-per-token API keys.
                 connections=tuple(sorted(model_connections[key], key=lambda c: c.auth != "oauth")),
@@ -207,11 +200,13 @@ def _build_provider(provider_id: str, provider: _ProviderFile) -> tuple[Provider
 
 
 class Catalog:
-    """The providers and models Koda can use, from the bundled and user models.json."""
+    """The providers and models Koda can use, from the bundled and user models.json, and
+    what of them ``credentials`` reach: ``connected``."""
 
-    def __init__(self, providers: dict[str, _ProviderFile]) -> None:
+    def __init__(self, providers: dict[str, _ProviderFile], credentials: Credentials) -> None:
         self._providers: dict[str, Provider] = {}
         self._models: dict[tuple[str, str], Model] = {}
+        self._credentials = credentials
         for provider_id, provider_file in providers.items():
             provider, models = _build_provider(provider_id, provider_file)
             self._providers[provider_id] = provider
@@ -221,15 +216,16 @@ class Catalog:
     @classmethod
     def from_files(
         cls,
+        credentials: Credentials,
         builtin_path: Path,
         user_path: Path | None = None,
     ) -> tuple[Catalog, list[CatalogWarning]]:
         """Load the catalog; an invalid user file is ignored with a warning."""
         builtin = _read(builtin_path)
         if user_path is None or not user_path.exists():
-            return cls(_merge(builtin, None)), []
+            return cls(_merge(builtin, None), credentials), []
         try:
-            return cls(_merge(builtin, _read(user_path))), []
+            return cls(_merge(builtin, _read(user_path)), credentials), []
         except (
             json.JSONDecodeError,
             ValidationError,
@@ -240,13 +236,19 @@ class Catalog:
             warning = CatalogWarning(
                 summary="invalid models.json", detail=f"Ignoring {user_path}: {e}"
             )
-            return cls(_merge(builtin, None)), [warning]
+            return cls(_merge(builtin, None), credentials), [warning]
 
     @classmethod
-    def load(cls) -> tuple[Catalog, list[CatalogWarning]]:
+    def load(cls, credentials: Credentials) -> tuple[Catalog, list[CatalogWarning]]:
         """Load the bundled catalog, merged with ~/.koda/models.json if present."""
         with as_file(files("koda.llm").joinpath("models.json")) as builtin_path:
-            return cls.from_files(builtin_path, model_overrides_file_path())
+            return cls.from_files(credentials, builtin_path, model_overrides_file_path())
+
+    @property
+    def connected(self) -> Connected:
+        """What the credentials reach, as they are now: a login shows straight away.
+        Reading it raises ``CredentialsError`` when the credentials can't be read."""
+        return Connected(self, self._credentials)
 
     def providers(self) -> list[Provider]:
         """All providers, in catalog order."""
@@ -256,7 +258,7 @@ class Catalog:
         """The provider with ``provider_id``."""
         provider = self._providers.get(_normalize(provider_id))
         if provider is None:
-            raise exceptions.LLMConfigurationError(f"Provider '{provider_id}' is not supported")
+            raise exceptions.ModelNotFound(f"Provider '{provider_id}' is not supported")
         return provider
 
     def models(self, provider_id: str | None = None) -> list[Model]:
@@ -271,7 +273,70 @@ class Catalog:
         provider = self.provider(provider_id)
         model = self._models.get((provider.id, _normalize(model_id)))
         if model is None:
-            raise exceptions.LLMConfigurationError(
+            raise exceptions.ModelNotFound(
                 f"Model '{model_id}' for provider {provider_id} is not supported"
             )
         return model
+
+    def resolve(self, provider_id: str | None, model_id: str | None) -> Model:
+        """The model to use, or the ``ModelUnavailable`` that says why there's none."""
+        if not self.connected.providers:
+            raise exceptions.NoProviderConnected
+        if provider_id is None or model_id is None:
+            raise exceptions.NoModelSelected
+        model = self.model(provider_id, model_id)
+        if model not in self.connected:
+            raise exceptions.ModelNotConnected(model.provider, model.id)
+        return model
+
+    async def connect(self, model: Model, *, tracing: bool = False) -> LLM:
+        """An LLM for ``model``, over its first connected connection.
+
+        With ``tracing``, OpenAI-compatible clients are traced to Langfuse.
+        """
+        connection = self.connected.connection(model)
+        return await connection.api.from_context(
+            LLMApiContext(
+                model=model,
+                connection=connection,
+                credentials=self._credentials,
+                openai_client=resolve_openai_client(tracing=tracing),
+            )
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class Connected:
+    """The part of a catalog its credentials reach. Each read asks the credentials anew."""
+
+    _catalog: Catalog
+    _credentials: Credentials
+
+    @property
+    def providers(self) -> list[Provider]:
+        """Connected providers, in catalog order."""
+        return [provider for provider in self._catalog.providers() if provider in self]
+
+    @property
+    def models(self) -> list[Model]:
+        """Connected models, in catalog order."""
+        return [model for model in self._catalog.models() if model in self]
+
+    def __contains__(self, item: Connection | Provider | Model) -> bool:
+        """Whether the credentials reach ``item``: a connection with its credential, or a
+        provider or model with any such connection."""
+        if isinstance(item, Connection):
+            credential = self._credentials.get_credential(item.credential_key)
+            return credential is not None and credential.auth_type == item.auth
+        return any(connection in self for connection in item.connections)
+
+    def connections(self, item: Provider | Model) -> list[Connection]:
+        """The connected connections of ``item``, in its order of preference."""
+        return [connection for connection in item.connections if connection in self]
+
+    def connection(self, model: Model) -> Connection:
+        """The connection to use for ``model``: its first connected one."""
+        for connection in model.connections:
+            if connection in self:
+                return connection
+        raise exceptions.ModelNotConnected(model.provider, model.id)

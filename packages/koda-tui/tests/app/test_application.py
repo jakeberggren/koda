@@ -18,6 +18,7 @@ from koda.llm import (
     LLMRateLimitError,
     Model,
     ProviderCredential,
+    Thinking,
     ThinkingOption,
 )
 from koda.sessions import InMemorySessionStore, Session
@@ -25,7 +26,7 @@ from koda_tui import strings
 from koda_tui.app.application import KodaTuiApp
 from koda_tui.app.keybindings import create_keybindings
 from koda_tui.appearance import RGBColor
-from koda_tui.settings import Settings
+from koda_tui.settings import AgentSettings, Settings, TuiSettings
 from koda_tui.state import PendingInput
 
 if TYPE_CHECKING:
@@ -34,7 +35,6 @@ if TYPE_CHECKING:
     import pytest
     from pydantic import BaseModel
 
-    from koda.llm import Credentials
     from koda.llm.types import LLMEvent, LLMRequest, LLMResponse
     from koda.messages import AssistantMessage
 
@@ -88,13 +88,16 @@ class _Connect:
         self.llm = llm
         self.calls = 0
 
-    async def __call__(self, model: Model, credentials: Credentials) -> _FakeLLM:
+    async def __call__(self, model: Model) -> _FakeLLM:
         self.calls += 1
         await asyncio.sleep(0)
         return self.llm
 
 
-_SETTINGS = Settings(provider="openai", model="gpt-5.2", theme="terminal-dark")
+_SETTINGS = Settings(
+    agent_settings=AgentSettings(provider="openai", model="gpt-5.2"),
+    tui_settings=TuiSettings(theme="terminal-dark"),
+)
 
 
 def _make_app(
@@ -104,12 +107,13 @@ def _make_app(
     llm: _FakeLLM | None = None,
 ) -> tuple[KodaTuiApp, _Connect]:
     connect = _Connect(llm or _FakeLLM())
-    catalog, _warnings = Catalog.load()
+    credentials = _connected() if credentials is None else credentials
+    catalog, _warnings = Catalog.load(credentials)
     app = KodaTuiApp(
         settings,
         workspace,
         catalog=catalog,
-        credentials=_connected() if credentials is None else credentials,
+        credentials=credentials,
         store=InMemorySessionStore(),
         connect=connect,
     )
@@ -120,9 +124,10 @@ def test_new_settings_are_saved_and_shown() -> None:
     credentials = _connected()
     credentials["bergetai:api-key"] = ApiKeyCredential(type="api_key", value="key")
     app, _ = _make_app(credentials=credentials)
-    app.update_settings(
-        replace(app.state.settings, provider="bergetai", model="zai-org/GLM-4.7-FP8")
+    agent_settings = replace(
+        app.state.settings.agent_settings, provider="bergetai", model="zai-org/GLM-4.7-FP8"
     )
+    app.update_settings(replace(app.state.settings, agent_settings=agent_settings))
 
     assert app.state.active_model is not None
     assert app.state.active_model.id == "zai-org/GLM-4.7-FP8"
@@ -138,7 +143,8 @@ def test_a_new_theme_redraws_without_asking_the_terminal_again(
     monkeypatch.setattr(app._terminal, "ask_background", ask_background)  # noqa: SLF001
     monkeypatch.setattr(app, "invalidate", invalidate)
 
-    app.update_settings(replace(app.state.settings, theme="auto"))
+    tui_settings = replace(app.state.settings.tui_settings, theme="auto")
+    app.update_settings(replace(app.state.settings, tui_settings=tui_settings))
 
     assert app.appearance.theme == "auto"
     ask_background.assert_not_called()
@@ -163,10 +169,12 @@ def _thinking_model() -> Model:
         id="gpt-5.2",
         name="GPT 5.2",
         provider="openai",
-        thinking_options=(
-            ThinkingOption(id="none", label="None"),
-            ThinkingOption(id="low", label="Low"),
-            ThinkingOption(id="high", label="High"),
+        thinking=Thinking(
+            (
+                ThinkingOption(id="none", label="None"),
+                ThinkingOption(id="low", label="Low"),
+                ThinkingOption(id="high", label="High"),
+            ),
         ),
     )
 
@@ -177,13 +185,15 @@ def test_cycle_thinking_moves_to_the_next_level_and_wraps_around() -> None:
     model = _thinking_model()
     app.state.active_model = model
 
-    app.state.settings = replace(app.state.settings, thinking="none")
+    agent_settings = replace(app.state.settings.agent_settings, thinking="none")
+    app.state.settings = replace(app.state.settings, agent_settings=agent_settings)
     app.cycle_thinking()
-    assert app.update_settings.call_args.args[0].thinking == "low"
+    assert app.update_settings.call_args.args[0].agent_settings.thinking == "low"
 
-    app.state.settings = replace(app.state.settings, thinking="high")
+    agent_settings = replace(app.state.settings.agent_settings, thinking="high")
+    app.state.settings = replace(app.state.settings, agent_settings=agent_settings)
     app.cycle_thinking()
-    assert app.update_settings.call_args.args[0].thinking == "none"
+    assert app.update_settings.call_args.args[0].agent_settings.thinking == "none"
 
 
 def test_cycle_thinking_does_nothing_without_a_model() -> None:
@@ -232,7 +242,8 @@ async def test_every_settings_change_rebuilds_the_agent() -> None:
     await _respond(app)
     app.invalidate = Mock()
 
-    app.update_settings(replace(app.state.settings, web_search=True))
+    agent_settings = replace(app.state.settings.agent_settings, web_search=True)
+    app.update_settings(replace(app.state.settings, agent_settings=agent_settings))
 
     app.invalidate.assert_called_once_with()
     await _respond(app)
@@ -289,8 +300,13 @@ class TestAgent:
         assert "Second instructions." in (connect.llm.last_request.instructions or "")
 
     async def test_thinking_resolves_to_the_models_first_mode(self) -> None:
+        credentials = _connected()
+        credentials["anthropic:api-key"] = ApiKeyCredential(type="api_key", value="key")
+        agent_settings = replace(
+            _SETTINGS.agent_settings, provider="anthropic", model="claude-fable-5"
+        )
         app, connect = _make_app(
-            settings=replace(_SETTINGS, provider="anthropic", model="claude-fable-5")
+            settings=replace(_SETTINGS, agent_settings=agent_settings), credentials=credentials
         )
 
         await _respond(app)
@@ -301,7 +317,8 @@ class TestAgent:
     async def test_responding_without_a_selected_model_fails_where_the_turn_failed(
         self,
     ) -> None:
-        app, _ = _make_app(settings=replace(_SETTINGS, model=None))
+        agent_settings = replace(_SETTINGS.agent_settings, model=None)
+        app, _ = _make_app(settings=replace(_SETTINGS, agent_settings=agent_settings))
 
         await _respond(app)
 
@@ -342,29 +359,33 @@ class TestStatus:
         assert app.state.issue is None
         assert app.state.active_model is not None
         assert app.state.active_model.id == "gpt-5.2"
-        assert [provider.id for provider in app.state.configured_providers] == ["openai"]
+        assert [provider.id for provider in app.state.connected_providers] == ["openai"]
 
     def test_setup_is_required_without_credentials(self) -> None:
         app, _ = _make_app(credentials=_Credentials())
         assert app.state.issue == strings.Screen.Status.SETUP_REQUIRED
 
     def test_selection_is_required_without_a_model(self) -> None:
-        app, _ = _make_app(settings=replace(_SETTINGS, model=None))
+        agent_settings = replace(_SETTINGS.agent_settings, model=None)
+        app, _ = _make_app(settings=replace(_SETTINGS, agent_settings=agent_settings))
 
         assert app.state.issue == strings.Screen.Status.SELECTION_REQUIRED
         assert app.state.active_model is None
 
     def test_an_unknown_model_is_not_found(self) -> None:
-        app, _ = _make_app(settings=replace(_SETTINGS, model="missing"))
+        agent_settings = replace(_SETTINGS.agent_settings, model="missing")
+        app, _ = _make_app(settings=replace(_SETTINGS, agent_settings=agent_settings))
         assert app.state.issue == strings.Screen.Status.MODEL_NOT_FOUND
 
     def test_a_model_of_an_unconnected_provider_is_not_connected(self) -> None:
-        settings = replace(_SETTINGS, provider="bergetai", model="google/gemma-4-31B-it")
-        app, _ = _make_app(settings=settings)
+        agent_settings = replace(
+            _SETTINGS.agent_settings, provider="bergetai", model="google/gemma-4-31B-it"
+        )
+        app, _ = _make_app(settings=replace(_SETTINGS, agent_settings=agent_settings))
         assert app.state.issue == strings.Screen.Status.MODEL_NOT_CONNECTED
 
     def test_an_unreadable_credentials_file_is_reported(self) -> None:
         app, _ = _make_app(credentials=_UnreadableCredentials())
 
         assert app.state.issue == strings.Screen.Status.CREDENTIALS_UNREADABLE
-        assert app.state.configured_providers == []
+        assert app.state.connected_providers == []

@@ -73,7 +73,7 @@ def _model(state: AppState) -> list[Segment]:
     segments: list[Segment] = [
         [(Tokens.Text.MUTED, f"{model.provider} {Icons.DIVIDER} {model.name}")]
     ]
-    thinking = model.resolve_thinking_option(state.settings.thinking)
+    thinking = model.thinking.resolve(state.settings.agent_settings.thinking)
     if thinking.id != "none":
         segments.append([(Tokens.Text.WARNING, thinking.label.lower())])
     return segments
@@ -111,7 +111,7 @@ def _tokens(state: AppState) -> list[Segment]:
 def _hints(state: AppState) -> list[Segment]:
     """Key bindings worth knowing, each as the key followed by what it does."""
     hints = [(strings.Key.CTRL_P_K, strings.Screen.Status.PALETTE)]
-    if state.active_model is not None and state.active_model.supports_thinking:
+    if state.active_model is not None and state.active_model.thinking.supported:
         hints.insert(0, (strings.Key.CTRL_T, strings.Screen.Status.CYCLE_THINKING))
     return [
         [(Tokens.Text.DEFAULT, key), (Tokens.Text.MUTED, f" {action}")] for key, action in hints

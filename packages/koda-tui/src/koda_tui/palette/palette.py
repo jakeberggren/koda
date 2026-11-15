@@ -71,14 +71,14 @@ class CommandPalette:
                 available=lambda state: (
                     _ready(state)
                     and state.active_model is not None
-                    and state.active_model.supports_thinking
+                    and state.active_model.thinking.supported
                 ),
             ),
             Command(
                 text=strings.Palette.Models,
                 group=Group.AGENT,
                 run=ModelMenu(context).open,
-                available=lambda state: bool(state.configured_providers),
+                available=lambda state: bool(state.connected_providers),
             ),
             Command(
                 text=strings.Palette.NewSession,
@@ -134,7 +134,10 @@ class CommandPalette:
 
     def _toggle_scrollbar(self) -> None:
         settings = self._context.settings
-        self._context.update_settings(replace(settings, show_scrollbar=not settings.show_scrollbar))
+        tui_settings = replace(
+            settings.tui_settings, show_scrollbar=not settings.tui_settings.show_scrollbar
+        )
+        self._context.update_settings(replace(settings, tui_settings=tui_settings))
         self._overlays.close_all()
 
 

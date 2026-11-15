@@ -1,19 +1,21 @@
-"""Settings: the model Koda uses, how it thinks, and how the TUI looks, in
+"""Settings: the agent's, and how the TUI looks and takes input, in
 ``~/.koda/settings.json``."""
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, ValidationError
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, ValidationError
 from pydantic_core import PydanticCustomError
 
-from koda.llm import ThinkingOptionId
+from koda.llm import LLMRequestOptions, ThinkingOptionId
 from koda.paths import koda_home_dir
 from koda_tui.appearance import AUTO, THEMES
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from koda.llm import Model
 
 
 class SettingsError(Exception):
@@ -39,8 +41,8 @@ def _theme(value: str) -> str:
     return value
 
 
-class Settings(BaseModel):
-    """What the user picked. Changed by replacing it: ``copy.replace(settings, ...)``."""
+class AgentSettings(BaseModel):
+    """The model the agent uses, and how it asks it."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -49,9 +51,38 @@ class Settings(BaseModel):
     thinking: ThinkingOptionId = "none"
     web_search: bool = False
     extended_prompt_retention: bool = False
+
+    def request_options(self, model: Model) -> LLMRequestOptions:
+        """The options to ask ``model`` with: the thinking level it supports nearest
+        the one picked."""
+        return LLMRequestOptions(
+            thinking=model.thinking.resolve(self.thinking).id,
+            web_search=self.web_search,
+            extended_prompt_retention=self.extended_prompt_retention,
+        )
+
+
+class TuiSettings(BaseModel):
+    """How the TUI looks and takes input."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
     theme: Annotated[str, AfterValidator(_theme)] = AUTO.name
     show_scrollbar: bool = True
     queue_inputs: bool = True
+
+
+class Settings(BaseModel):
+    """What the user picked: for the agent, and for the TUI. Changed by replacing it::
+
+    agent_settings = replace(settings.agent_settings, thinking="high")
+    settings = replace(settings, agent_settings=agent_settings)
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    agent_settings: AgentSettings = Field(default_factory=AgentSettings)
+    tui_settings: TuiSettings = Field(default_factory=TuiSettings)
 
     @classmethod
     def load(cls, path: Path | None = None) -> Settings:

@@ -77,7 +77,9 @@ class ProviderMenu:
                     ListItem(
                         label=selection.label,
                         detail=selection.connection.description or "",
-                        marker=Icons.DONE if self._connected(selection) else None,
+                        marker=Icons.DONE
+                        if selection.connection in self._context.catalog.connected
+                        else None,
                         data=selection,
                     )
                     for selection in connections
@@ -94,20 +96,11 @@ class ProviderMenu:
             ListItem(
                 label=provider.name,
                 detail=provider.description or "",
-                marker=Icons.DONE if self._any_connected(provider) else None,
+                marker=Icons.DONE if provider in self._context.catalog.connected else None,
                 data=provider,
             )
             for provider in self._catalog.providers()
         ]
-
-    def _any_connected(self, provider: Provider) -> bool:
-        return any(
-            self._connected(ProviderConnectionSelection(provider, connection))
-            for connection in provider.connections
-        )
-
-    def _connected(self, selection: ProviderConnectionSelection) -> bool:
-        return bool(self._context.credentials.get_credential(selection.credential_key))
 
     def _connect(self, selection: ProviderConnectionSelection) -> None:
         """Log in through the browser, or ask for the API key."""
@@ -130,8 +123,15 @@ class ProviderMenu:
         and close the palette."""
         self._context.credentials.set_credential(selection.credential_key, credential)
         settings = self._context.settings
-        if settings.model is None and (models := self._catalog.models(selection.provider.id)):
-            settings = replace(settings, provider=models[0].provider, model=models[0].id)
+        if settings.agent_settings.model is None and (
+            models := self._catalog.models(selection.provider.id)
+        ):
+            agent_settings = replace(
+                settings.agent_settings,
+                provider=models[0].provider,
+                model=models[0].id,
+            )
+            settings = replace(settings, agent_settings=agent_settings)
         self._context.update_settings(settings)
         self._overlays.close_all()
 

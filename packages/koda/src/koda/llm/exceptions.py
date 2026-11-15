@@ -21,6 +21,37 @@ class LLMConfigurationError(LLMError):
     that isn't connected, or a catalog entry missing what the API needs."""
 
 
+class ModelUnavailable(LLMConfigurationError):  # noqa: N818 - reads as the condition
+    """There's no model to use: one subclass per reason, for the caller to explain."""
+
+
+class NoProviderConnected(ModelUnavailable):
+    """No provider has a credential."""
+
+    def __init__(self) -> None:
+        super().__init__("No provider is connected")
+
+
+class NoModelSelected(ModelUnavailable):
+    """No model is picked."""
+
+    def __init__(self) -> None:
+        super().__init__("No model selected")
+
+
+class ModelNotFound(ModelUnavailable):
+    """The catalog has no such provider or model."""
+
+
+class ModelNotConnected(ModelUnavailable):
+    """The model exists, but none of its connections has a credential."""
+
+    def __init__(self, provider: str, model: str) -> None:
+        super().__init__(f"Model '{model}' of provider '{provider}' is not connected")
+        self.provider = provider
+        self.model = model
+
+
 class CredentialsError(LLMConfigurationError):
     """The credentials file can't be read."""
 

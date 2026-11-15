@@ -123,9 +123,6 @@
               "max_output_tokens": 128000,
               "name": "Claude Opus 4.8",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
                   "none",
                   "low",
@@ -142,9 +139,6 @@
               "max_output_tokens": 128000,
               "name": "Claude Opus 4.7",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
                   "none",
                   "low",
@@ -161,9 +155,6 @@
               "max_output_tokens": 128000,
               "name": "Claude Opus 4.6",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 128000
-                },
                 "modes": [
                   "none",
                   "low",
@@ -179,9 +170,6 @@
               "max_output_tokens": 64000,
               "name": "Claude Opus 4.5",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 64000
-                },
                 "modes": [
                   "none",
                   "enabled"
@@ -194,9 +182,6 @@
               "max_output_tokens": 64000,
               "name": "Claude Sonnet 4.6",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 64000
-                },
                 "modes": [
                   "none",
                   "low",
@@ -212,9 +197,6 @@
               "max_output_tokens": 64000,
               "name": "Claude Haiku 4.5",
               "thinking": {
-                "budget_tokens": {
-                  "max_tokens": 4096
-                },
                 "modes": [
                   "none",
                   "enabled"
@@ -228,7 +210,7 @@
       "name": "Anthropic",
       "thinking_modes": {
         "enabled": {
-          "description": "Use extended thinking with the model's configured token budget.",
+          "description": "Use extended thinking with half the output tokens as its budget.",
           "label": "On"
         },
         "high": {

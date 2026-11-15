@@ -6,30 +6,12 @@ from typing import TYPE_CHECKING, Literal, Self
 from koda.llm import exceptions
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from koda.llm.apis import LLMApi
     from koda.llm.auth.protocols import OAuthLoginCallbacks, ProviderAuth
-    from koda.llm.credentials import Credentials, OAuthCredential
+    from koda.llm.credentials import OAuthCredential
 
 type ThinkingOptionId = str
 type AuthMethod = Literal["api-key", "oauth"]
-
-
-def resolve_thinking_mode(
-    requested: ThinkingOptionId,
-    supported: Sequence[ThinkingOptionId],
-) -> ThinkingOptionId:
-    """Resolve a requested thinking mode against ordered model-supported modes.
-
-    The first supported mode is the model default/fallback. Models with no declared
-    thinking modes fall back to explicit no-thinking.
-    """
-    if not supported:
-        return "none"
-    if requested in supported:
-        return requested
-    return supported[0]
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +26,34 @@ class ThinkingOption:
         return cls(id="none", label="none")
 
 
+@dataclass(frozen=True, slots=True)
+class Thinking:
+    """The thinking levels a model offers, in order; the first is its default. Never
+    empty: a model that can't think offers only "none"."""
+
+    options: tuple[ThinkingOption, ...] = (ThinkingOption.none(),)
+
+    def __post_init__(self) -> None:
+        if not self.options:
+            raise ValueError("Thinking needs at least one option")
+
+    @property
+    def supported(self) -> bool:
+        """Whether there's a level besides "none" to choose."""
+        return any(option.id != "none" for option in self.options)
+
+    def resolve(self, option_id: ThinkingOptionId) -> ThinkingOption:
+        """The option with ``option_id``, or the default when there's none such."""
+        return next((option for option in self.options if option.id == option_id), self.options[0])
+
+    def after(self, current: ThinkingOptionId) -> ThinkingOptionId | None:
+        """The level after ``current``, wrapping around; None with nothing to choose."""
+        if not self.supported:
+            return None
+        index = self.options.index(self.resolve(current))
+        return self.options[(index + 1) % len(self.options)].id
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Connection:
     """One way to reach a provider: an API, an endpoint, and an API key or, with ``oauth``,
@@ -56,7 +66,7 @@ class Connection:
     oauth: ProviderAuth | None = None
     label: str | None = None
     description: str | None = None
-    detail: str | None = None
+    detail: str = ""
     capabilities: dict[str, object] = field(default_factory=dict)
 
     @property
@@ -67,11 +77,6 @@ class Connection:
     def credential_key(self) -> str:
         """The key this connection's credential is stored under."""
         return f"{self.provider}:{self.id}"
-
-    def is_connected(self, credentials: Credentials) -> bool:
-        """Whether ``credentials`` has a credential for this connection."""
-        credential = credentials.get_credential(self.credential_key)
-        return credential is not None and credential.auth_type == self.auth
 
     async def login(self, callbacks: OAuthLoginCallbacks) -> OAuthCredential:
         """Log in through the browser; ``callbacks`` open the URL and ask for anything the
@@ -88,57 +93,15 @@ class Provider:
     description: str | None = None
     connections: tuple[Connection, ...] = ()
 
-    def is_connected(self, credentials: Credentials) -> bool:
-        """Whether any connection to the provider has its credential."""
-        return any(connection.is_connected(credentials) for connection in self.connections)
-
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Model:
     id: str
     name: str
     provider: str
-    detail: str | None = None
     context_window: int | None = None
     max_output_tokens: int | None = None
-    thinking_options: tuple[ThinkingOption, ...] = ()
-    thinking_budget_tokens: int | None = None
+    thinking: Thinking = Thinking()
     capabilities: dict[str, object] = field(default_factory=dict)
     connections: tuple[Connection, ...] = ()
     """The connections that offer this model, in order of preference."""
-
-    @property
-    def effective_thinking_options(self) -> tuple[ThinkingOption, ...]:
-        """Return selectable thinking options with no-thinking as the fallback."""
-        return self.thinking_options or (ThinkingOption.none(),)
-
-    @property
-    def supports_thinking(self) -> bool:
-        """Return whether this model supports any non-default thinking option."""
-        return any(option.id != "none" for option in self.effective_thinking_options)
-
-    def resolve_thinking_option(self, thinking_id: ThinkingOptionId) -> ThinkingOption:
-        """Return the matching thinking option or the model's default option."""
-        options = self.effective_thinking_options
-        resolved_id = resolve_thinking_mode(thinking_id, [option.id for option in options])
-        return next(option for option in options if option.id == resolved_id)
-
-    def next_thinking(self, current: ThinkingOptionId) -> ThinkingOptionId | None:
-        """The thinking level after ``current``, wrapping around; None if the model has
-        no levels to choose between."""
-        if not self.supports_thinking:
-            return None
-        options = [option.id for option in self.effective_thinking_options]
-        index = options.index(self.resolve_thinking_option(current).id)
-        return options[(index + 1) % len(options)]
-
-    def is_connected(self, credentials: Credentials) -> bool:
-        """Whether any of this model's connections has a credential."""
-        return any(connection.is_connected(credentials) for connection in self.connections)
-
-    def connection(self, credentials: Credentials) -> Connection:
-        """The connection to use: the first connected one."""
-        for connection in self.connections:
-            if connection.is_connected(credentials):
-                return connection
-        raise exceptions.LLMConfigurationError(f"Provider '{self.provider}' is not connected")

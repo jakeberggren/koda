@@ -29,7 +29,7 @@ terminal.
 ```text
 packages/koda-tui/src/koda_tui/
 ├── main.py         # Builds the app from its parts, sets up logging, and runs it
-├── settings.py     # Settings, loaded from and saved to ~/.koda/settings.json
+├── settings.py     # Settings (agent + TUI), loaded from and saved to ~/.koda/settings.json
 ├── state.py        # AppState: what the UI shows
 ├── strings.py      # All user-facing text
 ├── workspace.py    # Workspace file index for @ mentions

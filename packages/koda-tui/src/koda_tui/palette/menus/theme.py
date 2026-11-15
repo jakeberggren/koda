@@ -21,7 +21,7 @@ class ThemeMenu:
         self._context = context
 
     def open(self) -> None:
-        current = self._context.settings.theme
+        current = self._context.settings.tui_settings.theme
         items = [
             ListItem(
                 label=theme.label,
@@ -39,7 +39,9 @@ class ThemeMenu:
         )
 
     def _select(self, theme: str) -> None:
-        if self._context.settings.theme == theme:
+        if self._context.settings.tui_settings.theme == theme:
             self._context.terminal.ask_background()
         else:
-            self._context.update_settings(replace(self._context.settings, theme=theme))
+            settings = self._context.settings
+            tui_settings = replace(settings.tui_settings, theme=theme)
+            self._context.update_settings(replace(settings, tui_settings=tui_settings))

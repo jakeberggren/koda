@@ -21,7 +21,7 @@ class ThinkingMenu:
 
     def open(self) -> None:
         model = self._context.state.active_model
-        current = self._context.settings.thinking
+        current = self._context.settings.agent_settings.thinking
         items: list[ListItem[ThinkingOptionId]] = [
             ListItem(
                 label=option.label,
@@ -29,7 +29,7 @@ class ThinkingMenu:
                 current=current == option.id,
                 data=option.id,
             )
-            for option in (model.effective_thinking_options if model else [])
+            for option in (model.thinking.options if model else ())
         ]
         self._context.choose(
             strings.Palette.Thinking.TITLE,
@@ -39,4 +39,6 @@ class ThinkingMenu:
         )
 
     def _select(self, thinking: ThinkingOptionId) -> None:
-        self._context.update_settings(replace(self._context.settings, thinking=thinking))
+        settings = self._context.settings
+        agent_settings = replace(settings.agent_settings, thinking=thinking)
+        self._context.update_settings(replace(settings, agent_settings=agent_settings))
